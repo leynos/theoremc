@@ -1,5 +1,8 @@
 # Theorem file format
 
+Decision context for symbol stability and vacuity policy is recorded in
+[ADR 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
+
 ## 1. YAML schema reference (v1)
 
 ### 1.1 Document model

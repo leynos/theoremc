@@ -3,7 +3,8 @@
 Status: draft (design settled for `.theorem` syntax + Kani MVP). Scope: Rust
 workspace toolchain, compile-time correlation, and no inline Rust blocks in
 `.theorem`. Primary audience: Rust engineers who want BDD-level legibility for
-formal checks.
+formal checks. Decision record:
+[ADR 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
 
 This specification incorporates several useful structural elements (repo layout
 sketch, risk framing, and some diagrams) from the attached Blitzy exploration,

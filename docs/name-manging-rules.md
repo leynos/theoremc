@@ -2,6 +2,8 @@
 
 This document defines the current mangling rules for action resolution,
 generated Kani harness naming, and stable external theorem identifiers.
+Decision context is recorded in
+[ADR 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
 
 ## Action name mangling
 
