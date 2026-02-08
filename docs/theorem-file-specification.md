@@ -428,8 +428,8 @@ T { field1: ..., field2: ..., }
 
 using the map keys as field names.
 
-If this does not typecheck, Rust gives a hard error at build time, matching the
-“always connected” feedback loop target.
+If this does not typecheck, Rust produces a hard error at build time, providing
+the desired “always connected” feedback loop.
 
 ______________________________________________________________________
 

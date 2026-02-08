@@ -114,7 +114,7 @@ Definitions:
 - `theorem_key(P, T)`: the exact string `{P}#{T}`
 - `theorem_slug(T)`:
   - If `T` matches `^[a-z_][a-z0-9_]*$`, keep it unchanged.
-  - Otherwise convert UpperCamelCase to `snake_case` deterministically:
+  - Otherwise, convert UpperCamelCase to `snake_case` deterministically:
     1. Insert `_` between a lower-case letter or digit and an upper-case
        letter.
     2. Split acronym runs before the last capital when followed by lower-case
