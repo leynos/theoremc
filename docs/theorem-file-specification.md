@@ -489,7 +489,7 @@ Now the “no surprises” bit: how strings in `.theorem` map to Rust symbol
 identifiers.
 
 Normative mangling definitions live in `docs/name-mangling-rules.md`. This
-section summarises those rules for convenience within the schema document.
+section summarizes those rules for convenience within the schema document.
 
 ### 7.1 Action name grammar (`ActionName`)
 
