@@ -27,6 +27,9 @@
   scripts, covering toolchain choices, structure, and operational expectations.
 - [Theorem file format](theorem-file-specification.md) - Schema and behavioural
   specification for `.theorem` documents and their compile-time semantics.
+- [Theoremc development roadmap](theoremc-development-roadmap.md) - Phased
+  implementation roadmap with traceable tasks derived from design, schema,
+  mangling, and ADR requirements.
 - [Theoremc design specification](theoremc-design.md) - End-to-end architecture
   and design rationale for theoremc, including parser, code generation,
   backend, and reporting design.
