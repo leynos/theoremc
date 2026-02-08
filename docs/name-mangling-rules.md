@@ -3,7 +3,7 @@
 This document defines the current mangling rules for action resolution,
 generated Kani harness naming, and stable external theorem identifiers.
 Decision context is recorded in
-[ADR 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
+[Architecture Decision Record (ADR) 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
 
 ## Action name mangling
 
@@ -13,7 +13,8 @@ An action name in a `.theorem` file is a dot-separated path.
 - Each `Segment` must match the ASCII identifier regex
   `^[A-Za-z_][A-Za-z0-9_]*$`.
 - No segment may be a Rust reserved keyword. Reserved-keyword segments are an
-  error.
+  error. The keyword set follows the
+  [Rust language reference](https://doc.rust-lang.org/reference/keywords.html).
 
 ### Resolution target
 

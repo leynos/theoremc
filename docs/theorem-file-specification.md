@@ -1,9 +1,9 @@
 # Theorem file format
 
 Decision context for symbol stability and vacuity policy is recorded in
-[ADR 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
+[Architecture Decision Record (ADR) 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
 
-## 1. YAML schema reference (v1)
+## 1. YAML (a human-readable data-serialization format) schema reference (v1)
 
 ### 1.1 Document model
 
@@ -54,8 +54,8 @@ these aliases:
 - `Prove` also as `prove`
 - `Evidence` also as `evidence`
 
-If you implement aliases, keep them shallow and predictable (avoid multiple
-spellings for the same key beyond case).
+If aliases are implemented, they should remain shallow and predictable (avoid
+multiple spellings for the same key beyond case).
 
 ______________________________________________________________________
 
@@ -68,13 +68,15 @@ These definitions make the rest unambiguous.
 An ASCII identifier string matching:
 
 - Regex: `^[A-Za-z_][A-Za-z0-9_]*$`
-- Additionally, it **MUST NOT** be a Rust reserved keyword (e.g. `fn`, `match`,
-  `type`). If it is, treat as an error (don’t silently fix it in the author’s
-  file).
+- Additionally, it **MUST NOT** be a Rust reserved keyword as defined in the
+  [Rust language reference](https://doc.rust-lang.org/reference/keywords.html)
+  (e.g. `fn`, `match`, `type`). If it is, treat it as an error (don’t silently
+  fix it in the author’s file).
 
 Rationale: the exploratory spec already required theorem names to be valid
-identifiers; we now lock down the exact rule for predictability and codegen
-stability.
+identifiers; this specification locks down the exact rule for predictable,
+stable code generation. The ASCII restriction is intentional in v1 to keep
+symbol generation deterministic across tooling and platform boundaries.
 
 ### 2.2 `Tag` (recommended format: lower-kebab or lower-snake)
 
@@ -119,9 +121,9 @@ Example: `BidirectionalLinksCommitPath3Nodes`
 - Type: string (can be YAML block string)
 - Constraint: must be non-empty after trimming.
 
-This is the BDD “scenario title + description” equivalent; we force it to exist
-to keep proofs socially legible. (This mirrors the exploratory spec’s
-requirement that `about` is mandatory.)
+This is the behaviour-driven development (BDD) “scenario title + description”
+equivalent; the field is mandatory to keep proofs socially legible. (This
+mirrors the exploratory spec’s requirement that `about` is mandatory.)
 
 ### 3.4 `Tags` (list of `Tag`)
 
@@ -202,9 +204,9 @@ A `LetBinding` is **exactly one** of:
 - `{ call: ActionCall }`
 - `{ must: ActionCall }`
 
-We explicitly disallow `maybe` in `Let` for v1, because “binding exists only in
-some paths” creates scoping complexity that harms readability and makes later
-steps hard to validate.
+The v1 schema explicitly disallows `maybe` in `Let`, because “binding exists
+only in some paths” creates scoping complexity that harms readability and makes
+later steps hard to validate.
 
 Example (from the settled syntax):
 
@@ -268,7 +270,8 @@ For v1, Kani is the MVP backend, so `Evidence.kani` is the primary required
 config for Kani-targeted theorems.
 
 The exploratory work already defined “Evidence must specify at least one
-backend” and “unwind required for kani”; we now lock that down in schema form.
+backend” and “unwind required for kani”; this specification now locks that down
+in schema form.
 
 ______________________________________________________________________
 
@@ -342,8 +345,8 @@ More precisely:
 
   - `must` simply calls it; no additional obligation is created.
 
-These semantics match what we already agreed in conversation and what the
-exploratory spec also described for `must`.
+These semantics match the settled design conversation and the exploratory
+specification’s description of `must`.
 
 #### 4.2.3 `maybe`
 
@@ -416,8 +419,8 @@ Any other map value is treated as a candidate **struct literal**.
 
 ### 5.4 Struct literal synthesis
 
-If an arg value is a YAML map and you are passing it into an action parameter
-of some struct type `T`, the generator emits:
+If an arg value is a YAML map passed into an action parameter of some struct
+type `T`, the generator emits:
 
 ```rust
 T { field1: ..., field2: ..., }
@@ -425,8 +428,8 @@ T { field1: ..., field2: ..., }
 
 using the map keys as field names.
 
-If this doesn’t typecheck, Rust gives you a hard error at build time (which is
-exactly the “always connected” feedback loop we want).
+If this does not typecheck, Rust gives a hard error at build time, matching the
+“always connected” feedback loop target.
 
 ______________________________________________________________________
 
@@ -439,7 +442,7 @@ ______________________________________________________________________
 For v1, define:
 
 - `kani` (optional but required if the theorem declares `Tags`/intent for kani
-  or if you run kani suite)
+  or if the Kani suite is run)
 - `verus` (optional; placeholder config only for now; real Verus semantics land
   post-MVP)
 - `stateright` (optional; placeholder)
@@ -460,8 +463,8 @@ this schema supports that while keeping Kani MVP crisp.
   - `UNREACHABLE`
   - `UNDETERMINED`
 
-`expect` exists for report gating (and for negative tests where you *want* a
-counterexample).
+`expect` exists for report gating (and for negative tests where a
+counterexample is expected).
 
 - `allow_vacuous` (optional): boolean, default `false`
 - `vacuity_because` (required when `allow_vacuous: true`): non-empty string
@@ -485,6 +488,9 @@ ______________________________________________________________________
 Now the “no surprises” bit: how strings in `.theorem` map to Rust symbol
 identifiers.
 
+Normative mangling definitions live in `docs/name-mangling-rules.md`. This
+section summarises those rules for convenience within the schema document.
+
 ### 7.1 Action name grammar (`ActionName`)
 
 An action name is a dot-separated path:
@@ -498,8 +504,8 @@ Examples:
 - `hnsw.commit_apply`
 - `hnsw.graph_with_capacity`
 
-I recommend you enforce *at least one dot* so authors naturally namespace their
-actions and avoid collisions.
+Enforcing *at least one dot* is recommended so authors naturally namespace
+their actions and avoid collisions.
 
 ### 7.2 Action resolution rule (string → Rust function path)
 
@@ -540,16 +546,16 @@ Collision checks:
 - Detect duplicate canonical action names and fail with source locations.
 - Detect duplicate mangled action identifiers and fail with all colliding names.
 
-This rule gives you compile-time binding without relying on link-time
-registries (inventory remains useful for reporting, but not required for
-resolution). This directly supports the “always connected” pattern described in
-the exploratory work.
+This rule gives compile-time binding without relying on link-time registries
+(`inventory` remains useful for reporting, but is not required for resolution).
+This directly supports the “always connected” pattern described in the
+exploratory work.
 
 ### 7.3 Generated module naming (file path → Rust module)
 
 Each `.theorem` file expands into a generated Rust module name that must be:
 
-- stability across builds
+- stable across builds
 - uniqueness across files
 - human-recognizable names
 - no collisions from sanitization
@@ -591,18 +597,18 @@ Module:
 mod __theoremc__file__theorems__bidirectional__a1b2c3d4e5f6 { ... }
 ```
 
-Why the hash: if you have `my-file.theorem` and `my_file.theorem`, both mangle
-to the same identifier; the hash prevents collision while still keeping names
-readable.
+Why the hash: if both `my-file.theorem` and `my_file.theorem` exist, both
+mangle to the same identifier; the hash prevents collision while still keeping
+names readable.
 
 ### 7.4 Generated harness function naming (theorem name → Kani harness)
 
-Kani lets you select a single proof harness using `--harness <name>`, and it
+Kani supports selecting a single proof harness using `--harness <name>`, and it
 supports using the *full module-qualified harness name* when needed (e.g.
 `ptr::unique::verify::check_new`), with Kani output printing the “full name” it
 is checking.[^3]
 
-We should exploit that, but also keep the simple name unique so
+This should be exploited while also keeping the simple name unique so
 `--harness theorem__foo` usually works.
 
 Define:
@@ -681,11 +687,12 @@ ______________________________________________________________________
 
 ## 8. Minimal Rust struct skeleton (to make implementation straightforward)
 
-This is not “extra design”; it’s the schema expressed in the shape you’ll
-actually deserialize into.
+This is not “extra design”; it is the schema expressed in the shape actually
+deserialized into.
 
-You’ll implement this with `serde` derives and deserialize using `serde-saphyr`
-(e.g., `serde_saphyr::from_str`, or multi-doc APIs), as required.[^1]
+This can be implemented with `serde` derives and deserialized using
+`serde-saphyr` (e.g., `serde_saphyr::from_str`, or multi-doc APIs), as
+required.[^1]
 
 ```rust
 // Pseudocode-level skeleton; fields omitted for brevity.
@@ -809,9 +816,9 @@ pub struct KaniEvidence {
 }
 ```
 
-(You’ll likely wrap `serde_saphyr::Value` into your own `Value` enum so you can
-enforce “no nulls”, implement `{ref:}`, `{literal:}` wrappers, and do typed
-struct-literal emission cleanly.)
+(A wrapper around `serde_saphyr::Value` is likely useful so a project-specific
+`Value` enum can enforce “no nulls”, implement `{ref:}` and `{literal:}`
+wrappers, and support typed struct-literal emission cleanly.)
 
 [^1]: <https://docs.rs/serde-saphyr?utm_source=chatgpt.com> "serde_saphyr -
       Rust"

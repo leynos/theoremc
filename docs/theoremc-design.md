@@ -2,14 +2,31 @@
 
 Status: draft (design settled for `.theorem` syntax + Kani MVP). Scope: Rust
 workspace toolchain, compile-time correlation, and no inline Rust blocks in
-`.theorem`. Primary audience: Rust engineers who want BDD-level legibility for
-formal checks. Decision record:
-[ADR 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
+`.theorem`. Primary audience: Rust engineers who want behaviour-driven
+development (BDD)-level legibility for formal checks. Decision record:
+[Architecture Decision Record (ADR) 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
 
 This specification incorporates several useful structural elements (repo layout
 sketch, risk framing, and some diagrams) from the attached Blitzy exploration,
-but it treats our most recent conversation as the source of truth for the
-semantics and the “no inline Rust blocks” rule.
+but it treats the most recent design conversation as the source of truth for
+the semantics and the “no inline Rust blocks” rule.
+
+______________________________________________________________________
+
+## 0. Normative references (single source of truth)
+
+This document provides architecture-level intent and implementation shape. To
+reduce drift risk, normative definitions are centralized:
+
+- `docs/theorem-file-specification.md` is normative for theorem schema, step
+  semantics, argument shaping, and evidence fields.
+- `docs/name-mangling-rules.md` is normative for action and harness mangling,
+  collision checks, and external theorem ID rules.
+- `docs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md` records
+  accepted rationale and trade-offs.
+
+If wording differs between documents, the normative references above take
+precedence.
 
 ______________________________________________________________________
 
@@ -24,7 +41,7 @@ failed *adoption* not because it is useless, but because it creates artefacts
 that are hard to read, hard to review, and hard to keep in sync with the code.
 
 `theoremc` aims to turn proofs into first-class engineering artefacts with
-BDD-like social ergonomics:
+behaviour-driven development (BDD)-like social ergonomics:
 
 - a theorem is a human-readable claim,
 - with explicit assumptions and boundedness,
@@ -135,9 +152,9 @@ ______________________________________________________________________
 
 ### 4.2 Settled syntax (source-of-truth)
 
-This is the settled shape (the “HNSW/Kani harnesses, no inline Rust blocks”
-form). It’s YAML-first, but supports typed action calls and the
-`assert/because` pairing:
+This is the settled shape (the “hierarchical navigable small world (HNSW)/Kani
+harnesses, no inline Rust blocks” form). It’s YAML-first, but supports typed
+action calls and the `assert/because` pairing:
 
 ```yaml
 Theorem: BidirectionalLinksCommitPath3Nodes
@@ -253,8 +270,8 @@ Each theorem document supports the following sections:
   “fixtures / derived constants”.
 
 - `Do:`
-  Required (MVP; may be empty for pure property theorems, but practically you
-  want at least one action or witness). This is a sequence of steps.
+  Required (MVP; may be empty for pure property theorems, but practical suites
+  should include at least one action or witness). This is a sequence of steps.
 
 - `Prove:`
   Required. Assertions-with-reasons.
@@ -291,7 +308,7 @@ Semantics (Kani MVP):
 - If `as:` is present, bind the return value to that name.
 
 Validation rule (MVP): if an action returns `Result` or `Option`, a `call` step
-must bind it with `as:` (otherwise you silently discard potential failure).
+must bind it with `as:` (otherwise potential failure is silently discarded).
 Prefer `must` when the intent is “this cannot fail”.
 
 #### 4.4.2 `must`
@@ -378,9 +395,9 @@ Evidence:
 - `allow_vacuous`: optional boolean, default `false`.
 - `vacuity_because`: required when `allow_vacuous: true`.
 
-In MVP, we treat `UNREACHABLE` and `UNDETERMINED` as failures by default unless
-explicitly expected, because “green but vacuous/unknown” is a reliability
-hazard.[^4]
+In MVP, `UNREACHABLE` and `UNDETERMINED` are treated as failures by default
+unless explicitly expected, because “green but vacuous/unknown” is a
+reliability hazard.[^4]
 
 ______________________________________________________________________
 
@@ -400,8 +417,8 @@ files. This ensures:
 
 ### 5.2 Action naming and resolution
 
-We need to resolve `action: hnsw.attach_node` into a *real function path* at
-compile time.
+The compiler must resolve `action: hnsw.attach_node` into a *real function
+path* at compile time.
 
 Key constraint: Rust procedural macros cannot query link-time registries (like
 `inventory`) during macro expansion. Therefore, compile-time resolution must be
@@ -421,7 +438,7 @@ action "hnsw.attach_node"
   "crate::theorem_actions::hnsw__attach_unode__h3f6b2a80c9d1"
 ```
 
-The mangling algorithm follows `docs/name-manging-rules.md`:
+The mangling algorithm follows `docs/name-mangling-rules.md`:
 
 - Escape each segment by replacing `_` with `_u`.
 - Join escaped segments with `__`.
@@ -442,7 +459,7 @@ binding point.
 
 ### 5.3 Optional attribute macro (documentation + reporting)
 
-We still provide:
+An additional attribute macro remains available:
 
 ```rust
 #[theorem_action("hnsw.attach_node")]
@@ -456,8 +473,8 @@ Purposes:
 - enable future tooling (docs, coverage, cross-ref navigation).
 
 For metadata collection, `inventory` is appropriate: it provides typed
-distributed plugin registration with no central list requirement.[^5] (We use
-it for reporting and coverage, not for compile-time resolution.)
+distributed plugin registration with no central list requirement.[^5] (This is
+used for reporting and coverage, not for compile-time resolution.)
 
 ### 5.4 Action signature rules
 
@@ -544,7 +561,7 @@ If a variable is ever passed as `&mut`, the generator declares it
 
 If a theorem uses a variable after it is moved into a by-value parameter, that
 is a normal Rust move error and is treated as a theorem authoring error
-(surfaced at compile time). We do not auto-clone.
+(surfaced at compile time). Auto-cloning is not applied.
 
 ______________________________________________________________________
 
@@ -583,8 +600,8 @@ All diagnostics must be source-located and actionable.
 
 `serde-saphyr` already focuses on good location information; its docs describe
 error messages that include snippets and precise location information, even
-across YAML anchors.[^3] We wrap those into `miette` diagnostics so errors in
-theorem files point to the exact line/column.
+across YAML anchors.[^3] These are wrapped into `miette` diagnostics so errors
+in theorem files point to the exact line/column.
 
 ______________________________________________________________________
 
@@ -592,7 +609,8 @@ ______________________________________________________________________
 
 ### 7.1 `build.rs` suite discovery
 
-To get “drop a file in `theorems/` and it participates”, we use a build script:
+To get “drop a file in `theorems/` and it participates”, the design uses a
+build script:
 
 - scan `theorems/` for `*.theorem`,
 - emit `cargo::rerun-if-changed=<path>` for the directory and each file,
@@ -604,8 +622,8 @@ Cargo documents that `cargo::rerun-if-changed=PATH` reruns the build script
 when the file changes, and if the path is a directory Cargo scans it for
 modifications.[^6]
 
-We also emit per-file rerun lines for robustness across Cargo versions and edge
-cases.
+Per-file rerun lines are also emitted for robustness across Cargo versions and
+edge cases.
 
 ### 7.2 The `theorem_file!()` proc macro
 
@@ -625,13 +643,13 @@ For each `.theorem` file, the macro expands to:
   - `#[kani::unwind(n)]` (from `Evidence.kani.unwind`)[^2]
 
 Kani explicitly notes that naively writing `#[kani::proof]` in code will make a
-normal `cargo build` fail unless you gate it (because the `kani` crate is not
+normal `cargo build` fail unless it is gated (because the `kani` crate is not
 present in non-Kani builds).[^8] Therefore, theoremc-generated harnesses are
 always behind `#[cfg(kani)]` (or an equivalent feature gate).
 
 ### 7.3 Binding probes
 
-We generate “typecheck probes” to make drift obvious:
+“Typecheck probes” are generated to make drift obvious:
 
 - For each referenced action function, emit a
   `let _: fn(...) -> ... = crate::theorem_actions::...;`
@@ -730,7 +748,7 @@ ______________________________________________________________________
 
 ## 10. Enforcement (guardrails, not the primary binding mechanism)
 
-We use enforcement to discourage bypass, not to keep things in sync.
+Enforcement is used to discourage bypass, not to keep things in sync.
 
 `theoremc-dylint` provides lints using Dylint, which runs Rust lints from
 dynamic libraries.[^10]
@@ -749,7 +767,7 @@ ______________________________________________________________________
 
 The layout below follows the attached exploration’s successful separation of
 concerns, but updates parsing to `serde-saphyr` and corrects the
-action-resolution story to match our compile-time binding rules.
+action-resolution story to match the compile-time binding rules.
 
 ```plaintext
 /
@@ -795,8 +813,8 @@ Mitigation:
 - treat `UNREACHABLE` as failure by default, surfaced explicitly in reports,
   per Kani’s definition.[^4]
 - support nontriviality witnesses (`cover`/`Witness`).
-- encourage `maybe` branching and “sometimes” witnesses when we add Stateright
-  later.
+- encourage `maybe` branching and “sometimes” witnesses when Stateright is
+  added later.
 
 ### 12.2 State-space explosion
 
@@ -806,7 +824,7 @@ laptop”.
 Mitigation:
 
 - require explicit `Evidence.kani.unwind` so bounds are visible.[^2]
-- warn in docs when a theorem contains many `maybe` steps or nested leuristic).
+- warn in docs when a theorem contains many `maybe` steps or nested heuristics.
 - recommend action design that keeps search space tight (fixture builders,
   bounded domains).
 
@@ -892,10 +910,10 @@ they must not be able to crash the compiler toolchain via malicious YAML.
 
 ______________________________________________________________________
 
-If you want to push this spec one notch further into “ready for
-implementation”, the next most valuable thing would be a complete, concrete
-YAML schema reference (field-by-field) and the precise mangling rules for
-action names and harness names. The rest is mostly engineering.
+To push this specification one notch further into “ready for implementation”,
+the next most valuable addition would be a complete, concrete YAML schema
+reference (field-by-field) and the precise mangling rules for action names and
+harness names. The remaining work is mostly engineering.
 
 [^1]: <https://docs.rs/crate/serde-saphyr/latest?utm_source=chatgpt.com>
       "serde-saphyr 0.0.7"

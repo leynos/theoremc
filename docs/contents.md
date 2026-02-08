@@ -2,7 +2,7 @@
 
 - [Documentation contents](contents.md) - Index of all documentation files in
   this directory.
-- [ADR 0001: theorem symbol stability and non-vacuity policy](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- [Architecture Decision Record (ADR) 0001: theorem symbol stability and non-vacuity policy](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   - Decision record for injective symbol mangling, explicit reference
   semantics, non-vacuity requirements, and theorem ID migration.
 - [Navigating code complexity: a guide for implementers and maintainers](complexity-antipatterns-and-refactoring-strategies.md)
@@ -11,7 +11,7 @@
 - [Documentation style guide](documentation-style-guide.md) - Authoring rules
   for spelling, formatting, Markdown structure, diagrams, and documentation
   consistency.
-- [Name mangling rules](name-manging-rules.md) - Normative mapping rules for
+- [Name mangling rules](name-mangling-rules.md) - Normative mapping rules for
   theorem action names, generated Kani harness symbols, and external theorem
   identifiers.
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)

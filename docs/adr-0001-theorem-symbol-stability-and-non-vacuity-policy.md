@@ -136,6 +136,6 @@ rename clarity.
 
 ## Related documents
 
-- `docs/name-manging-rules.md`
+- `docs/name-mangling-rules.md`
 - `docs/theorem-file-specification.md`
 - `docs/theoremc-design.md`
