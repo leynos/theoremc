@@ -1,0 +1,744 @@
+# Theorem file format
+
+## 1. YAML schema reference (v1)
+
+### 1.1 Document model
+
+A `.theorem` file contains either:
+
+- a single YAML document, or
+- multiple YAML documents separated by `---` (each document defines one
+  theorem).
+
+Implementation note: `serde-saphyr` supports deserializing multiple YAML
+documents into a `Vec<T>` (and it aims to be panic-free on malformed input and
+avoid `unsafe` in library code).[^1]
+
+### 1.2 Conformance rules
+
+These rules are *normative* for v1:
+
+- Unknown top-level keys: **MUST error** (`deny_unknown_fields` behaviour).
+- Required keys missing: **MUST error**.
+- Scalar types wrong (e.g., `Tags: foo` instead of `Tags: [foo]`): **MUST
+  error**.
+- `Assume.expr` and `Prove.assert`:
+
+  - **MUST parse as Rust expressions** (syntactic validation using `syn`).
+  - **MUST be single expressions** (no statement blocks, no `let`, no `for`,
+    etc.).
+- Theorem names:
+
+  - **MUST be unique per crate** (within the theorem suite included in that
+    crate).
+  - **MUST be a valid Rust identifier in the restricted ASCII subset** (details
+    below). This matches the exploratory work’s “valid Rust identifier”
+    validation rule, now made precise.
+
+### 1.3 Lower-case alias recommended
+
+Canonical keys use TitleCase. For author ergonomics, the parser **MAY** accept
+these aliases:
+
+- `Theorem` also as `theorem`
+- `About` also as `about`
+- `Tags` also as `tags`
+- `Given` also as `given`
+- `Forall` also as `forall`
+- `Assume` also as `assume`
+- `Let` also as `let`
+- `Do` also as `do`
+- `Prove` also as `prove`
+- `Evidence` also as `evidence`
+
+If you implement aliases, keep them shallow and predictable (avoid multiple
+spellings for the same key beyond case).
+
+______________________________________________________________________
+
+## 2. Primitive schema types (building blocks)
+
+These definitions make the rest unambiguous.
+
+### 2.1 `Identifier`
+
+An ASCII identifier string matching:
+
+- Regex: `^[A-Za-z_][A-Za-z0-9_]*$`
+- Additionally, it **MUST NOT** be a Rust reserved keyword (e.g. `fn`, `match`,
+  `type`). If it is, treat as an error (don’t silently fix it in the author’s
+  file).
+
+Rationale: the exploratory spec already required theorem names to be valid
+identifiers; we now lock down the exact rule for predictability and codegen
+stability.
+
+### 2.2 `Tag` (recommended format: lower-kebab or lower-snake)
+
+- No semantic impact; it’s metadata.
+
+### 2.3 `RustExpr`
+
+- A string containing a Rust expression.
+- It **MUST** parse as `syn::Expr`.
+- It is assumed to typecheck to `bool` in places that require a boolean.
+
+### 2.4 `RustType`
+
+- A string containing a Rust type expression.
+- It **MUST** parse as `syn::Type`.
+
+Examples: `"u64"`, `"crate::account::Account"`, `"std::sync::Arc<MyType>"`,
+`"Option<&'static str>"`.
+
+______________________________________________________________________
+
+## 3. Top-level schema: `TheoremDoc`
+
+A theorem document is a YAML mapping with these fields.
+
+### 3.1 `Schema`
+
+- Type: integer
+- Optional
+- Default: `1`
+- Purpose: forwards compatibility for future schema changes.
+
+### 3.2 `Theorem` (required)
+
+- Type: `Identifier`
+- Uniqueness: must be unique across all theorem docs compiled into the crate.
+
+Example: `BidirectionalLinksCommitPath3Nodes`
+
+### 3.3 `About` (required)
+
+- Type: string (can be YAML block string)
+- Constraint: must be non-empty after trimming.
+
+This is the BDD “scenario title + description” equivalent; we force it to exist
+to keep proofs socially legible. (This mirrors the exploratory spec’s
+requirement that `about` is mandatory.)
+
+### 3.4 `Tags` (list of `Tag`)
+
+- Default: `[]`
+
+### 3.5 `Given` (optional)
+
+- Type: list of strings
+- Default: `[]`
+- Semantics: narrative only; no codegen.
+
+### 3.6 `Forall` (optional)
+
+- Type: mapping of `Identifier -> RustType`
+- Default: `{}`
+
+Example:
+
+```yaml
+Forall:
+  a: Account
+  amount: u64
+```
+
+Semantics (Kani backend): each entry becomes a symbolic input
+`kani::any::<Ty>()`.
+
+Implementation note: preserve YAML map order by deserializing into an
+insertion-ordered map (e.g., `IndexMap`) so generated harnesses stay stable
+under diffs.
+
+### 3.7 `Assume` (optional)
+
+- Type: list of `Assumption`
+- Default: `[]`
+
+Each `Assumption` is a mapping:
+
+- `expr` (required): `RustExpr` (must parse)
+- `because` (required): non-empty string explanation
+
+Example:
+
+```yaml
+Assume:
+  - expr: "amount <= (u64::MAX - a.balance)"
+    because: "prevent overflow in deposit"
+```
+
+Semantics (Kani): each becomes `kani::assume(<expr>);` (with optional
+tracing/report metadata).
+
+### 3.8 `Let` (optional)
+
+- Type: mapping of `Identifier -> LetBinding`
+- Default: `{}`
+
+Each binding defines a named value computed before `Do:` executes. Use it for
+fixtures and derived constants.
+
+A `LetBinding` is **exactly one** of:
+
+- `{ call: ActionCall }`
+- `{ must: ActionCall }`
+
+We explicitly disallow `maybe` in `Let` for v1, because “binding exists only in
+some paths” creates scoping complexity that harms readability and makes later
+steps hard to validate.
+
+Example (from the settled syntax):
+
+```yaml
+Let:
+  params:
+    must:
+      action: hnsw.params
+      args: { max_connections: 1, max_level: 2 }
+  graph:
+    call:
+      action: hnsw.graph_with_capacity
+      args: { params: params, capacity: 3 }
+```
+
+Semantics:
+
+- `call`: evaluate the action; bind the result to the `Let` key.
+- `must`: evaluate the action; prove it cannot fail (Result/Option handling);
+  bind its unwrapped success value.
+
+### 3.9 `Do` (optional, but practically required)
+
+- Type: list of `Step`
+- Default: `[]`
+
+Each `Step` is exactly one of:
+
+- `{ call: ActionCall }`
+- `{ must: ActionCall }`
+- `{ maybe: MaybeBlock }`
+
+(Details below.)
+
+### 3.10 `Prove` (required)
+
+- Type: list of `Assertion`
+- Must be non-empty.
+
+Each `Assertion` is a mapping:
+
+- `assert` (required): `RustExpr` (must parse)
+- `because` (required): non-empty string
+
+Example:
+
+```yaml
+Prove:
+  - assert: "hnsw.is_bidirectional(&graph)"
+    because: "bidirectional invariant holds after commit-path reconciliation"
+```
+
+Semantics (Kani): emits `assert!(<expr>, "<because>");`.
+
+### 3.11 `Evidence` (required)
+
+- Type: `Evidence`
+- Must specify at least one backend configuration.
+
+For v1, Kani is the MVP backend, so `Evidence.kani` is the primary required
+config for Kani-targeted theorems.
+
+The exploratory work already defined “Evidence must specify at least one
+backend” and “unwind required for kani”; we now lock that down in schema form.
+
+______________________________________________________________________
+
+## 4. Step and action schemas
+
+### 4.1 `ActionCall`
+
+An `ActionCall` is a mapping:
+
+- `action` (required): `ActionName` (see below)
+- `args` (required): mapping of `Identifier -> Value`
+- `as` (optional): `Identifier`
+
+Example:
+
+```yaml
+call:
+  action: account.deposit
+  args: { account: a, amount: amount }
+  as: b
+```
+
+Binding rules:
+
+- In `Do:`:
+
+  - If `as` exists, the call’s return value is bound to that name.
+  - If `as` is absent:
+
+    - Allowed only if the return type is `()` (infallible, no value).
+    - Otherwise, **error** (prevents accidentally discarding important results
+      or failures).
+- In `Let:`:
+
+  - The `Let` key is the binding name; `as` is ignored (and should error if
+    present, to prevent confusion).
+
+### 4.2 `Step` variants
+
+#### 4.2.1 `call`
+
+```yaml
+- call:
+    action: hnsw.add_bidirectional_edge
+    args: { graph: graph, origin: 0, target: 2, level: 1 }
+```
+
+Semantics: invokes the action.
+
+#### 4.2.2 `must`
+
+```yaml
+- must:
+    action: hnsw.attach_node
+    args: { graph: graph, node: 2, level: 1, sequence: 2 }
+```
+
+Semantics: invokes the action and proves it cannot fail under current
+assumptions.
+
+More precisely:
+
+- If the action returns `Result<T, E>`:
+
+  - `must` generates an obligation `assert!(res.is_ok(), "...")` then unwraps
+    to `T`.
+- If the action returns `Option<T>`:
+
+  - `must` generates `assert!(opt.is_some(), "...")` then unwraps to `T`.
+- If the action returns `T` or `()`:
+
+  - `must` simply calls it; no additional obligation is created.
+
+These semantics match what we already agreed in conversation and what the
+exploratory spec also described for `must`.
+
+#### 4.2.3 `maybe`
+
+- `because` (required): non-empty string explanation
+- `do` (required): list of `Step`
+
+Example:
+
+```yaml
+- maybe:
+    because: "optional baseline edge for state space exploration"
+    do:
+      - call:
+          action: hnsw.add_bidirectional_edge
+          args: { graph: graph, origin: 0, target: 1, level: 0 }
+```
+
+Semantics: symbolic branching.
+
+In Kani, this compiles to something morally equivalent to:
+
+```rust
+let b: bool = kani::any();
+if b { /* nested steps */ }
+```
+
+So the model checker explores both branches. The exploratory spec also states
+this interpretation of `maybe`.
+
+______________________________________________________________________
+
+## 5. Value forms and how they compile
+
+`args:` values are YAML values with a small amount of interpretation to
+preserve friendliness while staying typecheckable.
+
+### 5.1 `Value` forms
+
+A `Value` is one of:
+
+1. YAML integer → Rust integer literal (`0`, `1`, `32`, …)
+2. YAML boolean → Rust boolean literal (`true`/`false`)
+3. YAML string → either a variable reference or a string literal (see below)
+4. YAML list → Rust `vec![...]`
+5. YAML map → either a struct literal or an explicit wrapper form
+
+### 5.2 Variable reference vs string literal (string scalars)
+
+For YAML string scalars in `args:`:
+
+- If the string exactly equals an in-scope binding name (`Forall` var, `Let`
+  binding, or a previous `Do` binding), interpret it as a **variable
+  reference**.
+- Otherwise interpret it as a **string literal**.
+
+To force a string literal that happens to match a variable name, use:
+
+```yaml
+label: { literal: "graph" }
+```
+
+### 5.3 Explicit wrappers (map values)
+
+A YAML map value with one of these sentinel keys takes a special meaning:
+
+- `{ ref: <Identifier> }` → force variable reference
+- `{ literal: <String> }` → force string literal
+
+Any other map value is treated as a candidate **struct literal**.
+
+### 5.4 Struct literal synthesis
+
+If an arg value is a YAML map and you are passing it into an action parameter
+of some struct type `T`, the generator emits:
+
+```rust
+T { field1: ..., field2: ..., }
+```
+
+using the map keys as field names.
+
+If this doesn’t typecheck, Rust gives you a hard error at build time (which is
+exactly the “always connected” feedback loop we want).
+
+______________________________________________________________________
+
+## 6. Evidence schema
+
+### 6.1 `Evidence`
+
+`Evidence` is a mapping of backend name → backend config.
+
+For v1, define:
+
+- `kani` (optional but required if the theorem declares `Tags`/intent for kani
+  or if you run kani suite)
+- `verus` (optional; placeholder config only for now; real Verus semantics land
+  post-MVP)
+- `stateright` (optional; placeholder)
+
+The exploratory spec includes multi-backend intent and a Kani-first ordering;
+this schema supports that while keeping Kani MVP crisp.
+
+### 6.2 `Evidence.kani`
+
+- `unwind` (required): positive integer
+  Compiles to `#[kani::unwind(<n>)]`. Kani documents `#[kani::unwind]` as the
+  mechanism to control loop unwinding bounds.[^2]
+
+- `expect` (required): enum string:
+
+  - `SUCCESS`
+  - `FAILURE`
+  - `UNREACHABLE`
+  - `UNDETERMINED`
+
+`expect` exists for report gating (and for negative tests where you *want* a
+counterexample).
+
+### 6.3 `Evidence.verus` (placeholder)
+
+A mapping (not required for MVP):
+
+- `mode` (optional): enum string such as `proof`
+
+This exists only to keep the schema stable for the multi-backend story already
+outlined in exploratory work and examples.
+
+______________________________________________________________________
+
+## 7. Precise mangling rules
+
+Now the “no surprises” bit: how strings in `.theorem` map to Rust symbol
+identifiers.
+
+### 7.1 Action name grammar (`ActionName`)
+
+An action name is a dot-separated path:
+
+- Grammar: `Segment ("." Segment)+`
+- Each `Segment` must match `Identifier`.
+
+Examples:
+
+- `account.deposit`
+- `hnsw.commit_apply`
+- `hnsw.graph_with_capacity`
+
+I recommend you enforce *at least one dot* so authors naturally namespace their
+actions and avoid collisions.
+
+### 7.2 Action resolution rule (string → Rust function path)
+
+**Canonical action module:** `crate::theorem_actions`
+
+**Mangled Rust function identifier:** join action segments with `__` (double
+underscore).
+
+So:
+
+- `hnsw.attach_node` → `crate::theorem_actions::hnsw__attach_node`
+- `account.withdraw` → `crate::theorem_actions::account__withdraw`
+- `hnsw.graph.with_capacity` →
+  `crate::theorem_actions::hnsw__graph__with_capacity`
+
+Reserved keywords:
+
+- If any segment equals a Rust keyword, error out (don’t try to “fix” it). This
+  keeps author intent explicit and avoids spooky collisions.
+
+This rule gives you compile-time binding without relying on link-time
+registries (inventory remains useful for reporting, but not required for
+resolution). This directly supports the “always connected” pattern described in
+the exploratory work.
+
+### 7.3 Generated module naming (file path → Rust module)
+
+Each `.theorem` file expands into a generated R
+
+- stability across builds
+- uniqueness across files
+- human-recognizable names
+- no collisions from sanitization
+
+Define:
+
+- Input: the literal path string `P` passed to `theorem_file!("P")` (relative
+  to crate root).
+
+- `path_stem(P)`: remove the trailing `.theorem` extension if present.
+
+- `path_mangle(P)`:
+
+  1. Replace `/` and `\` with `__`
+  2. Replace any character not in `[A-Za-z0-9_]` with `_`
+  3. Collapse consecutive `_` into a single `_`
+  4. Lowercase
+  5. If it starts with a digit, prefix `_`
+
+- `hash8(P)`: compute `blake3(P.as_bytes())`, take the first 8 hex chars of the
+  digest.
+
+Generated module name:
+
+```plaintext
+__theoremc__file__{path_mangle(path_stem(P))}__{hash8(P)}
+```
+
+Example:
+
+- `P = "theorems/bidirectional.theorem"`
+- `path_stem(P) = "theorems/bidirectional"`
+- `path_mangle(...) = "theorems__bidirectional"`
+- `hash8(P) = "a1b2c3d4"` (illustrative)
+
+Module:
+
+```plaintext
+mod __theoremc__file__theorems__bidirectional__a1b2c3d4 { ... }
+```
+
+Why the hash: if you have `my-file.theorem` and `my_file.theorem`, both mangle
+to the same identifier; the hash prevents collision while still keeping names
+readable.
+
+### 7.4 Generated harness function naming (theorem name → Kani harness)
+
+Kani lets you select a single proof harness using `--harness <name>`, and it
+supports using the *full module-qualified harness name* when needed (e.g.
+`ptr::unique::verify::check_new`), with Kani output printing the “full name” it
+is checking.[^3]
+
+We should exploit that, but also keep the simple name unique so
+`--harness theorem__foo` usually works.
+
+Define:
+
+- `theorem_id` = the `Theorem` field (an `Identifier`).
+
+- `theorem_snake(theorem_id)`:
+
+  - If `theorem_id` already matches `^[a-z_][a-z0-9_]*$`, keep it.
+  - Else convert UpperCamelCase → snake_case with this deterministic rule:
+
+    - Insert `_` between a lower/digit and an upper (e.g. `Path3` → `path_3`)
+    - Split acronym runs before the last capital when followed by a lowercase
+      (e.g. `HNSWInvariant` → `hnsw_invariant`)
+    - Lowercase everything
+
+- Harness function identifier:
+
+```plaintext
+theorem__{theorem_snake(theorem_id)}
+```
+
+We also enforce:
+
+- Theorem names must be unique across the crate’s theorem suite → harness
+  function names become unique.
+
+### 7.5 Full harness path layout
+
+Within the per-file module, generate backend submodules. For Kani:
+
+```rust
+#[cfg(kani)]
+mod kani {
+    #[kani::proof]
+    #[kani::unwind(N)]
+    pub fn theorem__...() { ... }
+}
+```
+
+So the *full harness name* Kani can use is:
+
+```plaintext
+__theoremc__file__...::kani::theorem__...
+```
+
+And the *short harness name* (what engineers usually type) is:
+
+```plaintext
+theorem__...
+```
+
+If there’s ever ambiguity (it shouldn’t happen if theorem names are unique, but
+bugs happen), Kani still supports the full name path.[^3]
+
+______________________________________________________________________
+
+## 8. Minimal Rust struct skeleton (to make implementation straightforward)
+
+This is not “extra design”; it’s the schema expressed in the shape you’ll
+actually deserialize into.
+
+You’ll implement this with `serde` derives and deserialize using `serde-saphyr`
+(e.g., `serde_saphyr::from_str`, or multi-doc APIs), as required.[^1]
+
+```rust
+// Pseudocode-level skeleton; fields omitted for brevity.
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TheoremDoc {
+    #[serde(default)]
+    pub schema: Option<u32>, // "Schema"
+
+    #[serde(rename = "Theorem", alias = "theorem")]
+    pub theorem: String,
+
+    #[serde(rename = "About", alias = "about")]
+    pub about: String,
+
+    #[serde(rename = "Tags", alias = "tags", default)]
+    pub tags: Vec<String>,
+
+    #[serde(rename = "Given", alias = "given", default)]
+    pub given: Vec<String>,
+
+    #[serde(rename = "Forall", alias = "forall", default)]
+    pub forall: indexmap::IndexMap<String, String>, // Identifier -> RustType
+
+    #[serde(rename = "Assume", alias = "assume", default)]
+    pub assume: Vec<Assumption>,
+
+    #[serde(rename = "Let", alias = "let", default)]
+    pub let_bindings: indexmap::IndexMap<String, LetBinding>,
+
+    #[serde(rename = "Do", alias = "do", default)]
+    pub do_steps: Vec<Step>,
+
+    #[serde(rename = "Prove", alias = "prove")]
+    pub prove: Vec<Assertion>,
+
+    #[serde(rename = "Evidence", alias = "evidence")]
+    pub evidence: Evidence,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Assumption {
+    pub expr: String,
+    pub because: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Assertion {
+    #[serde(rename = "assert")]
+    pub assert_expr: String,
+    pub because: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(untagged)]
+pub enum LetBinding {
+    Call { call: ActionCall },
+    Must { must: ActionCall },
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+#[serde(untagged)]
+pub enum Step {
+    Call { call: ActionCall },
+    Must { must: ActionCall },
+    Maybe { maybe: MaybeBlock },
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MaybeBlock {
+    pub because: String,
+    #[serde(rename = "do")]
+    pub do_steps: Vec<Step>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActionCall {
+    pub action: String,
+    pub args: indexmap::IndexMap<String, serde_saphyr::Value>, // or your own Value type
+    #[serde(default)]
+    pub as_: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Evidence {
+    #[serde(default)]
+    pub kani: Option<KaniEvidence>,
+    #[serde(default)]
+    pub verus: Option<serde_saphyr::Value>,
+    #[serde(default)]
+    pub stateright: Option<serde_saphyr::Value>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct KaniEvidence {
+    pub unwind: u32,
+    pub expect: String,
+}
+```
+
+(You’ll likely wrap `serde_saphyr::Value` into your own `Value` enum so you can
+enforce “no nulls”, implement `{ref:}`, `{literal:}` wrappers, and do typed
+struct-literal emission cleanly.)
+
+[^1]: <https://docs.rs/serde-saphyr?utm_source=chatgpt.com> "serde_saphyr -
+      Rust"
+[^2]: <https://model-checking.github.io/kani/reference/attributes.html?utm_source=chatgpt.com>
+       "Attributes - The Kani Rust Verifier"
+[^3]: <https://model-checking.github.io/verify-rust-std/tools/kani.html?utm_source=chatgpt.com>
+       "Kani - Verify Rust Std Lib"

@@ -69,8 +69,8 @@ Example shape:
 
 ### 2. Backend submodule
 
-Inside the per-file module, the Kani backend is emitted under `mod kani`,
-gated by `#[cfg(kani)]`.
+Inside the per-file module, the Kani backend is emitted under `mod kani`, gated
+by `#[cfg(kani)]`.
 
 ### 3. Harness function name
 
