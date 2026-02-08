@@ -105,7 +105,8 @@ Out of scope: backend-specific error rendering.
   `DES-6`, `TFS-1`.
 - [ ] Build a fixture suite of valid and invalid `.theorem` files that covers
   aliases, nested `maybe`, `must` semantics preconditions, and witness policy.
-  Acceptance: fixtures run in CI and gate parser and validator regressions.
+  Acceptance: fixtures run in continuous integration (CI) and gate parser and
+  validator regressions.
   Signposts: `TFS-1`, `TFS-4`, `TFS-6`, `ADR-4`.
 
 ## Phase 2: action resolution and deterministic naming
