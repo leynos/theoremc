@@ -125,7 +125,7 @@ ______________________________________________________________________
 
 ### 4.1 Files and documents
 
-- File extension: `.theorUTF-8)
+- File extension: `.theorem` (UTF-8 text)
 - A single `.theorem` file may contain **one or more YAML documents** separated
   by `---`. This is optional but useful for grouping related theorems.
   `serde-saphyr` explicitly supports deserializing multiple YAML documents from
@@ -157,40 +157,44 @@ Let:
   max_connections:
     call:
       action: hnsw.max_connections
-      args: { params: params }
+      args: { params: { ref: params } }
   graph:
     call:
       action: hnsw.graph_with_capacity
-      args: { params: params, capacity: 3 }
+      args: { params: { ref: params }, capacity: 3 }
 
 Do:
   - must:
       action: hnsw.insert_first
-      args: { graph: graph, node: 0, level: 1, sequence: 0 }
+      args: { graph: { ref: graph }, node: 0, level: 1, sequence: 0 }
 
   - must:
       action: hnsw.attach_node
-      args: { graph: graph, node: 1, level: 1, sequence: 1 }
+      args: { graph: { ref: graph }, node: 1, level: 1, sequence: 1 }
 
   - must:
       action: hnsw.attach_node
-      args: { graph: graph, node: 2, level: 1, sequence: 2 }
+      args: { graph: { ref: graph }, node: 2, level: 1, sequence: 2 }
 
   - call:
       action: hnsw.add_bidirectional_edge
-      args: { graph: graph, origin: 0, target: 2, level: 1 }
+      args: { graph: { ref: graph }, origin: 0, target: 2, level: 1 }
 
   - must:
       action: hnsw.commit_apply
       args:
-        graph: graph
-        max_connections: max_connections
+        graph: { ref: graph }
+        max_connections: { ref: max_connections }
         new_node: { id: 1, level: 1 }
         updates:
           - node: 1
             level: 1
             candidates: [0]
             kept: [0]
+
+Witness:
+  - cover: "hnsw.edge_present(&graph, 0, 1, 1)"
+    because: "the harness reaches the reconciliation path under symbolic input"
 
 Prove:
   - assert: "hnsw.is_bidirectional(&graph)"
@@ -254,6 +258,10 @@ Each theorem document supports the following sections:
 - `Prove:`
   Required. Assertions-with-reasons.
 
+- `Witness:`
+  Required unless `Evidence.kani.allow_vacuous: true`. Each witness is a
+  cover-expression with a human explanation.
+
 - `Evidence:`
   Required. Backend configuration (MVP: Kani). Stores bounds/limits and
   expected outcomes.
@@ -271,7 +279,7 @@ A *step* is one of:
 ```yaml
 - call:
     action: hnsw.add_bidirectional_edge
-    args: { graph: graph, origin: 0, target: 2, level: 1 }
+    args: { graph: { ref: graph }, origin: 0, target: 2, level: 1 }
     as: some_binding   # optional in Do; implicit in Let
 ```
 
@@ -290,7 +298,7 @@ Prefer `must` when the intent is “this cannot fail”.
 ```yaml
 - must:
     action: hnsw.attach_node
-    args: { graph: graph, node: 2, level: 1, sequence: 2 }
+    args: { graph: { ref: graph }, node: 2, level: 1, sequence: 2 }
 ```
 
 Semantics:
@@ -323,7 +331,7 @@ properties to be verified, and failing assertions produce counterexamples.[^2]
     do:
       - call:
           action: hnsw.add_bidirectional_edge
-          args: { graph: graph, origin: 0, target: 1, level: 0 }
+          args: { graph: { ref: graph }, origin: 0, target: 1, level: 0 }
 ```
 
 Semantics:
@@ -359,12 +367,15 @@ Evidence:
   kani:
     unwind: 10
     expect: SUCCESS
+    allow_vacuous: false
 ```
 
 - `unwind`: required. Mapped to `#[kani::unwind(n)]`.[^2]
 - `expect`: required. Used by reporting/CI: expected harness result (e.g.,
   `SUCCESS`, `FAILURE`, `UNREACHABLE`, `UNDETERMINED`). Kani documents statuses
   including `UNREACHABLE` as “property holds vacuously.”[^4]
+- `allow_vacuous`: optional boolean, default `false`.
+- `vacuity_because`: required when `allow_vacuous: true`.
 
 In MVP, we treat `UNREACHABLE` and `UNDETERMINED` as failures by default unless
 explicitly expected, because “green but vacuous/unknown” is a reliability
@@ -401,17 +412,28 @@ program*.
 - Each crate that uses theoremc defines a module `crate::theorem_actions` (name
   configurable later).
 - The action name `foo.bar` maps to a function identifier in that module by a
-  fixed mangling rule:
+  fixed, injective mangling rule:
 
 ```plaintext
-action "hnsw.attach_node"  ->  function path "crate::theorem_actions::hnsw__attach_node"
+action "hnsw.attach_node"
+  -> function path
+  "crate::theorem_actions::hnsw__attach_unode__h3f6b2a80c9d1"
 ```
+
+The mangling algorithm follows `docs/name-manging-rules.md`:
+
+- Escape each segment by replacing `_` with `_u`.
+- Join escaped segments with `__`.
+- Append `__h{hash12(canonical_action_name)}`.
+
+Build-time checks must fail on either duplicate canonical action names or
+duplicate mangled identifiers.
 
 - Authors may implement the function directly there or re-export it:
 
 ```rust
 // src/theorem_actions.rs or src/theorem_actions/mod.rs
-pub use crate::hnsw::actions::attach_node as hnsw__attach_node;
+pub use crate::hnsw::actions::attach_node as hnsw__attach_unode__h3f6b2a80c9d1;
 ```
 
 This keeps `.theorem` friendly while giving the compiler a direct, typed
@@ -467,23 +489,24 @@ Supported YAML value forms:
 - lists: `[ ... ]`
 - maps: `{ key: value, ... }`
 
-#### 5.5.1 Variable references vs string literals
+#### 5.5.1 Explicit variable references and string literals
 
-For friendliness, we keep the convention used in our examples:
+To avoid accidental semantics changes over time:
 
-- If a YAML scalar is a plain string matching an in-scope variable name, treat
-  it as a **variable reference**.
-- Otherwise, treat it as a **string literal**.
+- Plain YAML strings are always string literals.
+- Variable references must use the explicit `{ ref: <Identifier> }` wrapper.
+- String literals may optionally use `{ literal: <String> }`.
 
-To disambiguate the rare case where you genuinely need a string literal that
-equals a variable name, we support an explicit wrapper:
+Examples:
 
 ```yaml
 args:
+  graph_ref: { ref: graph }
   label: { literal: "graph" }
 ```
 
-(Where `literal:` forces a string literal, never a variable reference.)
+This avoids the case where adding a new binding silently changes the meaning of
+an existing argument string.
 
 #### 5.5.2 Struct literal synthesis
 
@@ -652,15 +675,16 @@ holds vacuously, and it reports reachability for assertion macros.[^4]
 Therefore:
 
 - theoremd treats `UNREACHABLE` as failure unless explicitly expected,
-- and provides a “nontriviality witness” mechanism (see next section).
+- and requires nontriviality witnesses unless vacuity is explicitly justified.
 
-### 8.4 Nontriviality witnesses (recommended)
+### 8.4 Nontriviality witnesses (required by default)
 
 To prevent “green but meaningless” harnesses:
 
-- We add an optional `Witness:` section (future-compatible) that compiles to
-  `kani::cover!` markers, and/or
-- we allow an explicit “cover assertion” list.
+- Theorem documents must include `Witness:` with at least one `cover` entry.
+- `Witness` entries compile to `kani::cover!` markers.
+- Vacuity may be accepted only when `Evidence.kani.allow_vacuous: true` and
+  `Evidence.kani.vacuity_because` is present.
 
 This is a direct response to the vacuity risk described above.[^4]
 
@@ -684,13 +708,22 @@ ______________________________________________________________________
 
 Report content per theorem:
 
+- stable theorem ID (`normalized_path#Theorem`)
 - name, about, tags, backend
 - assumptions (with “because”)
 - steps (Do/Let) with pass/fail and any “must failed” counterexample context
 - prove assertions (each labelled by its “because”)
+- witness coverage results
 - evidence config (unwind, expected status)
 - result status: success/failure/unreachable/undetermined
 - concrete playback artefact (on failure)
+
+Theoremd also supports ID migration aliases via
+`theorems/theorem-id-aliases.yaml`:
+
+- old canonical ID → new canonical ID
+- acyclic alias graph required
+- each deprecated ID resolves to exactly one canonical ID
 
 ______________________________________________________________________
 

@@ -171,6 +171,21 @@ Assume:
 Semantics (Kani): each becomes `kani::assume(<expr>);` (with optional
 tracing/report metadata).
 
+### 3.7.1 `Witness` (required unless vacuity is explicitly allowed)
+
+- Type: list of `WitnessCheck`
+- Default: `[]`
+- Constraint: non-empty unless `Evidence.kani.allow_vacuous: true`
+
+Each `WitnessCheck` is a mapping:
+
+- `cover` (required): `RustExpr` (must parse)
+- `because` (required): non-empty string explanation
+
+Semantics (Kani): each witness emits `kani::cover!(<expr>)`, so successful runs
+must exercise at least one non-vacuous path unless vacuity is explicitly
+accepted.
+
 ### 3.8 `Let` (optional)
 
 - Type: mapping of `Identifier -> LetBinding`
@@ -199,7 +214,7 @@ Let:
   graph:
     call:
       action: hnsw.graph_with_capacity
-      args: { params: params, capacity: 3 }
+      args: { params: { ref: params }, capacity: 3 }
 ```
 
 Semantics:
@@ -269,7 +284,7 @@ Example:
 ```yaml
 call:
   action: account.deposit
-  args: { account: a, amount: amount }
+  args: { account: { ref: a }, amount: { ref: amount } }
   as: b
 ```
 
@@ -295,7 +310,7 @@ Binding rules:
 ```yaml
 - call:
     action: hnsw.add_bidirectional_edge
-    args: { graph: graph, origin: 0, target: 2, level: 1 }
+    args: { graph: { ref: graph }, origin: 0, target: 2, level: 1 }
 ```
 
 Semantics: invokes the action.
@@ -305,7 +320,7 @@ Semantics: invokes the action.
 ```yaml
 - must:
     action: hnsw.attach_node
-    args: { graph: graph, node: 2, level: 1, sequence: 2 }
+    args: { graph: { ref: graph }, node: 2, level: 1, sequence: 2 }
 ```
 
 Semantics: invokes the action and proves it cannot fail under current
@@ -340,7 +355,7 @@ Example:
     do:
       - call:
           action: hnsw.add_bidirectional_edge
-          args: { graph: graph, origin: 0, target: 1, level: 0 }
+          args: { graph: { ref: graph }, origin: 0, target: 1, level: 0 }
 ```
 
 Semantics: symbolic branching.
@@ -368,24 +383,24 @@ A `Value` is one of:
 
 1. YAML integer → Rust integer literal (`0`, `1`, `32`, …)
 2. YAML boolean → Rust boolean literal (`true`/`false`)
-3. YAML string → either a variable reference or a string literal (see below)
+3. YAML string → Rust string literal
 4. YAML list → Rust `vec![...]`
 5. YAML map → either a struct literal or an explicit wrapper form
 
-### 5.2 Variable reference vs string literal (string scalars)
+### 5.2 Explicit variable references and string literals
 
-For YAML string scalars in `args:`:
+For YAML argument values in `args:`:
 
-- If the string exactly equals an in-scope binding name (`Forall` var, `Let`
-  binding, or a previous `Do` binding), interpret it as a **variable
-  reference**.
-- Otherwise interpret it as a **string literal**.
+- Plain YAML strings are always string literals.
+- Variable references must use `{ ref: <Identifier> }`.
 
-To force a string literal that happens to match a variable name, use:
+String literals may also use `{ literal: <String> }` when explicitness helps.
 
 ```yaml
 label: { literal: "graph" }
 ```
+
+This rule avoids accidental meaning changes when new bindings are introduced.
 
 ### 5.3 Explicit wrappers (map values)
 
@@ -445,6 +460,12 @@ this schema supports that while keeping Kani MVP crisp.
 `expect` exists for report gating (and for negative tests where you *want* a
 counterexample).
 
+- `allow_vacuous` (optional): boolean, default `false`
+- `vacuity_because` (required when `allow_vacuous: true`): non-empty string
+  rationale
+
+If `allow_vacuous` is `false`, `Witness` must contain at least one item.
+
 ### 6.3 `Evidence.verus` (placeholder)
 
 A mapping (not required for MVP):
@@ -481,20 +502,40 @@ actions and avoid collisions.
 
 **Canonical action module:** `crate::theorem_actions`
 
-**Mangled Rust function identifier:** join action segments with `__` (double
-underscore).
+**Mangled Rust function identifier:**
+`{action_slug(canonical_name)}__h{hash12(canonical_name)}`.
+
+Definitions:
+
+- `segment_escape(segment)`:
+  1. Replace `_` with `_u`.
+  2. Leave ASCII letters and digits unchanged.
+- `action_slug(canonical_name)`:
+  1. Split `canonical_name` on `.`.
+  2. Apply `segment_escape` to each segment.
+  3. Join escaped segments with `__`.
+- `hash12(value)`:
+  1. Compute `blake3(value.as_bytes())`.
+  2. Take the first 12 lowercase hex characters.
 
 So:
 
-- `hnsw.attach_node` → `crate::theorem_actions::hnsw__attach_node`
-- `account.withdraw` → `crate::theorem_actions::account__withdraw`
+- `hnsw.attach_node` →
+  `crate::theorem_actions::hnsw__attach_unode__h3f6b2a80c9d1`
+- `account.withdraw` →
+  `crate::theorem_actions::account__withdraw__h5a197f4ee18c`
 - `hnsw.graph.with_capacity` →
-  `crate::theorem_actions::hnsw__graph__with_capacity`
+  `crate::theorem_actions::hnsw__graph__with_ucapacity__h8d6a20f2c44e`
 
 Reserved keywords:
 
 - If any segment equals a Rust keyword, error out (don’t try to “fix” it). This
   keeps author intent explicit and avoids spooky collisions.
+
+Collision checks:
+
+- Detect duplicate canonical action names and fail with source locations.
+- Detect duplicate mangled action identifiers and fail with all colliding names.
 
 This rule gives you compile-time binding without relying on link-time
 registries (inventory remains useful for reporting, but not required for
@@ -503,7 +544,7 @@ the exploratory work.
 
 ### 7.3 Generated module naming (file path → Rust module)
 
-Each `.theorem` file expands into a generated R
+Each `.theorem` file expands into a generated Rust module name that must be:
 
 - stability across builds
 - uniqueness across files
@@ -525,13 +566,13 @@ Define:
   4. Lowercase
   5. If it starts with a digit, prefix `_`
 
-- `hash8(P)`: compute `blake3(P.as_bytes())`, take the first 8 hex chars of the
-  digest.
+- `hash12(P)`: compute `blake3(P.as_bytes())`, take the first 12 hex chars of
+  the digest.
 
 Generated module name:
 
 ```plaintext
-__theoremc__file__{path_mangle(path_stem(P))}__{hash8(P)}
+__theoremc__file__{path_mangle(path_stem(P))}__{hash12(P)}
 ```
 
 Example:
@@ -539,12 +580,12 @@ Example:
 - `P = "theorems/bidirectional.theorem"`
 - `path_stem(P) = "theorems/bidirectional"`
 - `path_mangle(...) = "theorems__bidirectional"`
-- `hash8(P) = "a1b2c3d4"` (illustrative)
+- `hash12(P) = "a1b2c3d4e5f6"` (illustrative)
 
 Module:
 
 ```plaintext
-mod __theoremc__file__theorems__bidirectional__a1b2c3d4 { ... }
+mod __theoremc__file__theorems__bidirectional__a1b2c3d4e5f6 { ... }
 ```
 
 Why the hash: if you have `my-file.theorem` and `my_file.theorem`, both mangle
@@ -564,6 +605,7 @@ We should exploit that, but also keep the simple name unique so
 Define:
 
 - `theorem_id` = the `Theorem` field (an `Identifier`).
+- `theorem_key` = `{P}#{theorem_id}`.
 
 - `theorem_snake(theorem_id)`:
 
@@ -578,13 +620,14 @@ Define:
 - Harness function identifier:
 
 ```plaintext
-theorem__{theorem_snake(theorem_id)}
+theorem__{theorem_snake(theorem_id)}__h{hash12(theorem_key)}
 ```
 
-We also enforce:
+Collision checks:
 
-- Theorem names must be unique across the crate’s theorem suite → harness
-  function names become unique.
+- Theorem names must still be unique across the crate theorem suite.
+- The generator must detect duplicate theorem keys and fail compilation with
+  source locations.
 
 ### 7.5 Full harness path layout
 
@@ -602,7 +645,7 @@ mod kani {
 So the *full harness name* Kani can use is:
 
 ```plaintext
-__theoremc__file__...::kani::theorem__...
+__theoremc__file__...::kani::theorem__...__h{hash12(P#T)}
 ```
 
 And the *short harness name* (what engineers usually type) is:
@@ -613,6 +656,23 @@ theorem__...
 
 If there’s ever ambiguity (it shouldn’t happen if theorem names are unique, but
 bugs happen), Kani still supports the full name path.[^3]
+
+### 7.6 Stable external theorem IDs and migration
+
+Reporting uses a stable external theorem ID independent of Rust symbols:
+
+- Canonical ID: `{normalized_path(P)}#{theorem_id}`
+- `normalized_path(P)`:
+  1. Use `/` as separator.
+  2. Remove leading `./`.
+  3. Preserve case.
+
+When files or theorem names move, maintain aliases in
+`theorems/theorem-id-aliases.yaml`:
+
+- Each entry maps an old canonical ID to a new canonical ID.
+- Alias graphs must be acyclic.
+- Every deprecated ID must resolve to exactly one canonical ID.
 
 ______________________________________________________________________
 
@@ -651,6 +711,9 @@ pub struct TheoremDoc {
     #[serde(rename = "Assume", alias = "assume", default)]
     pub assume: Vec<Assumption>,
 
+    #[serde(rename = "Witness", alias = "witness", default)]
+    pub witness: Vec<WitnessCheck>,
+
     #[serde(rename = "Let", alias = "let", default)]
     pub let_bindings: indexmap::IndexMap<String, LetBinding>,
 
@@ -676,6 +739,13 @@ pub struct Assumption {
 pub struct Assertion {
     #[serde(rename = "assert")]
     pub assert_expr: String,
+    pub because: String,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WitnessCheck {
+    pub cover: String,
     pub because: String,
 }
 
@@ -729,6 +799,10 @@ pub struct Evidence {
 pub struct KaniEvidence {
     pub unwind: u32,
     pub expect: String,
+    #[serde(default)]
+    pub allow_vacuous: bool,
+    #[serde(default)]
+    pub vacuity_because: Option<String>,
 }
 ```
 
