@@ -63,15 +63,15 @@ multi-document file loading.
 
 Out of scope: code generation and backend emission.
 
-- [ ] Implement `TheoremDoc` and subordinate schema types with
+- [x] Implement `TheoremDoc` and subordinate schema types with
   `serde(deny_unknown_fields)` and TitleCase plus lower-case aliases exactly as
   specified. Acceptance: unit tests prove unknown keys and wrong scalar types
   fail deserialization with actionable errors. Signposts: `TFS-1`, `DES-6`.
-- [ ] Implement `.theorem` multi-document loading (`---` separation) into an
+- [x] Implement `.theorem` multi-document loading (`---` separation) into an
   ordered in-memory collection. Acceptance: parser tests cover one-document and
   many-document files with stable document ordering. Signposts: `TFS-1`,
   `DES-6`.
-- [ ] Enforce theorem identifier lexical rules (`^[A-Za-z_][A-Za-z0-9_]*$`) and
+- [x] Enforce theorem identifier lexical rules (`^[A-Za-z_][A-Za-z0-9_]*$`) and
   Rust keyword rejection. Acceptance: validation tests reject reserved keywords
   and invalid ASCII identifiers with line/column diagnostics. Signposts:
   `TFS-1`, `DES-6`.

@@ -1,0 +1,12 @@
+Theorem: 123InvalidStart
+About: Theorem name starts with a digit
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

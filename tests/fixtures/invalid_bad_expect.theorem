@@ -1,0 +1,12 @@
+Theorem: BadExpect
+About: Evidence expect is not a valid enum variant
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: INVALID_VALUE
+Witness:
+  - cover: "true"
+    because: always reachable

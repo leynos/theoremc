@@ -1,0 +1,20 @@
+theorem: LowercaseAliases
+about: All keys use lowercase aliases
+tags: [test, alias]
+given:
+  - a basic context
+forall:
+  x: u64
+assume:
+  - expr: "x < 100"
+    because: bounded input
+witness:
+  - cover: "x == 50"
+    because: mid-range value
+prove:
+  - assert: "x < 100"
+    because: assumption holds
+evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS

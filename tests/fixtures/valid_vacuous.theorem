@@ -1,0 +1,11 @@
+Theorem: VacuousAllowed
+About: A theorem that explicitly allows vacuous success
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+    allow_vacuous: true
+    vacuity_because: this theorem is intentionally vacuous for testing

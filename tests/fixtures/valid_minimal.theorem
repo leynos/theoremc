@@ -1,0 +1,12 @@
+Theorem: Minimal
+About: The simplest valid theorem
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

@@ -1,0 +1,5 @@
+Theorem: NoEvidence
+About: Missing required Evidence section
+Prove:
+  - assert: "true"
+    because: trivially true

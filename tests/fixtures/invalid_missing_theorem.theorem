@@ -1,0 +1,8 @@
+About: Missing the required Theorem field
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS

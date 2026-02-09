@@ -1,0 +1,39 @@
+Theorem: FirstTheorem
+About: First theorem in a multi-document file
+Prove:
+  - assert: "x > 0"
+    because: x is positive
+Evidence:
+  kani:
+    unwind: 5
+    expect: SUCCESS
+Witness:
+  - cover: "x == 1"
+    because: at least one positive value
+---
+Theorem: SecondTheorem
+About: Second theorem in the same file
+Tags: [smoke]
+Prove:
+  - assert: "y != 0"
+    because: y is non-zero
+Evidence:
+  kani:
+    unwind: 3
+    expect: SUCCESS
+Witness:
+  - cover: "y == 42"
+    because: a concrete non-zero value
+---
+Theorem: ThirdTheorem
+About: Third theorem for good measure
+Prove:
+  - assert: "z >= 0"
+    because: z is non-negative
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "z == 0"
+    because: boundary value
