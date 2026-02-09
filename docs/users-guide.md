@@ -1,23 +1,25 @@
 # User's guide
 
-This guide covers the behaviour and API of the `theoremc` library from the
-perspective of a library consumer.
+This guide covers the behaviour and application programming interface (API) of
+the `theoremc` library from the perspective of a library consumer.
 
 ## Theorem document schema
 
-A `.theorem` file is a UTF-8 text file containing one or more YAML documents.
-Multiple documents within a single file are separated by `---`. Each document
-describes one theorem.
+A `.theorem` file is a UTF-8 text file containing one or more YAML (YAML Ain't
+Markup Language) documents. Multiple documents within a single file are
+separated by `---`. Each document describes one theorem.
 
 ### Loading theorem documents
 
 Use `theoremc::schema::load_theorem_docs` to parse a `.theorem` file's
 contents into a vector of `TheoremDoc` structs:
 
-    use theoremc::schema::load_theorem_docs;
+```rust
+use theoremc::schema::load_theorem_docs;
 
-    let yaml = std::fs::read_to_string("theorems/my_theorem.theorem")?;
-    let docs = load_theorem_docs(&yaml)?;
+let yaml = std::fs::read_to_string("theorems/my_theorem.theorem")?;
+let docs = load_theorem_docs(&yaml)?;
+```
 
 The function:
 
@@ -35,7 +37,7 @@ use `TitleCase` canonically, but lowercase aliases are also accepted (e.g.,
 
 | Field | Type | Required | Default | Notes |
 | --- | --- | --- | --- | --- |
-| `Schema` | integer | no | `None` (treated as 1) | Forwards compatibility. |
+| `Schema` | integer | no | `None` (unspecified) | Forwards compatibility. |
 | `Theorem` | string | **yes** | — | Must be a valid identifier (see below). |
 | `About` | string | **yes** | — | Human-readable description of intent. |
 | `Tags` | list of strings | no | `[]` | Metadata for filtering and reporting. |
@@ -63,50 +65,60 @@ explaining why the identifier was rejected.
 
 **Assumption**: a constraint on symbolic inputs.
 
-    Assume:
-      - expr: "amount <= u64::MAX"
-        because: "prevent overflow"
+```yaml
+Assume:
+  - expr: "amount <= u64::MAX"
+    because: "prevent overflow"
+```
 
 **Assertion**: a proof obligation.
 
-    Prove:
-      - assert: "balance == expected"
-        because: "deposit adds to balance"
+```yaml
+Prove:
+  - assert: "balance == expected"
+    because: "deposit adds to balance"
+```
 
 **WitnessCheck**: a non-vacuity witness.
 
-    Witness:
-      - cover: "amount == 50"
-        because: "mid-range deposit is exercised"
+```yaml
+Witness:
+  - cover: "amount == 50"
+    because: "mid-range deposit is exercised"
+```
 
 **LetBinding**: a named value binding. Must be one of `call` or `must`.
 
-    Let:
-      params:
-        must:
-          action: account.params
-          args: { max_balance: 1000 }
-      result:
-        call:
-          action: account.deposit
-          args: { account: { ref: a }, amount: { ref: amount } }
+```yaml
+Let:
+  params:
+    must:
+      action: account.params
+      args: { max_balance: 1000 }
+  result:
+    call:
+      action: account.deposit
+      args: { account: { ref: a }, amount: { ref: amount } }
+```
 
 **Step**: an element of the `Do` sequence. Must be one of `call`, `must`, or
 `maybe`.
 
-    Do:
-      - call:
-          action: account.deposit
-          args: { account: { ref: a }, amount: 100 }
-      - must:
-          action: account.validate
-          args: { account: { ref: result } }
-      - maybe:
-          because: "optional second deposit"
-          do:
-            - call:
-                action: account.deposit
-                args: { account: { ref: result }, amount: 10 }
+```yaml
+Do:
+  - call:
+      action: account.deposit
+      args: { account: { ref: a }, amount: 100 }
+  - must:
+      action: account.validate
+      args: { account: { ref: result } }
+  - maybe:
+      because: "optional second deposit"
+      do:
+        - call:
+            action: account.deposit
+            args: { account: { ref: result }, amount: 10 }
+```
 
 **ActionCall**: an invocation of a theorem action.
 
@@ -114,13 +126,15 @@ explaining why the identifier was rejected.
 - `args` (required): mapping of parameter name to value.
 - `as` (optional): binding name for the return value.
 
-**Evidence**: backend configuration. Currently supports `kani`, with
+**Evidence**: backend configuration. Currently, supports `kani`, with
 `verus` and `stateright` as placeholders.
 
-    Evidence:
-      kani:
-        unwind: 10
-        expect: SUCCESS
+```yaml
+Evidence:
+  kani:
+    unwind: 10
+    expect: SUCCESS
+```
 
 **KaniEvidence** fields:
 
@@ -147,30 +161,34 @@ Action arguments accept:
 ### Error handling
 
 `load_theorem_docs` returns `Result<Vec<TheoremDoc>, SchemaError>` where
-`SchemaError` has two variants:
+`SchemaError` has three variants:
 
 - `Deserialize(String)` — YAML parsing or schema mismatch error.
 - `InvalidIdentifier { identifier, reason }` — identifier validation failure.
+- `ValidationFailed { theorem, reason }` — structural constraint violation
+  (e.g., empty `Prove` section or no Evidence backend).
 
-Both variants produce actionable error messages suitable for display to
+All variants produce actionable error messages suitable for display to
 theorem authors.
 
 ### Minimal example
 
-    Theorem: DepositInvariant
-    About: Depositing into an account preserves the balance invariant.
-    Forall:
-      amount: u64
-    Assume:
-      - expr: "amount <= u64::MAX - balance"
-        because: "prevent overflow"
-    Witness:
-      - cover: "amount == 50"
-        because: "mid-range deposit is exercised"
-    Prove:
-      - assert: "new_balance == balance + amount"
-        because: "deposit adds exactly the deposited amount"
-    Evidence:
-      kani:
-        unwind: 10
-        expect: SUCCESS
+```yaml
+Theorem: DepositInvariant
+About: Depositing into an account preserves the balance invariant.
+Forall:
+  amount: u64
+Assume:
+  - expr: "amount <= u64::MAX - balance"
+    because: "prevent overflow"
+Witness:
+  - cover: "amount == 50"
+    because: "mid-range deposit is exercised"
+Prove:
+  - assert: "new_balance == balance + amount"
+    because: "deposit adds exactly the deposited amount"
+Evidence:
+  kani:
+    unwind: 10
+    expect: SUCCESS
+```

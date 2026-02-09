@@ -614,7 +614,7 @@ deserialization (Step 1.1 of the roadmap):
   variant matching already rejects unknown shapes structurally.
 - `serde-saphyr` does not provide a `Value` type. A project-specific
   `TheoremValue` enum is used (`Bool`, `Integer`, `Float`, `String`,
-  `Sequence`, `Mapping`) with a hand-written `Deserialize` implementation.
+  `Sequence`, `Mapping`) with a handwritten `Deserialize` implementation.
   This enforces no-null at the type level and avoids an unnecessary
   `serde_json` dependency.
 - `KaniExpectation` is modelled as a Rust enum with four variants (`Success`,
@@ -630,7 +630,7 @@ deserialization (Step 1.1 of the roadmap):
   as a library. Cargo supports this layout natively for a single package with
   both `lib` and `bin` targets.
 - `rstest-bdd` v0.5.0 was evaluated but lacks documentation for concrete
-  usage patterns. `rstest` parameterised tests with BDD-style naming
+  usage patterns. `rstest` parameterized tests with BDD-style naming
   conventions are used instead.
 
 ______________________________________________________________________

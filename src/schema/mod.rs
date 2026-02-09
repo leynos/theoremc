@@ -8,14 +8,16 @@
 mod error;
 mod identifier;
 mod loader;
+mod newtypes;
 mod types;
 mod value;
 
 pub use error::SchemaError;
 pub use identifier::validate_identifier;
 pub use loader::load_theorem_docs;
+pub use newtypes::{ForallVar, TheoremName};
 pub use types::{
     ActionCall, Assertion, Assumption, Evidence, KaniEvidence, KaniExpectation, LetBinding,
-    MaybeBlock, Step, TheoremDoc, WitnessCheck,
+    LetCall, LetMust, MaybeBlock, Step, StepCall, StepMaybe, StepMust, TheoremDoc, WitnessCheck,
 };
 pub use value::TheoremValue;

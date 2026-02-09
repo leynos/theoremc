@@ -15,4 +15,13 @@ pub enum SchemaError {
         /// A human-readable explanation of why the identifier is invalid.
         reason: String,
     },
+
+    /// A structural constraint was violated after deserialization.
+    #[error("validation failed for theorem '{theorem}': {reason}")]
+    ValidationFailed {
+        /// The theorem name that failed validation.
+        theorem: String,
+        /// A human-readable explanation of the violation.
+        reason: String,
+    },
 }

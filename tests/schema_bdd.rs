@@ -1,6 +1,6 @@
 //! Behaviour-driven tests for theorem document deserialization.
 //!
-//! These tests use `rstest` parameterisation to express Given/When/Then
+//! These tests use `rstest` parameterization to express Given/When/Then
 //! acceptance criteria for the schema validation rules.
 
 use rstest::rstest;
@@ -29,7 +29,7 @@ fn given_a_valid_theorem_file_when_loaded_then_it_succeeds(#[case] fixture: &str
 
 #[rstest]
 #[case::unknown_top_level("invalid_unknown_key.theorem", "unknown field")]
-#[case::bad_expect_value("invalid_bad_expect.theorem", "")]
+#[case::bad_expect_value("invalid_bad_expect.theorem", "YAML deserialization failed")]
 fn given_a_structurally_invalid_file_when_loaded_then_error_is_actionable(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
@@ -41,14 +41,12 @@ fn given_a_structurally_invalid_file_when_loaded_then_error_is_actionable(
         result.is_err(),
         "expected {fixture} to fail deserialization"
     );
-    if !expected_fragment.is_empty() {
-        let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
-        assert!(
-            msg.contains(expected_fragment),
-            "error for {fixture} should contain '{expected_fragment}', \
-             got: {msg}"
-        );
-    }
+    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
+    assert!(
+        msg.contains(expected_fragment),
+        "error for {fixture} should contain '{expected_fragment}', \
+         got: {msg}"
+    );
 }
 
 // ── Given a missing required field, deserialization fails ────────────
@@ -170,6 +168,7 @@ fn given_multi_doc_yaml_when_loaded_then_order_is_preserved() {
 #[case::keyword_virtual("virtual")]
 #[case::keyword_yield("yield")]
 #[case::keyword_union("union")]
+#[case::keyword_self_upper("Self")]
 fn given_a_rust_keyword_as_theorem_name_when_loaded_then_it_fails(#[case] keyword: &str) {
     let yaml = format!(
         "

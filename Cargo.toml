@@ -4,13 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
 serde-saphyr = "0.0.17"
-indexmap = { version = "2", features = ["serde"] }
-thiserror = "2"
+indexmap = { version = "2.13.0", features = ["serde"] }
+thiserror = "2.0.18"
 
 [dev-dependencies]
-rstest = "0.26"
+rstest = "0.26.1"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

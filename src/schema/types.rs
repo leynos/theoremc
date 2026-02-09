@@ -8,6 +8,7 @@
 use indexmap::IndexMap;
 use serde::Deserialize;
 
+use super::newtypes::{ForallVar, TheoremName};
 use super::value::TheoremValue;
 
 // ── Top-level document ──────────────────────────────────────────────
@@ -41,14 +42,17 @@ use super::value::TheoremValue;
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TheoremDoc {
-    /// Schema version for forwards compatibility (default: 1).
+    /// Schema version for forwards compatibility.
+    ///
+    /// When omitted in the YAML source the field is `None`, indicating
+    /// "unspecified — treat as current default".
     #[serde(rename = "Schema", alias = "schema", default)]
     pub schema: Option<u32>,
 
     /// Unique theorem name (must be a valid Rust identifier, not a
-    /// reserved keyword).
+    /// reserved keyword). Validated at deserialization time.
     #[serde(rename = "Theorem", alias = "theorem")]
-    pub theorem: String,
+    pub theorem: TheoremName,
 
     /// Human-readable description of the theorem's intent.
     #[serde(rename = "About", alias = "about")]
@@ -64,7 +68,7 @@ pub struct TheoremDoc {
 
     /// Symbolic quantified variables mapped to Rust types.
     #[serde(rename = "Forall", alias = "forall", default)]
-    pub forall: IndexMap<String, String>,
+    pub forall: IndexMap<ForallVar, String>,
 
     /// Constraints on symbolic inputs.
     #[serde(rename = "Assume", alias = "assume", default)]
@@ -148,16 +152,26 @@ pub struct WitnessCheck {
 #[serde(untagged)]
 pub enum LetBinding {
     /// Invoke an action and bind the result.
-    Call {
-        /// The action call to execute.
-        call: ActionCall,
-    },
+    Call(LetCall),
     /// Invoke an action, prove it cannot fail, and bind the unwrapped
     /// success value.
-    Must {
-        /// The action call to execute and prove infallible.
-        must: ActionCall,
-    },
+    Must(LetMust),
+}
+
+/// Wrapper for a `call` variant in a `Let` binding.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LetCall {
+    /// The action call to execute.
+    pub call: ActionCall,
+}
+
+/// Wrapper for a `must` variant in a `Let` binding.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LetMust {
+    /// The action call to execute and prove infallible.
+    pub must: ActionCall,
 }
 
 // ── Steps ───────────────────────────────────────────────────────────
@@ -170,21 +184,36 @@ pub enum LetBinding {
 #[serde(untagged)]
 pub enum Step {
     /// Invoke an action.
-    Call {
-        /// The action call to execute.
-        call: ActionCall,
-    },
+    Call(StepCall),
     /// Invoke an action and prove it cannot fail.
-    Must {
-        /// The action call to execute and prove infallible.
-        must: ActionCall,
-    },
+    Must(StepMust),
     /// Symbolic branching — both branches are explored by the model
     /// checker.
-    Maybe {
-        /// The maybe block with a reason and nested steps.
-        maybe: MaybeBlock,
-    },
+    Maybe(StepMaybe),
+}
+
+/// Wrapper for a `call` variant in a `Do` step.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StepCall {
+    /// The action call to execute.
+    pub call: ActionCall,
+}
+
+/// Wrapper for a `must` variant in a `Do` step.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StepMust {
+    /// The action call to execute and prove infallible.
+    pub must: ActionCall,
+}
+
+/// Wrapper for a `maybe` variant in a `Do` step.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StepMaybe {
+    /// The maybe block with a reason and nested steps.
+    pub maybe: MaybeBlock,
 }
 
 // ── Maybe block ─────────────────────────────────────────────────────

@@ -20,7 +20,7 @@ const RUST_KEYWORDS: &[&str] = &[
     // Reserved keywords (no current syntax but reserved for future use)
     "abstract", "become", "box", "do", "final", "macro", "override", "priv", "try", "typeof",
     "unsized", "virtual", "yield", // Weak keywords used in specific contexts
-    "union", "dyn",
+    "union",
 ];
 
 /// Validates that a string is a legal theorem identifier.
@@ -66,9 +66,11 @@ pub fn validate_identifier(s: &str) -> Result<(), SchemaError> {
     if is_rust_keyword(s) {
         return Err(SchemaError::InvalidIdentifier {
             identifier: s.to_owned(),
-            reason: "this is a Rust reserved keyword and cannot \
-                     be used as a theorem identifier"
-                .to_owned(),
+            reason: concat!(
+                "this is a Rust reserved keyword and cannot ",
+                "be used as a theorem identifier",
+            )
+            .to_owned(),
         });
     }
 

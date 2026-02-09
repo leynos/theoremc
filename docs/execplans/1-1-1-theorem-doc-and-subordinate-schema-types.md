@@ -10,7 +10,7 @@ Status: COMPLETE
 
 After this change a library consumer can call
 `theoremc::schema::load_theorem_docs(yaml_text)` to deserialize one or more
-YAML theorem documents from a single string into a `Vec<TheoremDoc>`. Every
+YAML (YAML Ain't Markup Language) theorem documents from a single string into a `Vec<TheoremDoc>`. Every
 document is strictly validated at deserialization time: unknown keys are
 rejected, required fields must be present, scalar types must match, TitleCase
 and lowercase key aliases both work, theorem identifiers must match
@@ -68,7 +68,7 @@ into correctly populated `TheoremDoc` structs.
 
 - Risk: `rstest-bdd` v0.5.0 may not compile on nightly-2026-01-30.
   Severity: low. Likelihood: low.
-  Mitigation: prototype in Milestone 0. Fall back to `rstest` parameterised
+  Mitigation: prototype in Milestone 0. Fall back to `rstest` parameterized
   tests with BDD-style naming.
 
 - Risk: `deny_unknown_fields` and `#[serde(untagged)]` cannot coexist on the
@@ -90,7 +90,7 @@ into correctly populated `TheoremDoc` structs.
 - [x] (2026-02-09) Milestone 2: identifier validation.
 - [x] (2026-02-09) Milestone 3: multi-document loading.
 - [x] (2026-02-09) Milestone 4: comprehensive tests (131 tests passing).
-- [x] (2026-02-09) Milestone 5: documentation and finalisation.
+- [x] (2026-02-09) Milestone 5: documentation and finalization.
 
 ## Surprises & discoveries
 
@@ -106,7 +106,7 @@ into correctly populated `TheoremDoc` structs.
   higher-level than needed for simple deserialization acceptance tests.
   Evidence: docs.rs page for rstest-bdd 0.5.0 lists macros and types but
   no runnable examples.
-  Impact: used `rstest` parameterised tests with BDD-style naming instead.
+  Impact: used `rstest` parameterized tests with BDD-style naming instead.
 
 - Observation: `missing_crate_level_docs` has been renamed to
   `rustdoc::missing_crate_level_docs` in current nightly.
@@ -159,7 +159,7 @@ into correctly populated `TheoremDoc` structs.
 
 - D7: rstest-bdd v0.5.0.
   Available on crates.io (released 2026-02-06). Prototype in Milestone 0 to
-  confirm toolchain compatibility. Fallback: `rstest` parameterised tests.
+  confirm toolchain compatibility. Fallback: `rstest` parameterized tests.
   Date: 2026-02-09.
 
 ## Outcomes & retrospective
@@ -171,7 +171,7 @@ All milestones completed successfully. The implementation delivers:
   `KaniEvidence`, `KaniExpectation`) plus `TheoremValue` and `SchemaError`.
 - Multi-document loading via `serde_saphyr::from_multiple`.
 - Identifier validation (ASCII pattern + Rust keyword rejection).
-- 131 tests: 33 unit (identifier + loader), 65 parameterised BDD-style
+- 131 tests: 33 unit (identifier + loader), 65 parameterized BDD-style
   (rstest), 33 integration (fixture-based).
 - 14 fixture files (5 valid, 9 invalid).
 - All quality gates pass: `make check-fmt`, `make lint`, `make test`.
@@ -329,7 +329,7 @@ Create test fixtures under `tests/fixtures/`:
 - `valid_full.theorem` — document using all sections.
 - `valid_multi.theorem` — two documents separated by `---`.
 - `valid_lowercase.theorem` — all keys in lowercase aliases.
-- `invalid_unknown_key.theorem` — document with an unrecognised top-level key.
+- `invalid_unknown_key.theorem` — document with an unrecognized top-level key.
 - `invalid_wrong_type.theorem` — `Tags: foo` instead of `Tags: [foo]`.
 - `invalid_missing_theorem.theorem` — missing required `Theorem` field.
 - `invalid_keyword_name.theorem` — theorem name is a Rust keyword.
@@ -343,7 +343,7 @@ Integration tests in `tests/`:
   asserting error messages.
 - `tests/multi_document.rs` — multi-document loading tests.
 
-Behavioural tests using `rstest-bdd` (or `rstest` parameterised fallback):
+Behavioural tests using `rstest-bdd` (or `rstest` parameterized fallback):
 
 - Given/When/Then scenarios for key acceptance criteria:
   - "Given a theorem file with an unknown key, when loaded, then
@@ -360,7 +360,7 @@ Unit tests within `src/schema/identifier.rs`:
 - Rust keywords: `"fn"`, `"let"`, `"match"`, `"type"`.
 - Non-keywords that look close: `"lets"`, `"types"`, `"True"`.
 
-### Milestone 5: documentation and finalisation
+### Milestone 5: documentation and finalization
 
 Create `docs/users-guide.md` with initial content covering the schema:
 document structure, required and optional fields, key aliases, identifier
