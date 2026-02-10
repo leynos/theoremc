@@ -3,6 +3,9 @@
 //! These tests use `rstest` parameterization to express Given/When/Then
 //! acceptance criteria for the schema validation rules.
 
+mod common;
+
+use common::load_fixture;
 use rstest::rstest;
 use theoremc::schema::load_theorem_docs;
 
@@ -15,8 +18,7 @@ use theoremc::schema::load_theorem_docs;
 #[case::lowercase_aliases("valid_lowercase.theorem")]
 #[case::vacuous_allowed("valid_vacuous.theorem")]
 fn given_a_valid_theorem_file_when_loaded_then_it_succeeds(#[case] fixture: &str) {
-    let yaml = std::fs::read_to_string(format!("tests/fixtures/{fixture}"))
-        .unwrap_or_else(|e| panic!("failed to read {fixture}: {e}"));
+    let yaml = load_fixture(fixture);
     let result = load_theorem_docs(&yaml);
     assert!(
         result.is_ok(),
@@ -34,8 +36,7 @@ fn given_a_structurally_invalid_file_when_loaded_then_error_is_actionable(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
 ) {
-    let yaml = std::fs::read_to_string(format!("tests/fixtures/{fixture}"))
-        .unwrap_or_else(|e| panic!("failed to read {fixture}: {e}"));
+    let yaml = load_fixture(fixture);
     let result = load_theorem_docs(&yaml);
     assert!(
         result.is_err(),
@@ -57,8 +58,7 @@ fn given_a_structurally_invalid_file_when_loaded_then_error_is_actionable(
 #[case::missing_prove("invalid_missing_prove.theorem")]
 #[case::missing_evidence("invalid_missing_evidence.theorem")]
 fn given_a_missing_required_field_when_loaded_then_it_fails(#[case] fixture: &str) {
-    let yaml = std::fs::read_to_string(format!("tests/fixtures/{fixture}"))
-        .unwrap_or_else(|e| panic!("failed to read {fixture}: {e}"));
+    let yaml = load_fixture(fixture);
     let result = load_theorem_docs(&yaml);
     assert!(
         result.is_err(),
@@ -75,8 +75,7 @@ fn given_an_invalid_theorem_name_when_loaded_then_error_mentions_reason(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
 ) {
-    let yaml = std::fs::read_to_string(format!("tests/fixtures/{fixture}"))
-        .unwrap_or_else(|e| panic!("failed to read {fixture}: {e}"));
+    let yaml = load_fixture(fixture);
     let result = load_theorem_docs(&yaml);
     assert!(
         result.is_err(),
@@ -95,8 +94,7 @@ fn given_an_invalid_theorem_name_when_loaded_then_error_mentions_reason(
 #[rstest]
 #[case::tags_as_string("invalid_wrong_type.theorem")]
 fn given_wrong_scalar_type_when_loaded_then_it_fails(#[case] fixture: &str) {
-    let yaml = std::fs::read_to_string(format!("tests/fixtures/{fixture}"))
-        .unwrap_or_else(|e| panic!("failed to read {fixture}: {e}"));
+    let yaml = load_fixture(fixture);
     let result = load_theorem_docs(&yaml);
     assert!(
         result.is_err(),
@@ -108,8 +106,7 @@ fn given_wrong_scalar_type_when_loaded_then_it_fails(#[case] fixture: &str) {
 
 #[test]
 fn given_multi_doc_yaml_when_loaded_then_order_is_preserved() {
-    let yaml = std::fs::read_to_string("tests/fixtures/valid_multi.theorem")
-        .unwrap_or_else(|e| panic!("failed to read fixture: {e}"));
+    let yaml = load_fixture("valid_multi.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse");
     let names: Vec<&str> = docs.iter().map(|d| d.theorem.as_str()).collect();
     assert_eq!(names, vec!["FirstTheorem", "SecondTheorem", "ThirdTheorem"]);
@@ -168,6 +165,7 @@ fn given_multi_doc_yaml_when_loaded_then_order_is_preserved() {
 #[case::keyword_virtual("virtual")]
 #[case::keyword_yield("yield")]
 #[case::keyword_union("union")]
+#[case::keyword_gen("gen")]
 #[case::keyword_self_upper("Self")]
 fn given_a_rust_keyword_as_theorem_name_when_loaded_then_it_fails(#[case] keyword: &str) {
     let yaml = format!(

@@ -4,13 +4,11 @@
 //! errors, cover `KaniExpectation` variants, and exercise inline edge cases
 //! for unknown keys in subordinate structures.
 
-use theoremc::schema::{KaniExpectation, load_theorem_docs};
+mod common;
 
-/// Loads a fixture file from the `tests/fixtures/` directory.
-fn load_fixture(name: &str) -> String {
-    std::fs::read_to_string(format!("tests/fixtures/{name}"))
-        .unwrap_or_else(|e| panic!("failed to read fixture {name}: {e}"))
-}
+use common::load_fixture;
+use rstest::rstest;
+use theoremc::schema::{KaniExpectation, load_theorem_docs};
 
 /// Helper to assert that loading a fixture fails.
 fn assert_fixture_fails(fixture_name: &str) -> String {
@@ -103,48 +101,19 @@ Witness:
     )
 }
 
-#[test]
-fn kani_expect_success_variant() {
-    let yaml = make_doc_with_expect("SUCCESS");
+#[rstest]
+#[case::success("SUCCESS", KaniExpectation::Success)]
+#[case::failure("FAILURE", KaniExpectation::Failure)]
+#[case::unreachable("UNREACHABLE", KaniExpectation::Unreachable)]
+#[case::undetermined("UNDETERMINED", KaniExpectation::Undetermined)]
+fn kani_expect_variant_roundtrips(#[case] yaml_value: &str, #[case] expected: KaniExpectation) {
+    let yaml = make_doc_with_expect(yaml_value);
     let docs = load_theorem_docs(&yaml).expect("should parse");
     let kani = docs
         .first()
         .and_then(|d| d.evidence.kani.as_ref())
         .expect("should have kani evidence");
-    assert_eq!(kani.expect, KaniExpectation::Success);
-}
-
-#[test]
-fn kani_expect_failure_variant() {
-    let yaml = make_doc_with_expect("FAILURE");
-    let docs = load_theorem_docs(&yaml).expect("should parse");
-    let kani = docs
-        .first()
-        .and_then(|d| d.evidence.kani.as_ref())
-        .expect("should have kani evidence");
-    assert_eq!(kani.expect, KaniExpectation::Failure);
-}
-
-#[test]
-fn kani_expect_unreachable_variant() {
-    let yaml = make_doc_with_expect("UNREACHABLE");
-    let docs = load_theorem_docs(&yaml).expect("should parse");
-    let kani = docs
-        .first()
-        .and_then(|d| d.evidence.kani.as_ref())
-        .expect("should have kani evidence");
-    assert_eq!(kani.expect, KaniExpectation::Unreachable);
-}
-
-#[test]
-fn kani_expect_undetermined_variant() {
-    let yaml = make_doc_with_expect("UNDETERMINED");
-    let docs = load_theorem_docs(&yaml).expect("should parse");
-    let kani = docs
-        .first()
-        .and_then(|d| d.evidence.kani.as_ref())
-        .expect("should have kani evidence");
-    assert_eq!(kani.expect, KaniExpectation::Undetermined);
+    assert_eq!(kani.expect, expected);
 }
 
 // ── Inline unhappy path edge cases ──────────────────────────────────
@@ -245,17 +214,14 @@ Witness:
 
 // ── Guard: identifiers from the doc that should work ────────────────
 
-#[test]
-fn doc_example_identifiers_accepted() {
-    // Identifiers from the design document examples
-    for name in &[
-        "BidirectionalLinksCommitPath3Nodes",
-        "DepositWithdrawInverse",
-        "hnsw_smoke",
-        "_internal",
-    ] {
-        let yaml = format!(
-            "
+#[rstest]
+#[case::long_camel("BidirectionalLinksCommitPath3Nodes")]
+#[case::inverse("DepositWithdrawInverse")]
+#[case::snake("hnsw_smoke")]
+#[case::underscore_prefix("_internal")]
+fn doc_example_identifiers_accepted(#[case] name: &str) {
+    let yaml = format!(
+        "
 Theorem: {name}
 About: testing identifier
 Prove:
@@ -269,8 +235,7 @@ Witness:
   - cover: 'true'
     because: always reachable
 "
-        );
-        let result = load_theorem_docs(&yaml);
-        assert!(result.is_ok(), "identifier '{name}' should be accepted");
-    }
+    );
+    let result = load_theorem_docs(&yaml);
+    assert!(result.is_ok(), "identifier '{name}' should be accepted");
 }

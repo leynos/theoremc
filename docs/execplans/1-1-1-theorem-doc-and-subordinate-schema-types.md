@@ -173,7 +173,7 @@ All milestones completed successfully. The implementation delivers:
 - Multi-document loading via `serde_saphyr::from_multiple`.
 - Identifier validation (ASCII pattern + Rust keyword rejection).
 - 131 tests: 33 unit (identifier + loader), 65 parameterized BDD-style
-  (rstest), 33 integration (fixture-based).
+  (rstest), 33 integration tests (fixture-based).
 - 14 fixture files (5 valid, 9 invalid).
 - All quality gates pass: `make check-fmt`, `make lint`, `make test`.
 
@@ -476,7 +476,7 @@ Production dependencies:
 
 Dev dependencies:
 
-- `rstest` 0.26.x — test fixtures and parameterisation.
+- `rstest` 0.26.x — test fixtures and parameterization.
 - `rstest-bdd` 0.5.0 — BDD-style behavioural tests.
 
 Public API surface (in `theoremc::schema`):
@@ -510,6 +510,7 @@ Public API surface (in `theoremc::schema`):
                             String(String), Sequence(Vec<TheoremValue>),
                             Mapping(IndexMap<String, TheoremValue>) }
     pub enum SchemaError { Deserialize(String),
-                           InvalidIdentifier { identifier, reason } }
+                           InvalidIdentifier { identifier, reason },
+                           ValidationFailed { theorem, reason } }
 
     pub fn validate_identifier(s: &str) -> Result<(), SchemaError>;

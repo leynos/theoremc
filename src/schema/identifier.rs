@@ -10,7 +10,7 @@ use super::error::SchemaError;
 ///
 /// Includes strict keywords, reserved keywords, and weak keywords that
 /// cannot serve as raw identifiers. The list covers all keywords defined
-/// in the Rust Reference (2021 edition and later).
+/// in the Rust Reference (2024 edition and later).
 const RUST_KEYWORDS: &[&str] = &[
     // Strict keywords
     "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
@@ -19,7 +19,8 @@ const RUST_KEYWORDS: &[&str] = &[
     "unsafe", "use", "where", "while",
     // Reserved keywords (no current syntax but reserved for future use)
     "abstract", "become", "box", "do", "final", "macro", "override", "priv", "try", "typeof",
-    "unsized", "virtual", "yield", // Weak keywords used in specific contexts
+    "unsized", "virtual", "yield", // Edition 2024 reserved keyword
+    "gen",   // Weak keywords used in specific contexts
     "union",
 ];
 

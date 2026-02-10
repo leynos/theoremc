@@ -17,7 +17,9 @@ use super::types::TheoremDoc;
 /// [`TheoremName`](super::newtypes::TheoremName) and
 /// [`ForallVar`](super::newtypes::ForallVar) newtypes. Additional
 /// structural constraints (non-empty `Prove`, at-least-one Evidence
-/// backend) are checked post-deserialization.
+/// backend, non-empty `Witness` when Kani `allow_vacuous` is false,
+/// and `vacuity_because` when `allow_vacuous` is true) are checked
+/// post-deserialization.
 ///
 /// # Errors
 ///
@@ -71,6 +73,27 @@ pub fn load_theorem_docs(input: &str) -> Result<Vec<TheoremDoc>, SchemaError> {
                 .to_owned(),
             });
         }
+
+        if let Some(kani) = &doc.evidence.kani {
+            if !kani.allow_vacuous && doc.witness.is_empty() {
+                return Err(SchemaError::ValidationFailed {
+                    theorem: doc.theorem.to_string(),
+                    reason: concat!(
+                        "Witness section must contain at least one witness ",
+                        "when allow_vacuous is false (the default)",
+                    )
+                    .to_owned(),
+                });
+            }
+
+            if kani.allow_vacuous && kani.vacuity_because.is_none() {
+                return Err(SchemaError::ValidationFailed {
+                    theorem: doc.theorem.to_string(),
+                    reason: concat!("vacuity_because is required when ", "allow_vacuous is true",)
+                        .to_owned(),
+                });
+            }
+        }
     }
 
     Ok(docs)
@@ -98,46 +121,12 @@ Witness:
     because: always reachable
 ";
 
-    /// Full example YAML covering every section.
-    const FULL_EXAMPLE_YAML: &str = r"
-Schema: 1
-Theorem: FullExample
-About: A theorem using every section
-Tags: [integration, example]
-Given:
-  - an account with balance 100
-Forall:
-  amount: u64
-Assume:
-  - expr: 'amount <= 100'
-    because: prevent overflow
-Witness:
-  - cover: 'amount == 50'
-    because: mid-range deposit
-Let:
-  result:
-    call:
-      action: account.deposit
-      args:
-        amount: { ref: amount }
-Do:
-  - call:
-      action: account.check_balance
-      args:
-        expected: 150
-Prove:
-  - assert: 'balance == 150'
-    because: deposit adds to balance
-Evidence:
-  kani:
-    unwind: 10
-    expect: SUCCESS
-";
-
-    /// Parsed single document from `FULL_EXAMPLE_YAML`.
+    /// Parsed `valid_full.theorem` fixture document.
     #[fixture]
     fn full_doc() -> TheoremDoc {
-        let docs = load_theorem_docs(FULL_EXAMPLE_YAML).expect("should parse");
+        let yaml = std::fs::read_to_string("tests/fixtures/valid_full.theorem")
+            .expect("should read valid_full.theorem");
+        let docs = load_theorem_docs(&yaml).expect("should parse");
         docs.into_iter().next().expect("should have one doc")
     }
 
@@ -150,33 +139,33 @@ Evidence:
 
     #[rstest]
     fn load_multi_document_file() {
-        let yaml = concat!(
-            "\nTheorem: First\n",
-            "About: First theorem\n",
-            "Prove:\n",
-            "  - assert: 'true'\n",
-            "    because: trivially true\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-            "Witness:\n",
-            "  - cover: 'true'\n",
-            "    because: always reachable\n",
-            "---\n",
-            "Theorem: Second\n",
-            "About: Second theorem\n",
-            "Prove:\n",
-            "  - assert: 'false'\n",
-            "    because: expected to fail\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 5\n",
-            "    expect: FAILURE\n",
-            "Witness:\n",
-            "  - cover: 'true'\n",
-            "    because: always reachable\n",
-        );
+        let yaml = r"
+Theorem: First
+About: First theorem
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+---
+Theorem: Second
+About: Second theorem
+Prove:
+  - assert: 'false'
+    because: expected to fail
+Evidence:
+  kani:
+    unwind: 5
+    expect: FAILURE
+Witness:
+  - cover: 'true'
+    because: always reachable
+";
         let docs = load_theorem_docs(yaml).expect("should parse");
         assert_eq!(docs.len(), 2);
         assert_eq!(docs.first().map(|d| d.theorem.as_str()), Some("First"));
@@ -185,18 +174,18 @@ Evidence:
 
     #[rstest]
     fn reject_unknown_top_level_key() {
-        let yaml = concat!(
-            "\nTheorem: Bad\n",
-            "About: Has an unknown key\n",
-            "UnknownKey: oops\n",
-            "Prove:\n",
-            "  - assert: 'true'\n",
-            "    because: trivially true\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-        );
+        let yaml = r"
+Theorem: Bad
+About: Has an unknown key
+UnknownKey: oops
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+";
         let result = load_theorem_docs(yaml);
         assert!(result.is_err());
         let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
@@ -205,54 +194,54 @@ Evidence:
 
     #[rstest]
     fn reject_wrong_scalar_type_for_tags() {
-        let yaml = concat!(
-            "\nTheorem: Bad\n",
-            "About: Tags should be a list\n",
-            "Tags: not_a_list\n",
-            "Prove:\n",
-            "  - assert: 'true'\n",
-            "    because: trivially true\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-        );
+        let yaml = r"
+Theorem: Bad
+About: Tags should be a list
+Tags: not_a_list
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+";
         let result = load_theorem_docs(yaml);
         assert!(result.is_err());
     }
 
     #[rstest]
     fn reject_missing_required_field_theorem() {
-        let yaml = concat!(
-            "\nAbout: Missing Theorem field\n",
-            "Prove:\n",
-            "  - assert: 'true'\n",
-            "    because: trivially true\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-        );
+        let yaml = r"
+About: Missing Theorem field
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+";
         let result = load_theorem_docs(yaml);
         assert!(result.is_err());
     }
 
     #[rstest]
     fn reject_rust_keyword_theorem_name() {
-        let yaml = concat!(
-            "\nTheorem: fn\n",
-            "About: Theorem named after a keyword\n",
-            "Prove:\n",
-            "  - assert: 'true'\n",
-            "    because: trivially true\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-            "Witness:\n",
-            "  - cover: 'true'\n",
-            "    because: always reachable\n",
-        );
+        let yaml = r"
+Theorem: fn
+About: Theorem named after a keyword
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+";
         let result = load_theorem_docs(yaml);
         assert!(result.is_err());
         let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
@@ -261,23 +250,23 @@ Evidence:
 
     #[rstest]
     fn accept_lowercase_aliases() {
-        let yaml = concat!(
-            "\ntheorem: LowercaseKeys\n",
-            "about: All keys use lowercase aliases\n",
-            "tags: [test]\n",
-            "given:\n",
-            "  - some context\n",
-            "prove:\n",
-            "  - assert: 'true'\n",
-            "    because: trivially true\n",
-            "evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-            "witness:\n",
-            "  - cover: 'true'\n",
-            "    because: always reachable\n",
-        );
+        let yaml = r"
+theorem: LowercaseKeys
+about: All keys use lowercase aliases
+tags: [test]
+given:
+  - some context
+prove:
+  - assert: 'true'
+    because: trivially true
+evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+witness:
+  - cover: 'true'
+    because: always reachable
+";
         let docs = load_theorem_docs(yaml).expect("should parse");
         assert_eq!(docs.len(), 1);
         assert_eq!(
@@ -288,44 +277,97 @@ Evidence:
 
     #[rstest]
     fn reject_invalid_identifier_in_forall() {
-        let yaml = concat!(
-            "\nTheorem: Bad\n",
-            "About: Forall key is invalid\n",
-            "Forall:\n",
-            "  123bad: u64\n",
-            "Prove:\n",
-            "  - assert: 'true'\n",
-            "    because: trivially true\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-            "Witness:\n",
-            "  - cover: 'true'\n",
-            "    because: always reachable\n",
-        );
+        let yaml = r"
+Theorem: Bad
+About: Forall key is invalid
+Forall:
+  123bad: u64
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+";
         let result = load_theorem_docs(yaml);
         assert!(result.is_err());
     }
 
     #[rstest]
-    fn load_document_has_correct_theorem_name(full_doc: TheoremDoc) {
+    fn reject_missing_witness_when_kani_not_vacuous() {
+        let yaml = r"
+Theorem: NoWitness
+About: Missing witness with kani default
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+";
+        let result = load_theorem_docs(yaml);
+        assert!(result.is_err());
+        let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
+        assert!(msg.contains("Witness section must contain at least one witness"));
+    }
+
+    #[rstest]
+    fn accept_missing_witness_when_kani_vacuous() {
+        let yaml = r"
+Theorem: VacuousOk
+About: No witness needed when vacuous
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+    allow_vacuous: true
+    vacuity_because: intentionally vacuous
+";
+        let docs = load_theorem_docs(yaml).expect("should parse");
+        assert_eq!(docs.len(), 1);
+    }
+
+    #[rstest]
+    fn reject_vacuous_without_reason() {
+        let yaml = r"
+Theorem: BadVacuous
+About: Vacuous without reason
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+    allow_vacuous: true
+Witness:
+  - cover: 'true'
+    because: always reachable
+";
+        let result = load_theorem_docs(yaml);
+        assert!(result.is_err());
+        let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
+        assert!(msg.contains("vacuity_because is required"));
+    }
+
+    #[rstest]
+    fn load_full_example_populates_all_sections(full_doc: TheoremDoc) {
         assert_eq!(full_doc.theorem.as_str(), "FullExample");
-    }
-
-    #[rstest]
-    fn load_document_has_correct_metadata_counts(full_doc: TheoremDoc) {
         assert_eq!(full_doc.tags.len(), 2);
-        assert_eq!(full_doc.given.len(), 1);
+        assert_eq!(full_doc.given.len(), 2);
         assert_eq!(full_doc.forall.len(), 1);
-    }
-
-    #[rstest]
-    fn load_document_has_correct_section_counts(full_doc: TheoremDoc) {
         assert_eq!(full_doc.assume.len(), 1);
         assert_eq!(full_doc.witness.len(), 1);
-        assert_eq!(full_doc.let_bindings.len(), 1);
-        assert_eq!(full_doc.do_steps.len(), 1);
-        assert_eq!(full_doc.prove.len(), 1);
+        assert_eq!(full_doc.let_bindings.len(), 2);
+        assert_eq!(full_doc.do_steps.len(), 2);
+        assert_eq!(full_doc.prove.len(), 2);
     }
 }
