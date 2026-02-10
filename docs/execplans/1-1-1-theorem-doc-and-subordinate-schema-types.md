@@ -10,8 +10,9 @@ Status: COMPLETE
 
 After this change a library consumer can call
 `theoremc::schema::load_theorem_docs(yaml_text)` to deserialize one or more
-YAML (YAML Ain't Markup Language) theorem documents from a single string into a `Vec<TheoremDoc>`. Every
-document is strictly validated at deserialization time: unknown keys are
+YAML (YAML Ain't Markup Language) theorem documents from a single string
+into a `Vec<TheoremDoc>`. Every document is strictly validated at
+deserialization time: unknown keys are
 rejected, required fields must be present, scalar types must match, TitleCase
 and lowercase key aliases both work, theorem identifiers must match
 `^[A-Za-z_][A-Za-z0-9_]*$` and must not be Rust reserved keywords.
