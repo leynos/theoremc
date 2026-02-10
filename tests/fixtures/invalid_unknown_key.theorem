@@ -1,0 +1,10 @@
+Theorem: Bad
+About: Has an unrecognised top-level key
+SpuriousKey: should not be here
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS

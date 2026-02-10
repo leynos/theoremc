@@ -33,3 +33,8 @@
 - [Theoremc design specification](theoremc-design.md) - End-to-end architecture
   and design rationale for theoremc, including parser, code generation,
   backend, and reporting design.
+- [User's guide](users-guide.md) - Guide for library consumers covering
+  schema types, loading API, identifier rules, and value forms.
+- [Execution plans](execplans/) - Implementation plans for roadmap steps.
+  - [Step 1.1: `TheoremDoc` and subordinate schema types](execplans/1-1-1-theorem-doc-and-subordinate-schema-types.md)
+    - ExecPlan for strict theorem document deserialization.

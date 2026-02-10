@@ -603,9 +603,39 @@ error messages that include snippets and precise location information, even
 across YAML anchors.[^3] These are wrapped into `miette` diagnostics so errors
 in theorem files point to the exact line/column.
 
+### 6.4 Implementation decisions (Step 1.1)
+
+The following decisions were taken during the implementation of schema
+deserialization (Step 1.1 of the roadmap):
+
+- `deny_unknown_fields` cannot coexist with `#[serde(untagged)]` on the same
+  enum container (`LetBinding`, `Step`). `deny_unknown_fields` is placed on
+  inner structs (`ActionCall`, `MaybeBlock`) instead; the untagged enum's
+  variant matching already rejects unknown shapes structurally.
+- `serde-saphyr` does not provide a `Value` type. A project-specific
+  `TheoremValue` enum is used (`Bool`, `Integer`, `Float`, `String`,
+  `Sequence`, `Mapping`) with a handwritten `Deserialize` implementation.
+  This enforces no-null at the type level and avoids an unnecessary
+  `serde_json` dependency.
+- `KaniExpectation` is modelled as a Rust enum with four variants (`Success`,
+  `Failure`, `Unreachable`, `Undetermined`) and `#[serde(rename)]` attributes
+  for the `UPPERCASE` string forms, catching invalid values at
+  deserialization time.
+- Schema types live in `src/schema/` (not `src/parser/`) because Step 1.1
+  is purely deserialization. The eventual `parser/` module in the workspace
+  layout will encompass the full parsing and validation pipeline.
+- The `ActionCall.as` field uses Rust field name `as_binding` with
+  `#[serde(rename = "as", default)]`.
+- `src/lib.rs` is added alongside `src/main.rs` so schema types are testable
+  as a library. Cargo supports this layout natively for a single package with
+  both `lib` and `bin` targets.
+- `rstest-bdd` v0.5.0 was evaluated but lacks documentation for concrete
+  usage patterns. `rstest` parameterized tests with BDD-style naming
+  conventions are used instead.
+
 ______________________________________________________________________
 
-## 7. Build integration (“always connected”)
+## 7. Build integration ("always connected")
 
 ### 7.1 `build.rs` suite discovery
 

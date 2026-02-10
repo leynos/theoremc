@@ -1,0 +1,49 @@
+Schema: 1
+Theorem: FullExample
+About: A theorem using every section
+Tags: [integration, example]
+Given:
+  - an account with balance 100
+  - a deposit amount under the overflow limit
+Forall:
+  amount: u64
+Assume:
+  - expr: "amount <= 100"
+    because: prevent overflow
+Witness:
+  - cover: "amount == 50"
+    because: mid-range deposit
+Let:
+  params:
+    must:
+      action: account.params
+      args:
+        max_balance: 1000
+  result:
+    call:
+      action: account.deposit
+      args:
+        account: { ref: a }
+        amount: { ref: amount }
+Do:
+  - must:
+      action: account.validate
+      args:
+        account: { ref: result }
+  - maybe:
+      because: optional second deposit
+      do:
+        - call:
+            action: account.deposit
+            args:
+              account: { ref: result }
+              amount: 10
+Prove:
+  - assert: "result.balance() >= amount"
+    because: deposit adds to balance
+  - assert: "result.is_valid()"
+    because: account invariants hold
+Evidence:
+  kani:
+    unwind: 10
+    expect: SUCCESS

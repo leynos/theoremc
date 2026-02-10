@@ -1,0 +1,10 @@
+Theorem: Bad
+About: Tags is a scalar instead of a list
+Tags: not_a_list
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
