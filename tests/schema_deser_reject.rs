@@ -212,6 +212,98 @@ Witness:
     assert!(msg.contains("Rust reserved keyword"));
 }
 
+// ── Non-empty field validation (step 1.2.1) ─────────────────────────
+
+#[test]
+fn rejects_empty_about() {
+    let msg = assert_fixture_fails("invalid_empty_about.theorem");
+    assert!(
+        msg.contains("About must be non-empty"),
+        "error should mention About, got: {msg}"
+    );
+}
+
+#[test]
+fn rejects_whitespace_only_about() {
+    let msg = assert_fixture_fails("invalid_whitespace_about.theorem");
+    assert!(
+        msg.contains("About must be non-empty"),
+        "error should mention About, got: {msg}"
+    );
+}
+
+#[test]
+fn rejects_empty_assert_expr() {
+    let msg = assert_fixture_fails("invalid_empty_assert.theorem");
+    assert!(
+        msg.contains("assert must be non-empty"),
+        "error should mention assert, got: {msg}"
+    );
+}
+
+#[test]
+fn rejects_empty_prove_because() {
+    let msg = assert_fixture_fails("invalid_empty_prove_because.theorem");
+    assert!(
+        msg.contains("because must be non-empty"),
+        "error should mention because, got: {msg}"
+    );
+}
+
+#[test]
+fn rejects_empty_assume_expr() {
+    let msg = assert_fixture_fails("invalid_empty_assume_expr.theorem");
+    assert!(
+        msg.contains("expr must be non-empty"),
+        "error should mention expr, got: {msg}"
+    );
+}
+
+#[test]
+fn rejects_empty_assume_because() {
+    let msg = assert_fixture_fails("invalid_empty_assume_because.theorem");
+    assert!(
+        msg.contains("because must be non-empty"),
+        "error should mention because, got: {msg}"
+    );
+}
+
+#[test]
+fn rejects_empty_witness_cover() {
+    let msg = assert_fixture_fails("invalid_empty_witness_cover.theorem");
+    assert!(
+        msg.contains("cover must be non-empty"),
+        "error should mention cover, got: {msg}"
+    );
+}
+
+#[test]
+fn rejects_empty_witness_because() {
+    let msg = assert_fixture_fails("invalid_empty_witness_because.theorem");
+    assert!(
+        msg.contains("because must be non-empty"),
+        "error should mention because, got: {msg}"
+    );
+}
+
+#[test]
+fn rejects_zero_unwind() {
+    let msg = assert_fixture_fails("invalid_zero_unwind.theorem");
+    assert!(
+        msg.contains("unwind must be a positive integer"),
+        "error should mention unwind, got: {msg}"
+    );
+}
+
+#[test]
+fn rejects_empty_vacuity_because() {
+    let msg = assert_fixture_fails("invalid_empty_vacuity_because.theorem");
+    assert!(
+        msg.contains("vacuity_because must be non-empty"),
+        "error should mention vacuity_because, got: {msg}"
+    );
+}
+
 // ── Guard: identifiers from the doc that should work ────────────────
 
 #[rstest]

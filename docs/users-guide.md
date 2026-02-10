@@ -11,8 +11,8 @@ separated by `---`. Each document describes one theorem.
 
 ### Loading theorem documents
 
-Use `theoremc::schema::load_theorem_docs` to parse a `.theorem` file's
-contents into a vector of `TheoremDoc` structs:
+Use `theoremc::schema::load_theorem_docs` to parse a `.theorem` file's contents
+into a vector of `TheoremDoc` structs:
 
 ```rust
 use theoremc::schema::load_theorem_docs;
@@ -27,28 +27,29 @@ The function:
 - Rejects unknown keys (any key not defined in the schema causes an error).
 - Validates theorem identifiers and `Forall` keys against the identifier
   rules (see below).
+- Enforces non-empty constraints on string fields (see below).
 - Returns `Err(SchemaError)` with an actionable message on failure.
 
 ### Top-level fields
 
-Every theorem document is a YAML mapping with the following fields. Keys
-use `TitleCase` canonically, but lowercase aliases are also accepted (e.g.,
+Every theorem document is a YAML mapping with the following fields. Keys use
+`TitleCase` canonically, but lowercase aliases are also accepted (e.g.,
 `Theorem` or `theorem`).
 
-| Field | Type | Required | Default | Notes |
-| --- | --- | --- | --- | --- |
-| `Schema` | integer | no | `None` (unspecified) | Forwards compatibility. |
-| `Theorem` | string | **yes** | — | Must be a valid identifier (see below). |
-| `About` | string | **yes** | — | Human-readable description of intent. |
-| `Tags` | list of strings | no | `[]` | Metadata for filtering and reporting. |
-| `Given` | list of strings | no | `[]` | Narrative context (no codegen impact). |
-| `Forall` | map (identifier → type) | no | `{}` | Symbolic quantified variables. |
-| `Assume` | list of `Assumption` | no | `[]` | Constraints on symbolic inputs. |
-| `Witness` | list of `WitnessCheck` | no | `[]` | Non-vacuity witnesses. |
-| `Let` | map (identifier → `LetBinding`) | no | `{}` | Named fixtures. |
-| `Do` | list of `Step` | no | `[]` | Theorem step sequence. |
-| `Prove` | list of `Assertion` | **yes** | — | Proof obligations. |
-| `Evidence` | `Evidence` | **yes** | — | Backend configuration. |
+| Field      | Type                              | Required | Default              | Notes                                   |
+| ---------- | --------------------------------- | -------- | -------------------- | --------------------------------------- |
+| `Schema`   | integer                           | no       | `None` (unspecified) | Forwards compatibility.                 |
+| `Theorem`  | string                            | **yes**  | —                    | Must be a valid identifier (see below). |
+| `About`    | string                            | **yes**  | —                    | Human-readable description of intent. Must be non-empty after trimming. |
+| `Tags`     | list of strings                   | no       | `[]`                 | Metadata for filtering and reporting.   |
+| `Given`    | list of strings                   | no       | `[]`                 | Narrative context (no codegen impact).  |
+| `Forall`   | map (identifier → type)           | no       | `{}`                 | Symbolic quantified variables.          |
+| `Assume`   | list of `Assumption`              | no       | `[]`                 | Constraints on symbolic inputs.         |
+| `Witness`  | list of `WitnessCheck`            | no       | `[]`                 | Non-vacuity witnesses.                  |
+| `Let`      | map (identifier → `LetBinding`)   | no       | `{}`                 | Named fixtures.                         |
+| `Do`       | list of `Step`                    | no       | `[]`                 | Theorem step sequence.                  |
+| `Prove`    | list of `Assertion`               | **yes**  | —                    | Proof obligations.                      |
+| `Evidence` | `Evidence`                        | **yes**  | —                    | Backend configuration.                  |
 
 ### Identifier rules
 
@@ -61,9 +62,30 @@ Theorem names and `Forall` map keys must satisfy:
 Invalid identifiers produce an `InvalidIdentifier` error with a message
 explaining why the identifier was rejected.
 
+### Non-empty constraints
+
+All string fields that carry semantic content must be non-empty after trimming
+(leading and trailing whitespace removed using Unicode-aware `str::trim()`).
+The loader rejects documents where any of the following fields are empty or
+contain only whitespace:
+
+- `About`
+- `Assumption.expr` and `Assumption.because`
+- `Assertion.assert` and `Assertion.because`
+- `WitnessCheck.cover` and `WitnessCheck.because`
+- `KaniEvidence.vacuity_because` (when present)
+
+Additionally:
+
+- `Prove` must contain at least one assertion.
+- `Evidence.kani.unwind` must be a positive integer (> 0).
+- `Witness` must contain at least one witness unless
+  `Evidence.kani.allow_vacuous` is `true`.
+
 ### Subordinate types
 
-**Assumption**: a constraint on symbolic inputs.
+**Assumption**: a constraint on symbolic inputs. Both `expr` and `because` are
+required and must be non-empty after trimming.
 
 ```yaml
 Assume:
@@ -71,7 +93,8 @@ Assume:
     because: "prevent overflow"
 ```
 
-**Assertion**: a proof obligation.
+**Assertion**: a proof obligation. Both `assert` and `because` are required and
+must be non-empty after trimming.
 
 ```yaml
 Prove:
@@ -79,7 +102,8 @@ Prove:
     because: "deposit adds to balance"
 ```
 
-**WitnessCheck**: a non-vacuity witness.
+**WitnessCheck**: a non-vacuity witness. Both `cover` and `because` are
+required and must be non-empty after trimming.
 
 ```yaml
 Witness:
@@ -126,8 +150,8 @@ Do:
 - `args` (required): mapping of parameter name to value.
 - `as` (optional): binding name for the return value.
 
-**Evidence**: backend configuration. Currently, supports `kani`, with
-`verus` and `stateright` as placeholders.
+**Evidence**: backend configuration. Currently, supports `kani`, with `verus`
+and `stateright` as placeholders.
 
 ```yaml
 Evidence:
@@ -138,13 +162,13 @@ Evidence:
 
 **KaniEvidence** fields:
 
-- `unwind` (required): positive integer (loop unwinding bound).
+- `unwind` (required): positive integer, must be > 0 (loop unwinding bound).
 - `expect` (required): one of `SUCCESS`, `FAILURE`, `UNREACHABLE`, or
   `UNDETERMINED`.
 - `allow_vacuous` (optional, default `false`): whether vacuous success is
   permitted.
 - `vacuity_because` (required when `allow_vacuous` is `true`): human-readable
-  justification.
+  justification. Must be non-empty after trimming.
 
 ### Value forms in arguments
 
@@ -168,8 +192,8 @@ Action arguments accept:
 - `ValidationFailed { theorem, reason }` — structural constraint violation
   (e.g., empty `Prove` section or no Evidence backend).
 
-All variants produce actionable error messages suitable for display to
-theorem authors.
+All variants produce actionable error messages suitable for display to theorem
+authors.
 
 ### Minimal example
 

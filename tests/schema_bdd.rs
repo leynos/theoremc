@@ -1,4 +1,5 @@
-//! Behaviour-driven tests for theorem document deserialization.
+//! Behaviour-driven tests for theorem document deserialization and
+//! validation.
 //!
 //! These tests use `rstest` parameterization to express Given/When/Then
 //! acceptance criteria for the schema validation rules.
@@ -188,5 +189,36 @@ Witness:
     assert!(
         result.is_err(),
         "Rust keyword '{keyword}' should be rejected as theorem name"
+    );
+}
+
+// ── Given empty or blank fields, validation fails ────────────────────
+
+#[rstest]
+#[case::empty_about("invalid_empty_about.theorem", "About must be non-empty")]
+#[case::whitespace_about("invalid_whitespace_about.theorem", "About must be non-empty")]
+#[case::empty_assert("invalid_empty_assert.theorem", "assert must be non-empty")]
+#[case::empty_prove_because("invalid_empty_prove_because.theorem", "because must be non-empty")]
+#[case::empty_assume_expr("invalid_empty_assume_expr.theorem", "expr must be non-empty")]
+#[case::empty_assume_because("invalid_empty_assume_because.theorem", "because must be non-empty")]
+#[case::empty_witness_cover("invalid_empty_witness_cover.theorem", "cover must be non-empty")]
+#[case::empty_witness_because("invalid_empty_witness_because.theorem", "because must be non-empty")]
+#[case::zero_unwind("invalid_zero_unwind.theorem", "unwind must be a positive integer")]
+#[case::empty_vacuity_because(
+    "invalid_empty_vacuity_because.theorem",
+    "vacuity_because must be non-empty"
+)]
+fn given_empty_or_blank_fields_when_loaded_then_validation_fails(
+    #[case] fixture: &str,
+    #[case] expected_fragment: &str,
+) {
+    let yaml = load_fixture(fixture);
+    let result = load_theorem_docs(&yaml);
+    assert!(result.is_err(), "expected {fixture} to fail validation");
+    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
+    assert!(
+        msg.contains(expected_fragment),
+        "error for {fixture} should contain '{expected_fragment}', \
+         got: {msg}"
     );
 }

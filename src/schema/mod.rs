@@ -10,6 +10,7 @@ mod identifier;
 mod loader;
 mod newtypes;
 mod types;
+mod validate;
 mod value;
 
 pub use error::SchemaError;

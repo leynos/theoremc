@@ -619,7 +619,24 @@ error messages that include snippets and precise location information, even
 across YAML anchors.[^3] These are wrapped into `miette` diagnostics so errors
 in theorem files point to the exact line/column.
 
-### 6.4 Implementation decisions (Step 1.1)
+### 6.4 Implementation decisions (Step 1.2.1)
+
+The following decisions were taken during the implementation of
+post-deserialization semantic validation (Step 1.2.1 of the roadmap):
+
+- Non-empty string validation uses `str::trim()`, which strips Unicode
+  whitespace (characters satisfying `char::is_whitespace`). The spec says
+  "non-empty after trimming" without specifying the algorithm; `str::trim()` is
+  the most defensive choice and aligns with Rust's standard library semantics.
+- Validation logic is extracted into `src/schema/validate.rs` to keep
+  `src/schema/loader.rs` under the 400-line limit and to improve separation of
+  concerns between deserialization and semantic validation.
+- `unwind: 0` is rejected because the spec (`TFS-6` §6.2) says "positive
+  integer", meaning > 0. The `u32` serde type already rejects negatives.
+- Error messages for indexed fields (assertions, assumptions, witnesses) use
+  1-based indices for human readability.
+
+### 6.5 Implementation decisions (Step 1.1)
 
 The following decisions were taken during the implementation of schema
 deserialization (Step 1.1 of the roadmap):

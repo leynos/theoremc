@@ -7,6 +7,7 @@
 
 use super::error::SchemaError;
 use super::types::TheoremDoc;
+use super::validate::validate_theorem_doc;
 
 /// Loads one or more theorem documents from a YAML string.
 ///
@@ -16,10 +17,12 @@ use super::types::TheoremDoc;
 /// and `Forall` keys are validated at deserialization time via the
 /// [`TheoremName`](super::newtypes::TheoremName) and
 /// [`ForallVar`](super::newtypes::ForallVar) newtypes. Additional
-/// structural constraints (non-empty `Prove`, at-least-one Evidence
-/// backend, non-empty `Witness` when Kani `allow_vacuous` is false,
-/// and `vacuity_because` when `allow_vacuous` is true) are checked
-/// post-deserialization.
+/// structural constraints are checked post-deserialization, including
+/// non-empty `About`, non-empty
+/// `Prove`, at-least-one Evidence backend, positive Kani `unwind`,
+/// non-blank string fields, non-empty `Witness` when Kani
+/// `allow_vacuous` is false, and `vacuity_because` when
+/// `allow_vacuous` is true.
 ///
 /// # Errors
 ///
@@ -53,47 +56,7 @@ pub fn load_theorem_docs(input: &str) -> Result<Vec<TheoremDoc>, SchemaError> {
         serde_saphyr::from_multiple(input).map_err(|e| SchemaError::Deserialize(e.to_string()))?;
 
     for doc in &docs {
-        if doc.prove.is_empty() {
-            return Err(SchemaError::ValidationFailed {
-                theorem: doc.theorem.to_string(),
-                reason: "Prove section must contain at least one assertion".to_owned(),
-            });
-        }
-
-        if doc.evidence.kani.is_none()
-            && doc.evidence.verus.is_none()
-            && doc.evidence.stateright.is_none()
-        {
-            return Err(SchemaError::ValidationFailed {
-                theorem: doc.theorem.to_string(),
-                reason: concat!(
-                    "Evidence section must specify at least one backend ",
-                    "(kani, verus, or stateright)",
-                )
-                .to_owned(),
-            });
-        }
-
-        if let Some(kani) = &doc.evidence.kani {
-            if !kani.allow_vacuous && doc.witness.is_empty() {
-                return Err(SchemaError::ValidationFailed {
-                    theorem: doc.theorem.to_string(),
-                    reason: concat!(
-                        "Witness section must contain at least one witness ",
-                        "when allow_vacuous is false (the default)",
-                    )
-                    .to_owned(),
-                });
-            }
-
-            if kani.allow_vacuous && kani.vacuity_because.is_none() {
-                return Err(SchemaError::ValidationFailed {
-                    theorem: doc.theorem.to_string(),
-                    reason: concat!("vacuity_because is required when ", "allow_vacuous is true",)
-                        .to_owned(),
-                });
-            }
-        }
+        validate_theorem_doc(doc)?;
     }
 
     Ok(docs)

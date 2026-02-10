@@ -124,7 +124,7 @@ In scope: structural and semantic checks for `Let`, `Do`, `Prove`, `Witness`,
 
 Out of scope: Rust typechecking of expressions.
 
-- [ ] Validate required fields and non-empty constraints for `Theorem`,
+- [x] Validate required fields and non-empty constraints for `Theorem`,
   `About`, `Prove`, and Kani evidence requirements. Acceptance: negative tests
   cover each missing/empty field and confirm deterministic error messages.
   Signposts: `TFS-1`, `TFS-6`, `DES-6`.

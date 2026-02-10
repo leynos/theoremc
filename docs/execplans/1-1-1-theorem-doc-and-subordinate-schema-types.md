@@ -10,17 +10,16 @@ Status: COMPLETE
 
 After this change a library consumer can call
 `theoremc::schema::load_theorem_docs(yaml_text)` to deserialize one or more
-YAML (YAML Ain't Markup Language) theorem documents from a single string
-into a `Vec<TheoremDoc>`. Every document is strictly validated at
-deserialization time: unknown keys are
-rejected, required fields must be present, scalar types must match, TitleCase
-and lowercase key aliases both work, theorem identifiers must match
-`^[A-Za-z_][A-Za-z0-9_]*$` and must not be Rust reserved keywords.
+YAML (YAML Ain't Markup Language) theorem documents from a single string into a
+`Vec<TheoremDoc>`. Every document is strictly validated at deserialization
+time: unknown keys are rejected, required fields must be present, scalar types
+must match, TitleCase and lowercase key aliases both work, theorem identifiers
+must match `^[A-Za-z_][A-Za-z0-9_]*$` and must not be Rust reserved keywords.
 
-This is Roadmap Phase 1, Step 1.1 — the first real code in the repository.
-It implements the schema structs, key-alias support, unknown-key rejection,
-and multi-document file loading described in `TFS-1` and `DES-6`. Code
-generation and backend emission are explicitly out of scope.
+This is Roadmap Phase 1, Step 1.1 — the first real code in the repository. It
+implements the schema structs, key-alias support, unknown-key rejection, and
+multi-document file loading described in `TFS-1` and `DES-6`. Code generation
+and backend emission are explicitly out of scope.
 
 Observable success: running `make test` passes and the new tests demonstrate
 that unknown keys, wrong scalar types, invalid identifiers, and Rust keywords
@@ -32,8 +31,8 @@ into correctly populated `TheoremDoc` structs.
 
 - All code must pass `make check-fmt`, `make lint`, and `make test`.
 - Clippy lints are aggressive (see `Cargo.toml` `[lints.clippy]`): no
-  `unwrap`, no `expect`, no indexing, no panics in result functions, no
-  missing docs, etc.
+  `unwrap`, no `expect`, no indexing, no panics in result functions, no missing
+  docs, etc.
 - No `unsafe` code.
 - No file longer than 400 lines.
 - Module-level (`//!`) doc comments on every module.
@@ -62,26 +61,22 @@ into correctly populated `TheoremDoc` structs.
 ## Risks
 
 - Risk: `serde-saphyr` v0.0.17 may not support `from_multiple` or may behave
-  unexpectedly with `deny_unknown_fields`.
-  Severity: medium. Likelihood: low.
+  unexpectedly with `deny_unknown_fields`. Severity: medium. Likelihood: low.
   Mitigation: prototype in Milestone 0. Fall back to manual YAML document
   splitting if `from_multiple` is absent.
 
 - Risk: `rstest-bdd` v0.5.0 may not compile on nightly-2026-01-30.
-  Severity: low. Likelihood: low.
-  Mitigation: prototype in Milestone 0. Fall back to `rstest` parameterized
-  tests with BDD-style naming.
+  Severity: low. Likelihood: low. Mitigation: prototype in Milestone 0. Fall
+  back to `rstest` parameterized tests with BDD-style naming.
 
 - Risk: `deny_unknown_fields` and `#[serde(untagged)]` cannot coexist on the
-  same container (known serde limitation).
-  Severity: medium. Likelihood: certain.
-  Mitigation: place `deny_unknown_fields` on inner structs, not on untagged
-  enum containers. See Decision D1.
+  same container (known serde limitation). Severity: medium. Likelihood:
+  certain. Mitigation: place `deny_unknown_fields` on inner structs, not on
+  untagged enum containers. See Decision D1.
 
 - Risk: `serde-saphyr` has no `Value` type; the spec skeleton references
-  `serde_saphyr::Value` which does not exist.
-  Severity: medium. Likelihood: certain.
-  Mitigation: define a custom `TheoremValue` enum. See Decision D2.
+  `serde_saphyr::Value` which does not exist. Severity: medium. Likelihood:
+  certain. Mitigation: define a custom `TheoremValue` enum. See Decision D2.
 
 ## Progress
 
@@ -96,24 +91,23 @@ into correctly populated `TheoremDoc` structs.
 ## Surprises & discoveries
 
 - Observation: Clippy's `expect_used` lint is automatically suppressed in
-  `#[test]` functions (via `allow-expect-in-tests`), so `#[expect]`
-  annotations for it are unfulfilled and cause their own lint error.
-  Evidence: `unfulfilled-lint-expectations` error when `#[expect(clippy::
-  expect_used)]` was placed on test functions.
-  Impact: use `.expect()` freely in `#[test]` functions without annotation.
+  `#[test]` functions (via `allow-expect-in-tests`), so `#[expect]` annotations
+  for it are unfulfilled and cause their own lint error. Evidence:
+  `unfulfilled-lint-expectations` error when `#[expect(clippy:: expect_used)]`
+  was placed on test functions. Impact: use `.expect()` freely in `#[test]`
+  functions without annotation.
 
 - Observation: `rstest-bdd` v0.5.0 lacks concrete usage examples in its
   API documentation. The step registration and scenario runner API is
   higher-level than needed for simple deserialization acceptance tests.
-  Evidence: docs.rs page for rstest-bdd 0.5.0 lists macros and types but
-  no runnable examples.
-  Impact: used `rstest` parameterized tests with BDD-style naming instead.
+  Evidence: docs.rs page for rstest-bdd 0.5.0 lists macros and types but no
+  runnable examples. Impact: used `rstest` parameterized tests with BDD-style
+  naming instead.
 
 - Observation: `missing_crate_level_docs` has been renamed to
-  `rustdoc::missing_crate_level_docs` in current nightly.
-  Evidence: warning during `cargo doc --no-deps`.
-  Impact: moved lint configuration from `[lints.rust]` to
-  `[lints.rustdoc]` section in `Cargo.toml`.
+  `rustdoc::missing_crate_level_docs` in current nightly. Evidence: warning
+  during `cargo doc --no-deps`. Impact: moved lint configuration from
+  `[lints.rust]` to `[lints.rustdoc]` section in `Cargo.toml`.
 
 ## Decision log
 
@@ -122,41 +116,36 @@ into correctly populated `TheoremDoc` structs.
   `deny_unknown_fields` on untagged enum containers. Place
   `deny_unknown_fields` on inner structs (`ActionCall`, `MaybeBlock`) instead.
   The single-key variant structure (`call:`, `must:`, `maybe:`) is validated
-  structurally by serde's untagged matching.
-  Date: 2026-02-09.
+  structurally by serde's untagged matching. Date: 2026-02-09.
 
 - D2: custom `TheoremValue` instead of `serde_json::Value`.
   `serde-saphyr` has no `Value` type. The spec notes "a wrapper around
-  `serde_saphyr::Value` is likely useful so a project-specific `Value` enum
-  can enforce 'no nulls'". We define `TheoremValue` with variants
-  `Bool(bool)`, `Integer(i64)`, `Float(f64)`, `String(String)`,
+  `serde_saphyr::Value` is likely useful so a project-specific `Value` enum can
+  enforce 'no nulls'". We define `TheoremValue` with variants `Bool(bool)`,
+  `Integer(i64)`, `Float(f64)`, `String(String)`,
   `Sequence(Vec<TheoremValue>)`, `Mapping(IndexMap<String, TheoremValue>)`.
   This avoids pulling in `serde_json` for a YAML-only project and enforces
-  no-null at the type level.
-  Date: 2026-02-09.
+  no-null at the type level. Date: 2026-02-09.
 
 - D3: `KaniExpectation` as a proper enum.
-  The spec lists exactly four valid values for `Evidence.kani.expect`. Model
-  as `enum KaniExpectation { Success, Failure, Unreachable, Undetermined }`
-  with `#[serde(rename = "SUCCESS")]` etc. This catches invalid values at
-  deserialization time rather than needing post-hoc string validation.
-  Date: 2026-02-09.
+  The spec lists exactly four valid values for `Evidence.kani.expect`. Model as
+  `enum KaniExpectation { Success, Failure, Unreachable, Undetermined }` with
+  `#[serde(rename = "SUCCESS")]` etc. This catches invalid values at
+  deserialization time rather than needing post-hoc string validation. Date:
+  2026-02-09.
 
 - D4: module location `src/schema/`.
   Step 1.1 is purely deserialization. The design doc's eventual `parser/`
   module is for the full parsing + validation pipeline (Step 1.2+). For now,
-  `src/schema/` is clearer and can be moved later.
-  Date: 2026-02-09.
+  `src/schema/` is clearer and can be moved later. Date: 2026-02-09.
 
 - D5: `ActionCall.as` field naming.
   `as` is a Rust keyword. Use field name `as_binding` with
-  `#[serde(rename = "as", default)]`.
-  Date: 2026-02-09.
+  `#[serde(rename = "as", default)]`. Date: 2026-02-09.
 
 - D6: library crate alongside binary.
   Create `src/lib.rs` so schema types are testable as a library. `src/main.rs`
-  remains the binary entry point.
-  Date: 2026-02-09.
+  remains the binary entry point. Date: 2026-02-09.
 
 - D7: rstest-bdd v0.5.0.
   Available on crates.io (released 2026-02-06). Prototype in Milestone 0 to
@@ -168,8 +157,8 @@ into correctly populated `TheoremDoc` structs.
 All milestones completed successfully. The implementation delivers:
 
 - 11 schema types (`TheoremDoc`, `Assumption`, `Assertion`, `WitnessCheck`,
-  `LetBinding`, `Step`, `MaybeBlock`, `ActionCall`, `Evidence`,
-  `KaniEvidence`, `KaniExpectation`) plus `TheoremValue` and `SchemaError`.
+  `LetBinding`, `Step`, `MaybeBlock`, `ActionCall`, `Evidence`, `KaniEvidence`,
+  `KaniExpectation`) plus `TheoremValue` and `SchemaError`.
 - Multi-document loading via `serde_saphyr::from_multiple`.
 - Identifier validation (ASCII pattern + Rust keyword rejection).
 - 131 tests: 33 unit (identifier + loader), 65 parameterized BDD-style
@@ -183,8 +172,8 @@ Lessons learned:
   known limitation. Placing the annotation on inner structs is a reliable
   workaround that preserves the spirit of strict deserialization.
 - `serde-saphyr` is solid for YAML deserialization but requires a custom
-  `Value` type; this is a one-time cost and the resulting type is better
-  suited to the project's needs (no-null enforcement).
+  `Value` type; this is a one-time cost and the resulting type is better suited
+  to the project's needs (no-null enforcement).
 - Nightly Rust's aggressive clippy lints (cognitive complexity, shadow,
   indexing) require careful test structuring — split assertions across
   functions to stay under complexity thresholds.
@@ -193,8 +182,8 @@ Lessons learned:
 
 The `theoremc` project is a Rust-based formal verification framework. It
 compiles human-readable `.theorem` YAML files into Kani proof harnesses. The
-repository is currently a skeleton: a single `src/main.rs` stub printing
-"Hello from Theorem Compiler!", a `Cargo.toml` with aggressive lints but no
+repository is currently a skeleton: a single `src/main.rs` stub printing "Hello
+from Theorem Compiler!", a `Cargo.toml` with aggressive lints but no
 dependencies, and extensive design documentation in `docs/`.
 
 Key reference documents:
@@ -220,11 +209,11 @@ Toolchain: Rust nightly-2026-01-30 (edition 2024). Build: `make check-fmt`,
 
 ### Milestone 0: scaffold and de-risk
 
-Add production and dev dependencies to `Cargo.toml`. Create `src/lib.rs` with
-a placeholder module declaration. Confirm that `serde-saphyr` compiles and
-that its multi-document API (`from_multiple` or equivalent) works. Confirm
-that `rstest-bdd` v0.5.0 compiles on the project toolchain. Run quality gates
-to confirm the scaffold is clean.
+Add production and dev dependencies to `Cargo.toml`. Create `src/lib.rs` with a
+placeholder module declaration. Confirm that `serde-saphyr` compiles and that
+its multi-document API (`from_multiple` or equivalent) works. Confirm that
+`rstest-bdd` v0.5.0 compiles on the project toolchain. Run quality gates to
+confirm the scaffold is clean.
 
 Dependencies to add:
 
@@ -303,8 +292,8 @@ walks the YAML value types and rejects null.
 - `validate_identifier(s: &str) -> Result<(), SchemaError>`: combines both
   checks.
 
-Integrate validation into the loading path so `TheoremDoc.theorem` and
-`Forall` map keys are validated after deserialization.
+Integrate validation into the loading path so `TheoremDoc.theorem` and `Forall`
+map keys are validated after deserialization.
 
 ### Milestone 3: multi-document loading
 
@@ -363,18 +352,17 @@ Unit tests within `src/schema/identifier.rs`:
 
 ### Milestone 5: documentation and finalization
 
-Create `docs/users-guide.md` with initial content covering the schema:
-document structure, required and optional fields, key aliases, identifier
-rules, and multi-document files. Include a minimal `.theorem` example.
+Create `docs/users-guide.md` with initial content covering the schema: document
+structure, required and optional fields, key aliases, identifier rules, and
+multi-document files. Include a minimal `.theorem` example.
 
 Update `docs/roadmap.md`: change the first Step 1.1 checkbox from `[ ]` to
 `[x]`.
 
-Update `docs/theoremc-design.md`: add a subsection under §6 recording
-decisions D1–D7.
+Update `docs/theoremc-design.md`: add a subsection under §6 recording decisions
+D1–D7.
 
-Update `docs/contents.md`: add entries for `users-guide.md` and
-`execplans/`.
+Update `docs/contents.md`: add entries for `users-guide.md` and `execplans/`.
 
 Run final `make check-fmt && make lint && make test`.
 
@@ -444,9 +432,9 @@ Expected: all three commands exit 0.
 ## Idempotence and recovery
 
 All steps are additive and re-runnable. No destructive operations. If a
-milestone fails, fix the issue and re-run `make check-fmt && make lint &&
-make test` from the repo root. The project can be reset to its initial state
-via `git checkout -- .` (all changes are tracked).
+milestone fails, fix the issue and re-run
+`make check-fmt && make lint && make test` from the repo root. The project can
+be reset to its initial state via `git checkout -- .` (all changes are tracked).
 
 ## Artifacts and notes
 
