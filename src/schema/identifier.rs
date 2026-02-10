@@ -19,8 +19,8 @@ const RUST_KEYWORDS: &[&str] = &[
     "unsafe", "use", "where", "while",
     // Reserved keywords (no current syntax but reserved for future use)
     "abstract", "become", "box", "do", "final", "macro", "override", "priv", "try", "typeof",
-    "unsized", "virtual", "yield", // Edition 2024 reserved keyword
-    "gen",   // Weak keywords used in specific contexts
+    "unsized", "virtual", "yield", "gen", // Edition 2024 reserved keyword
+    // Weak keywords used in specific contexts
     "union",
 ];
 
