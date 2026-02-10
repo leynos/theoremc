@@ -99,129 +99,67 @@ fn is_rust_keyword(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
 
     // ── Valid identifiers ───────────────────────────────────────────
 
-    #[test]
-    fn valid_simple_name() {
-        assert!(validate_identifier("Foo").is_ok());
-    }
-
-    #[test]
-    fn valid_with_underscore_prefix() {
-        assert!(validate_identifier("_bar").is_ok());
-    }
-
-    #[test]
-    fn valid_with_digits() {
-        assert!(validate_identifier("Baz123").is_ok());
-    }
-
-    #[test]
-    fn valid_mixed_case_and_underscores() {
-        assert!(validate_identifier("My_Theorem_42").is_ok());
-    }
-
-    #[test]
-    fn valid_single_letter() {
-        assert!(validate_identifier("x").is_ok());
-    }
-
-    #[test]
-    fn valid_single_underscore() {
-        assert!(validate_identifier("_").is_ok());
+    #[rstest]
+    #[case::simple_name("Foo")]
+    #[case::underscore_prefix("_bar")]
+    #[case::with_digits("Baz123")]
+    #[case::mixed_case_and_underscores("My_Theorem_42")]
+    #[case::single_letter("x")]
+    #[case::single_underscore("_")]
+    fn valid_identifier_accepted(#[case] input: &str) {
+        assert!(validate_identifier(input).is_ok());
     }
 
     // ── Invalid identifier patterns ─────────────────────────────────
 
-    #[test]
-    fn invalid_starts_with_digit() {
-        let err = validate_identifier("123abc");
-        assert!(err.is_err());
-        let msg = err.err().map(|e| e.to_string()).unwrap_or_default();
-        assert!(msg.contains("must match the pattern"));
-    }
-
-    #[test]
-    fn invalid_empty_string() {
-        assert!(validate_identifier("").is_err());
-    }
-
-    #[test]
-    fn invalid_contains_hyphen() {
-        assert!(validate_identifier("foo-bar").is_err());
-    }
-
-    #[test]
-    fn invalid_contains_space() {
-        assert!(validate_identifier("foo bar").is_err());
-    }
-
-    #[test]
-    fn invalid_contains_dot() {
-        assert!(validate_identifier("foo.bar").is_err());
+    #[rstest]
+    #[case::starts_with_digit("123abc", "must match the pattern")]
+    #[case::empty_string("", "must not be empty")]
+    #[case::contains_hyphen("foo-bar", "must match the pattern")]
+    #[case::contains_space("foo bar", "must match the pattern")]
+    #[case::contains_dot("foo.bar", "must match the pattern")]
+    fn invalid_pattern_rejected(#[case] input: &str, #[case] expected_msg: &str) {
+        let err = validate_identifier(input).expect_err("should be invalid");
+        let msg = err.to_string();
+        assert!(
+            msg.contains(expected_msg),
+            "expected message containing {expected_msg:?}, got {msg:?}",
+        );
     }
 
     // ── Rust keyword rejection ──────────────────────────────────────
 
-    #[test]
-    fn keyword_fn_rejected() {
-        let err = validate_identifier("fn");
-        assert!(err.is_err());
-        let msg = err.err().map(|e| e.to_string()).unwrap_or_default();
-        assert!(msg.contains("Rust reserved keyword"));
-    }
-
-    #[test]
-    fn keyword_let_rejected() {
-        assert!(validate_identifier("let").is_err());
-    }
-
-    #[test]
-    fn keyword_match_rejected() {
-        assert!(validate_identifier("match").is_err());
-    }
-
-    #[test]
-    fn keyword_type_rejected() {
-        assert!(validate_identifier("type").is_err());
-    }
-
-    #[test]
-    fn keyword_self_lowercase_rejected() {
-        assert!(validate_identifier("self").is_err());
-    }
-
-    #[test]
-    fn keyword_self_uppercase_rejected() {
-        assert!(validate_identifier("Self").is_err());
-    }
-
-    #[test]
-    fn keyword_async_rejected() {
-        assert!(validate_identifier("async").is_err());
-    }
-
-    #[test]
-    fn keyword_yield_rejected() {
-        assert!(validate_identifier("yield").is_err());
+    #[rstest]
+    #[case::keyword_fn("fn")]
+    #[case::keyword_let("let")]
+    #[case::keyword_match("match")]
+    #[case::keyword_type("type")]
+    #[case::keyword_self("self")]
+    #[case::keyword_self_upper("Self")]
+    #[case::keyword_async("async")]
+    #[case::keyword_yield("yield")]
+    fn keyword_rejected(#[case] input: &str) {
+        let err = validate_identifier(input).expect_err("should be invalid");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("Rust reserved keyword"),
+            "expected keyword message, got {msg:?}",
+        );
     }
 
     // ── Non-keywords that look close ────────────────────────────────
 
-    #[test]
-    fn non_keyword_lets_accepted() {
-        assert!(validate_identifier("lets").is_ok());
-    }
-
-    #[test]
-    fn non_keyword_types_accepted() {
-        assert!(validate_identifier("types").is_ok());
-    }
-
-    #[test]
-    fn non_keyword_matching_accepted() {
-        assert!(validate_identifier("matching").is_ok());
+    #[rstest]
+    #[case::lets("lets")]
+    #[case::types("types")]
+    #[case::matching("matching")]
+    fn non_keyword_near_miss_accepted(#[case] input: &str) {
+        assert!(validate_identifier(input).is_ok());
     }
 }
