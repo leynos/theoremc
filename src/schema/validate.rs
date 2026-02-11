@@ -46,6 +46,24 @@ fn require_non_blank_fields(
     Ok(())
 }
 
+/// Iterates over a collection, extracting labelled string fields from
+/// each item and validating that none are blank.  This eliminates the
+/// repeated `for (i, item) … require_non_blank_fields(…)` loop in
+/// `validate_assertions`, `validate_assumptions`, and
+/// `validate_witnesses`.
+fn validate_collection_fields<T>(
+    doc: &TheoremDoc,
+    section: &str,
+    items: &[T],
+    extract_fields: impl Fn(&T) -> Vec<(&str, &str)>,
+) -> Result<(), SchemaError> {
+    for (i, item) in items.iter().enumerate() {
+        let fields = extract_fields(item);
+        require_non_blank_fields(doc, section, i + 1, &fields)?;
+    }
+    Ok(())
+}
+
 // ── Public entry point ──────────────────────────────────────────────
 
 /// Validates a deserialized theorem document against semantic
@@ -106,43 +124,28 @@ fn validate_prove_non_empty(doc: &TheoremDoc) -> Result<(), SchemaError> {
 /// Every `Assertion` must have non-empty `assert` and `because`
 /// fields after trimming (`TFS-1` §3.10).
 fn validate_assertions(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    for (i, a) in doc.prove.iter().enumerate() {
-        require_non_blank_fields(
-            doc,
-            "Prove assertion",
-            i + 1,
-            &[("assert", &a.assert_expr), ("because", &a.because)],
-        )?;
-    }
-    Ok(())
+    validate_collection_fields(doc, "Prove assertion", &doc.prove, |a| {
+        vec![
+            ("assert", a.assert_expr.as_str()),
+            ("because", a.because.as_str()),
+        ]
+    })
 }
 
 /// Every `Assumption` must have non-empty `expr` and `because`
 /// fields after trimming (`TFS-1` §3.7).
 fn validate_assumptions(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    for (i, a) in doc.assume.iter().enumerate() {
-        require_non_blank_fields(
-            doc,
-            "Assume constraint",
-            i + 1,
-            &[("expr", &a.expr), ("because", &a.because)],
-        )?;
-    }
-    Ok(())
+    validate_collection_fields(doc, "Assume constraint", &doc.assume, |a| {
+        vec![("expr", a.expr.as_str()), ("because", a.because.as_str())]
+    })
 }
 
 /// Every `WitnessCheck` must have non-empty `cover` and `because`
 /// fields after trimming (`TFS-1` §3.7.1).
 fn validate_witnesses(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    for (i, w) in doc.witness.iter().enumerate() {
-        require_non_blank_fields(
-            doc,
-            "Witness",
-            i + 1,
-            &[("cover", &w.cover), ("because", &w.because)],
-        )?;
-    }
-    Ok(())
+    validate_collection_fields(doc, "Witness", &doc.witness, |w| {
+        vec![("cover", w.cover.as_str()), ("because", w.because.as_str())]
+    })
 }
 
 /// Evidence section must specify at least one backend, and Kani

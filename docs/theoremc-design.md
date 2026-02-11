@@ -627,13 +627,13 @@ post-deserialization semantic validation (Step 1.2.1 of the roadmap):
 
 - Non-empty string validation uses `str::trim()`, which strips
   Unicode whitespace (characters satisfying `char::is_whitespace`). The spec
-  says "non-empty after trimming" without specifying the algorithm;
+  says, "non-empty after trimming" without specifying the algorithm;
   `str::trim()` is the most defensive choice and aligns with Rust's standard
   library semantics.
 - Validation logic is extracted into `src/schema/validate.rs`
   to keep `src/schema/loader.rs` under the 400-line limit and to improve
   separation of concerns between deserialization and semantic validation.
-- `unwind: 0` is rejected because the spec (`TFS-6` §6.2) says
+- `unwind: 0` is rejected because the spec (`TFS-6` §6.2) says,
   "positive integer", meaning > 0. The `u32` serde type already rejects
   negatives.
 - Error messages for indexed fields (assertions, assumptions,
