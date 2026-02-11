@@ -213,5 +213,6 @@ composable internationalized libraries that work together seamlessly.
 
 [^1]: i18n_embed - Rust - [Docs.rs](https://docs.rs/i18n-embed), accessed on
       August 18, 2025.
-[^2]: i18n_embed - Rust - [Docs.rs](https://docs.rs/i18n-embed/0.14.1/i18n_embed/),
+[^2]: i18n_embed - Rust -
+      [Docs.rs](https://docs.rs/i18n-embed/0.14.1/i18n_embed/),
       accessed on August 18, 2025.
