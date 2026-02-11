@@ -5,7 +5,8 @@ workspace toolchain, compile-time correlation, and no inline Rust blocks in
 `.theorem`. Primary audience: Rust engineers who want behaviour-driven
 development (BDD)-level legibility for formal checks. Decision records:
 [Architecture Decision Record (ADR) 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
-and [Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md).
+ and
+[Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md).
 
 This specification incorporates several useful structural elements (repo layout
 sketch, risk framing, and some diagrams) from the attached Blitzy exploration,
@@ -673,6 +674,96 @@ The default backend for human-facing localization is Fluent:
 
 This preserves composability for library consumers while keeping deterministic,
 inspectable diagnostics for tooling and CI.
+
+### 6.6 Localization rendering sequence
+
+Figure 1. Diagnostic capture, localization rendering, and report projection
+flow under the ADR 002 library-first localization model.
+
+```mermaid
+sequenceDiagram
+  participant ConsumerApplication
+  participant TheoremcCore
+  participant LocalizerImpl
+  participant Theoremd
+
+  ConsumerApplication->>TheoremcCore: run_with_localizer(LocalizerImpl)
+  TheoremcCore-->>TheoremcCore: detect_error()
+  TheoremcCore-->>TheoremcCore: build Diagnostic
+  TheoremcCore->>Theoremd: record(Diagnostic)
+  Theoremd-->>Theoremd: store code+args+english_fallback
+
+  TheoremcCore->>LocalizerImpl: render_code_args(code, arguments, english_fallback)
+  LocalizerImpl-->>LocalizerImpl: lookup in consumer_then_theoremc_catalogs
+  LocalizerImpl-->>TheoremcCore: localized_message_or_english_fallback
+
+  TheoremcCore->>Theoremd: attach_localized_message(code, localized_message)
+  Theoremd-->>ConsumerApplication: report with
+  Theoremd-->>ConsumerApplication: machine_fields(code,arguments,english)
+  Theoremd-->>ConsumerApplication: optional_localized_message
+```
+
+### 6.7 Diagnostic and localization class model
+
+Figure 2. Class-level model for diagnostic payloads, localization contracts,
+and report-entry population in theoremc and theoremd.
+
+```mermaid
+classDiagram
+  class Diagnostic {
+    +DiagnosticCode code
+    +Map~String,String~ arguments
+    +SourceLocation location
+    +String english_fallback
+    +String to_english()
+  }
+
+  class DiagnosticCode {
+    +String value
+  }
+
+  class SourceLocation {
+    +String file
+    +int line
+    +int column
+  }
+
+  class Localizer {
+    <<interface>>
+    +String render_code_args(DiagnosticCode code, Map~String,String~ arguments, String english_fallback)
+  }
+
+  class FluentLocalizer {
+    +FluentLoader consumer_loader
+    +FluentLoader theoremc_loader
+    +String render_code_args(DiagnosticCode code, Map~String,String~ arguments, String english_fallback)
+    -String try_consumer(DiagnosticCode code, Map~String,String~ arguments)
+    -String try_theoremc(DiagnosticCode code, Map~String,String~ arguments)
+  }
+
+  class TheoremdReportEntry {
+    +DiagnosticCode code
+    +Map~String,String~ arguments
+    +String english_fallback
+    +String~0..1~ localized_message
+    +String status
+  }
+
+  class TheoremcCoreAPI {
+    +Result run_with_localizer(Localizer localizer)
+  }
+
+  Diagnostic --> DiagnosticCode
+  Diagnostic --> SourceLocation
+  Diagnostic ..> Localizer : uses
+
+  Localizer <|.. FluentLocalizer
+
+  Diagnostic --> TheoremdReportEntry : populates
+  TheoremdReportEntry --> DiagnosticCode
+
+  TheoremcCoreAPI --> Diagnostic : emits
+```
 
 ______________________________________________________________________
 
