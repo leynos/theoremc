@@ -3,8 +3,9 @@
 Status: draft (design settled for `.theorem` syntax + Kani MVP). Scope: Rust
 workspace toolchain, compile-time correlation, and no inline Rust blocks in
 `.theorem`. Primary audience: Rust engineers who want behaviour-driven
-development (BDD)-level legibility for formal checks. Decision record:
-[Architecture Decision Record (ADR) 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
+development (BDD)-level legibility for formal checks. Decision records:
+[Architecture Decision Record (ADR) 001](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+and [Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md).
 
 This specification incorporates several useful structural elements (repo layout
 sketch, risk framing, and some diagrams) from the attached Blitzy exploration,
@@ -22,8 +23,11 @@ reduce drift risk, normative definitions are centralized:
   semantics, argument shaping, and evidence fields.
 - `docs/name-mangling-rules.md` is normative for action and harness mangling,
   collision checks, and external theorem ID rules.
-- `docs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md` records
+- `docs/adr-001-theorem-symbol-stability-and-non-vacuity-policy.md` records
   accepted rationale and trade-offs.
+- `docs/adr-002-library-first-internationalization-and-localization-with-fluent.md`
+  is normative for localization architecture, diagnostic rendering boundaries,
+  and Fluent backend policy.
 
 If wording differs between documents, the normative references above take
 precedence.
@@ -77,7 +81,8 @@ ______________________________________________________________________
 `theoremc` is a Cargo workspace composed of:
 
 - a core library (`theoremc-core`) containing the schema, parsing, validation,
-  resolution, and backend-agnostic IR,
+  resolution, diagnostic modelling, localization contracts, and
+  backend-agnostic IR,
 - a proc-macro crate (`theoremc-macros`) that embeds theorem compilation into
   normal Rust builds,
 - backend emitter crates (MVP: Kani),
@@ -399,6 +404,17 @@ In MVP, `UNREACHABLE` and `UNDETERMINED` are treated as failures by default
 unless explicitly expected, because “green but vacuous/unknown” is a
 reliability hazard.[^4]
 
+### 4.7 Theorem schema internationalization scope
+
+ADR 002 explicitly keeps theorem schema keywords language-stable in this
+release line. Canonical field names in `.theorem` files remain:
+`Theorem`, `Given`, `Let`, `Do`, `Prove`, and `Evidence`.
+
+This means theoremc localizes diagnostics and reports, not theorem syntax.
+Keyword internationalization (for example, parser support for localized schema
+keys) is deferred to a future ADR after demand and migration impact are
+validated.
+
 ______________________________________________________________________
 
 ## 5. Rust actions (“step definitions” for proofs)
@@ -614,13 +630,13 @@ deserialization (Step 1.1 of the roadmap):
   variant matching already rejects unknown shapes structurally.
 - `serde-saphyr` does not provide a `Value` type. A project-specific
   `TheoremValue` enum is used (`Bool`, `Integer`, `Float`, `String`,
-  `Sequence`, `Mapping`) with a handwritten `Deserialize` implementation.
-  This enforces no-null at the type level and avoids an unnecessary
-  `serde_json` dependency.
+  `Sequence`, `Mapping`) with a handwritten `Deserialize` implementation. This
+  enforces no-null at the type level and avoids an unnecessary `serde_json`
+  dependency.
 - `KaniExpectation` is modelled as a Rust enum with four variants (`Success`,
   `Failure`, `Unreachable`, `Undetermined`) and `#[serde(rename)]` attributes
-  for the `UPPERCASE` string forms, catching invalid values at
-  deserialization time.
+  for the `UPPERCASE` string forms, catching invalid values at deserialization
+  time.
 - Schema types live in `src/schema/` (not `src/parser/`) because Step 1.1
   is purely deserialization. The eventual `parser/` module in the workspace
   layout will encompass the full parsing and validation pipeline.
@@ -632,6 +648,121 @@ deserialization (Step 1.1 of the roadmap):
 - `rstest-bdd` v0.5.0 was evaluated but lacks documentation for concrete
   usage patterns. `rstest` parameterized tests with BDD-style naming
   conventions are used instead.
+
+### 6.5 Localized diagnostics contract (ADR 002)
+
+Theoremc adopts a library-first localization boundary for diagnostics:
+
+- Diagnostics are represented first as stable machine-readable data:
+  diagnostic code, structured arguments, and source location.
+- Every diagnostic also carries an English fallback string as the required
+  baseline human message.
+- Localization is applied only at display/reporting boundaries via an injected
+  localizer interface; localized strings are not the source of truth.
+
+Locale negotiation and process-level localization state belong to the consumer
+application. Theoremc does not read locale environment variables and does not
+mutate global or thread-local localization state.
+
+The default backend for human-facing localization is Fluent:
+
+- theoremc ships embedded Fluent resources for `en-US`,
+- consumers may layer their own resources over theoremc defaults,
+- formatter failures or missing keys fall back deterministically (consumer
+  message → theoremc default message → English fallback string).
+
+This preserves composability for library consumers while keeping deterministic,
+inspectable diagnostics for tooling and CI.
+
+### 6.6 Localization rendering sequence
+
+Figure 1. Diagnostic capture, localization rendering, and report projection
+flow under the ADR 002 library-first localization model.
+
+```mermaid
+sequenceDiagram
+  participant ConsumerApplication
+  participant TheoremcCore
+  participant LocalizerImpl
+  participant Theoremd
+
+  ConsumerApplication->>TheoremcCore: run_with_localizer(LocalizerImpl)
+  TheoremcCore-->>TheoremcCore: detect_error()
+  TheoremcCore-->>TheoremcCore: build Diagnostic
+  TheoremcCore->>Theoremd: record(Diagnostic)
+  Theoremd-->>Theoremd: store code+args+english_fallback
+
+  TheoremcCore->>LocalizerImpl: render_code_args(code, arguments, english_fallback)
+  LocalizerImpl-->>LocalizerImpl: lookup in consumer_then_theoremc_catalogs
+  LocalizerImpl-->>TheoremcCore: localized_message_or_english_fallback
+
+  TheoremcCore->>Theoremd: attach_localized_message(code, localized_message)
+  Theoremd-->>ConsumerApplication: report with
+  Theoremd-->>ConsumerApplication: machine_fields(code,arguments,english)
+  Theoremd-->>ConsumerApplication: optional_localized_message
+```
+
+### 6.7 Diagnostic and localization class model
+
+Figure 2. Class-level model for diagnostic payloads, localization contracts,
+and report-entry population in theoremc and theoremd.
+
+```mermaid
+classDiagram
+  class Diagnostic {
+    +DiagnosticCode code
+    +Map~String,String~ arguments
+    +SourceLocation location
+    +String english_fallback
+    +String to_english()
+  }
+
+  class DiagnosticCode {
+    +String value
+  }
+
+  class SourceLocation {
+    +String file
+    +int line
+    +int column
+  }
+
+  class Localizer {
+    <<interface>>
+    +String render_code_args(DiagnosticCode code, Map~String,String~ arguments, String english_fallback)
+  }
+
+  class FluentLocalizer {
+    +FluentLoader consumer_loader
+    +FluentLoader theoremc_loader
+    +String render_code_args(DiagnosticCode code, Map~String,String~ arguments, String english_fallback)
+    -String try_consumer(DiagnosticCode code, Map~String,String~ arguments)
+    -String try_theoremc(DiagnosticCode code, Map~String,String~ arguments)
+  }
+
+  class TheoremdReportEntry {
+    +DiagnosticCode code
+    +Map~String,String~ arguments
+    +String english_fallback
+    +String~0..1~ localized_message
+    +String status
+  }
+
+  class TheoremcCoreAPI {
+    +Result run_with_localizer(Localizer localizer)
+  }
+
+  Diagnostic --> DiagnosticCode
+  Diagnostic --> SourceLocation
+  Diagnostic ..> Localizer : uses
+
+  Localizer <|.. FluentLocalizer
+
+  Diagnostic --> TheoremdReportEntry : populates
+  TheoremdReportEntry --> DiagnosticCode
+
+  TheoremcCoreAPI --> Diagnostic : emits
+```
 
 ______________________________________________________________________
 
@@ -764,6 +895,9 @@ Report content per theorem:
 - prove assertions (each labelled by its “because”)
 - witness coverage results
 - evidence config (unwind, expected status)
+- diagnostic code and structured arguments (machine-readable)
+- English fallback message text
+- optional localized message text (when a localizer is provided)
 - result status: success/failure/unreachable/undetermined
 - concrete playback artefact (on failure)
 
@@ -773,6 +907,15 @@ Theoremd also supports ID migration aliases via
 - old canonical ID → new canonical ID
 - acyclic alias graph required
 - each deprecated ID resolves to exactly one canonical ID
+
+Machine-facing artefacts remain deterministic regardless of locale:
+
+- compile-time diagnostics from proc macros and code generation are always
+  emitted in deterministic English,
+- CI outputs (for example JUnit XML, Cucumber JSON, and future JSON reports)
+  always include stable diagnostic codes and structured fields,
+- localized human text is an optional projection, not a required field for
+  machine consumers.
 
 ______________________________________________________________________
 

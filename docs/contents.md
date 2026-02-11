@@ -2,9 +2,12 @@
 
 - [Documentation contents](contents.md) - Index of all documentation files in
   this directory.
-- [Architecture Decision Record (ADR) 0001: theorem symbol stability and non-vacuity policy](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- [Architecture Decision Record (ADR) 001: theorem symbol stability and non-vacuity policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
   - Decision record for injective symbol mangling, explicit reference
   semantics, non-vacuity requirements, and theorem ID migration.
+- [Architecture Decision Record (ADR) 002: library-first internationalization and localization with Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+  - Decision record for Fluent-based, library-safe localization via injected
+  localizers, structured diagnostic codes, and deterministic fallback policy.
 - [Navigating code complexity: a guide for implementers and maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring
   strategies for long-lived codebases.
