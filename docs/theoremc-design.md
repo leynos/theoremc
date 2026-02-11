@@ -4,9 +4,8 @@ Status: draft (design settled for `.theorem` syntax + Kani MVP). Scope: Rust
 workspace toolchain, compile-time correlation, and no inline Rust blocks in
 `.theorem`. Primary audience: Rust engineers who want behaviour-driven
 development (BDD)-level legibility for formal checks. Decision records:
-[Architecture Decision Record (ADR) 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
- and
-[Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md).
+[Architecture Decision Record (ADR) 001](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+and [Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md).
 
 This specification incorporates several useful structural elements (repo layout
 sketch, risk framing, and some diagrams) from the attached Blitzy exploration,
@@ -24,10 +23,10 @@ reduce drift risk, normative definitions are centralized:
   semantics, argument shaping, and evidence fields.
 - `docs/name-mangling-rules.md` is normative for action and harness mangling,
   collision checks, and external theorem ID rules.
-- `docs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md` records
+- `docs/adr-001-theorem-symbol-stability-and-non-vacuity-policy.md` records
   accepted rationale and trade-offs.
 - `docs/adr-002-library-first-internationalization-and-localization-with-fluent.md`
-  is normative for localisation architecture, diagnostic rendering boundaries,
+  is normative for localization architecture, diagnostic rendering boundaries,
   and Fluent backend policy.
 
 If wording differs between documents, the normative references above take
@@ -82,7 +81,7 @@ ______________________________________________________________________
 `theoremc` is a Cargo workspace composed of:
 
 - a core library (`theoremc-core`) containing the schema, parsing, validation,
-  resolution, diagnostic modelling, localisation contracts, and
+  resolution, diagnostic modelling, localization contracts, and
   backend-agnostic IR,
 - a proc-macro crate (`theoremc-macros`) that embeds theorem compilation into
   normal Rust builds,

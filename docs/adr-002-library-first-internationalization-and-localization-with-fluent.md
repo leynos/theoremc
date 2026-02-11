@@ -1,4 +1,4 @@
-# Architectureal Decision Record (ADR) 002: library-first internationalization and localization with Fluent
+# Architectural Decision Record (ADR) 002: library-first internationalization and localization with Fluent
 
 - Status: proposed
 - Date: 2026-02-11
@@ -11,7 +11,7 @@
 applications, each with their own locale negotiation policy, fallback rules,
 and runtime environment constraints.
 
-We reviewed three existing approaches:
+Three existing approaches were reviewed:
 
 - `rstest-bdd` ships Fluent catalogues inside the crate and exposes helpers for
   switching locales at runtime. It provides strong defaults and broad locale
@@ -21,23 +21,24 @@ We reviewed three existing approaches:
   `# language:` directive. It does not localize runtime diagnostics.
 - `ortho-config` defines a library-safe `Localizer` trait and a
   `FluentLocalizer` implementation that layers consumer catalogues over
-  embedded defaults. It avoids global localisation state, preserves fallback
+  embedded defaults. It avoids global localization state, preserves fallback
   behaviour, and allows deterministic error handling.
 
 `theoremc` currently emits English diagnostics through `Display` strings in
 typed error enums. This is deterministic but not localizable.
 
-For theoremc, we need:
+For theoremc, the following are required:
 
-- library-safe localisation without process-wide mutable state,
-- stable machine-readable diagnostics for tooling and CI integration,
+- library-safe localization without process-wide mutable state,
+- stable machine-readable diagnostics for tooling and Continuous Integration
+  (CI),
 - Fluent-based message rendering for human-facing output,
 - deterministic fallback behaviour when translations are missing or malformed,
 - no hidden locale negotiation inside the library.
 
 ## Decision
 
-### 1. Adopt a library-first localisation contract
+### 1. Adopt a library-first localization contract
 
 `theoremc` will adopt an injected localizer model, not a global loader model.
 
@@ -59,7 +60,7 @@ state.
 Errors remain typed and inspectable. Localized rendering is applied at display
 boundaries, not as the source of truth for programmatic error handling.
 
-### 3. Use Fluent as the default localisation backend
+### 3. Use Fluent as the default localization backend
 
 `theoremc` will ship embedded Fluent resources for `en-US` as the required
 baseline locale and may add further locales incrementally.
@@ -133,4 +134,4 @@ effort.
 - `docs/localizable-rust-libraries-with-fluent.md`
 - `docs/theoremc-design.md`
 - `docs/users-guide.md`
-- `docs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md`
+- `docs/adr-001-theorem-symbol-stability-and-non-vacuity-policy.md`

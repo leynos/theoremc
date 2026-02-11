@@ -25,7 +25,7 @@ Use these signposts to trace each roadmap task to the defining requirement.
   (parsing, validation, and diagnostics).
 - `DES-6.5`:
   [docs/theoremc-design.md §6.5](theoremc-design.md#65-localized-diagnostics-contract-adr-002)
-  (localized diagnostics contract and localisation boundaries).
+  (localized diagnostics contract and localization boundaries).
 - `DES-7`:
   [docs/theoremc-design.md §7](theoremc-design.md#7-build-integration-always-connected)
   (build integration and compile-time connectedness).
@@ -58,19 +58,19 @@ Use these signposts to trace each roadmap task to the defining requirement.
   [docs/name-mangling-rules.md §Stable external theorem identifiers](name-mangling-rules.md#stable-external-theorem-identifiers)
   (stable external theorem identifiers and alias migration rules).
 - `ADR-1`:
-  [ADR 0001 decision 1](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+  [ADR 0001 decision 1](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (injective action mangling).
 - `ADR-2`:
-  [ADR 0001 decision 2](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+  [ADR 0001 decision 2](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (injective harness naming).
 - `ADR-3`:
-  [ADR 0001 decision 3](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+  [ADR 0001 decision 3](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (explicit `{ ref: ... }` semantics).
 - `ADR-4`:
-  [ADR 0001 decision 4](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+  [ADR 0001 decision 4](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (non-vacuity witness policy).
 - `ADR-5`:
-  [ADR 0001 decision 5](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+  [ADR 0001 decision 5](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (stable external IDs and migration aliases).
 - `ADR2-1`:
   [ADR 002 decision 1](adr-002-library-first-internationalization-and-localization-with-fluent.md)
@@ -463,7 +463,8 @@ Dependencies: phase 1.
 In scope: stable code-and-arguments diagnostics model and deterministic English
 fallback text.
 
-Out of scope: locale negotiation and UI-specific message composition.
+Out of scope: locale negotiation and user interface (UI)-specific message
+composition.
 
 - [ ] Define a canonical diagnostic payload type containing code, structured
   arguments, source location, and required English fallback text. Acceptance:
