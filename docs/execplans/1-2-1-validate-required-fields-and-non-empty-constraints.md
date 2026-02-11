@@ -276,7 +276,7 @@ approximately 20 new tests.
 
 ### Milestone 5: final quality gates
 
-```
+```shell
 set -o pipefail
 make check-fmt 2>&1 | tee /tmp/check-fmt.log
 make lint 2>&1 | tee /tmp/lint.log
@@ -291,44 +291,56 @@ All commands run from `/home/user/project`.
 
 Milestone 0:
 
-    # Read and audit all valid fixture files
-    # Read and audit all inline YAML constants in loader.rs tests
-    # Confirm no empty/whitespace fields exist
+```shell
+# Read and audit all valid fixture files
+# Read and audit all inline YAML constants in loader.rs tests
+# Confirm no empty/whitespace fields exist
+```
 
 Milestone 1:
 
-    # Create src/schema/validate.rs
-    # Update src/schema/mod.rs
-    # Update src/schema/loader.rs
-    make check-fmt && make lint && make test
+```shell
+# Create src/schema/validate.rs
+# Update src/schema/mod.rs
+# Update src/schema/loader.rs
+make check-fmt && make lint && make test
+```
 
 Milestone 2:
 
-    # Add validation helpers to validate.rs
-    make check-fmt && make lint && make test
+```shell
+# Add validation helpers to validate.rs
+make check-fmt && make lint && make test
+```
 
 Milestone 3:
 
-    # Create 10 fixture files in tests/fixtures/
-    # Add BDD tests to tests/schema_bdd.rs
-    # Add integration tests to tests/schema_deser_reject.rs
-    # Add unit tests to src/schema/validate.rs
-    make check-fmt && make lint && make test
+```shell
+# Create 10 fixture files in tests/fixtures/
+# Add BDD tests to tests/schema_bdd.rs
+# Add integration tests to tests/schema_deser_reject.rs
+# Add unit tests to src/schema/validate.rs
+make check-fmt && make lint && make test
+```
 
 Milestone 4:
 
-    # Update docs/users-guide.md
-    # Update docs/roadmap.md
-    # Update docs/contents.md
-    # Update docs/theoremc-design.md
-    # Write this ExecPlan document
+```shell
+# Update docs/users-guide.md
+# Update docs/roadmap.md
+# Update docs/contents.md
+# Update docs/theoremc-design.md
+# Write this ExecPlan document
+```
 
 Milestone 5:
 
-    set -o pipefail
-    make check-fmt 2>&1 | tee /tmp/check-fmt.log
-    make lint 2>&1 | tee /tmp/lint.log
-    make test 2>&1 | tee /tmp/test.log
+```shell
+set -o pipefail
+make check-fmt 2>&1 | tee /tmp/check-fmt.log
+make lint 2>&1 | tee /tmp/lint.log
+make test 2>&1 | tee /tmp/test.log
+```
 
 ## Validation and acceptance
 
@@ -343,10 +355,12 @@ Quality criteria:
 
 Quality method:
 
-    set -o pipefail
-    make check-fmt 2>&1 | tee /tmp/check-fmt.log
-    make lint 2>&1 | tee /tmp/lint.log
-    make test 2>&1 | tee /tmp/test.log
+```shell
+set -o pipefail
+make check-fmt 2>&1 | tee /tmp/check-fmt.log
+make lint 2>&1 | tee /tmp/lint.log
+make test 2>&1 | tee /tmp/test.log
+```
 
 Expected: all three commands exit 0. Test count increases by approximately 20
 (from 147 to 167).
