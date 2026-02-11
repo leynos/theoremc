@@ -407,8 +407,8 @@ reliability hazard.[^4]
 ### 4.7 Theorem schema internationalization scope
 
 ADR 002 explicitly keeps theorem schema keywords language-stable in this
-release line. `Theorem`, `Given`, `Let`, `Do`, `Prove`, and `Evidence` remain
-canonical field names in `.theorem` files.
+release line. Canonical field names in `.theorem` files remain:
+`Theorem`, `Given`, `Let`, `Do`, `Prove`, and `Evidence`.
 
 This means theoremc localizes diagnostics and reports, not theorem syntax.
 Keyword internationalization (for example, parser support for localized schema
