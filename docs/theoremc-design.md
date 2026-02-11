@@ -5,8 +5,7 @@ workspace toolchain, compile-time correlation, and no inline Rust blocks in
 `.theorem`. Primary audience: Rust engineers who want behaviour-driven
 development (BDD)-level legibility for formal checks. Decision records:
 [Architecture Decision Record (ADR) 0001](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
- and
-[Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md).
+and [Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md).
 
 This specification incorporates several useful structural elements (repo layout
 sketch, risk framing, and some diagrams) from the attached Blitzy exploration,
