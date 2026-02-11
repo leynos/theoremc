@@ -8,46 +8,85 @@ specification and decision record documents.
 
 Use these signposts to trace each roadmap task to the defining requirement.
 
-- `DES-2`: [docs/theoremc-design.md §2](theoremc-design.md#2-non-negotiable-constraints)
+- `DES-2`:
+  [docs/theoremc-design.md §2](theoremc-design.md#2-non-negotiable-constraints)
   (non-negotiable constraints).
-- `DES-3`: [docs/theoremc-design.md §3](theoremc-design.md#3-high-level-architecture)
+- `DES-3`:
+  [docs/theoremc-design.md §3](theoremc-design.md#3-high-level-architecture)
   (high-level architecture and pipeline shape).
-- `DES-4`: [docs/theoremc-design.md §4](theoremc-design.md#4-the-theorem-file-format)
+- `DES-4`:
+  [docs/theoremc-design.md §4](theoremc-design.md#4-the-theorem-file-format)
   (theorem format and step semantics).
-- `DES-5`: [docs/theoremc-design.md §5](theoremc-design.md#5-rust-actions-step-definitions-for-proofs)
+- `DES-5`:
+  [docs/theoremc-design.md §5](theoremc-design.md#5-rust-actions-step-definitions-for-proofs)
   (action model and argument shaping).
-- `DES-6`: [docs/theoremc-design.md §6](theoremc-design.md#6-parsing-and-validation)
+- `DES-6`:
+  [docs/theoremc-design.md §6](theoremc-design.md#6-parsing-and-validation)
   (parsing, validation, and diagnostics).
-- `DES-7`: [docs/theoremc-design.md §7](theoremc-design.md#7-build-integration-always-connected)
+- `DES-6.5`:
+  [docs/theoremc-design.md §6.5](theoremc-design.md#65-localized-diagnostics-contract-adr-002)
+  (localized diagnostics contract and localisation boundaries).
+- `DES-7`:
+  [docs/theoremc-design.md §7](theoremc-design.md#7-build-integration-always-connected)
   (build integration and compile-time connectedness).
 - `DES-8`: [docs/theoremc-design.md §8](theoremc-design.md#8-kani-backend-mvp)
   (Kani backend semantics, witnesses, and vacuity policy).
 - `DES-9`: [docs/theoremc-design.md §9](theoremc-design.md#9-reporting-theoremd)
   (reporting scope and formats).
-- `DES-10`: [docs/theoremc-design.md §10](theoremc-design.md#10-enforcement-guardrails-not-the-primary-binding-mechanism)
+- `DES-10`:
+  [docs/theoremc-design.md §10](theoremc-design.md#10-enforcement-guardrails-not-the-primary-binding-mechanism)
   (optional enforcement via lints).
-- `TFS-1`: [docs/theorem-file-specification.md §§1-3](theorem-file-specification.md#1-yaml-a-human-readable-data-serialization-format-schema-reference-v1)
+- `DES-4.7`:
+  [docs/theoremc-design.md §4.7](theoremc-design.md#47-theorem-schema-internationalization-scope)
+  (theorem schema keyword internationalization scope).
+- `TFS-1`:
+  [docs/theorem-file-specification.md §§1-3](theorem-file-specification.md#1-yaml-a-human-readable-data-serialization-format-schema-reference-v1)
   (document model and conformance rules).
-- `TFS-4`: [docs/theorem-file-specification.md §4](theorem-file-specification.md#4-step-and-action-schemas)
+- `TFS-4`:
+  [docs/theorem-file-specification.md §4](theorem-file-specification.md#4-step-and-action-schemas)
   (step and action schema).
-- `TFS-5`: [docs/theorem-file-specification.md §5](theorem-file-specification.md#5-value-forms-and-how-they-compile)
+- `TFS-5`:
+  [docs/theorem-file-specification.md §5](theorem-file-specification.md#5-value-forms-and-how-they-compile)
   (value forms and explicit reference semantics).
-- `TFS-6`: [docs/theorem-file-specification.md §6](theorem-file-specification.md#6-evidence-schema)
+- `TFS-6`:
+  [docs/theorem-file-specification.md §6](theorem-file-specification.md#6-evidence-schema)
   (evidence schema).
-- `NMR-1`: [docs/name-mangling-rules.md §§Action and harness mangling](name-mangling-rules.md#action-name-mangling)
+- `NMR-1`:
+  [docs/name-mangling-rules.md §§Action and harness mangling](name-mangling-rules.md#action-name-mangling)
   (action and harness mangling rules).
-- `NMR-2`: [docs/name-mangling-rules.md §Stable external theorem identifiers](name-mangling-rules.md#stable-external-theorem-identifiers)
+- `NMR-2`:
+  [docs/name-mangling-rules.md §Stable external theorem identifiers](name-mangling-rules.md#stable-external-theorem-identifiers)
   (stable external theorem identifiers and alias migration rules).
-- `ADR-1`: [ADR 0001 decision 1](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- `ADR-1`:
+  [ADR 0001 decision 1](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (injective action mangling).
-- `ADR-2`: [ADR 0001 decision 2](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- `ADR-2`:
+  [ADR 0001 decision 2](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (injective harness naming).
-- `ADR-3`: [ADR 0001 decision 3](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- `ADR-3`:
+  [ADR 0001 decision 3](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (explicit `{ ref: ... }` semantics).
-- `ADR-4`: [ADR 0001 decision 4](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- `ADR-4`:
+  [ADR 0001 decision 4](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (non-vacuity witness policy).
-- `ADR-5`: [ADR 0001 decision 5](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- `ADR-5`:
+  [ADR 0001 decision 5](adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (stable external IDs and migration aliases).
+- `ADR2-1`:
+  [ADR 002 decision 1](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+  (library-first localizer injection; no theoremc locale negotiation).
+- `ADR2-2`:
+  [ADR 002 decision 2](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+  (stable diagnostic code + args + English fallback as source of truth).
+- `ADR2-3`:
+  [ADR 002 decision 3](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+  (Fluent default backend with consumer-over-default layering).
+- `ADR2-4`:
+  [ADR 002 decision 4](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+  (deterministic English for compile-time and machine-facing artefacts).
+- `ADR2-5`:
+  [ADR 002 decision 5](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+  (parser keyword internationalization deferred to future ADR).
 
 ## Phase 1: schema and validation foundation
 
@@ -115,8 +154,7 @@ Out of scope: backend-specific error rendering.
 - [ ] Build a fixture suite of valid and invalid `.theorem` files that covers
   aliases, nested `maybe`, `must` semantics preconditions, and witness policy.
   Acceptance: fixtures run in continuous integration (CI) and gate parser and
-  validator regressions.
-  Signposts: `TFS-1`, `TFS-4`, `TFS-6`, `ADR-4`.
+  validator regressions. Signposts: `TFS-1`, `TFS-4`, `TFS-6`, `ADR-4`.
 
 ## Phase 2: action resolution and deterministic naming
 
@@ -413,6 +451,87 @@ Out of scope: production deployment templates.
   request template and contributor docs reference the checklist explicitly.
   Signposts: `DES-6`, `DES-7`, `DES-9`.
 
+## Phase 7: library-first localization and Fluent diagnostics
+
+Outcome: theoremc diagnostics remain deterministic and machine-readable while
+supporting localized human rendering through injected localizers.
+
+### Step 7.1: implement canonical diagnostic model and compatibility policy
+
+Dependencies: phase 1.
+
+In scope: stable code-and-arguments diagnostics model and deterministic English
+fallback text.
+
+Out of scope: locale negotiation and UI-specific message composition.
+
+- [ ] Define a canonical diagnostic payload type containing code, structured
+  arguments, source location, and required English fallback text. Acceptance:
+  parser and validator diagnostics are emitted through this model with
+  snapshot-backed stability tests. Signposts: `DES-6`, `DES-6.5`, `ADR2-2`.
+- [ ] Define compatibility policy for diagnostic codes and argument schemas.
+  Acceptance: contributor documentation and tests guard against accidental
+  breaking changes in existing codes and argument keys. Signposts: `DES-6.5`,
+  `ADR2-2`.
+
+### Step 7.2: implement localizer contract and Fluent default backend
+
+Dependencies: step 7.1.
+
+In scope: library-safe localizer abstraction, embedded `en-US` resources,
+consumer layering, and deterministic fallback semantics.
+
+Out of scope: process-wide locale globals.
+
+- [ ] Introduce a library-level `Localizer` trait (or equivalent) that renders
+  diagnostic messages from code and structured arguments. Acceptance: theoremc
+  APIs accept localization as injected context and never read locale
+  environment variables. Signposts: `DES-6.5`, `ADR2-1`.
+- [ ] Embed theoremc `en-US` Fluent resources and expose them for consumer
+  loader composition. Acceptance: integration tests show host applications can
+  load theoremc Fluent assets into an existing Fluent language loader.
+  Signposts: `DES-6.5`, `ADR2-3`.
+- [ ] Implement optional Fluent-backed localizer layering consumer catalogues
+  over theoremc defaults with deterministic fallback for missing keys and
+  formatting failures. Acceptance: tests cover consumer hit, default fallback,
+  and formatting-error fallback paths. Signposts: `DES-6.5`, `ADR2-3`.
+
+### Step 7.3: enforce rendering boundaries and report semantics
+
+Dependencies: steps 7.1 and 7.2, plus phase 5.
+
+In scope: deterministic compile-time diagnostics and dual machine/human report
+fields.
+
+Out of scope: parser keyword localization.
+
+- [ ] Keep proc-macro and code-generation diagnostics deterministic English.
+  Acceptance: compile-fail and snapshot tests confirm output stability across
+  host locale changes. Signposts: `DES-6.5`, `ADR2-4`.
+- [ ] Extend `theoremd` outputs to always include stable diagnostic code and
+  arguments, include required English fallback text, and attach localized text
+  only when a localizer is configured. Acceptance: report snapshots for
+  Markdown, HTML, JUnit XML, and Cucumber JSON confirm invariant machine fields
+  and optional localized projection fields. Signposts: `DES-9`, `DES-6.5`,
+  `ADR2-2`, `ADR2-4`.
+- [ ] Add locale-determinism regression tests proving machine-facing artefacts
+  are identical across locales while localized human-facing strings vary only
+  in localized fields. Signposts: `DES-9`, `DES-6.5`, `ADR2-4`.
+
+### Step 7.4: document and guard deferred parser keyword internationalization
+
+Dependencies: step 7.3.
+
+In scope: explicit deferral policy and regression coverage for canonical schema
+keywords.
+
+Out of scope: implementation of localized theorem schema keys.
+
+- [ ] Document and enforce that `.theorem` top-level keys remain canonical in
+  this release line. Acceptance: parser tests reject unsupported localized key
+  synonyms and docs explain the deferral policy with migration implications.
+  Signposts: `DES-4`, `DES-4.7`, `ADR2-5`.
+
 ## Sequencing summary
 
 - Execute phases in order.
@@ -422,3 +541,5 @@ Out of scope: production deployment templates.
   stable.
 - Treat vacuity policy implementation as a release gate, not an optional
   enhancement.
+- Start localization integration only after core diagnostics are structured and
+  stable.
