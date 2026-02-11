@@ -1,4 +1,4 @@
-# ADR 0002: library-first internationalization and localization with Fluent
+# Architectureal Decision Record (ADR) 002: library-first internationalization and localization with Fluent
 
 - Status: proposed
 - Date: 2026-02-11
