@@ -6,7 +6,7 @@
 //! successful YAML deserialization.
 
 use super::error::SchemaError;
-use super::types::TheoremDoc;
+use super::types::{KaniEvidence, TheoremDoc};
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -21,6 +21,29 @@ fn fail(doc: &TheoremDoc, reason: String) -> SchemaError {
         theorem: doc.theorem.to_string(),
         reason,
     }
+}
+
+/// Validates that all labelled string fields within an indexed
+/// section entry are non-empty after trimming. Returns an error on
+/// the first blank field.
+fn require_non_blank_fields(
+    doc: &TheoremDoc,
+    section: &str,
+    pos: usize,
+    fields: &[(&str, &str)],
+) -> Result<(), SchemaError> {
+    for &(label, value) in fields {
+        if is_blank(value) {
+            return Err(fail(
+                doc,
+                format!(
+                    "{section} {pos}: {label} must be \
+                     non-empty after trimming"
+                ),
+            ));
+        }
+    }
+    Ok(())
 }
 
 // ── Public entry point ──────────────────────────────────────────────
@@ -39,7 +62,8 @@ fn fail(doc: &TheoremDoc, reason: String) -> SchemaError {
 /// - Kani `unwind` is positive (> 0).
 /// - Kani `vacuity_because` is non-empty after trimming when present.
 /// - Kani `allow_vacuous: true` requires `vacuity_because`.
-/// - Kani `allow_vacuous: false` (default) requires non-empty `Witness`.
+/// - Kani `allow_vacuous: false` (default) requires non-empty
+///   `Witness`.
 ///
 /// # Errors
 ///
@@ -73,50 +97,36 @@ fn validate_prove_non_empty(doc: &TheoremDoc) -> Result<(), SchemaError> {
     if doc.prove.is_empty() {
         return Err(fail(
             doc,
-            "Prove section must contain at least one assertion".to_owned(),
+            concat!("Prove section must contain at least one ", "assertion",).to_owned(),
         ));
     }
     Ok(())
 }
 
-/// Every `Assertion` must have non-empty `assert` and `because` fields
-/// after trimming (`TFS-1` §3.10).
+/// Every `Assertion` must have non-empty `assert` and `because`
+/// fields after trimming (`TFS-1` §3.10).
 fn validate_assertions(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    for (i, assertion) in doc.prove.iter().enumerate() {
-        let pos = i + 1;
-        if is_blank(&assertion.assert_expr) {
-            return Err(fail(
-                doc,
-                format!("Prove assertion {pos}: assert must be non-empty after trimming"),
-            ));
-        }
-        if is_blank(&assertion.because) {
-            return Err(fail(
-                doc,
-                format!("Prove assertion {pos}: because must be non-empty after trimming"),
-            ));
-        }
+    for (i, a) in doc.prove.iter().enumerate() {
+        require_non_blank_fields(
+            doc,
+            "Prove assertion",
+            i + 1,
+            &[("assert", &a.assert_expr), ("because", &a.because)],
+        )?;
     }
     Ok(())
 }
 
-/// Every `Assumption` must have non-empty `expr` and `because` fields
-/// after trimming (`TFS-1` §3.7).
+/// Every `Assumption` must have non-empty `expr` and `because`
+/// fields after trimming (`TFS-1` §3.7).
 fn validate_assumptions(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    for (i, assumption) in doc.assume.iter().enumerate() {
-        let pos = i + 1;
-        if is_blank(&assumption.expr) {
-            return Err(fail(
-                doc,
-                format!("Assume constraint {pos}: expr must be non-empty after trimming"),
-            ));
-        }
-        if is_blank(&assumption.because) {
-            return Err(fail(
-                doc,
-                format!("Assume constraint {pos}: because must be non-empty after trimming",),
-            ));
-        }
+    for (i, a) in doc.assume.iter().enumerate() {
+        require_non_blank_fields(
+            doc,
+            "Assume constraint",
+            i + 1,
+            &[("expr", &a.expr), ("because", &a.because)],
+        )?;
     }
     Ok(())
 }
@@ -124,20 +134,13 @@ fn validate_assumptions(doc: &TheoremDoc) -> Result<(), SchemaError> {
 /// Every `WitnessCheck` must have non-empty `cover` and `because`
 /// fields after trimming (`TFS-1` §3.7.1).
 fn validate_witnesses(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    for (i, witness) in doc.witness.iter().enumerate() {
-        let pos = i + 1;
-        if is_blank(&witness.cover) {
-            return Err(fail(
-                doc,
-                format!("Witness {pos}: cover must be non-empty after trimming"),
-            ));
-        }
-        if is_blank(&witness.because) {
-            return Err(fail(
-                doc,
-                format!("Witness {pos}: because must be non-empty after trimming"),
-            ));
-        }
+    for (i, w) in doc.witness.iter().enumerate() {
+        require_non_blank_fields(
+            doc,
+            "Witness",
+            i + 1,
+            &[("cover", &w.cover), ("because", &w.because)],
+        )?;
     }
     Ok(())
 }
@@ -146,68 +149,87 @@ fn validate_witnesses(doc: &TheoremDoc) -> Result<(), SchemaError> {
 /// evidence must satisfy unwind, vacuity, and witness constraints
 /// (`TFS-6` §6.2, `ADR-4`).
 fn validate_evidence(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    if doc.evidence.kani.is_none()
-        && doc.evidence.verus.is_none()
-        && doc.evidence.stateright.is_none()
-    {
+    if !doc.evidence.has_any_backend() {
         return Err(fail(
             doc,
             concat!(
-                "Evidence section must specify at least one backend ",
-                "(kani, verus, or stateright)",
+                "Evidence section must specify at least one ",
+                "backend (kani, verus, or stateright)",
             )
             .to_owned(),
         ));
     }
 
     if let Some(kani) = &doc.evidence.kani {
-        if kani.unwind == 0 {
-            return Err(fail(
-                doc,
-                "Evidence.kani.unwind must be a positive integer (> 0)".to_owned(),
-            ));
-        }
-
-        if !kani.allow_vacuous && doc.witness.is_empty() {
-            return Err(fail(
-                doc,
-                concat!(
-                    "Witness section must contain at least one witness ",
-                    "when allow_vacuous is false (the default)",
-                )
-                .to_owned(),
-            ));
-        }
-
-        if kani.allow_vacuous {
-            match &kani.vacuity_because {
-                None => {
-                    return Err(fail(
-                        doc,
-                        concat!("vacuity_because is required when ", "allow_vacuous is true",)
-                            .to_owned(),
-                    ));
-                }
-                Some(reason) if is_blank(reason) => {
-                    return Err(fail(
-                        doc,
-                        concat!(
-                            "Evidence.kani.vacuity_because must be ",
-                            "non-empty after trimming",
-                        )
-                        .to_owned(),
-                    ));
-                }
-                Some(_) => {}
-            }
-        }
+        validate_kani_unwind(doc, kani)?;
+        validate_kani_vacuity(doc, kani)?;
+        validate_kani_witnesses(doc, kani)?;
     }
 
     Ok(())
 }
 
+/// Kani `unwind` must be a positive integer (`TFS-6` §6.2).
+fn validate_kani_unwind(doc: &TheoremDoc, kani: &KaniEvidence) -> Result<(), SchemaError> {
+    if kani.unwind == 0 {
+        return Err(fail(
+            doc,
+            concat!("Evidence.kani.unwind must be a positive ", "integer (> 0)",).to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+/// Kani vacuity policy: `allow_vacuous: true` requires a non-empty
+/// `vacuity_because`; when present, `vacuity_because` must be
+/// non-empty regardless of `allow_vacuous` (`ADR-4`).
+fn validate_kani_vacuity(doc: &TheoremDoc, kani: &KaniEvidence) -> Result<(), SchemaError> {
+    let requires_reason = kani.allow_vacuous;
+    let has_reason = kani.vacuity_because.is_some();
+    let reason_is_blank = kani.vacuity_because.as_deref().is_some_and(is_blank);
+
+    if requires_reason && !has_reason {
+        return Err(fail(
+            doc,
+            concat!("vacuity_because is required when ", "allow_vacuous is true",).to_owned(),
+        ));
+    }
+
+    if has_reason && reason_is_blank {
+        return Err(fail(
+            doc,
+            concat!(
+                "Evidence.kani.vacuity_because must be ",
+                "non-empty after trimming",
+            )
+            .to_owned(),
+        ));
+    }
+
+    Ok(())
+}
+
+/// Kani non-vacuity default: `Witness` section must contain at least
+/// one witness when `allow_vacuous` is false (`ADR-4`).
+fn validate_kani_witnesses(doc: &TheoremDoc, kani: &KaniEvidence) -> Result<(), SchemaError> {
+    if !kani.allow_vacuous && doc.witness.is_empty() {
+        return Err(fail(
+            doc,
+            concat!(
+                "Witness section must contain at least one ",
+                "witness when allow_vacuous is false ",
+                "(the default)",
+            )
+            .to_owned(),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    //! Unit tests for post-deserialization semantic validation.
+
     use rstest::*;
 
     use crate::schema::load_theorem_docs;
@@ -219,186 +241,9 @@ mod tests {
         result.err().map(|e| e.to_string()).unwrap_or_default()
     }
 
-    // ── About validation ────────────────────────────────────────────
-
-    #[rstest]
-    #[case::empty_string(
-        r#"
-Theorem: T
-About: ""
-Prove:
-  - assert: "true"
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: "true"
-    because: always reachable
-"#
-    )]
-    #[case::whitespace_only(
-        r#"
-Theorem: T
-About: "   "
-Prove:
-  - assert: "true"
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: "true"
-    because: always reachable
-"#
-    )]
-    fn blank_about_is_rejected(#[case] yaml: &str) {
-        let msg = load_err(yaml);
-        assert!(
-            msg.contains("About must be non-empty"),
-            "expected About error, got: {msg}"
-        );
-    }
-
-    // ── Assertion validation ────────────────────────────────────────
-
-    #[test]
-    fn blank_assert_expr_is_rejected() {
-        let yaml = r#"
-Theorem: T
-About: valid
-Prove:
-  - assert: ""
-    because: some reason
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: "true"
-    because: always reachable
-"#;
-        let msg = load_err(yaml);
-        assert!(msg.contains("assert must be non-empty"));
-    }
-
-    #[test]
-    fn blank_prove_because_is_rejected() {
-        let yaml = r#"
-Theorem: T
-About: valid
-Prove:
-  - assert: "true"
-    because: ""
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: "true"
-    because: always reachable
-"#;
-        let msg = load_err(yaml);
-        assert!(msg.contains("because must be non-empty"));
-    }
-
-    // ── Assumption validation ───────────────────────────────────────
-
-    #[test]
-    fn blank_assume_expr_is_rejected() {
-        let yaml = r#"
-Theorem: T
-About: valid
-Assume:
-  - expr: ""
-    because: some reason
-Prove:
-  - assert: "true"
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: "true"
-    because: always reachable
-"#;
-        let msg = load_err(yaml);
-        assert!(msg.contains("expr must be non-empty"));
-    }
-
-    #[test]
-    fn blank_assume_because_is_rejected() {
-        let yaml = r#"
-Theorem: T
-About: valid
-Assume:
-  - expr: "x > 0"
-    because: ""
-Prove:
-  - assert: "true"
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: "true"
-    because: always reachable
-"#;
-        let msg = load_err(yaml);
-        assert!(msg.contains("because must be non-empty"));
-    }
-
-    // ── Witness validation ──────────────────────────────────────────
-
-    #[test]
-    fn blank_witness_cover_is_rejected() {
-        let yaml = r#"
-Theorem: T
-About: valid
-Prove:
-  - assert: "true"
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: ""
-    because: always reachable
-"#;
-        let msg = load_err(yaml);
-        assert!(msg.contains("cover must be non-empty"));
-    }
-
-    #[test]
-    fn blank_witness_because_is_rejected() {
-        let yaml = r#"
-Theorem: T
-About: valid
-Prove:
-  - assert: "true"
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: "true"
-    because: ""
-"#;
-        let msg = load_err(yaml);
-        assert!(msg.contains("because must be non-empty"));
-    }
-
-    // ── Kani evidence validation ────────────────────────────────────
-
-    #[test]
-    fn zero_unwind_is_rejected() {
-        let yaml = r"
+    /// Minimal valid YAML template with placeholders for About,
+    /// Prove, Assume, Witness, and Evidence sections.
+    const VALID_BASE: &str = r"
 Theorem: T
 About: valid
 Prove:
@@ -406,32 +251,73 @@ Prove:
     because: trivially true
 Evidence:
   kani:
-    unwind: 0
+    unwind: 1
     expect: SUCCESS
 Witness:
   - cover: 'true'
     because: always reachable
 ";
+
+    #[rstest]
+    #[case::empty_about(
+        "Theorem: T\nAbout: \"\"\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
+        "About must be non-empty"
+    )]
+    #[case::whitespace_about(
+        "Theorem: T\nAbout: \"   \"\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
+        "About must be non-empty"
+    )]
+    #[case::empty_assert_expr(
+        "Theorem: T\nAbout: ok\nProve:\n  - assert: \"\"\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
+        "Prove assertion 1: assert must be non-empty"
+    )]
+    #[case::empty_prove_because(
+        "Theorem: T\nAbout: ok\nProve:\n  - assert: 'true'\n    because: \"\"\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
+        "Prove assertion 1: because must be non-empty"
+    )]
+    #[case::empty_assume_expr(
+        "Theorem: T\nAbout: ok\nAssume:\n  - expr: \"\"\n    because: r\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
+        "Assume constraint 1: expr must be non-empty"
+    )]
+    #[case::empty_assume_because(
+        "Theorem: T\nAbout: ok\nAssume:\n  - expr: 'x > 0'\n    because: \"\"\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
+        "Assume constraint 1: because must be non-empty"
+    )]
+    #[case::empty_witness_cover(
+        "Theorem: T\nAbout: ok\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: \"\"\n    because: r",
+        "Witness 1: cover must be non-empty"
+    )]
+    #[case::empty_witness_because(
+        "Theorem: T\nAbout: ok\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: \"\"",
+        "Witness 1: because must be non-empty"
+    )]
+    #[case::zero_unwind(
+        "Theorem: T\nAbout: ok\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 0\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
+        "unwind must be a positive integer"
+    )]
+    #[case::blank_vacuity_because_when_vacuous(
+        "Theorem: T\nAbout: ok\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\n    allow_vacuous: true\n    vacuity_because: \"\"",
+        "vacuity_because must be non-empty"
+    )]
+    #[case::blank_vacuity_because_when_not_vacuous(
+        "Theorem: T\nAbout: ok\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\n    vacuity_because: \"  \"\nWitness:\n  - cover: 'true'\n    because: r",
+        "vacuity_because must be non-empty"
+    )]
+    fn given_invalid_field_when_loaded_then_rejected(
+        #[case] yaml: &str,
+        #[case] expected_fragment: &str,
+    ) {
         let msg = load_err(yaml);
-        assert!(msg.contains("unwind must be a positive integer"));
+        assert!(
+            msg.contains(expected_fragment),
+            "expected error containing '{expected_fragment}', \
+             got: {msg}"
+        );
     }
 
     #[test]
-    fn blank_vacuity_because_is_rejected() {
-        let yaml = r#"
-Theorem: T
-About: valid
-Prove:
-  - assert: "true"
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-    allow_vacuous: true
-    vacuity_because: ""
-"#;
-        let msg = load_err(yaml);
-        assert!(msg.contains("vacuity_because must be non-empty"));
+    fn valid_base_parses_successfully() {
+        let result = load_theorem_docs(VALID_BASE);
+        assert!(result.is_ok(), "VALID_BASE should parse: {result:?}");
     }
 }

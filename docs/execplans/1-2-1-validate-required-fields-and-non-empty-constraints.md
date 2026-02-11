@@ -16,14 +16,14 @@ actionable error message identifying the theorem name and the failing
 constraint.
 
 This is Roadmap Phase 1, Step 1.2.1. It builds on Step 1.1 (strict
-deserialization) by adding post-deserialization validation for non-empty fields,
-positive `unwind`, and vacuity-related constraints defined by `TFS-1` sections
-3.3, 3.7, 3.7.1, 3.10, `TFS-6` section 6.2, and `DES-6` section 6.2.
+deserialization) by adding post-deserialization validation for non-empty
+fields, positive `unwind`, and vacuity-related constraints defined by `TFS-1`
+sections 3.3, 3.7, 3.7.1, 3.10, `TFS-6` section 6.2, and `DES-6` section 6.2.
 
 Observable success: running `make test` passes with approximately 20 new tests
-(unit, BDD, and integration) that confirm each non-empty constraint is enforced
-with a deterministic error message containing an expected fragment string.
-Existing tests remain green (no regressions).
+(unit, behaviour-driven development (BDD), and integration) that confirm each
+non-empty constraint is enforced with a deterministic error message containing
+an expected fragment string. Existing tests remain green (no regressions).
 
 ## Constraints
 
@@ -57,8 +57,8 @@ Existing tests remain green (no regressions).
 ## Risks
 
 - Risk: adding validation logic inline to `loader.rs` would breach the
-  400-line limit. Severity: medium. Likelihood: certain (`loader.rs` was at
-  373 lines). Mitigation: extract all validation into a new
+  400-line limit. Severity: medium. Likelihood: certain (`loader.rs` was at 373
+  lines). Mitigation: extract all validation into a new
   `src/schema/validate.rs` module.
 
 - Risk: existing valid fixtures or inline YAML test constants might contain
@@ -113,14 +113,14 @@ Existing tests remain green (no regressions).
   whitespace characters, making it the most defensive choice. Date: 2026-02-10.
 
 - D3: `unwind: 0` is rejected.
-  The spec (`TFS-6` §6.2) says "positive integer", meaning > 0. The `u32`
-  serde type already rejects negative values. A post-deserialization check
-  rejects zero. Date: 2026-02-10.
+  The spec (`TFS-6` §6.2) says "positive integer", meaning > 0. The `u32` serde
+  type already rejects negative values. A post-deserialization check rejects
+  zero. Date: 2026-02-10.
 
 - D4: 1-based indexing in error messages.
-  Error messages for indexed fields (`Prove assertion 1:`, `Assume
-  constraint 1:`, `Witness 1:`) use 1-based indices for human readability.
-  Date: 2026-02-10.
+  Error messages for indexed fields (`Prove assertion 1:`,
+  `Assume constraint 1:`, `Witness 1:`) use 1-based indices for human
+  readability. Date: 2026-02-10.
 
 ## Outcomes & retrospective
 
@@ -135,8 +135,8 @@ All milestones completed successfully. The implementation delivers:
   `schema_deser_reject.rs`.
 - Total test count increased from 147 to 167.
 - Documentation updated: `users-guide.md` (non-empty constraints),
-  `roadmap.md` (checkbox), `contents.md` (execplan entry),
-  `theoremc-design.md` (decision note).
+  `roadmap.md` (checkbox), `contents.md` (execplan entry), `theoremc-design.md`
+  (decision note).
 - All quality gates pass: `make check-fmt`, `make lint`, `make test`.
 
 Lessons learned:
@@ -210,17 +210,19 @@ This is a pure refactor with no behavioural change.
 
 Add private validation helpers in `validate.rs`:
 
-| Rule | Field | Check | Error reason |
-| --- | --- | --- | --- |
-| 1 | `About` | `is_blank(&doc.about)` | `About must be non-empty after trimming` |
-| 2 | `Assertion.assert_expr` | `is_blank(...)` | `Prove assertion {i}: assert must be non-empty after trimming` |
-| 3 | `Assertion.because` | `is_blank(...)` | `Prove assertion {i}: because must be non-empty after trimming` |
-| 4 | `Assumption.expr` | `is_blank(...)` | `Assume constraint {i}: expr must be non-empty after trimming` |
-| 5 | `Assumption.because` | `is_blank(...)` | `Assume constraint {i}: because must be non-empty after trimming` |
-| 6 | `WitnessCheck.cover` | `is_blank(...)` | `Witness {i}: cover must be non-empty after trimming` |
-| 7 | `WitnessCheck.because` | `is_blank(...)` | `Witness {i}: because must be non-empty after trimming` |
-| 8 | `KaniEvidence.unwind` | `unwind == 0` | `Evidence.kani.unwind must be a positive integer (> 0)` |
-| 9 | `KaniEvidence.vacuity_because` | present but `is_blank(...)` | `Evidence.kani.vacuity_because must be non-empty after trimming` |
+*Table 1: validation rules added in Milestone 2.*
+
+| Rule | Field                          | Check                       | Error reason                                                      |
+| ---- | ------------------------------ | --------------------------- | ----------------------------------------------------------------- |
+| 1    | `About`                        | `is_blank(&doc.about)`      | `About must be non-empty after trimming`                          |
+| 2    | `Assertion.assert_expr`        | `is_blank(...)`             | `Prove assertion {i}: assert must be non-empty after trimming`    |
+| 3    | `Assertion.because`            | `is_blank(...)`             | `Prove assertion {i}: because must be non-empty after trimming`   |
+| 4    | `Assumption.expr`              | `is_blank(...)`             | `Assume constraint {i}: expr must be non-empty after trimming`    |
+| 5    | `Assumption.because`           | `is_blank(...)`             | `Assume constraint {i}: because must be non-empty after trimming` |
+| 6    | `WitnessCheck.cover`           | `is_blank(...)`             | `Witness {i}: cover must be non-empty after trimming`             |
+| 7    | `WitnessCheck.because`         | `is_blank(...)`             | `Witness {i}: because must be non-empty after trimming`           |
+| 8    | `KaniEvidence.unwind`          | `unwind == 0`               | `Evidence.kani.unwind must be a positive integer (> 0)`           |
+| 9    | `KaniEvidence.vacuity_because` | present but `is_blank(...)` | `Evidence.kani.vacuity_because must be non-empty after trimming`  |
 
 Gate: `make check-fmt && make lint && make test` — existing tests still pass
 (all existing fixtures have non-empty fields, confirmed by Milestone 0 audit).
@@ -254,8 +256,8 @@ fn given_empty_or_blank_fields_when_loaded_then_validation_fails(
 ) { ... }
 ```
 
-Add unit tests in `src/schema/validate.rs` `#[cfg(test)] mod tests` with
-inline YAML for each failure case.
+Add unit tests in `src/schema/validate.rs` `#[cfg(test)] mod tests` with inline
+YAML for each failure case.
 
 Add integration tests in `tests/schema_deser_reject.rs` for key rejection
 categories.
@@ -397,8 +399,8 @@ Key file paths (all relative to repo root):
 
 ## Interfaces and dependencies
 
-No new dependencies. This plan uses only the existing dependency set from
-Step 1.1.
+No new dependencies. This plan uses only the existing dependency set from Step
+1.1.
 
 Internal interface added:
 

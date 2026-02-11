@@ -36,20 +36,20 @@ Every theorem document is a YAML mapping with the following fields. Keys use
 `TitleCase` canonically, but lowercase aliases are also accepted (e.g.,
 `Theorem` or `theorem`).
 
-| Field      | Type                              | Required | Default              | Notes                                   |
-| ---------- | --------------------------------- | -------- | -------------------- | --------------------------------------- |
-| `Schema`   | integer                           | no       | `None` (unspecified) | Forwards compatibility.                 |
-| `Theorem`  | string                            | **yes**  | —                    | Must be a valid identifier (see below). |
+| Field      | Type                              | Required | Default              | Notes                                                                   |
+| ---------- | --------------------------------- | -------- | -------------------- | ----------------------------------------------------------------------- |
+| `Schema`   | integer                           | no       | `None` (unspecified) | Forwards compatibility.                                                 |
+| `Theorem`  | string                            | **yes**  | —                    | Must be a valid identifier (see below).                                 |
 | `About`    | string                            | **yes**  | —                    | Human-readable description of intent. Must be non-empty after trimming. |
-| `Tags`     | list of strings                   | no       | `[]`                 | Metadata for filtering and reporting.   |
-| `Given`    | list of strings                   | no       | `[]`                 | Narrative context (no codegen impact).  |
-| `Forall`   | map (identifier → type)           | no       | `{}`                 | Symbolic quantified variables.          |
-| `Assume`   | list of `Assumption`              | no       | `[]`                 | Constraints on symbolic inputs.         |
-| `Witness`  | list of `WitnessCheck`            | no       | `[]`                 | Non-vacuity witnesses.                  |
-| `Let`      | map (identifier → `LetBinding`)   | no       | `{}`                 | Named fixtures.                         |
-| `Do`       | list of `Step`                    | no       | `[]`                 | Theorem step sequence.                  |
-| `Prove`    | list of `Assertion`               | **yes**  | —                    | Proof obligations.                      |
-| `Evidence` | `Evidence`                        | **yes**  | —                    | Backend configuration.                  |
+| `Tags`     | list of strings                   | no       | `[]`                 | Metadata for filtering and reporting.                                   |
+| `Given`    | list of strings                   | no       | `[]`                 | Narrative context (no codegen impact).                                  |
+| `Forall`   | map (identifier → type)           | no       | `{}`                 | Symbolic quantified variables.                                          |
+| `Assume`   | list of `Assumption`              | no       | `[]`                 | Constraints on symbolic inputs.                                         |
+| `Witness`  | list of `WitnessCheck`            | no       | `[]`                 | Non-vacuity witnesses.                                                  |
+| `Let`      | map (identifier → `LetBinding`)   | no       | `{}`                 | Named fixtures.                                                         |
+| `Do`       | list of `Step`                    | no       | `[]`                 | Theorem step sequence.                                                  |
+| `Prove`    | list of `Assertion`               | **yes**  | —                    | Proof obligations.                                                      |
+| `Evidence` | `Evidence`                        | **yes**  | —                    | Backend configuration.                                                  |
 
 ### Identifier rules
 
@@ -75,11 +75,11 @@ contain only whitespace:
 - `WitnessCheck.cover` and `WitnessCheck.because`
 - `KaniEvidence.vacuity_because` (when present)
 
-Additionally:
+The loader also enforces these structural constraints:
 
-- `Prove` must contain at least one assertion.
-- `Evidence.kani.unwind` must be a positive integer (> 0).
-- `Witness` must contain at least one witness unless
+- The `Prove` section requires at least one assertion.
+- `Evidence.kani.unwind` accepts only positive integers (> 0).
+- At least one `Witness` entry is required unless
   `Evidence.kani.allow_vacuous` is `true`.
 
 ### Subordinate types
