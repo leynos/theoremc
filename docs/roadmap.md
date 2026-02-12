@@ -128,7 +128,7 @@ Out of scope: Rust typechecking of expressions.
   `About`, `Prove`, and Kani evidence requirements. Acceptance: negative tests
   cover each missing/empty field and confirm deterministic error messages.
   Signposts: `TFS-1`, `TFS-6`, `DES-6`.
-- [ ] Parse `Assume.expr`, `Prove.assert`, and `Witness.cover` as `syn::Expr`
+- [x] Parse `Assume.expr`, `Prove.assert`, and `Witness.cover` as `syn::Expr`
   and reject statement blocks. Acceptance: tests demonstrate single-expression
   acceptance and block-style rejection. Signposts: `TFS-1`, `DES-6`.
 - [ ] Enforce `Step` and `LetBinding` shape rules (`Let` allows only `call` or

@@ -977,6 +977,7 @@ dependencies = [
  "rstest",
  "serde",
  "serde-saphyr",
+ "syn",
  "thiserror",
 ]
 

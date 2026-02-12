@@ -1,0 +1,12 @@
+Theorem: SyntaxAssert
+About: Prove assert contains invalid Rust syntax
+Prove:
+  - assert: "not valid %%"
+    because: test expression validation
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

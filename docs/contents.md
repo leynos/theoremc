@@ -43,3 +43,6 @@
     - ExecPlan for strict theorem document deserialization.
   - [Step 1.2.1: Validate required fields and non-empty constraints](execplans/1-2-1-validate-required-fields-and-non-empty-constraints.md)
     - ExecPlan for post-deserialization semantic validation rules.
+  - [Step 1.2.2: Parse expression fields as `syn::Expr`](execplans/1-2-2-parse-assume-prove-and-witness-expressions.md)
+    - ExecPlan for expression syntax validation and statement block
+    rejection.

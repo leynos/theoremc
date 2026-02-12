@@ -6,6 +6,7 @@
 //! and support for both TitleCase and lowercase key aliases.
 
 mod error;
+mod expr;
 mod identifier;
 mod loader;
 mod newtypes;

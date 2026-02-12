@@ -1,0 +1,15 @@
+Theorem: SyntaxAssumeExpr
+About: Assume expr contains invalid Rust syntax
+Assume:
+  - expr: "not valid %%"
+    because: test expression validation
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

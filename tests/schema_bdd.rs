@@ -252,3 +252,46 @@ fn given_empty_or_blank_fields_when_loaded_then_validation_fails(
          got: {msg}"
     );
 }
+
+// ── Given statement blocks or invalid syntax in expression fields,
+//    validation fails ──────────────────────────────────────────────
+
+#[rstest]
+#[case::block_in_assume_expr(
+    "invalid_block_assume_expr.theorem",
+    "Assume constraint 1: expr must be a single expression"
+)]
+#[case::for_loop_in_assert(
+    "invalid_for_loop_assert.theorem",
+    "Prove assertion 1: assert must be a single expression"
+)]
+#[case::while_in_witness_cover(
+    "invalid_while_witness_cover.theorem",
+    "Witness 1: cover must be a single expression"
+)]
+#[case::invalid_syntax_in_assume(
+    "invalid_syntax_assume_expr.theorem",
+    "Assume constraint 1: expr is not a valid Rust expression"
+)]
+#[case::invalid_syntax_in_assert(
+    "invalid_syntax_assert.theorem",
+    "Prove assertion 1: assert is not a valid Rust expression"
+)]
+#[case::invalid_syntax_in_witness(
+    "invalid_syntax_witness_cover.theorem",
+    "Witness 1: cover is not a valid Rust expression"
+)]
+fn given_statement_or_bad_syntax_in_expr_when_loaded_then_validation_fails(
+    #[case] fixture: &str,
+    #[case] expected_fragment: &str,
+) {
+    let yaml = load_fixture(fixture);
+    let result = load_theorem_docs(&yaml);
+    assert!(result.is_err(), "expected {fixture} to fail validation");
+    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
+    assert!(
+        msg.contains(expected_fragment),
+        "error for {fixture} should contain '{expected_fragment}', \
+         got: {msg}"
+    );
+}

@@ -82,6 +82,41 @@ The loader also enforces these structural constraints:
 - At least one `Witness` entry is required unless
   `Evidence.kani.allow_vacuous` is `true`.
 
+### Expression syntax validation
+
+The expression fields `Assumption.expr`, `Assertion.assert`, and
+`WitnessCheck.cover` must contain syntactically valid Rust expressions. The
+loader parses each expression using `syn::Expr` and rejects any expression that
+is not a single, value-producing form.
+
+Accepted forms include comparisons, function and method calls, boolean
+literals, identifiers, arithmetic, `if` expressions, `match` expressions,
+closures, field access, and other standard Rust expressions:
+
+```yaml
+Assume:
+  - expr: "amount <= (u64::MAX - balance)"
+    because: prevent overflow
+Prove:
+  - assert: "result.is_valid()"
+    because: account invariants hold
+Witness:
+  - cover: "if x > 0 { x } else { 1 }"
+    because: positive branch is exercised
+```
+
+Rejected forms include statement blocks, loops (`for`, `while`, `loop`), `let`
+bindings, `unsafe`/`async`/`const` blocks, assignments, and flow-control
+statements (`return`, `break`, `continue`):
+
+```yaml
+# These will be rejected:
+Assume:
+  - expr: "{ let x = 1; x > 0 }"    # block expression
+  - expr: "for i in 0..10 { }"       # for loop
+  - expr: "x = 5"                    # assignment
+```
+
 ### Subordinate types
 
 **Assumption**: a constraint on symbolic inputs. Both `expr` and `because` are
