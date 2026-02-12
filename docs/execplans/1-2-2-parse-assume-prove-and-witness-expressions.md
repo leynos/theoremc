@@ -80,7 +80,7 @@ with clear error messages. Existing tests remain green (no regressions).
 
 - Risk: `syn::parse_str` behaviour for edge cases (e.g., `"let x = 5"`)
   could vary across syn versions. Severity: low. Likelihood: low (`Expr::Let`
-  has been stable since syn 2.0). Mitigation: pin to `^2.0.114` (already in
+  has been stable since syn 2.0). Mitigation: pin to `^2.0.115` (already in
   lockfile) and test exact strings.
 
 ## Progress
@@ -170,7 +170,7 @@ All milestones completed successfully. The implementation delivers:
   fixtures.
 - Total test count increased from 167 to 198 (31 new tests: 26 unit tests in
   `expr.rs`, 4 unit tests in `validate.rs`, and 6 BDD tests).
-- 1 new production dependency: `syn` 2.0.114 with `parsing` + `full` features.
+- 1 new production dependency: `syn` 2.0.115 with `parsing` + `full` features.
 - Documentation updated: `users-guide.md` (expression validation section),
   `roadmap.md` (checkbox), `contents.md` (execplan entry), `theoremc-design.md`
   (implementation decisions section 6.5).
@@ -241,7 +241,7 @@ Gate: visual audit only. No code changes.
 
 Edit `Cargo.toml` to add `syn` as a direct dependency:
 
-    syn = { version = "2.0.114", default-features = false, features = ["parsing", "full"] }
+    syn = { version = "2.0.115", default-features = false, features = ["parsing", "full"] }
 
 This goes in `[dependencies]` (not `[dev-dependencies]`) because expression
 validation is core library functionality.
@@ -437,7 +437,7 @@ YAML. Confirmed all are simple single expressions.
 
 Milestone 1: added `syn` to `[dependencies]` in `Cargo.toml`:
 
-    syn = { version = "2.0.114", default-features = false,
+    syn = { version = "2.0.115", default-features = false,
             features = ["parsing", "full"] }
 
 `cargo check` passed.
@@ -509,7 +509,7 @@ Key file paths (all relative to repo root):
 
 New dependency:
 
-    syn = { version = "2.0.114", default-features = false, features = ["parsing", "full"] }
+    syn = { version = "2.0.115", default-features = false, features = ["parsing", "full"] }
 
 Internal interface added in `src/schema/expr.rs`:
 

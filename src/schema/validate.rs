@@ -287,6 +287,16 @@ mod tests {
         result.err().map(|e| e.to_string()).unwrap_or_default()
     }
 
+    /// Helper: assert YAML loading fails with an error containing `expected_fragment`.
+    fn assert_load_err_contains(yaml: &str, expected_fragment: &str) {
+        let msg = load_err(yaml);
+        assert!(
+            msg.contains(expected_fragment),
+            "expected error containing '{expected_fragment}', \
+             got: {msg}"
+        );
+    }
+
     /// Minimal valid YAML template with placeholders for About,
     /// Prove, Assume, Witness, and Evidence sections.
     const VALID_BASE: &str = r"
@@ -353,12 +363,7 @@ Witness:
         #[case] yaml: &str,
         #[case] expected_fragment: &str,
     ) {
-        let msg = load_err(yaml);
-        assert!(
-            msg.contains(expected_fragment),
-            "expected error containing '{expected_fragment}', \
-             got: {msg}"
-        );
+        assert_load_err_contains(yaml, expected_fragment);
     }
 
     #[rstest]
@@ -382,12 +387,7 @@ Witness:
         #[case] yaml: &str,
         #[case] expected_fragment: &str,
     ) {
-        let msg = load_err(yaml);
-        assert!(
-            msg.contains(expected_fragment),
-            "expected error containing '{expected_fragment}', \
-             got: {msg}"
-        );
+        assert_load_err_contains(yaml, expected_fragment);
     }
 
     #[test]

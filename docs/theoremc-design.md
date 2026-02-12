@@ -644,7 +644,7 @@ post-deserialization semantic validation (Step 1.2.1 of the roadmap):
 The following decisions were taken during the implementation of expression
 syntax validation (Step 1.2.2 of the roadmap):
 
-- `syn` 2.0.114 is added as a direct dependency with `parsing` and `full`
+- `syn` 2.0.115 is added as a direct dependency with `parsing` and `full`
   features (`default-features = false`). The `parsing` feature provides
   `syn::parse_str::<Expr>` and `full` provides all `Expr` variant types needed
   for the denylist check. Other features are not needed.

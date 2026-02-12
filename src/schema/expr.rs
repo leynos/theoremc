@@ -109,7 +109,7 @@ mod tests {
     #[case::method_call_with_comparison("result.balance() >= amount")]
     #[case::function_call_with_ref("hnsw.is_bidirectional(&graph)")]
     #[case::negated_call("!hnsw.edge_present(&graph, 2, 0, 1)")]
-    #[case::parenthesised_arithmetic("amount <= (u64::MAX - a.balance)")]
+    #[case::parenthesized_arithmetic("amount <= (u64::MAX - a.balance)")]
     #[case::plain_identifier("x")]
     #[case::if_expression("if x > 0 { a } else { b }")]
     #[case::match_expression("match x { 1 => true, _ => false }")]
