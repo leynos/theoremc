@@ -40,7 +40,8 @@ pub(crate) fn validate_rust_expr(input: &str) -> Result<(), String> {
 ///
 /// Rejected forms: blocks, loops (`for`, `while`, `loop`), `let`
 /// bindings, `unsafe`/`async`/`const`/`try` blocks, flow-control
-/// (`return`, `break`, `continue`, `yield`), and assignments.
+/// (`return`, `break`, `continue`, `yield`), assignments, and
+/// compound assignments (`+=`, `-=`, etc.).
 ///
 /// Allowed forms: `if`, `match`, closures, function/method calls,
 /// binary/unary operations, literals, paths, field access, indexing,
@@ -63,6 +64,31 @@ const fn is_statement_like(expr: &syn::Expr) -> bool {
             | syn::Expr::Unsafe(_)
             | syn::Expr::While(_)
             | syn::Expr::Yield(_)
+    ) || is_compound_assignment(expr)
+}
+
+/// Returns `true` if `expr` is a compound assignment operator
+/// (`+=`, `-=`, `*=`, `/=`, `%=`, `^=`, `&=`, `|=`, `<<=`, `>>=`).
+///
+/// In `syn` 2.x, compound assignments are represented as
+/// `Expr::Binary` with a `BinOp::*Assign` operator, unlike simple
+/// `=` which uses `Expr::Assign`.
+const fn is_compound_assignment(expr: &syn::Expr) -> bool {
+    matches!(
+        expr,
+        syn::Expr::Binary(b) if matches!(
+            b.op,
+            syn::BinOp::AddAssign(_)
+                | syn::BinOp::SubAssign(_)
+                | syn::BinOp::MulAssign(_)
+                | syn::BinOp::DivAssign(_)
+                | syn::BinOp::RemAssign(_)
+                | syn::BinOp::BitXorAssign(_)
+                | syn::BinOp::BitAndAssign(_)
+                | syn::BinOp::BitOrAssign(_)
+                | syn::BinOp::ShlAssign(_)
+                | syn::BinOp::ShrAssign(_)
+        )
     )
 }
 
@@ -112,6 +138,9 @@ mod tests {
     #[case::break_expr("break 42", "not a statement or block")]
     #[case::continue_expr("continue", "not a statement or block")]
     #[case::assignment("x = 5", "not a statement or block")]
+    #[case::add_assign("x += 1", "not a statement or block")]
+    #[case::sub_assign("x -= 2", "not a statement or block")]
+    #[case::mul_assign("x *= 3", "not a statement or block")]
     fn given_statement_like_form_when_validated_then_rejected(
         #[case] input: &str,
         #[case] expected_fragment: &str,

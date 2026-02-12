@@ -1,8 +1,9 @@
 # Parse `Assume.expr`, `Prove.assert`, and `Witness.cover` as `syn::Expr`
 
-This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
-`Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections
+`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
+`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
+proceeds.
 
 Status: COMPLETE
 
@@ -18,10 +19,11 @@ field, and the reason for rejection.
 
 This is Roadmap Phase 1, Step 1.2.2. It builds on Step 1.2.1
 (post-deserialization non-empty validation) by adding syntactic expression
-validation via the `syn` crate. The specification requirements are `TFS-1`
-sections 1.2 and 2.3 ("`RustExpr` MUST parse as `syn::Expr`; MUST be single
-expressions") and `DES-6` section 6.2 ("Expression syntax: `Assume.expr` and
-`Prove.assert` parse as `syn::Expr` (syntax only)").
+validation via the `syn` crate. The specification requirements are Theorem File
+Specification (TFS) `TFS-1` sections 1.2 and 2.3 ("`RustExpr` MUST parse as
+`syn::Expr`; MUST be single expressions") and Design document (DES) `DES-6`
+section 6.2 ("Expression syntax: `Assume.expr` and `Prove.assert` parse as
+`syn::Expr` (syntax only)").
 
 Observable success: running `make test` passes with new tests that confirm (a)
 valid expressions like `"x > 0"` and `"result.is_valid()"` are accepted, and
@@ -90,7 +92,8 @@ with clear error messages. Existing tests remain green (no regressions).
 - [x] (2026-02-12) Milestone 2: create `src/schema/expr.rs` with unit tests.
 - [x] (2026-02-12) Milestone 3: integrate expression validation into
   `validate.rs`.
-- [x] (2026-02-12) Milestone 4: create test fixtures and BDD tests.
+- [x] (2026-02-12) Milestone 4: create test fixtures and behaviour-driven
+  development (BDD) tests.
 - [x] (2026-02-12) Milestone 5: documentation updates.
 - [x] (2026-02-12) Milestone 6: final quality gates (198 tests passing).
 
@@ -130,7 +133,8 @@ with clear error messages. Existing tests remain green (no regressions).
 
 - D2: denylist approach for rejected expression forms (not allowlist).
   The spec says "no statement blocks, no `let`, no `for`, etc." A denylist of
-  14 specific `syn::Expr` variants covers the "etc." while allowing legitimate
+  14 specific `syn::Expr` variants plus compound assignment operators (10
+  `BinOp::*Assign` variants) covers the "etc." while allowing legitimate
   expression forms (closures, `if`, `match`, method calls). An allowlist would
   risk being too restrictive and rejecting valid expressions that theorem
   authors need. Date: 2026-02-12.
@@ -187,9 +191,9 @@ Lessons learned:
 
 ## Context and orientation
 
-The `theoremc` crate compiles human-readable `.theorem` YAML files into Kani
-model-checking proof harnesses. The schema is defined in
-`docs/theorem-file-specification.md` (`TFS-1`) and the design rationale in
+The `theoremc` crate compiles human-readable `.theorem` YAML (YAML Ain't Markup
+Language) files into Kani model-checking proof harnesses. The schema is defined
+in `docs/theorem-file-specification.md` (`TFS-1`) and the design rationale in
 `docs/theoremc-design.md` (`DES-6`).
 
 Three struct types carry expression fields as plain `String` values:
@@ -273,26 +277,30 @@ Implementation:
 
 Private predicate:
 
-    const fn is_statement_like(expr: &syn::Expr) -> bool
+    fn is_statement_like(expr: &syn::Expr) -> bool
 
-Uses `matches!` to check for these 14 denied `syn::Expr` variants:
+Uses `matches!` to check for these 14 denied `syn::Expr` variants, plus a
+helper `is_compound_assignment` that detects compound assignment operators
+(`+=`, `-=`, etc.) which `syn` 2.x represents as `Expr::Binary` with
+`BinOp::*Assign` variants:
 
-| Variant          | Why rejected                                         |
-| ---------------- | ---------------------------------------------------- |
-| `Expr::Assign`   | Assignment is a side-effect, not a value expression. |
-| `Expr::Async`    | `async { ... }` block. Spec: "no statement blocks".  |
-| `Expr::Block`    | Explicit `{ ... }` block with statements.            |
-| `Expr::Break`    | Flow control, not a value-producing expression.      |
-| `Expr::Const`    | `const { ... }` block. Analogous to async/unsafe.    |
-| `Expr::Continue` | Flow control.                                        |
-| `Expr::ForLoop`  | `for` loop. Spec: "no `for`".                        |
-| `Expr::Let`      | `let` guard/binding. Spec: "no `let`".               |
-| `Expr::Loop`     | Unconditional `loop { ... }`.                        |
-| `Expr::Return`   | Flow control.                                        |
-| `Expr::TryBlock` | `try { ... }` block.                                 |
-| `Expr::Unsafe`   | `unsafe { ... }` block. Spec: "no statement blocks". |
-| `Expr::While`    | `while` loop. Analogous to `for`.                    |
-| `Expr::Yield`    | `yield` expression. Only meaningful in generators.   |
+| Variant                   | Why rejected                                         |
+| ------------------------- | ---------------------------------------------------- |
+| `Expr::Assign`            | Assignment is a side-effect, not a value expression. |
+| `Expr::Async`             | `async { ... }` block. Spec: "no statement blocks".  |
+| `Expr::Block`             | Explicit `{ ... }` block with statements.            |
+| `Expr::Break`             | Flow control, not a value-producing expression.      |
+| `Expr::Const`             | `const { ... }` block. Analogous to async/unsafe.    |
+| `Expr::Continue`          | Flow control.                                        |
+| `Expr::ForLoop`           | `for` loop. Spec: "no `for`".                        |
+| `Expr::Let`               | `let` guard/binding. Spec: "no `let`".               |
+| `Expr::Loop`              | Unconditional `loop { ... }`.                        |
+| `Expr::Return`            | Flow control.                                        |
+| `Expr::TryBlock`          | `try { ... }` block.                                 |
+| `Expr::Unsafe`            | `unsafe { ... }` block. Spec: "no statement blocks". |
+| `Expr::While`             | `while` loop. Analogous to `for`.                    |
+| `Expr::Yield`             | `yield` expression. Only meaningful in generators.   |
+| `Expr::Binary` (compound) | `+=`, `-=`, `*=`, etc. Mutating side-effect.         |
 
 Allowed forms include: `if`, `match`, closures, method calls, function calls,
 binary/unary operations, literals, paths, field access, indexing, casts,
