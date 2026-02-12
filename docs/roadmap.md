@@ -19,74 +19,74 @@ Use these signposts to trace each roadmap task to the defining requirement.
   (theorem format and step semantics).
 - `DES-5`:
   [docs/theoremc-design.md §5](theoremc-design.md#5-rust-actions-step-definitions-for-proofs)
-  (action model and argument shaping).
+   (action model and argument shaping).
 - `DES-6`:
   [docs/theoremc-design.md §6](theoremc-design.md#6-parsing-and-validation)
   (parsing, validation, and diagnostics).
 - `DES-6.5`:
   [docs/theoremc-design.md §6.5](theoremc-design.md#65-localized-diagnostics-contract-adr-002)
-  (localized diagnostics contract and localization boundaries).
+   (localized diagnostics contract and localization boundaries).
 - `DES-7`:
   [docs/theoremc-design.md §7](theoremc-design.md#7-build-integration-always-connected)
-  (build integration and compile-time connectedness).
+   (build integration and compile-time connectedness).
 - `DES-8`: [docs/theoremc-design.md §8](theoremc-design.md#8-kani-backend-mvp)
   (Kani backend semantics, witnesses, and vacuity policy).
 - `DES-9`: [docs/theoremc-design.md §9](theoremc-design.md#9-reporting-theoremd)
   (reporting scope and formats).
 - `DES-10`:
   [docs/theoremc-design.md §10](theoremc-design.md#10-enforcement-guardrails-not-the-primary-binding-mechanism)
-  (optional enforcement via lints).
+   (optional enforcement via lints).
 - `DES-4.7`:
   [docs/theoremc-design.md §4.7](theoremc-design.md#47-theorem-schema-internationalization-scope)
-  (theorem schema keyword internationalization scope).
+   (theorem schema keyword internationalization scope).
 - `TFS-1`:
   [docs/theorem-file-specification.md §§1-3](theorem-file-specification.md#1-yaml-a-human-readable-data-serialization-format-schema-reference-v1)
-  (document model and conformance rules).
+   (document model and conformance rules).
 - `TFS-4`:
   [docs/theorem-file-specification.md §4](theorem-file-specification.md#4-step-and-action-schemas)
-  (step and action schema).
+   (step and action schema).
 - `TFS-5`:
   [docs/theorem-file-specification.md §5](theorem-file-specification.md#5-value-forms-and-how-they-compile)
-  (value forms and explicit reference semantics).
+   (value forms and explicit reference semantics).
 - `TFS-6`:
   [docs/theorem-file-specification.md §6](theorem-file-specification.md#6-evidence-schema)
-  (evidence schema).
+   (evidence schema).
 - `NMR-1`:
   [docs/name-mangling-rules.md §§Action and harness mangling](name-mangling-rules.md#action-name-mangling)
-  (action and harness mangling rules).
+   (action and harness mangling rules).
 - `NMR-2`:
   [docs/name-mangling-rules.md §Stable external theorem identifiers](name-mangling-rules.md#stable-external-theorem-identifiers)
-  (stable external theorem identifiers and alias migration rules).
+   (stable external theorem identifiers and alias migration rules).
 - `ADR-1`:
   [ADR 0001 decision 1](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
-  (injective action mangling).
+   (injective action mangling).
 - `ADR-2`:
   [ADR 0001 decision 2](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
-  (injective harness naming).
+   (injective harness naming).
 - `ADR-3`:
   [ADR 0001 decision 3](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
-  (explicit `{ ref: ... }` semantics).
+   (explicit `{ ref: ... }` semantics).
 - `ADR-4`:
   [ADR 0001 decision 4](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
-  (non-vacuity witness policy).
+   (non-vacuity witness policy).
 - `ADR-5`:
   [ADR 0001 decision 5](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
-  (stable external IDs and migration aliases).
+   (stable external IDs and migration aliases).
 - `ADR2-1`:
   [ADR 002 decision 1](adr-002-library-first-internationalization-and-localization-with-fluent.md)
-  (library-first localizer injection; no theoremc locale negotiation).
+   (library-first localizer injection; no theoremc locale negotiation).
 - `ADR2-2`:
   [ADR 002 decision 2](adr-002-library-first-internationalization-and-localization-with-fluent.md)
-  (stable diagnostic code + args + English fallback as source of truth).
+   (stable diagnostic code + args + English fallback as source of truth).
 - `ADR2-3`:
   [ADR 002 decision 3](adr-002-library-first-internationalization-and-localization-with-fluent.md)
-  (Fluent default backend with consumer-over-default layering).
+   (Fluent default backend with consumer-over-default layering).
 - `ADR2-4`:
   [ADR 002 decision 4](adr-002-library-first-internationalization-and-localization-with-fluent.md)
-  (deterministic English for compile-time and machine-facing artefacts).
+   (deterministic English for compile-time and machine-facing artefacts).
 - `ADR2-5`:
   [ADR 002 decision 5](adr-002-library-first-internationalization-and-localization-with-fluent.md)
-  (parser keyword internationalization deferred to future ADR).
+   (parser keyword internationalization deferred to future ADR).
 
 ## Phase 1: schema and validation foundation
 
@@ -124,7 +124,7 @@ In scope: structural and semantic checks for `Let`, `Do`, `Prove`, `Witness`,
 
 Out of scope: Rust typechecking of expressions.
 
-- [ ] Validate required fields and non-empty constraints for `Theorem`,
+- [x] Validate required fields and non-empty constraints for `Theorem`,
   `About`, `Prove`, and Kani evidence requirements. Acceptance: negative tests
   cover each missing/empty field and confirm deterministic error messages.
   Signposts: `TFS-1`, `TFS-6`, `DES-6`.

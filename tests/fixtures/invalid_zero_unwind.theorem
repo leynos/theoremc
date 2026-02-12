@@ -1,0 +1,12 @@
+Theorem: ZeroUnwind
+About: Kani unwind must be positive
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 0
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

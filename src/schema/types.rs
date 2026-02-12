@@ -268,6 +268,14 @@ pub struct Evidence {
     pub stateright: Option<TheoremValue>,
 }
 
+impl Evidence {
+    /// Returns `true` if at least one backend is configured.
+    #[must_use]
+    pub const fn has_any_backend(&self) -> bool {
+        self.kani.is_some() || self.verus.is_some() || self.stateright.is_some()
+    }
+}
+
 // ── Kani evidence ───────────────────────────────────────────────────
 
 /// Configuration for the Kani model-checking backend.

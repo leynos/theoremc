@@ -41,3 +41,5 @@
 - [Execution plans](execplans/) - Implementation plans for roadmap steps.
   - [Step 1.1: `TheoremDoc` and subordinate schema types](execplans/1-1-1-theorem-doc-and-subordinate-schema-types.md)
     - ExecPlan for strict theorem document deserialization.
+  - [Step 1.2.1: Validate required fields and non-empty constraints](execplans/1-2-1-validate-required-fields-and-non-empty-constraints.md)
+    - ExecPlan for post-deserialization semantic validation rules.

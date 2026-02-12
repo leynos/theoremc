@@ -1,0 +1,11 @@
+Theorem: EmptyVacuityBecause
+About: Vacuity reason must not be empty
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+    allow_vacuous: true
+    vacuity_because: ""

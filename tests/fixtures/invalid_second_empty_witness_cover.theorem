@@ -1,0 +1,14 @@
+Theorem: SecondEmptyWitnessCover
+About: Second witness has an empty cover expression
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: first witness is fine
+  - cover: ""
+    because: second witness is blank

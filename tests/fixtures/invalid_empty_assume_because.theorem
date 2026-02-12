@@ -1,0 +1,15 @@
+Theorem: EmptyAssumeBecause
+About: Valid about text
+Assume:
+  - expr: "x > 0"
+    because: ""
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

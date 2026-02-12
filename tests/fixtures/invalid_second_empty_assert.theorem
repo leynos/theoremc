@@ -1,0 +1,14 @@
+Theorem: SecondEmptyAssert
+About: Second assertion has an empty assert expression
+Prove:
+  - assert: "valid_expr"
+    because: first assertion is fine
+  - assert: ""
+    because: second assertion is blank
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

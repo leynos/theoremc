@@ -1,0 +1,17 @@
+Theorem: SecondEmptyAssumeExpr
+About: Second assumption has an empty expr
+Assume:
+  - expr: "x > 0"
+    because: first constraint is fine
+  - expr: ""
+    because: second constraint is blank
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

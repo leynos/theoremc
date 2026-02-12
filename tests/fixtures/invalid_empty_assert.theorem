@@ -1,0 +1,12 @@
+Theorem: EmptyAssert
+About: Valid about text
+Prove:
+  - assert: ""
+    because: some reason
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable
