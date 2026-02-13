@@ -241,7 +241,9 @@ Gate: visual audit only. No code changes.
 
 Edit `Cargo.toml` to add `syn` as a direct dependency:
 
-    syn = { version = "2.0.115", default-features = false, features = ["parsing", "full"] }
+```toml
+syn = { version = "2.0.115", default-features = false, features = ["parsing", "full"] }
+```
 
 This goes in `[dependencies]` (not `[dev-dependencies]`) because expression
 validation is core library functionality.
@@ -257,14 +259,16 @@ expression strings using `syn`.
 
 Public function:
 
-    /// Validates that `input` is a syntactically valid Rust expression
-    /// and is not a statement-like form (block, loop, assignment, or
-    /// flow-control construct).
-    ///
-    /// Returns `Ok(())` if the input is a valid single expression.
-    /// Returns `Err(reason)` with a human-readable reason string if
-    /// parsing fails or a disallowed form is detected.
-    pub(crate) fn validate_rust_expr(input: &str) -> Result<(), String>
+```rust
+/// Validates that `input` is a syntactically valid Rust expression
+/// and is not a statement-like form (block, loop, assignment, or
+/// flow-control construct).
+///
+/// Returns `Ok(())` if the input is a valid single expression.
+/// Returns `Err(reason)` with a human-readable reason string if
+/// parsing fails or a disallowed form is detected.
+pub(crate) fn validate_rust_expr(input: &str) -> Result<(), String>
+```
 
 Implementation:
 
@@ -277,7 +281,9 @@ Implementation:
 
 Private predicate:
 
-    fn is_statement_like(expr: &syn::Expr) -> bool
+```rust
+fn is_statement_like(expr: &syn::Expr) -> bool
+```
 
 Uses `matches!` to check for these 14 denied `syn::Expr` variants, plus a
 helper `is_compound_assignment` that detects compound assignment operators
@@ -320,7 +326,7 @@ Happy-path rstest parameterized cases (all return `Ok(())`):
 - `"result.balance() >= amount"` -- method call with comparison.
 - `"hnsw.is_bidirectional(&graph)"` -- function call with reference arg.
 - `"!hnsw.edge_present(&graph, 2, 0, 1)"` -- unary + function call.
-- `"amount <= (u64::MAX - a.balance)"` -- parenthesised arithmetic.
+- `"amount <= (u64::MAX - a.balance)"` -- parenthesized arithmetic.
 - `"x"` -- plain identifier.
 - `"if x > 0 { a } else { b }"` -- if expression (allowed).
 - `"match x { 1 => true, _ => false }"` -- match expression (allowed).
@@ -353,23 +359,31 @@ Add `use super::expr;` to `validate.rs`.
 
 Add a new orchestrator function:
 
-    fn validate_expressions(doc: &TheoremDoc) -> Result<(), SchemaError>
+```rust
+fn validate_expressions(doc: &TheoremDoc) -> Result<(), SchemaError>
+```
 
 This calls three section-specific helpers:
 
-    fn validate_assumption_exprs(doc: &TheoremDoc) -> Result<(), SchemaError>
+```rust
+fn validate_assumption_exprs(doc: &TheoremDoc) -> Result<(), SchemaError>
+```
 
 Iterates `doc.assume`, calling `expr::validate_rust_expr(a.expr.trim())` and
 wrapping errors as
 `fail(doc, format!("Assume constraint {}: expr {reason}", i + 1))`.
 
-    fn validate_assertion_exprs(doc: &TheoremDoc) -> Result<(), SchemaError>
+```rust
+fn validate_assertion_exprs(doc: &TheoremDoc) -> Result<(), SchemaError>
+```
 
 Iterates `doc.prove`, calling `expr::validate_rust_expr(a.assert_expr.trim())`
 and wrapping errors as
 `fail(doc, format!("Prove assertion {}: assert {reason}", i + 1))`.
 
-    fn validate_witness_exprs(doc: &TheoremDoc) -> Result<(), SchemaError>
+```rust
+fn validate_witness_exprs(doc: &TheoremDoc) -> Result<(), SchemaError>
+```
 
 Iterates `doc.witness`, calling `expr::validate_rust_expr(w.cover.trim())` and
 wrapping errors as `fail(doc, format!("Witness {}: cover {reason}", i + 1))`.
@@ -421,10 +435,12 @@ Gate: `make check-fmt && make lint && make test`.
 
 ### Milestone 6: final quality gates
 
-    set -o pipefail
-    make check-fmt 2>&1 | tee /tmp/check-fmt.log
-    make lint 2>&1 | tee /tmp/lint.log
-    make test 2>&1 | tee /tmp/test.log
+```shell
+set -o pipefail
+make check-fmt 2>&1 | tee /tmp/check-fmt.log
+make lint 2>&1 | tee /tmp/lint.log
+make test 2>&1 | tee /tmp/test.log
+```
 
 All three must exit 0.
 
@@ -437,8 +453,10 @@ YAML. Confirmed all are simple single expressions.
 
 Milestone 1: added `syn` to `[dependencies]` in `Cargo.toml`:
 
-    syn = { version = "2.0.115", default-features = false,
-            features = ["parsing", "full"] }
+```toml
+syn = { version = "2.0.115", default-features = false,
+        features = ["parsing", "full"] }
+```
 
 `cargo check` passed.
 
@@ -468,10 +486,12 @@ Quality criteria:
 
 Quality method:
 
-    set -o pipefail
-    make check-fmt 2>&1 | tee /tmp/check-fmt.log
-    make lint 2>&1 | tee /tmp/lint.log
-    make test 2>&1 | tee /tmp/test.log
+```shell
+set -o pipefail
+make check-fmt 2>&1 | tee /tmp/check-fmt.log
+make lint 2>&1 | tee /tmp/lint.log
+make test 2>&1 | tee /tmp/test.log
+```
 
 Expected: all three commands exit 0. Test count increased from 167 to 198.
 
@@ -509,13 +529,17 @@ Key file paths (all relative to repo root):
 
 New dependency:
 
-    syn = { version = "2.0.115", default-features = false, features = ["parsing", "full"] }
+```toml
+syn = { version = "2.0.115", default-features = false, features = ["parsing", "full"] }
+```
 
 Internal interface added in `src/schema/expr.rs`:
 
-    /// Validates that `input` is a syntactically valid Rust expression
-    /// and is not a statement-like form.
-    pub(crate) fn validate_rust_expr(input: &str) -> Result<(), String>
+```rust
+/// Validates that `input` is a syntactically valid Rust expression
+/// and is not a statement-like form.
+pub(crate) fn validate_rust_expr(input: &str) -> Result<(), String>
+```
 
 Called from `validate_expressions` in `src/schema/validate.rs`, which is called
 from `validate_theorem_doc` after non-blank validation and before evidence

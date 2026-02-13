@@ -150,8 +150,13 @@ mod tests {
         let reason = result.err().unwrap_or_default();
         assert!(
             reason.contains(expected_fragment),
-            "reason for '{input}' should contain \
-             '{expected_fragment}', got: {reason}"
+            concat!(
+                "reason for '{input}' should contain ",
+                "'{expected_fragment}', got: {reason}"
+            ),
+            input = input,
+            expected_fragment = expected_fragment,
+            reason = reason
         );
     }
 
@@ -167,8 +172,12 @@ mod tests {
         let reason = result.err().unwrap_or_default();
         assert!(
             reason.contains("is not a valid Rust expression"),
-            "reason for '{input}' should mention parse failure, \
-             got: {reason}"
+            concat!(
+                "reason for '{input}' should mention ",
+                "parse failure, got: {reason}"
+            ),
+            input = input,
+            reason = reason
         );
     }
 }
