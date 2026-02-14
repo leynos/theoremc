@@ -290,12 +290,7 @@ mod tests {
         let msg = load_err(yaml);
         assert!(
             msg.contains(expected_fragment),
-            concat!(
-                "expected error containing ",
-                "'{expected_fragment}', got: {msg}"
-            ),
-            expected_fragment = expected_fragment,
-            msg = msg
+            "expected error containing '{expected_fragment}', got: {msg}"
         );
     }
 
