@@ -19,8 +19,13 @@ fn assert_fixture_err_contains(fixture: &str, expected_fragment: &str) {
     let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
     assert!(
         msg.contains(expected_fragment),
-        "error for {fixture} should contain \
-         '{expected_fragment}', got: {msg}"
+        concat!(
+            "error for {fixture} should contain '{expected_fragment}', ",
+            "got: {msg}"
+        ),
+        fixture = fixture,
+        expected_fragment = expected_fragment,
+        msg = msg
     );
 }
 

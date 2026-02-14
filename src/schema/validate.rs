@@ -275,10 +275,8 @@ fn validate_kani_witnesses(doc: &TheoremDoc, kani: &KaniEvidence) -> Result<(), 
 #[cfg(test)]
 mod tests {
     //! Unit tests for post-deserialization semantic validation.
-
-    use rstest::*;
-
     use crate::schema::load_theorem_docs;
+    use rstest::*;
 
     /// Helper: load inline YAML and return the error string.
     fn load_err(yaml: &str) -> String {
@@ -292,8 +290,12 @@ mod tests {
         let msg = load_err(yaml);
         assert!(
             msg.contains(expected_fragment),
-            "expected error containing '{expected_fragment}', \
-             got: {msg}"
+            concat!(
+                "expected error containing ",
+                "'{expected_fragment}', got: {msg}"
+            ),
+            expected_fragment = expected_fragment,
+            msg = msg
         );
     }
 

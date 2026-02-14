@@ -47,7 +47,7 @@ with clear error messages. Existing tests remain green (no regressions).
 - This plan must not modify paths outside `src/schema/`, `tests/`, `docs/`,
   `Cargo.toml`, and fixture files.
 - Existing valid fixtures must continue to parse successfully.
-- The `syn` crate must be a production dependency (not dev-only), because
+- The `syn` crate must be a production dependency (not dev-only) because
   expression validation is core library functionality invoked by
   `load_theorem_docs`.
 
@@ -292,7 +292,7 @@ helper `is_compound_assignment` that detects compound assignment operators
 
 | Variant                   | Why rejected                                         |
 | ------------------------- | ---------------------------------------------------- |
-| `Expr::Assign`            | Assignment is a side-effect, not a value expression. |
+| `Expr::Assign`            | Assignment is a side effect, not a value expression. |
 | `Expr::Async`             | `async { ... }` block. Spec: "no statement blocks".  |
 | `Expr::Block`             | Explicit `{ ... }` block with statements.            |
 | `Expr::Break`             | Flow control, not a value-producing expression.      |
@@ -306,7 +306,7 @@ helper `is_compound_assignment` that detects compound assignment operators
 | `Expr::Unsafe`            | `unsafe { ... }` block. Spec: "no statement blocks". |
 | `Expr::While`             | `while` loop. Analogous to `for`.                    |
 | `Expr::Yield`             | `yield` expression. Only meaningful in generators.   |
-| `Expr::Binary` (compound) | `+=`, `-=`, `*=`, etc. Mutating side-effect.         |
+| `Expr::Binary` (compound) | `+=`, `-=`, `*=`, etc. Mutating side effect.         |
 
 Allowed forms include: `if`, `match`, closures, method calls, function calls,
 binary/unary operations, literals, paths, field access, indexing, casts,
