@@ -276,7 +276,7 @@ fn validate_kani_witnesses(doc: &TheoremDoc, kani: &KaniEvidence) -> Result<(), 
 mod tests {
     //! Unit tests for post-deserialization semantic validation.
     use crate::schema::load_theorem_docs;
-    use rstest::*;
+    use rstest::rstest;
 
     /// Helper: load inline YAML and return the error string.
     fn load_err(yaml: &str) -> String {
