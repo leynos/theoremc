@@ -1,0 +1,15 @@
+Theorem: BlockAssumeExpr
+About: Assume expr contains a block expression
+Assume:
+  - expr: "{ let x = 1; x }"
+    because: test expression validation
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

@@ -10,6 +10,25 @@ use common::load_fixture;
 use rstest::rstest;
 use theoremc::schema::load_theorem_docs;
 
+/// Helper: assert that loading the named fixture fails with an error
+/// containing the expected fragment.
+fn assert_fixture_err_contains(fixture: &str, expected_fragment: &str) {
+    let yaml = load_fixture(fixture);
+    let result = load_theorem_docs(&yaml);
+    assert!(result.is_err(), "expected {fixture} to fail");
+    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
+    assert!(
+        msg.contains(expected_fragment),
+        concat!(
+            "error for {fixture} should contain '{expected_fragment}', ",
+            "got: {msg}"
+        ),
+        fixture = fixture,
+        expected_fragment = expected_fragment,
+        msg = msg
+    );
+}
+
 // ── Given valid documents, deserialization succeeds ──────────────────
 
 #[rstest]
@@ -37,18 +56,7 @@ fn given_a_structurally_invalid_file_when_loaded_then_error_is_actionable(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
 ) {
-    let yaml = load_fixture(fixture);
-    let result = load_theorem_docs(&yaml);
-    assert!(
-        result.is_err(),
-        "expected {fixture} to fail deserialization"
-    );
-    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
-    assert!(
-        msg.contains(expected_fragment),
-        "error for {fixture} should contain '{expected_fragment}', \
-         got: {msg}"
-    );
+    assert_fixture_err_contains(fixture, expected_fragment);
 }
 
 // ── Given a missing required field, deserialization fails ────────────
@@ -76,18 +84,7 @@ fn given_an_invalid_theorem_name_when_loaded_then_error_mentions_reason(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
 ) {
-    let yaml = load_fixture(fixture);
-    let result = load_theorem_docs(&yaml);
-    assert!(
-        result.is_err(),
-        "expected {fixture} to fail identifier validation"
-    );
-    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
-    assert!(
-        msg.contains(expected_fragment),
-        "error for {fixture} should contain '{expected_fragment}', \
-         got: {msg}"
-    );
+    assert_fixture_err_contains(fixture, expected_fragment);
 }
 
 // ── Given a wrong scalar type, deserialization fails ────────────────
@@ -242,13 +239,40 @@ fn given_empty_or_blank_fields_when_loaded_then_validation_fails(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
 ) {
-    let yaml = load_fixture(fixture);
-    let result = load_theorem_docs(&yaml);
-    assert!(result.is_err(), "expected {fixture} to fail validation");
-    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
-    assert!(
-        msg.contains(expected_fragment),
-        "error for {fixture} should contain '{expected_fragment}', \
-         got: {msg}"
-    );
+    assert_fixture_err_contains(fixture, expected_fragment);
+}
+
+// ── Given statement blocks or invalid syntax in expression fields,
+//    validation fails ──────────────────────────────────────────────
+
+#[rstest]
+#[case::block_in_assume_expr(
+    "invalid_block_assume_expr.theorem",
+    "Assume constraint 1: expr must be a single expression"
+)]
+#[case::for_loop_in_assert(
+    "invalid_for_loop_assert.theorem",
+    "Prove assertion 1: assert must be a single expression"
+)]
+#[case::while_in_witness_cover(
+    "invalid_while_witness_cover.theorem",
+    "Witness 1: cover must be a single expression"
+)]
+#[case::invalid_syntax_in_assume(
+    "invalid_syntax_assume_expr.theorem",
+    "Assume constraint 1: expr is not a valid Rust expression"
+)]
+#[case::invalid_syntax_in_assert(
+    "invalid_syntax_assert.theorem",
+    "Prove assertion 1: assert is not a valid Rust expression"
+)]
+#[case::invalid_syntax_in_witness(
+    "invalid_syntax_witness_cover.theorem",
+    "Witness 1: cover is not a valid Rust expression"
+)]
+fn given_statement_or_bad_syntax_in_expr_when_loaded_then_validation_fails(
+    #[case] fixture: &str,
+    #[case] expected_fragment: &str,
+) {
+    assert_fixture_err_contains(fixture, expected_fragment);
 }

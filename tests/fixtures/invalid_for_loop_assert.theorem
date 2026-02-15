@@ -1,0 +1,12 @@
+Theorem: ForLoopAssert
+About: Prove assert contains a for loop
+Prove:
+  - assert: "for i in 0..10 { }"
+    because: test expression validation
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

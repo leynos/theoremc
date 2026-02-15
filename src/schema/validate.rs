@@ -6,6 +6,7 @@
 //! successful YAML deserialization.
 
 use super::error::SchemaError;
+use super::expr;
 use super::types::{KaniEvidence, TheoremDoc};
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -76,6 +77,9 @@ fn validate_collection_fields<T>(
 /// - All `Assertion` fields are non-empty after trimming.
 /// - All `Assumption` fields are non-empty after trimming.
 /// - All `WitnessCheck` fields are non-empty after trimming.
+/// - All expression fields (`Assume.expr`, `Prove.assert`,
+///   `Witness.cover`) parse as `syn::Expr` and are not statement-like
+///   forms (`TFS-1` §1.2, §2.3, `DES-6` §6.2).
 /// - At least one evidence backend is specified.
 /// - Kani `unwind` is positive (> 0).
 /// - Kani `vacuity_because` is non-empty after trimming when present.
@@ -93,6 +97,7 @@ pub(crate) fn validate_theorem_doc(doc: &TheoremDoc) -> Result<(), SchemaError> 
     validate_assertions(doc)?;
     validate_assumptions(doc)?;
     validate_witnesses(doc)?;
+    validate_expressions(doc)?;
     validate_evidence(doc)?;
     Ok(())
 }
@@ -146,6 +151,44 @@ fn validate_witnesses(doc: &TheoremDoc) -> Result<(), SchemaError> {
     validate_collection_fields(doc, "Witness", &doc.witness, |w| {
         vec![("cover", w.cover.as_str()), ("because", w.because.as_str())]
     })
+}
+
+// ── Expression syntax validation ─────────────────────────────────
+
+/// All expression fields parse as valid, non-statement `syn::Expr`
+/// forms (`TFS-1` §1.2, §2.3, `DES-6` §6.2).
+fn validate_expressions(doc: &TheoremDoc) -> Result<(), SchemaError> {
+    validate_assumption_exprs(doc)?;
+    validate_assertion_exprs(doc)?;
+    validate_witness_exprs(doc)?;
+    Ok(())
+}
+
+/// Every `Assumption.expr` must parse as a single `syn::Expr`.
+fn validate_assumption_exprs(doc: &TheoremDoc) -> Result<(), SchemaError> {
+    for (i, a) in doc.assume.iter().enumerate() {
+        expr::validate_rust_expr(a.expr.trim())
+            .map_err(|reason| fail(doc, format!("Assume constraint {}: expr {reason}", i + 1)))?;
+    }
+    Ok(())
+}
+
+/// Every `Assertion.assert_expr` must parse as a single `syn::Expr`.
+fn validate_assertion_exprs(doc: &TheoremDoc) -> Result<(), SchemaError> {
+    for (i, a) in doc.prove.iter().enumerate() {
+        expr::validate_rust_expr(a.assert_expr.trim())
+            .map_err(|reason| fail(doc, format!("Prove assertion {}: assert {reason}", i + 1)))?;
+    }
+    Ok(())
+}
+
+/// Every `WitnessCheck.cover` must parse as a single `syn::Expr`.
+fn validate_witness_exprs(doc: &TheoremDoc) -> Result<(), SchemaError> {
+    for (i, w) in doc.witness.iter().enumerate() {
+        expr::validate_rust_expr(w.cover.trim())
+            .map_err(|reason| fail(doc, format!("Witness {}: cover {reason}", i + 1)))?;
+    }
+    Ok(())
 }
 
 /// Evidence section must specify at least one backend, and Kani
@@ -232,16 +275,23 @@ fn validate_kani_witnesses(doc: &TheoremDoc, kani: &KaniEvidence) -> Result<(), 
 #[cfg(test)]
 mod tests {
     //! Unit tests for post-deserialization semantic validation.
-
-    use rstest::*;
-
     use crate::schema::load_theorem_docs;
+    use rstest::rstest;
 
     /// Helper: load inline YAML and return the error string.
     fn load_err(yaml: &str) -> String {
         let result = load_theorem_docs(yaml);
         assert!(result.is_err(), "expected YAML to fail validation");
         result.err().map(|e| e.to_string()).unwrap_or_default()
+    }
+
+    /// Helper: assert YAML loading fails with an error containing `expected_fragment`.
+    fn assert_load_err_contains(yaml: &str, expected_fragment: &str) {
+        let msg = load_err(yaml);
+        assert!(
+            msg.contains(expected_fragment),
+            "expected error containing '{expected_fragment}', got: {msg}"
+        );
     }
 
     /// Minimal valid YAML template with placeholders for About,
@@ -310,12 +360,31 @@ Witness:
         #[case] yaml: &str,
         #[case] expected_fragment: &str,
     ) {
-        let msg = load_err(yaml);
-        assert!(
-            msg.contains(expected_fragment),
-            "expected error containing '{expected_fragment}', \
-             got: {msg}"
-        );
+        assert_load_err_contains(yaml, expected_fragment);
+    }
+
+    #[rstest]
+    #[case::block_assume_expr(
+        "Theorem: T\nAbout: ok\nAssume:\n  - expr: '{ let x = 1; x }'\n    because: r\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
+        "Assume constraint 1: expr must be a single expression"
+    )]
+    #[case::for_loop_assert(
+        "Theorem: T\nAbout: ok\nProve:\n  - assert: 'for i in 0..10 { }'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
+        "Prove assertion 1: assert must be a single expression"
+    )]
+    #[case::block_witness_cover(
+        "Theorem: T\nAbout: ok\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: '{ true }'\n    because: r",
+        "Witness 1: cover must be a single expression"
+    )]
+    #[case::invalid_syntax_assume(
+        "Theorem: T\nAbout: ok\nAssume:\n  - expr: 'not rust %%'\n    because: r\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
+        "Assume constraint 1: expr is not a valid Rust expression"
+    )]
+    fn given_invalid_expression_when_loaded_then_rejected(
+        #[case] yaml: &str,
+        #[case] expected_fragment: &str,
+    ) {
+        assert_load_err_contains(yaml, expected_fragment);
     }
 
     #[test]

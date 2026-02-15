@@ -639,7 +639,30 @@ post-deserialization semantic validation (Step 1.2.1 of the roadmap):
 - Error messages for indexed fields (assertions, assumptions,
   witnesses) use 1-based indices for human readability.
 
-### 6.5 Implementation decisions (Step 1.1)
+### 6.5 Implementation decisions (Step 1.2.2)
+
+The following decisions were taken during the implementation of expression
+syntax validation (Step 1.2.2 of the roadmap):
+
+- `syn` 2.0.115 is added as a direct dependency with `parsing` and `full`
+  features (`default-features = false`). The `parsing` feature provides
+  `syn::parse_str::<Expr>` and `full` provides all `Expr` variant types needed
+  for the denylist check. Other features are not needed.
+- A new `src/schema/expr.rs` module isolates expression parsing from
+  structural validation in `validate.rs`, preserving the 400-line file limit
+  and separation of concerns.
+- A denylist approach rejects 14 `syn::Expr` variants that represent
+  statement-like or block-like constructs: `Assign`, `Async`, `Block`, `Break`,
+  `Const`, `Continue`, `ForLoop`, `Let`, `Loop`, `Return`, `TryBlock`,
+  `Unsafe`, `While`, and `Yield`. This matches the spec requirement ("no
+  statement blocks, no `let`, no `for`, etc.").
+- `if` and `match` expressions are allowed because they are value-producing
+  expressions in Rust, not statement blocks.
+- Expression validation runs after non-blank field validation so that empty
+  strings produce clear "must be non-empty" errors rather than confusing `syn`
+  parse errors.
+
+### 6.6 Implementation decisions (Step 1.1)
 
 The following decisions were taken during the implementation of schema
 deserialization (Step 1.1 of the roadmap):
@@ -669,7 +692,7 @@ deserialization (Step 1.1 of the roadmap):
   usage patterns. `rstest` parameterized tests with BDD-style naming
   conventions are used instead.
 
-### 6.5 Localized diagnostics contract (ADR 002)
+### 6.7 Localized diagnostics contract (ADR 002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:
 
@@ -694,7 +717,7 @@ The default backend for human-facing localization is Fluent:
 This preserves composability for library consumers while keeping deterministic,
 inspectable diagnostics for tooling and CI.
 
-### 6.6 Localization rendering sequence
+### 6.8 Localization rendering sequence
 
 Figure 1. Diagnostic capture, localization rendering, and report projection
 flow under the ADR 002 library-first localization model.
@@ -722,7 +745,7 @@ sequenceDiagram
   Theoremd-->>ConsumerApplication: optional_localized_message
 ```
 
-### 6.7 Diagnostic and localization class model
+### 6.9 Diagnostic and localization class model
 
 Figure 2. Class-level model for diagnostic payloads, localization contracts,
 and report-entry population in theoremc and theoremd.
