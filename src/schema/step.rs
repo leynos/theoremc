@@ -222,28 +222,19 @@ mod tests {
         );
     }
 
-    #[test]
-    fn nested_maybe_with_blank_because_fails() {
-        let inner = maybe_step("", vec![call_step("a.b")]);
+    #[rstest]
+    #[case::blank_because("", vec![call_step("a.b")], "maybe.do step 1: maybe.because must be non-empty")]
+    #[case::empty_do("inner reason", vec![], "maybe.do step 1: maybe.do must contain at least one step")]
+    fn nested_maybe_validation_errors(
+        #[case] inner_because: &str,
+        #[case] inner_do: Vec<Step>,
+        #[case] expected_error: &str,
+    ) {
+        let inner = maybe_step(inner_because, inner_do);
         let outer = maybe_step("outer reason", vec![inner]);
         let steps = vec![outer];
         let err = validate_step_list(&steps, "Do step").expect_err("should fail");
-        assert!(
-            err.contains("maybe.do step 1: maybe.because must be non-empty"),
-            "got: {err}"
-        );
-    }
-
-    #[test]
-    fn nested_maybe_with_empty_do_fails() {
-        let inner = maybe_step("inner reason", vec![]);
-        let outer = maybe_step("outer reason", vec![inner]);
-        let steps = vec![outer];
-        let err = validate_step_list(&steps, "Do step").expect_err("should fail");
-        assert!(
-            err.contains("maybe.do step 1: maybe.do must contain at least one step"),
-            "got: {err}"
-        );
+        assert!(err.contains(expected_error), "got: {err}");
     }
 
     #[test]
