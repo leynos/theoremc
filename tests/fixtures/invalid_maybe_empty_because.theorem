@@ -1,0 +1,22 @@
+Schema: 1
+Theorem: MaybeEmptyBecause
+About: A theorem with an empty maybe.because
+Tags: [integration]
+Prove:
+  - assert: "true"
+    because: trivially true
+Do:
+  - maybe:
+      because: ""
+      do:
+        - call:
+            action: account.deposit
+            args:
+              amount: 10
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

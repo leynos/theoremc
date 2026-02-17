@@ -131,7 +131,7 @@ Out of scope: Rust typechecking of expressions.
 - [x] Parse `Assume.expr`, `Prove.assert`, and `Witness.cover` as `syn::Expr`
   and reject statement blocks. Acceptance: tests demonstrate single-expression
   acceptance and block-style rejection. Signposts: `TFS-1`, `DES-6`.
-- [ ] Enforce `Step` and `LetBinding` shape rules (`Let` allows only `call` or
+- [x] Enforce `Step` and `LetBinding` shape rules (`Let` allows only `call` or
   `must`, `maybe` requires `because` and nested `do`). Acceptance: validation
   tests cover each invalid variant combination. Signposts: `TFS-4`, `DES-4`.
 - [ ] Enforce non-vacuity defaults (`Witness` required unless

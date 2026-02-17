@@ -1,0 +1,20 @@
+Schema: 1
+Theorem: LetEmptyAction
+About: A theorem with a blank action in a Let binding
+Tags: [integration]
+Let:
+  params:
+    must:
+      action: ""
+      args:
+        max_balance: 1000
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

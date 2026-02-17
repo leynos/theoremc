@@ -1,0 +1,18 @@
+Schema: 1
+Theorem: MaybeEmptyDo
+About: A theorem with an empty maybe.do list
+Tags: [integration]
+Prove:
+  - assert: "true"
+    because: trivially true
+Do:
+  - maybe:
+      because: optional branch
+      do: []
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

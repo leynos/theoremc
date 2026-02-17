@@ -10,6 +10,7 @@ mod expr;
 mod identifier;
 mod loader;
 mod newtypes;
+mod step;
 mod types;
 mod validate;
 mod value;
