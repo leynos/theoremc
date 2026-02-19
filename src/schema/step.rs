@@ -214,19 +214,11 @@ mod tests {
         );
     }
 
-    #[test]
-    fn maybe_step_with_empty_because_fails() {
-        let steps = vec![maybe_step("", vec![call_step("a.b")])];
-        let err = validate_step_list(&steps, "Do step").expect_err("should fail");
-        assert!(
-            err.contains("maybe.because must be non-empty"),
-            "got: {err}"
-        );
-    }
-
-    #[test]
-    fn maybe_step_with_whitespace_because_fails() {
-        let steps = vec![maybe_step("   ", vec![call_step("a.b")])];
+    #[rstest]
+    #[case("")]
+    #[case("   ")]
+    fn maybe_step_with_invalid_because_fails(#[case] because: &str) {
+        let steps = vec![maybe_step(because, vec![call_step("a.b")])];
         let err = validate_step_list(&steps, "Do step").expect_err("should fail");
         assert!(
             err.contains("maybe.because must be non-empty"),

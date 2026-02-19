@@ -202,7 +202,7 @@ Key files:
 - `tests/schema_deser_reject.rs` (241 lines) — unhappy-path rejection tests.
 - `tests/fixtures/` — 33 fixture files (5 valid, 28 invalid).
 - Current test count: 204 (79 unit + 86 integration + 15 deser + 21 reject +
-  3 doc, 1 ignored).
+  3 docs, 1 ignored).
 
 ## Plan of work
 
@@ -430,7 +430,7 @@ Gate: `make check-fmt && make lint && make test`.
    validation rules: ActionCall.action non-empty, MaybeBlock.because non-empty,
    MaybeBlock.do non-empty, recursive validation of nested steps.
 
-Gate: `make check-fmt` (for any markdown formatting).
+Gate: `make check-fmt` (for any Markdown formatting).
 
 ### Milestone 5: final quality gates
 
