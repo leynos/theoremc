@@ -102,7 +102,8 @@ it correctly rejects the input; improving that message is a Step 1.3 concern
 - [x] (2026-02-17) Milestone 0: audit existing fixtures for compliance.
 - [x] (2026-02-17) Milestones 1+2: create `src/schema/step.rs` with validation
   logic and unit tests; integrate into `validate.rs`.
-- [x] (2026-02-17) Milestone 3: create test fixtures and BDD tests.
+- [x] (2026-02-17) Milestone 3: create test fixtures and behaviour-driven
+  development (BDD) tests.
 - [x] (2026-02-17) Milestone 4: documentation updates.
 - [x] (2026-02-17) Milestone 5: final quality gates (223 tests, 0 failures).
 

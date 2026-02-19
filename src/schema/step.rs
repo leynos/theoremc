@@ -97,9 +97,31 @@ mod tests {
     use super::*;
     use crate::schema::types::{ActionCall, MaybeBlock, Step, StepCall, StepMaybe, StepMust};
     use indexmap::IndexMap;
-    use rstest::rstest;
+    use rstest::{fixture, rstest};
 
-    /// Helper: build an `ActionCall` with the given action name.
+    /// Fixture: a valid `ActionCall` with a non-empty dotted action name.
+    #[fixture]
+    fn valid_action() -> ActionCall {
+        ActionCall {
+            action: "a.b".to_owned(),
+            args: IndexMap::new(),
+            as_binding: None,
+        }
+    }
+
+    /// Fixture: a valid `Step::Call` wrapping the default valid action.
+    #[fixture]
+    fn valid_call(valid_action: ActionCall) -> Step {
+        Step::Call(StepCall { call: valid_action })
+    }
+
+    /// Fixture: a valid `Step::Must` wrapping the default valid action.
+    #[fixture]
+    fn valid_must(valid_action: ActionCall) -> Step {
+        Step::Must(StepMust { must: valid_action })
+    }
+
+    /// Builder: an `ActionCall` with a custom action name.
     fn action(name: &str) -> ActionCall {
         ActionCall {
             action: name.to_owned(),
@@ -108,17 +130,17 @@ mod tests {
         }
     }
 
-    /// Helper: build a `Step::Call` with the given action name.
+    /// Builder: a `Step::Call` with a custom action name.
     fn call_step(name: &str) -> Step {
         Step::Call(StepCall { call: action(name) })
     }
 
-    /// Helper: build a `Step::Must` with the given action name.
+    /// Builder: a `Step::Must` with a custom action name.
     fn must_step(name: &str) -> Step {
         Step::Must(StepMust { must: action(name) })
     }
 
-    /// Helper: build a `Step::Maybe` with the given because and steps.
+    /// Builder: a `Step::Maybe` with custom because and steps.
     fn maybe_step(because: &str, steps: Vec<Step>) -> Step {
         Step::Maybe(StepMaybe {
             maybe: MaybeBlock {
@@ -154,21 +176,21 @@ mod tests {
 
     // ── Step list validation ──────────────────────────────────────
 
-    #[test]
-    fn valid_call_step_passes() {
-        let steps = vec![call_step("a.b")];
+    #[rstest]
+    fn valid_call_step_passes(valid_call: Step) {
+        let steps = vec![valid_call];
         assert!(validate_step_list(&steps, "Do step").is_ok());
     }
 
-    #[test]
-    fn valid_must_step_passes() {
-        let steps = vec![must_step("a.b")];
+    #[rstest]
+    fn valid_must_step_passes(valid_must: Step) {
+        let steps = vec![valid_must];
         assert!(validate_step_list(&steps, "Do step").is_ok());
     }
 
-    #[test]
-    fn valid_maybe_step_passes() {
-        let steps = vec![maybe_step("optional branch", vec![call_step("a.b")])];
+    #[rstest]
+    fn valid_maybe_step_passes(valid_call: Step) {
+        let steps = vec![maybe_step("optional branch", vec![valid_call])];
         assert!(validate_step_list(&steps, "Do step").is_ok());
     }
 
@@ -237,9 +259,9 @@ mod tests {
         assert!(err.contains(expected_error), "got: {err}");
     }
 
-    #[test]
-    fn second_step_error_reports_correct_position() {
-        let steps = vec![call_step("a.b"), call_step("")];
+    #[rstest]
+    fn second_step_error_reports_correct_position(valid_call: Step) {
+        let steps = vec![valid_call, call_step("")];
         let err = validate_step_list(&steps, "Do step").expect_err("should fail");
         assert!(
             err.contains("Do step 2: action must be non-empty"),
