@@ -61,7 +61,7 @@ all acceptance criteria and quality gates pass.
 
 - Risk: `src/schema/validate.rs` is near the 400-line cap.
   Severity: medium. Likelihood: high. Mitigation: add or expand unit tests in
-  `src/schema/loader.rs` and/or dedicated integration tests instead of
+  `src/schema/loader.rs`, dedicated integration tests, or both, instead of
   expanding `validate.rs` test module.
 
 - Risk: introducing `rstest-bdd` may add macro wiring friction.
@@ -202,7 +202,7 @@ If no logic gap is found, record that decision and skip direct validator edits.
 Add or extend unit tests to cover full acceptance matrix. Prefer
 `src/schema/loader.rs` test module to avoid crossing the `validate.rs` size cap.
 
-Add fixture-based and/or inline cases for:
+Add fixture-based or inline cases for:
 
 - valid non-vacuous theorem with witness,
 - valid vacuous theorem (`allow_vacuous: true` + non-empty `vacuity_because`),
@@ -250,26 +250,33 @@ Run from the repository root. Keep command logs for review.
 
 1. Baseline audit and targeted test loop.
 
+    ```sh
     set -o pipefail
     make test | tee /tmp/step-1-2-4-baseline.log
+    ```
 
 2. Implement code/test/doc changes from milestones 1-4.
 
 3. Format Markdown and Rust.
 
+    ```sh
     set -o pipefail
     make fmt | tee /tmp/step-1-2-4-fmt.log
+    ```
 
 4. Validate docs and diagrams.
 
+    ```sh
     set -o pipefail
     make markdownlint | tee /tmp/step-1-2-4-markdownlint.log
 
     set -o pipefail
     make nixie | tee /tmp/step-1-2-4-nixie.log
+    ```
 
 5. Run required commit gates.
 
+    ```sh
     set -o pipefail
     make check-fmt | tee /tmp/step-1-2-4-check-fmt.log
 
@@ -278,6 +285,7 @@ Run from the repository root. Keep command logs for review.
 
     set -o pipefail
     make test | tee /tmp/step-1-2-4-test.log
+    ```
 
 6. Confirm roadmap checkbox updated and all logs show success.
 

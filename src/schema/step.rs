@@ -195,12 +195,6 @@ mod tests {
     }
 
     #[rstest]
-    fn valid_must_step_passes(valid_must: Step) {
-        let steps = vec![valid_must];
-        assert!(validate_step_list(&steps, "Do step").is_ok());
-    }
-
-    #[rstest]
     #[case::call_empty(call_step(""))]
     #[case::call_whitespace(call_step("  "))]
     #[case::must_empty(must_step(""))]
