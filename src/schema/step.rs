@@ -199,19 +199,13 @@ mod tests {
         assert!(validate_step_list(&steps, "Do step").is_ok());
     }
 
-    #[test]
-    fn call_step_with_blank_action_fails() {
-        let steps = vec![call_step("")];
-        let err = validate_step_list(&steps, "Do step").expect_err("should fail");
-        assert!(
-            err.contains("Do step 1: action must be non-empty"),
-            "got: {err}"
-        );
-    }
-
-    #[test]
-    fn must_step_with_blank_action_fails() {
-        let steps = vec![must_step("  ")];
+    #[rstest]
+    #[case::call_empty(call_step(""))]
+    #[case::call_whitespace(call_step("  "))]
+    #[case::must_empty(must_step(""))]
+    #[case::must_whitespace(must_step("  "))]
+    fn step_with_blank_action_fails(#[case] step: Step) {
+        let steps = vec![step];
         let err = validate_step_list(&steps, "Do step").expect_err("should fail");
         assert!(
             err.contains("Do step 1: action must be non-empty"),
