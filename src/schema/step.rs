@@ -77,14 +77,19 @@ fn validate_maybe_block(
 ) -> Result<(), String> {
     if maybe.because.trim().is_empty() {
         return Err(format!(
-            "{path} {pos}: maybe.because must be \
-             non-empty after trimming"
+            concat!(
+                "{path} {pos}: maybe.because must be ",
+                "non-empty after trimming"
+            ),
+            path = path,
+            pos = pos
         ));
     }
     if maybe.do_steps.is_empty() {
         return Err(format!(
-            "{path} {pos}: maybe.do must contain \
-             at least one step"
+            concat!("{path} {pos}: maybe.do must contain ", "at least one step"),
+            path = path,
+            pos = pos
         ));
     }
     let nested_path = format!("{path} {pos}: maybe.do step");
