@@ -66,8 +66,8 @@ all acceptance criteria and quality gates pass.
 
 - Risk: introducing `rstest-bdd` may add macro wiring friction.
   Severity: medium. Likelihood: medium. Mitigation: follow crate examples from
-  local registry source and keep the BDD surface focused on this single roadmap
-  step.
+  local registry source and keep the behaviour-driven development (BDD) surface
+  focused on this single roadmap step.
 
 - Risk: error-fragment assertions become brittle if message text drifts.
   Severity: low. Likelihood: medium. Mitigation: assert stable semantic
@@ -211,9 +211,13 @@ Add fixture-based and/or inline cases for:
 - invalid vacuous path: `allow_vacuous: true` without `vacuity_because`,
 - invalid vacuous path: `allow_vacuous: true` with blank `vacuity_because`.
 
+Fixture design rule for this milestone: each invalid fixture must isolate a
+single vacuity-policy failure mode with minimal required fields so behavioural
+intent remains stable as unrelated schema features evolve.
+
 ### Milestone 3: behavioural tests with `rstest-bdd` v0.5.0
 
-Add BDD feature and scenario wiring:
+Add behaviour-driven development (BDD) feature and scenario wiring:
 
 - add dev dependencies in `Cargo.toml`:
   `rstest-bdd = "0.5.0"` and `rstest-bdd-macros = "0.5.0"`,
@@ -242,13 +246,12 @@ regressions outside vacuity policy behaviour.
 
 ## Concrete steps
 
-Run from repository root (`/home/user/project`). Keep command logs for review.
+Run from the repository root. Keep command logs for review.
 
 1. Baseline audit and targeted test loop.
 
     set -o pipefail
-    cargo test reject_missing_witness_when_kani_not_vacuous \
-      -- --nocapture | tee /tmp/step-1-2-4-baseline.log
+    make test | tee /tmp/step-1-2-4-baseline.log
 
 2. Implement code/test/doc changes from milestones 1-4.
 
