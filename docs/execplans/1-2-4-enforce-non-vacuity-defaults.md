@@ -312,7 +312,7 @@ document communicates intent explicitly and aligns with the schema contract:
 - Cite concrete rationale in `because` fields for `Prove`, `Assume`, and
   `Witness` entries so checks remain reviewable.
 - For each `Prove`, `Assume`, and `Witness` entry, cite related clauses and
-  external documents so provenance is reviewable; where your authoring workflow
+  external documents so provenance is reviewable; where the authoring workflow
   supports it, include a companion `references` field with clause IDs, section
   anchors, or source links.
 - Keep witness intent explicit: if a theorem is expected to be non-vacuous,
