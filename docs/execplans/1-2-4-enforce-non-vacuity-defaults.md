@@ -361,9 +361,9 @@ Validation and diagnostics for this area should follow a stability-first policy:
   untouched, isolate failure to the new BDD file, and retry with minimal
   scenario patterns proven in upstream crate tests.
 
-## Artifacts and notes
+## Artefacts and notes
 
-Expected artifacts from implementation:
+Expected artefacts from implementation:
 
 - New/updated vacuity fixtures under `tests/fixtures/`.
 - New BDD feature file under `tests/features/`.
