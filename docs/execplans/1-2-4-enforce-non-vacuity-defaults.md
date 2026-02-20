@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -76,14 +76,19 @@ all acceptance criteria and quality gates pass.
 ## Progress
 
 - [x] (2026-02-20 17:12Z) Draft this ExecPlan.
-- [ ] Milestone 0: audit current Step 1.2.4 implementation and test gaps.
-- [ ] Milestone 1: adjust vacuity validation logic only if audit finds gaps.
-- [ ] Milestone 2: add unit tests for valid/invalid vacuity declarations and
-  default-failure behaviour.
-- [ ] Milestone 3: add `rstest-bdd` behavioural tests for the same acceptance
-  matrix.
-- [ ] Milestone 4: update design and user docs; mark roadmap Step 1.2.4 done.
-- [ ] Milestone 5: run formatting, lint, and full test gates.
+- [x] (2026-02-20 17:24Z) Milestone 0: audited current Step 1.2.4
+  implementation and identified acceptance/test/documentation gaps.
+- [x] (2026-02-20 17:27Z) Milestone 1: no validator logic changes required.
+  Existing `validate_kani_vacuity` and `validate_kani_witnesses` semantics
+  already matched `TFS-6` and `ADR-4`.
+- [x] (2026-02-20 17:34Z) Milestone 2: added unit coverage for explicit
+  `allow_vacuous: false` missing-witness failure in `src/schema/loader.rs`.
+- [x] (2026-02-20 17:43Z) Milestone 3: added `rstest-bdd` v0.5.0 behavioural
+  scenarios and fixtures for happy/unhappy vacuity flows.
+- [x] (2026-02-20 17:51Z) Milestone 4: updated design and user documentation,
+  indexed this ExecPlan, and marked Step 1.2.4 done in the roadmap.
+- [x] (2026-02-20 17:58Z) Milestone 5: ran formatting, lint, and full test
+  gates successfully.
 
 ## Surprises & discoveries
 
@@ -115,8 +120,38 @@ all acceptance criteria and quality gates pass.
 
 ## Outcomes & retrospective
 
-Not started. This section will be completed when implementation and validation
-finish, including final test counts, quality gate results, and lessons learned.
+Step 1.2.4 was completed without validator logic changes because existing
+semantic checks in `src/schema/validate.rs` already satisfied the non-vacuity
+policy contract.
+
+Delivered changes:
+
+- Added explicit-false missing-witness unit test in `src/schema/loader.rs`.
+- Added `rstest-bdd` v0.5.0 + `rstest-bdd-macros` v0.5.0 dev dependencies.
+- Added behavioural feature/scenario coverage in
+  `tests/features/schema_vacuity.feature` and `tests/schema_vacuity_bdd.rs`.
+- Added invalid fixtures for default and explicit-false missing witness plus
+  missing vacuity reason.
+- Updated `docs/theoremc-design.md` with Step 1.2.4 decisions.
+- Updated `docs/users-guide.md` to clarify omitted-vs-false and rationale
+  requirements.
+- Marked roadmap Step 1.2.4 done and indexed this ExecPlan in
+  `docs/contents.md`.
+
+Quality gates and validation outcomes:
+
+- `make fmt` passed.
+- `make markdownlint` passed.
+- `make nixie` passed.
+- `make check-fmt` passed.
+- `make lint` passed.
+- `make test` passed, including new `tests/schema_vacuity_bdd.rs` scenarios.
+
+Key lesson:
+
+- When validator semantics already satisfy a roadmap item, acceptance closure is
+  primarily a traceability task: add missing behavioural coverage, document
+  rationale, and close roadmap/doc gaps without unnecessary refactoring.
 
 ## Context and orientation
 
@@ -128,19 +163,17 @@ behaviour is defined by:
   (`ADR-4` decision 4),
 - `docs/theoremc-design.md:926` (`DES-8` §8.4).
 
-Current implementation state relevant to this step:
+Current implementation state after completion:
 
-- `src/schema/validate.rs` already enforces:
-  `allow_vacuous: true` requires `vacuity_because`, `vacuity_because` must be
-  non-empty when present, and missing `Witness` fails when `allow_vacuous` is
-  false/default.
-- `src/schema/loader.rs` has unit tests for missing-witness default failure,
-  explicit vacuous success with rationale, and missing rationale rejection.
-- `tests/schema_bdd.rs` does not currently cover missing witness default-failure
-  or missing-rationale failure as `rstest-bdd` behavioural scenarios.
-- `docs/theoremc-design.md` has implementation decisions through Step 1.2.3, but
-  none yet for Step 1.2.4.
-- `docs/roadmap.md` still shows Step 1.2.4 as unchecked.
+- `src/schema/validate.rs` continues to enforce non-vacuity defaults via
+  `validate_kani_vacuity` and `validate_kani_witnesses`.
+- `src/schema/loader.rs` includes explicit-false missing-witness coverage in
+  addition to existing vacuity unit tests.
+- `tests/schema_vacuity_bdd.rs` and
+  `tests/features/schema_vacuity.feature` provide `rstest-bdd` behavioural
+  scenarios for happy and unhappy vacuity flows.
+- `docs/theoremc-design.md` now includes Step 1.2.4 decisions.
+- `docs/roadmap.md` marks Step 1.2.4 as done.
 
 ## Plan of work
 
