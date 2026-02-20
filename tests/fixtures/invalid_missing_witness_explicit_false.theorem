@@ -1,0 +1,10 @@
+Theorem: MissingWitnessExplicitFalse
+About: Witness is missing with allow_vacuous explicitly set to false
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+    allow_vacuous: false

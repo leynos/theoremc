@@ -48,3 +48,5 @@
     rejection.
   - [Step 1.2.3: Enforce `Step` and `LetBinding` shape rules](execplans/1-2-3-enforce-step-and-let-binding.md)
     - ExecPlan for step and let-binding structural validation.
+  - [Step 1.2.4: Enforce non-vacuity defaults](execplans/1-2-4-enforce-non-vacuity-defaults.md)
+    - ExecPlan for vacuity policy defaults and override validation.

@@ -79,8 +79,10 @@ The loader also enforces these structural constraints:
 
 - The `Prove` section requires at least one assertion.
 - `Evidence.kani.unwind` accepts only positive integers (> 0).
-- At least one `Witness` entry is required unless
-  `Evidence.kani.allow_vacuous` is `true`.
+- At least one `Witness` entry is required when `allow_vacuous` is omitted or
+  explicitly `false`.
+- `allow_vacuous: true` is accepted only with a non-empty
+  `vacuity_because` rationale.
 
 ### Expression syntax validation
 
@@ -217,7 +219,7 @@ Evidence:
 - `expect` (required): one of `SUCCESS`, `FAILURE`, `UNREACHABLE`, or
   `UNDETERMINED`.
 - `allow_vacuous` (optional, default `false`): whether vacuous success is
-  permitted.
+  permitted. When omitted, behaviour is identical to `allow_vacuous: false`.
 - `vacuity_because` (required when `allow_vacuous` is `true`): human-readable
   justification. Must be non-empty after trimming.
 

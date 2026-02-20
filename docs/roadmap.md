@@ -134,7 +134,7 @@ Out of scope: Rust typechecking of expressions.
 - [x] Enforce `Step` and `LetBinding` shape rules (`Let` allows only `call` or
   `must`, `maybe` requires `because` and nested `do`). Acceptance: validation
   tests cover each invalid variant combination. Signposts: `TFS-4`, `DES-4`.
-- [ ] Enforce non-vacuity defaults (`Witness` required unless
+- [x] Enforce non-vacuity defaults (`Witness` required unless
   `allow_vacuous: true` with non-empty `vacuity_because`). Acceptance: tests
   cover valid and invalid vacuity declarations and default-failure behaviour.
   Signposts: `TFS-6`, `ADR-4`, `DES-8`.

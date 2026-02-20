@@ -280,6 +280,26 @@ Evidence:
     }
 
     #[rstest]
+    fn reject_missing_witness_when_kani_explicitly_not_vacuous() {
+        let yaml = r"
+Theorem: NoWitnessExplicit
+About: Missing witness with allow_vacuous set to false
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+    allow_vacuous: false
+";
+        let result = load_theorem_docs(yaml);
+        assert!(result.is_err());
+        let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
+        assert!(msg.contains("Witness section must contain at least one witness"));
+    }
+
+    #[rstest]
     fn accept_missing_witness_when_kani_vacuous() {
         let yaml = r"
 Theorem: VacuousOk

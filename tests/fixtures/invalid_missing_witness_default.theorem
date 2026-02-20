@@ -1,0 +1,9 @@
+Theorem: MissingWitnessDefault
+About: Witness is missing under the default non-vacuous policy
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS

@@ -688,9 +688,10 @@ deserialization (Step 1.1 of the roadmap):
 - `src/lib.rs` is added alongside `src/main.rs` so schema types are testable
   as a library. Cargo supports this layout natively for a single package with
   both `lib` and `bin` targets.
-- `rstest-bdd` v0.5.0 was evaluated but lacks documentation for concrete
-  usage patterns. `rstest` parameterized tests with BDD-style naming
-  conventions are used instead.
+- `rstest-bdd` v0.5.0 was evaluated during Step 1.1 and initially deferred
+  because concrete usage patterns were sparse. Step 1.2.4 later adopts
+  `rstest-bdd` for vacuity-policy behavioural scenarios once project-local
+  patterns were established.
 
 ### 6.7 Implementation decisions (Step 1.2.3)
 
@@ -714,6 +715,22 @@ The following decisions were taken during the implementation of `Step` and
 - `validate_expressions` was consolidated from three single-purpose helpers
   into one function to reclaim line budget in `validate.rs`. The behaviour is
   identical.
+
+### 6.7.1 Implementation decisions (Step 1.2.4)
+
+The following decisions were taken during implementation of non-vacuity
+defaults (Step 1.2.4 of the roadmap):
+
+- Vacuity policy enforcement stays in `src/schema/validate.rs` under two
+  focused helpers: `validate_kani_vacuity` (override contract) and
+  `validate_kani_witnesses` (default witness requirement).
+- `allow_vacuous: false` and omitted `allow_vacuous` are treated identically.
+  Both require at least one `Witness` entry.
+- `allow_vacuous: true` is accepted only when `vacuity_because` is present and
+  non-empty after trimming.
+- Behavioural vacuity-policy coverage is implemented with `rstest-bdd` v0.5.0
+  scenarios in `tests/schema_vacuity_bdd.rs` and
+  `tests/features/schema_vacuity.feature`.
 
 ### 6.8 Localized diagnostics contract (ADR 002)
 

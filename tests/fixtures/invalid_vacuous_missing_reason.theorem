@@ -1,0 +1,10 @@
+Theorem: VacuousMissingReason
+About: Vacuous mode requires an explicit reason
+Prove:
+  - assert: "true"
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+    allow_vacuous: true
