@@ -46,3 +46,5 @@
   - [Step 1.2.2: Parse expression fields as `syn::Expr`](execplans/1-2-2-parse-assume-prove-and-witness-expressions.md)
     - ExecPlan for expression syntax validation and statement block
     rejection.
+  - [Step 1.2.3: Enforce `Step` and `LetBinding` shape rules](execplans/1-2-3-enforce-step-and-let-binding.md)
+    - ExecPlan for step and let-binding structural validation.

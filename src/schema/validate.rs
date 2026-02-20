@@ -7,7 +7,8 @@
 
 use super::error::SchemaError;
 use super::expr;
-use super::types::{KaniEvidence, TheoremDoc};
+use super::step;
+use super::types::{KaniEvidence, LetBinding, TheoremDoc};
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -80,6 +81,10 @@ fn validate_collection_fields<T>(
 /// - All expression fields (`Assume.expr`, `Prove.assert`,
 ///   `Witness.cover`) parse as `syn::Expr` and are not statement-like
 ///   forms (`TFS-1` §1.2, §2.3, `DES-6` §6.2).
+/// - All `Let` binding and `Do` step `ActionCall.action` fields are
+///   non-empty after trimming (`TFS-4` §3.8, §3.9).
+/// - All `MaybeBlock.because` fields are non-empty after trimming and
+///   `MaybeBlock.do` lists are non-empty (`TFS-4` §4.2.3, `DES-4`).
 /// - At least one evidence backend is specified.
 /// - Kani `unwind` is positive (> 0).
 /// - Kani `vacuity_because` is non-empty after trimming when present.
@@ -98,6 +103,8 @@ pub(crate) fn validate_theorem_doc(doc: &TheoremDoc) -> Result<(), SchemaError> 
     validate_assumptions(doc)?;
     validate_witnesses(doc)?;
     validate_expressions(doc)?;
+    validate_let_bindings(doc)?;
+    validate_do_steps(doc)?;
     validate_evidence(doc)?;
     Ok(())
 }
@@ -158,37 +165,40 @@ fn validate_witnesses(doc: &TheoremDoc) -> Result<(), SchemaError> {
 /// All expression fields parse as valid, non-statement `syn::Expr`
 /// forms (`TFS-1` §1.2, §2.3, `DES-6` §6.2).
 fn validate_expressions(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    validate_assumption_exprs(doc)?;
-    validate_assertion_exprs(doc)?;
-    validate_witness_exprs(doc)?;
-    Ok(())
-}
-
-/// Every `Assumption.expr` must parse as a single `syn::Expr`.
-fn validate_assumption_exprs(doc: &TheoremDoc) -> Result<(), SchemaError> {
     for (i, a) in doc.assume.iter().enumerate() {
         expr::validate_rust_expr(a.expr.trim())
             .map_err(|reason| fail(doc, format!("Assume constraint {}: expr {reason}", i + 1)))?;
     }
-    Ok(())
-}
-
-/// Every `Assertion.assert_expr` must parse as a single `syn::Expr`.
-fn validate_assertion_exprs(doc: &TheoremDoc) -> Result<(), SchemaError> {
     for (i, a) in doc.prove.iter().enumerate() {
         expr::validate_rust_expr(a.assert_expr.trim())
             .map_err(|reason| fail(doc, format!("Prove assertion {}: assert {reason}", i + 1)))?;
     }
-    Ok(())
-}
-
-/// Every `WitnessCheck.cover` must parse as a single `syn::Expr`.
-fn validate_witness_exprs(doc: &TheoremDoc) -> Result<(), SchemaError> {
     for (i, w) in doc.witness.iter().enumerate() {
         expr::validate_rust_expr(w.cover.trim())
             .map_err(|reason| fail(doc, format!("Witness {}: cover {reason}", i + 1)))?;
     }
     Ok(())
+}
+
+// ── Step and Let binding validation ──────────────────────────────
+
+/// Every `Let` binding's `ActionCall.action` must be non-empty
+/// (`TFS-4` §3.8, `DES-4` §4.4).
+fn validate_let_bindings(doc: &TheoremDoc) -> Result<(), SchemaError> {
+    for (name, binding) in &doc.let_bindings {
+        let ac = match binding {
+            LetBinding::Call(c) => &c.call,
+            LetBinding::Must(m) => &m.must,
+        };
+        step::validate_action_call(ac)
+            .map_err(|r| fail(doc, format!("Let binding '{name}': {r}")))?;
+    }
+    Ok(())
+}
+
+/// Every `Do` step must have valid shape (`TFS-4` §3.9, §4.2.3).
+fn validate_do_steps(doc: &TheoremDoc) -> Result<(), SchemaError> {
+    step::validate_step_list(&doc.do_steps, "Do step").map_err(|r| fail(doc, r))
 }
 
 /// Evidence section must specify at least one backend, and Kani
@@ -356,14 +366,6 @@ Witness:
         "Theorem: T\nAbout: ok\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\n    vacuity_because: \"  \"\nWitness:\n  - cover: 'true'\n    because: r",
         "vacuity_because must be non-empty"
     )]
-    fn given_invalid_field_when_loaded_then_rejected(
-        #[case] yaml: &str,
-        #[case] expected_fragment: &str,
-    ) {
-        assert_load_err_contains(yaml, expected_fragment);
-    }
-
-    #[rstest]
     #[case::block_assume_expr(
         "Theorem: T\nAbout: ok\nAssume:\n  - expr: '{ let x = 1; x }'\n    because: r\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
         "Assume constraint 1: expr must be a single expression"
@@ -380,7 +382,7 @@ Witness:
         "Theorem: T\nAbout: ok\nAssume:\n  - expr: 'not rust %%'\n    because: r\nProve:\n  - assert: 'true'\n    because: t\nEvidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\nWitness:\n  - cover: 'true'\n    because: r",
         "Assume constraint 1: expr is not a valid Rust expression"
     )]
-    fn given_invalid_expression_when_loaded_then_rejected(
+    fn given_invalid_field_when_loaded_then_rejected(
         #[case] yaml: &str,
         #[case] expected_fragment: &str,
     ) {

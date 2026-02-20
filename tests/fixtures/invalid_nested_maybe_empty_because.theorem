@@ -1,0 +1,25 @@
+Schema: 1
+Theorem: NestedMaybeEmptyBecause
+About: A theorem with a nested maybe that has an empty because
+Tags: [integration]
+Prove:
+  - assert: "true"
+    because: trivially true
+Do:
+  - maybe:
+      because: outer reason
+      do:
+        - maybe:
+            because: ""
+            do:
+              - call:
+                  action: account.deposit
+                  args:
+                    amount: 10
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

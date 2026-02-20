@@ -117,6 +117,22 @@ Assume:
   - expr: "x = 5"                    # assignment
 ```
 
+### Step and Let binding validation
+
+The loader validates the structural constraints of `Let` bindings and `Do`
+steps:
+
+- Every `ActionCall.action` field (in both `Let` bindings and `Do` steps) must
+  be non-empty after trimming. Blank action names are rejected.
+- Every `MaybeBlock.because` field must be non-empty after trimming.
+- Every `MaybeBlock.do` list must contain at least one step (an empty `maybe`
+  block is meaningless).
+- Validation recurses into nested `maybe` blocks. A `maybe` containing another
+  `maybe` with a blank `because` is caught with a full path context (e.g.,
+  `"Do step 2: maybe.do step 1: maybe.because must be non-empty"`).
+- `Let` bindings accept only `call` or `must` variants. A `maybe` block inside
+  `Let` is rejected at the deserialization level.
+
 ### Subordinate types
 
 **Assumption**: a constraint on symbolic inputs. Both `expr` and `because` are

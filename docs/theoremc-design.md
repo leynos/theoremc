@@ -692,7 +692,30 @@ deserialization (Step 1.1 of the roadmap):
   usage patterns. `rstest` parameterized tests with BDD-style naming
   conventions are used instead.
 
-### 6.7 Localized diagnostics contract (ADR 002)
+### 6.7 Implementation decisions (Step 1.2.3)
+
+The following decisions were taken during the implementation of `Step` and
+`LetBinding` shape validation (Step 1.2.3 of the roadmap):
+
+- `LetBinding` variant restriction: the `LetBinding` enum has only `Call` and
+  `Must` variants. Serde's `#[serde(untagged)]` deserialization rejects any
+  YAML that does not match either variant shape. A `maybe:` block inside `Let`
+  produces a serde deserialization error ("data did not match any variant").
+  This is sufficient — no additional runtime validation is needed to enforce
+  "Let allows only call or must". Improving the error message is a Step 1.3
+  concern (diagnostics quality).
+- Validation logic is extracted into `src/schema/step.rs`, following the
+  `expr.rs` pattern from Step 1.2.2. The module provides `pub(crate)` functions
+  returning `Result<(), String>`, allowing `validate.rs` to wrap errors with
+  theorem-level context. This keeps `validate.rs` under the 400-line limit.
+- Error path context uses a "breadcrumb" string
+  (e.g., `"Do step 2: maybe.do step 1"`) that builds up through recursion,
+  giving users a clear trail to the problematic field.
+- `validate_expressions` was consolidated from three single-purpose helpers
+  into one function to reclaim line budget in `validate.rs`. The behaviour is
+  identical.
+
+### 6.8 Localized diagnostics contract (ADR 002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:
 
@@ -717,7 +740,7 @@ The default backend for human-facing localization is Fluent:
 This preserves composability for library consumers while keeping deterministic,
 inspectable diagnostics for tooling and CI.
 
-### 6.8 Localization rendering sequence
+### 6.9 Localization rendering sequence
 
 Figure 1. Diagnostic capture, localization rendering, and report projection
 flow under the ADR 002 library-first localization model.
@@ -745,7 +768,7 @@ sequenceDiagram
   Theoremd-->>ConsumerApplication: optional_localized_message
 ```
 
-### 6.9 Diagnostic and localization class model
+### 6.10 Diagnostic and localization class model
 
 Figure 2. Class-level model for diagnostic payloads, localization contracts,
 and report-entry population in theoremc and theoremd.

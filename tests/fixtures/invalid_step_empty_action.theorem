@@ -1,0 +1,19 @@
+Schema: 1
+Theorem: StepEmptyAction
+About: A theorem with a blank action in a Do step
+Tags: [integration]
+Prove:
+  - assert: "true"
+    because: trivially true
+Do:
+  - must:
+      action: ""
+      args:
+        account: { ref: a }
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: always reachable

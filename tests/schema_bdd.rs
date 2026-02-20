@@ -276,3 +276,27 @@ fn given_statement_or_bad_syntax_in_expr_when_loaded_then_validation_fails(
 ) {
     assert_fixture_err_contains(fixture, expected_fragment);
 }
+
+// ── Given invalid Step or LetBinding shapes, validation fails ─────
+
+#[rstest]
+#[case::maybe_empty_because(
+    "invalid_maybe_empty_because.theorem",
+    "maybe.because must be non-empty"
+)]
+#[case::maybe_empty_do(
+    "invalid_maybe_empty_do.theorem",
+    "maybe.do must contain at least one step"
+)]
+#[case::let_empty_action("invalid_let_empty_action.theorem", "action must be non-empty")]
+#[case::step_empty_action("invalid_step_empty_action.theorem", "action must be non-empty")]
+#[case::nested_maybe_empty_because(
+    "invalid_nested_maybe_empty_because.theorem",
+    "maybe.because must be non-empty"
+)]
+fn given_invalid_step_or_let_shape_when_loaded_then_validation_fails(
+    #[case] fixture: &str,
+    #[case] expected_fragment: &str,
+) {
+    assert_fixture_err_contains(fixture, expected_fragment);
+}
