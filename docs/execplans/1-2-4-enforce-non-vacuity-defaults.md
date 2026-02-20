@@ -102,7 +102,7 @@ all acceptance criteria and quality gates pass.
   rather than `rstest-bdd` scenarios.
 - `docs/rstest-bdd-users-guide.md` is not present in this repository; concrete
   `rstest-bdd` usage references were taken from the published crate source
-  (`~/.cargo/registry/src/.../rstest-bdd-0.5.0/README.md` and tests).
+  (`~/.cargo/registry/src/…/rstest-bdd-0.5.0/README.md` and tests).
 
 ## Decision log
 
@@ -213,7 +213,7 @@ Add fixture-based or inline cases for:
 - invalid vacuous path: `allow_vacuous: true` with blank `vacuity_because`.
 
 Fixture design rule for this milestone: each invalid fixture must isolate a
-single vacuity-policy failure mode with minimal required fields so behavioural
+single vacuity-policy failure mode with minimal required fields, so behavioural
 intent remains stable as unrelated schema features evolve.
 
 ### Milestone 3: behavioural tests with `rstest-bdd` v0.5.0
@@ -310,9 +310,9 @@ When authoring theorem files that rely on non-vacuity defaults, ensure the
 document communicates intent explicitly and aligns with the schema contract:
 
 - Cite concrete rationale in `because` fields for `Prove`, `Assume`, and
-  `Witness` entries so checks remain reviewable.
+  `Witness` entries, so checks remain reviewable.
 - For each `Prove`, `Assume`, and `Witness` entry, cite related clauses and
-  external documents so provenance is reviewable; where the authoring workflow
+  external documents, so provenance is reviewable; where the authoring workflow
   supports it, include a companion `references` field with clause IDs, section
   anchors, or source links.
 - Keep witness intent explicit: if a theorem is expected to be non-vacuous,
