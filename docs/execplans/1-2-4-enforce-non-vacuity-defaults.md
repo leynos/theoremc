@@ -92,8 +92,9 @@ all acceptance criteria and quality gates pass.
 
 ## Surprises & discoveries
 
-- The project memory MCP servers were not available in this environment, so no
-  historical qdrant notes could be retrieved for this session.
+- The project memory Model Context Protocol (MCP) servers were not available in
+  this environment, so no historical qdrant notes could be retrieved for this
+  session.
 - The current validator already contains dedicated vacuity checks in
   `validate_kani_vacuity` and `validate_kani_witnesses` in
   `src/schema/validate.rs`.
@@ -302,6 +303,54 @@ Acceptance is met only if all conditions below are true:
 - `docs/users-guide.md` reflects any user-visible behaviour/API clarifications.
 - `docs/roadmap.md` Step 1.2.4 is marked done.
 - `make check-fmt`, `make lint`, and `make test` all pass.
+
+## Theorem authoring guidance
+
+When authoring theorem files that rely on non-vacuity defaults, ensure the
+document communicates intent explicitly and aligns with the schema contract:
+
+- Cite concrete rationale in `because` fields for `Prove`, `Assume`, and
+  `Witness` entries so checks remain reviewable.
+- Keep witness intent explicit: if a theorem is expected to be non-vacuous,
+  provide at least one `Witness` entry; if vacuity is intentional, set
+  `allow_vacuous: true` and provide a non-empty `vacuity_because`.
+- Use `Evidence.kani.expect` values to match intended verification outcomes
+  (`SUCCESS`, `FAILURE`, `UNREACHABLE`, `UNDETERMINED`) and avoid ambiguous
+  expectations in fixtures or examples.
+
+## Contributor checklist
+
+Before marking this roadmap step complete in future updates, contributors
+should verify all artefacts and snapshots affected by schema/validation edits:
+
+- Parser fixtures:
+  add or update focused fixtures under `tests/fixtures/` for each new happy and
+  unhappy path.
+- Codegen snapshots:
+  if a change affects generated output in downstream tooling, refresh and
+  review any relevant codegen snapshots.
+- Report snapshots:
+  if diagnostics or reporting output changes, refresh and review report
+  snapshots to ensure intended user-facing deltas.
+- Behavioural and unit coverage:
+  ensure unit tests and behavioural scenarios cover acceptance paths and error
+  fragments.
+- Gates:
+  run `make check-fmt`, `make lint`, and `make test` with log capture.
+
+## Compatibility policy
+
+Validation and diagnostics for this area should follow a stability-first policy:
+
+- Diagnostic code compatibility:
+  if diagnostic codes are introduced for schema validation, treat published
+  codes as stable and document any additions or deprecations.
+- Diagnostic argument-schema compatibility:
+  preserve argument names and semantic meaning for existing diagnostics;
+  changes require explicit migration notes.
+- Error message evolution:
+  prefer additive clarifications over semantic rewrites, and keep deterministic
+  fragments used by behavioural tests stable unless acceptance criteria change.
 
 ## Idempotence and recovery
 
