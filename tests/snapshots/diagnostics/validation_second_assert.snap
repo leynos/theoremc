@@ -1,0 +1,1 @@
+schema.validation_failure | tests/fixtures/invalid_second_empty_assert.theorem:6:13 | Prove assertion 2: assert must be non-empty after trimming

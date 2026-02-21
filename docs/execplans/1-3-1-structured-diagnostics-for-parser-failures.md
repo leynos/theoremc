@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -91,14 +91,20 @@ Observable success:
 ## Progress
 
 - [x] (2026-02-21) Draft ExecPlan for Step 1.3.
-- [ ] Milestone 0: baseline audit and diagnostic contract definition.
-- [ ] Milestone 1: introduce structured diagnostic model and error plumbing.
-- [ ] Milestone 2: implement parser failure wrapping with source locations.
-- [ ] Milestone 3: implement validator failure wrapping with source locations.
-- [ ] Milestone 4: build fixture corpus and snapshot harness.
-- [ ] Milestone 5: add unit + behavioural (`rstest-bdd` v0.5.0) coverage.
-- [ ] Milestone 6: update design and user documentation.
-- [ ] Milestone 7: run format/lint/test gates and mark roadmap Step 1.3 done.
+- [x] (2026-02-21) Milestone 0: baseline audit and diagnostic contract
+  definition.
+- [x] (2026-02-21) Milestone 1: introduced structured diagnostic model and
+  error plumbing.
+- [x] (2026-02-21) Milestone 2: implemented parser failure wrapping with source
+  locations.
+- [x] (2026-02-21) Milestone 3: implemented validator failure wrapping with
+  source locations.
+- [x] (2026-02-21) Milestone 4: built fixture corpus and snapshot harness.
+- [x] (2026-02-21) Milestone 5: added unit + behavioural (`rstest-bdd` v0.5.0)
+  coverage.
+- [x] (2026-02-21) Milestone 6: updated design and user documentation.
+- [x] (2026-02-21) Milestone 7: quality gates passed and roadmap Step 1.3
+  marked done.
 
 ## Surprises & discoveries
 
@@ -107,8 +113,12 @@ Observable success:
   already includes `rstest-bdd = "0.5.0"` and `rstest-bdd-macros = "0.5.0"`.
 - Project-memory MCP/qdrant resources are not available in this environment,
   so no historical notes were retrievable for this planning session.
-- Current `SchemaError` variants carry string messages but no first-class
-  source-location fields.
+- `src/schema/loader.rs` exceeded the 400-line module limit when diagnostics
+  tests were added inline. The tests were moved to `src/schema/loader_tests.rs`
+  and wired via `#[path = "loader_tests.rs"]` to keep `loader.rs` concise.
+- `serde-saphyr` parse error `Display` output includes multiline snippets.
+  Structured diagnostics now normalize parser messages to the first line so
+  snapshot baselines remain deterministic.
 
 ## Decision log
 
@@ -127,22 +137,43 @@ Observable success:
 
 ## Outcomes & retrospective
 
-Pending implementation.
+Step 1.3 is complete.
+
+Implemented outcomes:
+
+- Added structured diagnostics (`SchemaDiagnostic`) with stable codes and
+  source/line/column fields.
+- Added source-aware loading API:
+  `load_theorem_docs_with_source(source, input)`, while preserving
+  `load_theorem_docs(input)` compatibility.
+- Wrapped parser and validator failures with structured diagnostics.
+- Added span-aware raw schema mapping for key validation fields to improve
+  location fidelity.
+- Added snapshot tests for representative parser and validator failures:
+  `tests/schema_diagnostics_snapshot.rs`.
+- Added fixture corpus regression tests:
+  `tests/schema_fixture_corpus.rs`.
+- Added behavioural diagnostics coverage with `rstest-bdd` v0.5.0:
+  `tests/schema_diagnostics_bdd.rs`.
+- Expanded fixture suite with alias, nested `maybe`, and `must`-shape focused
+  fixtures.
+- Updated `docs/theoremc-design.md`, `docs/users-guide.md`,
+  `docs/roadmap.md`, and `docs/contents.md`.
 
 ## Context and orientation
 
 Relevant current implementation files:
 
-- `src/schema/error.rs` defines `SchemaError` as string-centric variants.
-- `src/schema/loader.rs` loads YAML via `serde_saphyr::from_multiple` and runs
-  semantic validation.
-- `src/schema/validate.rs` emits deterministic reason strings but currently has
-  no line/column/source metadata.
-- `src/schema/types.rs` defines theorem schema and currently stores plain
-  values for most fields.
-- `tests/schema_bdd.rs`, `tests/schema_deser.rs`, and
-  `tests/schema_deser_reject.rs` cover behaviour largely through substring
-  matching on `to_string()`.
+- `src/schema/error.rs` carries structured diagnostics alongside semantic error
+  variants.
+- `src/schema/loader.rs` and `src/schema/raw.rs` implement source-aware loading
+  and diagnostic location mapping.
+- `src/schema/validate.rs` remains the semantic rule engine with deterministic
+  reason strings.
+- `tests/schema_diagnostics_snapshot.rs` locks source-located diagnostic output
+  shape.
+- `tests/schema_fixture_corpus.rs` and `tests/schema_diagnostics_bdd.rs`
+  validate fixture and behavioural coverage for Step 1.3.
 
 Roadmap target for this plan:
 

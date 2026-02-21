@@ -50,3 +50,5 @@
     - ExecPlan for step and let-binding structural validation.
   - [Step 1.2.4: Enforce non-vacuity defaults](execplans/1-2-4-enforce-non-vacuity-defaults.md)
     - ExecPlan for vacuity policy defaults and override validation.
+  - [Step 1.3.1: Structured diagnostics for parser failures](execplans/1-3-1-structured-diagnostics-for-parser-failures.md)
+    - ExecPlan for source-located diagnostics and parser regression fixtures.

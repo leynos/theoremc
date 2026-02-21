@@ -1,0 +1,1 @@
+schema.validation_failure | tests/fixtures/invalid_missing_witness_default.theorem:1:10 | Witness section must contain at least one witness when allow_vacuous is false (the default)

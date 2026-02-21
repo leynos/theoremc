@@ -1,0 +1,27 @@
+Theorem: NestedMaybeProof
+About: Nested maybe blocks remain valid when all reasons and actions are present.
+Let:
+  baseline:
+    must:
+      action: account.params
+      args: { max_balance: 1000 }
+Do:
+  - maybe:
+      because: optional first branch
+      do:
+        - maybe:
+            because: optional second branch
+            do:
+              - must:
+                  action: account.validate
+                  args: { account: { ref: baseline } }
+Prove:
+  - assert: "true"
+    because: baseline theorem remains valid
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: at least one path is reachable
