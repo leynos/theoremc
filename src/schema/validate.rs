@@ -22,6 +22,7 @@ fn fail(doc: &TheoremDoc, reason: String) -> SchemaError {
     SchemaError::ValidationFailed {
         theorem: doc.theorem.to_string(),
         reason,
+        diagnostic: None,
     }
 }
 

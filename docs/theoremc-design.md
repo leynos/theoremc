@@ -617,8 +617,9 @@ All diagnostics must be source-located and actionable.
 
 `serde-saphyr` already focuses on good location information; its docs describe
 error messages that include snippets and precise location information, even
-across YAML anchors.[^3] These are wrapped into `miette` diagnostics so errors
-in theorem files point to the exact line/column.
+across YAML anchors.[^3] The loader wraps parse and validation failures into
+theoremc structured diagnostics (code plus source, line, column, and fallback
+message), leaving renderer-specific formatting to downstream consumers.
 
 ### 6.4 Implementation decisions (Step 1.2.1)
 
@@ -731,6 +732,34 @@ defaults (Step 1.2.4 of the roadmap):
 - Behavioural vacuity-policy coverage is implemented with `rstest-bdd` v0.5.0
   scenarios in `tests/schema_vacuity_bdd.rs` and
   `tests/features/schema_vacuity.feature`.
+
+### 6.7.2 Implementation decisions (Step 1.3)
+
+The following decisions were taken during implementation of structured
+diagnostics and parser regression corpus work (Step 1.3 of the roadmap):
+
+- The loader now supports an explicit source-aware entrypoint,
+  `load_theorem_docs_with_source(source, input)`, while preserving
+  `load_theorem_docs(input)` as a convenience wrapper using a deterministic
+  synthetic source (`<inline>`). This keeps existing call sites stable while
+  enabling source-path diagnostics for tooling and tests.
+- Structured diagnostics are represented as machine-readable payloads
+  (`SchemaDiagnostic`) with stable codes: `schema.parse_failure` and
+  `schema.validation_failure`, plus source file, line, column, and
+  deterministic fallback message text.
+- YAML parser failures are wrapped directly with parser-provided location
+  coordinates. The diagnostic message stores the first line of the parser error
+  to keep snapshots deterministic and concise.
+- Semantic validator failures continue to use `validate.rs` for rule logic, but
+  are now enriched at the loader boundary using span-aware raw schema types for
+  key fields (`About`, `Assume`, `Prove`, `Witness`, and Kani vacuity fields).
+  Where a field-specific mapping is unavailable, diagnostics fall back to the
+  theorem declaration location.
+- Step 1.3 regression coverage adds:
+  snapshot tests for representative parser/validator failures, a dedicated
+  fixture-corpus test suite covering aliases, nested `maybe`, `must` shape, and
+  witness policy scenarios, and behavioural tests with `rstest-bdd` v0.5.0 for
+  source-located diagnostics behaviour.
 
 ### 6.8 Localized diagnostics contract (ADR 002)
 

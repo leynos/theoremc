@@ -147,11 +147,11 @@ In scope: error reporting quality, location fidelity, and regression fixtures.
 
 Out of scope: backend-specific error rendering.
 
-- [ ] Wrap parser and validator failures in structured diagnostics that include
+- [x] Wrap parser and validator failures in structured diagnostics that include
   source file, line, and column. Acceptance: snapshot tests assert stable,
   source-located diagnostic output for representative failures. Signposts:
   `DES-6`, `TFS-1`.
-- [ ] Build a fixture suite of valid and invalid `.theorem` files that covers
+- [x] Build a fixture suite of valid and invalid `.theorem` files that covers
   aliases, nested `maybe`, `must` semantics preconditions, and witness policy.
   Acceptance: fixtures run in continuous integration (CI) and gate parser and
   validator regressions. Signposts: `TFS-1`, `TFS-4`, `TFS-6`, `ADR-4`.

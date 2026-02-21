@@ -30,6 +30,18 @@ The function:
 - Enforces non-empty constraints on string fields (see below).
 - Returns `Err(SchemaError)` with an actionable message on failure.
 
+When you have a concrete source path (for example, a fixture path or project
+file path), prefer `load_theorem_docs_with_source` so diagnostics include that
+source identifier:
+
+```rust
+use theoremc::schema::load_theorem_docs_with_source;
+
+let source = "theorems/my_theorem.theorem";
+let yaml = std::fs::read_to_string(source)?;
+let docs = load_theorem_docs_with_source(source, &yaml)?;
+```
+
 ### Top-level fields
 
 Every theorem document is a YAML mapping with the following fields. Keys use
@@ -237,13 +249,25 @@ Action arguments accept:
 
 ### Error handling
 
-`load_theorem_docs` returns `Result<Vec<TheoremDoc>, SchemaError>` where
-`SchemaError` has three variants:
+`load_theorem_docs` and `load_theorem_docs_with_source` return
+`Result<Vec<TheoremDoc>, SchemaError>`, where `SchemaError` has three variants:
 
-- `Deserialize(String)` — YAML parsing or schema mismatch error.
+- `Deserialize { message, diagnostic }` — YAML parsing or schema mismatch
+  error.
 - `InvalidIdentifier { identifier, reason }` — identifier validation failure.
-- `ValidationFailed { theorem, reason }` — structural constraint violation
-  (e.g., empty `Prove` section or no Evidence backend).
+- `ValidationFailed { theorem, reason, diagnostic }` — structural constraint
+  violation (e.g., empty `Prove` section or no Evidence backend).
+
+For parse and validation failures, `diagnostic` includes structured location
+metadata when available:
+
+- stable code (`schema.parse_failure` or `schema.validation_failure`),
+- source identifier,
+- line and column,
+- deterministic fallback message.
+
+Use `SchemaError::diagnostic()` to access this payload for custom rendering,
+snapshot assertions, or editor integration.
 
 All variants produce actionable error messages suitable for display to theorem
 authors.

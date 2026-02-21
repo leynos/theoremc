@@ -1,0 +1,1 @@
+schema.validation_failure | tests/fixtures/invalid_empty_about.theorem:2:8 | About must be non-empty after trimming

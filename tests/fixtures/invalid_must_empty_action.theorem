@@ -1,0 +1,16 @@
+Theorem: MustEmptyAction
+About: Must steps require non-empty action names.
+Do:
+  - must:
+      action: "   "
+      args: {}
+Prove:
+  - assert: "true"
+    because: theorem body is otherwise valid
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: witness policy still applies

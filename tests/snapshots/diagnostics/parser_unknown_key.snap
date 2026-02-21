@@ -1,0 +1,1 @@
+schema.parse_failure | tests/fixtures/invalid_unknown_key.theorem:1:1 | error: line 1 column 1: unknown field `SpuriousKey`, expected one of Schema, schema, Theorem, theorem, About, about, Tags, tags, Given, given, Forall, forall, Assume, assume, Witness, witness, Let, let, Do, do, Prove, prove, Evidence, evidence at line 1, column 1
