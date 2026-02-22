@@ -12,6 +12,20 @@ use super::newtypes::{ForallVar, TheoremName};
 use super::types::{Evidence, KaniEvidence, KaniExpectation, LetBinding, Step, TheoremDoc};
 use super::value::TheoremValue;
 
+/// Semantic wrapper for validation failure reason strings.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ValidationReason<'a>(&'a str);
+
+impl<'a> ValidationReason<'a> {
+    pub(crate) const fn new(reason: &'a str) -> Self {
+        Self(reason)
+    }
+
+    pub(crate) const fn as_str(&self) -> &'a str {
+        self.0
+    }
+}
+
 /// Raw theorem document with location-carrying fields.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -140,13 +154,13 @@ impl RawTheoremDoc {
 
     /// Returns the best-effort field location for a validation error reason.
     #[must_use]
-    pub(crate) fn location_for_validation_reason(&self, reason: &str) -> Location {
+    pub(crate) fn location_for_validation_reason(&self, reason: ValidationReason<'_>) -> Location {
         self.location_for_reason(reason)
             .unwrap_or_else(|| self.theorem_location())
     }
 
-    fn location_for_reason(&self, reason: &str) -> Option<Location> {
-        if reason.starts_with("About must be non-empty") {
+    fn location_for_reason(&self, reason: ValidationReason<'_>) -> Option<Location> {
+        if reason.as_str().starts_with("About must be non-empty") {
             return Some(self.about.referenced);
         }
 
@@ -166,49 +180,55 @@ impl RawTheoremDoc {
         None
     }
 
-    fn prove_field_location(&self, reason: &str) -> Option<Location> {
+    fn prove_field_location(&self, reason: ValidationReason<'_>) -> Option<Location> {
         let index = indexed_error_position(reason, "Prove assertion ")?;
         let prove = self.prove.get(index)?;
-        if reason.contains(": because ") {
+        if reason.as_str().contains(": because ") {
             Some(prove.because.referenced)
         } else {
             Some(prove.assert_expr.referenced)
         }
     }
 
-    fn assume_field_location(&self, reason: &str) -> Option<Location> {
+    fn assume_field_location(&self, reason: ValidationReason<'_>) -> Option<Location> {
         let index = indexed_error_position(reason, "Assume constraint ")?;
         let assume = self.assume.get(index)?;
-        if reason.contains(": because ") {
+        if reason.as_str().contains(": because ") {
             Some(assume.because.referenced)
         } else {
             Some(assume.expr.referenced)
         }
     }
 
-    fn witness_field_location(&self, reason: &str) -> Option<Location> {
+    fn witness_field_location(&self, reason: ValidationReason<'_>) -> Option<Location> {
         let index = indexed_error_position(reason, "Witness ")?;
         let witness = self.witness.get(index)?;
-        if reason.contains(": because ") {
+        if reason.as_str().contains(": because ") {
             Some(witness.because.referenced)
         } else {
             Some(witness.cover.referenced)
         }
     }
 
-    fn kani_field_location(&self, reason: &str) -> Option<Location> {
+    fn kani_field_location(&self, reason: ValidationReason<'_>) -> Option<Location> {
         let kani = self.evidence.kani.as_ref()?;
 
-        if reason.starts_with("Evidence.kani.unwind") {
+        if reason.as_str().starts_with("Evidence.kani.unwind") {
             return Some(kani.unwind.referenced);
         }
-        if reason.starts_with("vacuity_because is required when allow_vacuous is true") {
+        if reason
+            .as_str()
+            .starts_with("vacuity_because is required when allow_vacuous is true")
+        {
             return kani
                 .allow_vacuous
                 .as_ref()
                 .map(|allow_vacuous| allow_vacuous.referenced);
         }
-        if reason.starts_with("Evidence.kani.vacuity_because must be non-empty") {
+        if reason
+            .as_str()
+            .starts_with("Evidence.kani.vacuity_because must be non-empty")
+        {
             return kani
                 .vacuity_because
                 .as_ref()
@@ -247,8 +267,8 @@ impl RawKaniEvidence {
 }
 
 /// Parses indexed validation reason prefixes like `Prove assertion 2: …`.
-fn indexed_error_position(reason: &str, prefix: &str) -> Option<usize> {
-    let tail = reason.strip_prefix(prefix)?;
+fn indexed_error_position(reason: ValidationReason<'_>, prefix: &str) -> Option<usize> {
+    let tail = reason.as_str().strip_prefix(prefix)?;
     let (raw_index, _) = tail.split_once(':')?;
     let parsed = raw_index.trim().parse::<usize>().ok()?;
     parsed.checked_sub(1)

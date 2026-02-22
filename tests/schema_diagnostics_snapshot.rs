@@ -3,12 +3,12 @@
 mod common;
 
 use common::load_fixture;
-use theoremc::schema::load_theorem_docs_with_source;
+use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 
 fn render_diagnostic_for_fixture(fixture_name: &str) -> String {
     let source = format!("tests/fixtures/{fixture_name}");
     let yaml = load_fixture(fixture_name);
-    let Err(error) = load_theorem_docs_with_source(&source, &yaml) else {
+    let Err(error) = load_theorem_docs_with_source(&SourceId::new(&source), &yaml) else {
         panic!("fixture should fail");
     };
     let Some(diagnostic) = error.diagnostic() else {

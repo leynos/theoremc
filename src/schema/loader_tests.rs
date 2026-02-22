@@ -31,6 +31,23 @@ fn full_doc() -> TheoremDoc {
         .expect("fixture should have one doc")
 }
 
+fn assert_parse_error(yaml: &str) {
+    let result = load_theorem_docs(yaml);
+    assert!(result.is_err(), "expected parser to reject fixture");
+}
+
+fn assert_parse_error_contains(yaml: &str, expected_substring: &str) {
+    let result = load_theorem_docs(yaml);
+    let Err(error) = result else {
+        panic!("expected parser to reject fixture");
+    };
+    let message = error.to_string();
+    assert!(
+        message.contains(expected_substring),
+        "expected parse error to contain '{expected_substring}', got: {message}"
+    );
+}
+
 #[rstest]
 fn load_single_minimal_document() {
     let docs = load_theorem_docs(MINIMAL_YAML).expect("should parse");
@@ -87,10 +104,7 @@ Evidence:
     unwind: 1
     expect: SUCCESS
 ";
-    let result = load_theorem_docs(yaml);
-    assert!(result.is_err());
-    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
-    assert!(msg.contains("unknown field"));
+    assert_parse_error_contains(yaml, "unknown field");
 }
 
 #[rstest]
@@ -107,8 +121,7 @@ Evidence:
     unwind: 1
     expect: SUCCESS
 ";
-    let result = load_theorem_docs(yaml);
-    assert!(result.is_err());
+    assert_parse_error(yaml);
 }
 
 #[rstest]
@@ -123,8 +136,7 @@ Evidence:
     unwind: 1
     expect: SUCCESS
 ";
-    let result = load_theorem_docs(yaml);
-    assert!(result.is_err());
+    assert_parse_error(yaml);
 }
 
 #[rstest]
@@ -143,10 +155,7 @@ Witness:
   - cover: 'true'
     because: always reachable
 ";
-    let result = load_theorem_docs(yaml);
-    assert!(result.is_err());
-    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
-    assert!(msg.contains("Rust reserved keyword"));
+    assert_parse_error_contains(yaml, "Rust reserved keyword");
 }
 
 #[rstest]
@@ -194,8 +203,7 @@ Witness:
   - cover: 'true'
     because: always reachable
 ";
-    let result = load_theorem_docs(yaml);
-    assert!(result.is_err());
+    assert_parse_error(yaml);
 }
 
 #[rstest]
@@ -211,10 +219,7 @@ Evidence:
     unwind: 1
     expect: SUCCESS
 ";
-    let result = load_theorem_docs(yaml);
-    assert!(result.is_err());
-    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
-    assert!(msg.contains("Witness section must contain at least one witness"));
+    assert_parse_error_contains(yaml, "Witness section must contain at least one witness");
 }
 
 #[rstest]
@@ -231,10 +236,7 @@ Evidence:
     expect: SUCCESS
     allow_vacuous: false
 ";
-    let result = load_theorem_docs(yaml);
-    assert!(result.is_err());
-    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
-    assert!(msg.contains("Witness section must contain at least one witness"));
+    assert_parse_error_contains(yaml, "Witness section must contain at least one witness");
 }
 
 #[rstest]
@@ -273,10 +275,7 @@ Witness:
   - cover: 'true'
     because: always reachable
 ";
-    let result = load_theorem_docs(yaml);
-    assert!(result.is_err());
-    let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
-    assert!(msg.contains("vacuity_because is required"));
+    assert_parse_error_contains(yaml, "vacuity_because is required");
 }
 
 #[rstest]
@@ -295,7 +294,10 @@ fn load_full_example_populates_all_sections(full_doc: TheoremDoc) {
 #[rstest]
 fn parse_diagnostics_include_explicit_source() {
     let yaml = "Theorem: T\nAbout: bad\nUnknown: key\n";
-    let result = load_theorem_docs_with_source("tests/fixtures/invalid_unknown_key.theorem", yaml);
+    let result = load_theorem_docs_with_source(
+        &SourceId::new("tests/fixtures/invalid_unknown_key.theorem"),
+        yaml,
+    );
     assert!(result.is_err(), "fixture should fail parsing");
 
     let error = result.expect_err("error expected");
@@ -324,7 +326,10 @@ Witness:
   - cover: 'true'
     because: reachable
 ";
-    let result = load_theorem_docs_with_source("tests/fixtures/invalid_empty_about.theorem", yaml);
+    let result = load_theorem_docs_with_source(
+        &SourceId::new("tests/fixtures/invalid_empty_about.theorem"),
+        yaml,
+    );
     assert!(result.is_err(), "fixture should fail validation");
 
     let error = result.expect_err("error expected");

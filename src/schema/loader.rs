@@ -7,7 +7,8 @@
 
 use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, SourceLocation};
 use super::error::SchemaError;
-use super::raw::RawTheoremDoc;
+use super::raw::{RawTheoremDoc, ValidationReason};
+use super::source_id::SourceId;
 use super::types::TheoremDoc;
 use super::validate::validate_theorem_doc;
 
@@ -57,7 +58,7 @@ const INLINE_SOURCE: &str = "<inline>";
 ///     let docs = load_theorem_docs(yaml).unwrap();
 ///     assert_eq!(docs.len(), 1);
 pub fn load_theorem_docs(input: &str) -> Result<Vec<TheoremDoc>, SchemaError> {
-    load_theorem_docs_with_source(INLINE_SOURCE, input)
+    load_theorem_docs_with_source(&SourceId::new(INLINE_SOURCE), input)
 }
 
 /// Loads theorem documents from YAML and records diagnostics against an
@@ -71,7 +72,7 @@ pub fn load_theorem_docs(input: &str) -> Result<Vec<TheoremDoc>, SchemaError> {
 /// Returns [`SchemaError::Deserialize`] when YAML parsing or deserialization
 /// fails and [`SchemaError::ValidationFailed`] when semantic validation fails.
 pub fn load_theorem_docs_with_source(
-    source: &str,
+    source: &SourceId,
     input: &str,
 ) -> Result<Vec<TheoremDoc>, SchemaError> {
     let raw_docs: Vec<RawTheoremDoc> = serde_saphyr::from_multiple(input).map_err(|error| {
@@ -98,14 +99,14 @@ pub fn load_theorem_docs_with_source(
 
 fn attach_validation_diagnostic(
     error: SchemaError,
-    source: &str,
+    source: &SourceId,
     raw_doc: &RawTheoremDoc,
 ) -> SchemaError {
     match error {
         SchemaError::ValidationFailed {
             theorem, reason, ..
         } => {
-            let location = raw_doc.location_for_validation_reason(&reason);
+            let location = raw_doc.location_for_validation_reason(ValidationReason::new(&reason));
             let diagnostic = validation_diagnostic(source, &reason, location);
             SchemaError::ValidationFailed {
                 theorem,
@@ -118,38 +119,53 @@ fn attach_validation_diagnostic(
 }
 
 fn parse_diagnostic(
-    source: &str,
+    source: &SourceId,
     message: &str,
     location: serde_saphyr::Location,
 ) -> SchemaDiagnostic {
-    SchemaDiagnostic {
-        code: SchemaDiagnosticCode::ParseFailure,
-        location: location_for_source(source, location),
-        message: first_line(message),
-    }
+    create_diagnostic(
+        SchemaDiagnosticCode::ParseFailure,
+        source,
+        first_line(message),
+        location,
+    )
 }
 
 fn validation_diagnostic(
-    source: &str,
+    source: &SourceId,
     reason: &str,
     location: serde_saphyr::Location,
 ) -> SchemaDiagnostic {
-    SchemaDiagnostic {
-        code: SchemaDiagnosticCode::ValidationFailure,
-        location: location_for_source(source, location),
-        message: reason.to_owned(),
-    }
+    create_diagnostic(
+        SchemaDiagnosticCode::ValidationFailure,
+        source,
+        reason.to_owned(),
+        location,
+    )
 }
 
-fn location_for_source(source: &str, location: serde_saphyr::Location) -> SourceLocation {
+fn location_for_source(source: &SourceId, location: serde_saphyr::Location) -> SourceLocation {
     let line = usize::try_from(location.line()).ok().unwrap_or(usize::MAX);
     let column = usize::try_from(location.column())
         .ok()
         .unwrap_or(usize::MAX);
     SourceLocation {
-        source: source.to_owned(),
+        source: source.as_str().to_owned(),
         line,
         column,
+    }
+}
+
+fn create_diagnostic(
+    code: SchemaDiagnosticCode,
+    source: &SourceId,
+    message: String,
+    location: serde_saphyr::Location,
+) -> SchemaDiagnostic {
+    SchemaDiagnostic {
+        code,
+        location: location_for_source(source, location),
+        message,
     }
 }
 
