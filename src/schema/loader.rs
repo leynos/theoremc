@@ -204,10 +204,7 @@ fn mapping_key_column(line: &str, field: FieldName<'_>) -> Option<usize> {
     }
 
     let leading = line.len() - trimmed.len();
-    if is_plain_mapping_key(trimmed, field)
-        || is_single_quoted_mapping_key(trimmed, field)
-        || is_double_quoted_mapping_key(trimmed, field)
-    {
+    if is_mapping_key_for_field(trimmed, field) {
         return Some(leading + 1);
     }
 
@@ -229,6 +226,12 @@ fn is_double_quoted_mapping_key(line: &str, field: FieldName<'_>) -> bool {
     line.strip_prefix('"')
         .and_then(|tail| tail.strip_prefix(field.as_str()))
         .is_some_and(|tail| tail.starts_with("\":"))
+}
+
+fn is_mapping_key_for_field(line: &str, field: FieldName<'_>) -> bool {
+    is_plain_mapping_key(line, field)
+        || is_single_quoted_mapping_key(line, field)
+        || is_double_quoted_mapping_key(line, field)
 }
 
 #[cfg(test)]
