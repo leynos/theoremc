@@ -77,9 +77,14 @@ pub fn load_theorem_docs_with_source(
 ) -> Result<Vec<TheoremDoc>, SchemaError> {
     let raw_docs: Vec<RawTheoremDoc> = serde_saphyr::from_multiple(input).map_err(|error| {
         let message = error.to_string();
-        let diagnostic = error
-            .location()
-            .map(|location| parse_diagnostic(source, &message, location));
+        let diagnostic = error.location().map(|location| {
+            create_diagnostic(
+                SchemaDiagnosticCode::ParseFailure,
+                source,
+                first_line(&message),
+                location,
+            )
+        });
         SchemaError::Deserialize {
             message,
             diagnostic,
@@ -107,7 +112,12 @@ fn attach_validation_diagnostic(
             theorem, reason, ..
         } => {
             let location = raw_doc.location_for_validation_reason(ValidationReason::new(&reason));
-            let diagnostic = validation_diagnostic(source, &reason, location);
+            let diagnostic = create_diagnostic(
+                SchemaDiagnosticCode::ValidationFailure,
+                source,
+                reason.clone(),
+                location,
+            );
             SchemaError::ValidationFailed {
                 theorem,
                 reason,
@@ -116,32 +126,6 @@ fn attach_validation_diagnostic(
         }
         other => other,
     }
-}
-
-fn parse_diagnostic(
-    source: &SourceId,
-    message: &str,
-    location: serde_saphyr::Location,
-) -> SchemaDiagnostic {
-    create_diagnostic(
-        SchemaDiagnosticCode::ParseFailure,
-        source,
-        first_line(message),
-        location,
-    )
-}
-
-fn validation_diagnostic(
-    source: &SourceId,
-    reason: &str,
-    location: serde_saphyr::Location,
-) -> SchemaDiagnostic {
-    create_diagnostic(
-        SchemaDiagnosticCode::ValidationFailure,
-        source,
-        reason.to_owned(),
-        location,
-    )
 }
 
 fn location_for_source(source: &SourceId, location: serde_saphyr::Location) -> SourceLocation {

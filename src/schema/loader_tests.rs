@@ -207,36 +207,26 @@ Witness:
 }
 
 #[rstest]
-fn reject_missing_witness_when_kani_not_vacuous() {
-    let yaml = r"
+#[case("reject_missing_witness_when_kani_not_vacuous", "")]
+#[case(
+    "reject_missing_witness_when_kani_explicitly_not_vacuous",
+    "\n    allow_vacuous: false"
+)]
+fn reject_missing_witness(#[case] case_name: &str, #[case] allow_vacuous_config: &str) {
+    let yaml = format!(
+        r"
 Theorem: NoWitness
-About: Missing witness with kani default
+About: Missing witness validation ({case_name})
 Prove:
   - assert: 'true'
     because: trivially true
 Evidence:
   kani:
     unwind: 1
-    expect: SUCCESS
-";
-    assert_parse_error_contains(yaml, "Witness section must contain at least one witness");
-}
-
-#[rstest]
-fn reject_missing_witness_when_kani_explicitly_not_vacuous() {
-    let yaml = r"
-Theorem: NoWitnessExplicit
-About: Missing witness with allow_vacuous set to false
-Prove:
-  - assert: 'true'
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-    allow_vacuous: false
-";
-    assert_parse_error_contains(yaml, "Witness section must contain at least one witness");
+    expect: SUCCESS{allow_vacuous_config}
+",
+    );
+    assert_parse_error_contains(&yaml, "Witness section must contain at least one witness");
 }
 
 #[rstest]
