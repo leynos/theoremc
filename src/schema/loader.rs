@@ -204,15 +204,10 @@ fn mapping_key_column(line: &str, field: FieldName<'_>) -> Option<usize> {
     }
 
     let leading = line.len() - trimmed.len();
-    if is_plain_mapping_key(trimmed, field) {
-        return Some(leading + 1);
-    }
-
-    if is_single_quoted_mapping_key(trimmed, field) {
-        return Some(leading + 1);
-    }
-
-    if is_double_quoted_mapping_key(trimmed, field) {
+    if is_plain_mapping_key(trimmed, field)
+        || is_single_quoted_mapping_key(trimmed, field)
+        || is_double_quoted_mapping_key(trimmed, field)
+    {
         return Some(leading + 1);
     }
 

@@ -12,15 +12,12 @@ use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 )]
 fn assert_diagnostic_failure(fixture_name: &str, expected_code: &str, failure_type: &str) {
     let source = format!("tests/fixtures/{fixture_name}");
-    let yaml = load_fixture(fixture_name)
-        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
+    let yaml = load_fixture(fixture_name).expect("failed to load fixture: {fixture_name}");
     let result = load_theorem_docs_with_source(&SourceId::new(&source), &yaml);
     let error = result.expect_err(&format!(
         "fixture should fail {failure_type}: {fixture_name}"
     ));
-    let Some(diagnostic) = error.diagnostic() else {
-        panic!("diagnostic should be present");
-    };
+    let diagnostic = error.diagnostic().expect("diagnostic should be present");
 
     assert_eq!(diagnostic.code.as_str(), expected_code);
     assert_eq!(diagnostic.location.source, source);
@@ -56,10 +53,13 @@ fn then_loading_fails_with_source_located_validator_diagnostics() {
 fn given_valid_theorem_fixture_for_diagnostics() {}
 
 #[then("loading succeeds with explicit source")]
+#[expect(
+    clippy::expect_used,
+    reason = "Tests intentionally use expect for clearer fixture loading diagnostics."
+)]
 fn then_loading_succeeds_with_explicit_source() {
     let source = "tests/fixtures/valid_aliases_and_must.theorem";
-    let yaml = load_fixture("valid_aliases_and_must.theorem")
-        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
+    let yaml = load_fixture("valid_aliases_and_must.theorem").expect("failed to load fixture");
     let result = load_theorem_docs_with_source(&SourceId::new(source), &yaml);
     assert!(result.is_ok(), "fixture should parse successfully");
 }
