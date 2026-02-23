@@ -12,6 +12,34 @@ use super::source_id::SourceId;
 use super::types::TheoremDoc;
 use super::validate::validate_theorem_doc;
 
+/// Newtype representing a YAML field name extracted from error messages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FieldName<'a>(&'a str);
+
+impl<'a> FieldName<'a> {
+    const fn new(name: &'a str) -> Self {
+        Self(name)
+    }
+
+    const fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
+/// Newtype representing an error message from deserialization failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ErrorMessage<'a>(&'a str);
+
+impl<'a> ErrorMessage<'a> {
+    const fn new(message: &'a str) -> Self {
+        Self(message)
+    }
+
+    const fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
 /// Synthetic source identifier used by [`load_theorem_docs`].
 const INLINE_SOURCE: &str = "<inline>";
 
@@ -77,7 +105,7 @@ pub fn load_theorem_docs_with_source(
 ) -> Result<Vec<TheoremDoc>, SchemaError> {
     let raw_docs: Vec<RawTheoremDoc> = serde_saphyr::from_multiple(input).map_err(|error| {
         let message = error.to_string();
-        let diagnostic = build_parse_diagnostic(source, input, &error, &message);
+        let diagnostic = build_parse_diagnostic(source, input, &error, ErrorMessage::new(&message));
         SchemaError::Deserialize {
             message,
             diagnostic,
@@ -125,13 +153,13 @@ fn build_parse_diagnostic(
     source: &SourceId,
     input: &str,
     error: &serde_saphyr::Error,
-    message: &str,
+    message: ErrorMessage<'_>,
 ) -> Option<SchemaDiagnostic> {
     let location = error.location()?;
     let mut diagnostic = create_diagnostic(
         SchemaDiagnosticCode::ParseFailure,
         source,
-        first_line(message),
+        first_line(message.as_str()),
         location,
     );
 
@@ -151,7 +179,7 @@ const fn should_reanchor_unknown_field(diagnostic: &SchemaDiagnostic) -> bool {
     diagnostic.location.line == 1 && diagnostic.location.column == 1
 }
 
-fn locate_unknown_field(input: &str, message: &str) -> Option<(usize, usize)> {
+fn locate_unknown_field(input: &str, message: ErrorMessage<'_>) -> Option<(usize, usize)> {
     let field = unknown_field_name(message)?;
 
     for (line_index, line) in input.lines().enumerate() {
@@ -163,13 +191,13 @@ fn locate_unknown_field(input: &str, message: &str) -> Option<(usize, usize)> {
     None
 }
 
-fn unknown_field_name(message: &str) -> Option<&str> {
-    let (_, tail) = message.split_once("unknown field `")?;
+fn unknown_field_name(message: ErrorMessage<'_>) -> Option<FieldName<'_>> {
+    let (_, tail) = message.as_str().split_once("unknown field `")?;
     let (field, _) = tail.split_once('`')?;
-    Some(field)
+    Some(FieldName::new(field))
 }
 
-fn mapping_key_column(line: &str, field: &str) -> Option<usize> {
+fn mapping_key_column(line: &str, field: FieldName<'_>) -> Option<usize> {
     let trimmed = line.trim_start();
     if trimmed.is_empty() || trimmed.starts_with('#') {
         return None;
@@ -191,20 +219,20 @@ fn mapping_key_column(line: &str, field: &str) -> Option<usize> {
     None
 }
 
-fn is_plain_mapping_key(line: &str, field: &str) -> bool {
-    line.strip_prefix(field)
+fn is_plain_mapping_key(line: &str, field: FieldName<'_>) -> bool {
+    line.strip_prefix(field.as_str())
         .is_some_and(|tail| tail.starts_with(':'))
 }
 
-fn is_single_quoted_mapping_key(line: &str, field: &str) -> bool {
+fn is_single_quoted_mapping_key(line: &str, field: FieldName<'_>) -> bool {
     line.strip_prefix('\'')
-        .and_then(|tail| tail.strip_prefix(field))
+        .and_then(|tail| tail.strip_prefix(field.as_str()))
         .is_some_and(|tail| tail.starts_with("':"))
 }
 
-fn is_double_quoted_mapping_key(line: &str, field: &str) -> bool {
+fn is_double_quoted_mapping_key(line: &str, field: FieldName<'_>) -> bool {
     line.strip_prefix('"')
-        .and_then(|tail| tail.strip_prefix(field))
+        .and_then(|tail| tail.strip_prefix(field.as_str()))
         .is_some_and(|tail| tail.starts_with("\":"))
 }
 
