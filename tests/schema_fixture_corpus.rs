@@ -40,8 +40,7 @@ fn valid_fixture_corpus_parses(#[case] fixture_name: &str) {
 #[case::missing_witness_default("invalid_missing_witness_default.theorem")]
 fn invalid_fixture_corpus_fails_with_diagnostic_source(#[case] fixture_name: &str) {
     let source = fixture_source(fixture_name);
-    let yaml = load_fixture(fixture_name)
-        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
+    let yaml = load_fixture(fixture_name).expect("failed to load fixture");
     let result = load_theorem_docs_with_source(&SourceId::new(&source), &yaml);
     let error = result.expect_err("expected fixture to fail");
     let diagnostic = error.diagnostic().expect("diagnostic should be present");

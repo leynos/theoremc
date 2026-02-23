@@ -6,16 +6,16 @@ use common::load_fixture;
 use rstest::rstest;
 use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 
-fn render_diagnostic_for_fixture(fixture_name: &str) -> String {
+fn render_diagnostic_for_fixture(fixture_name: &str) -> Result<String, Box<dyn std::error::Error>> {
     let source = format!("tests/fixtures/{fixture_name}");
-    let yaml = load_fixture(fixture_name)
-        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
+    let yaml = load_fixture(fixture_name)?;
     let error = load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
-        .expect_err("fixture should fail");
-    let Some(diagnostic) = error.diagnostic() else {
-        panic!("schema failures should carry structured diagnostics");
-    };
-    diagnostic.render()
+        .err()
+        .ok_or_else(|| std::io::Error::other("fixture should fail"))?;
+    let diagnostic = error.diagnostic().ok_or_else(|| {
+        std::io::Error::other("schema failures should carry structured diagnostics")
+    })?;
+    Ok(diagnostic.render())
 }
 
 #[rstest]
@@ -36,7 +36,8 @@ fn render_diagnostic_for_fixture(fixture_name: &str) -> String {
     include_str!("snapshots/diagnostics/validation_missing_witness.snap")
 )]
 fn schema_diagnostic_snapshot_matches(#[case] fixture_name: &str, #[case] expected_snapshot: &str) {
-    let actual = render_diagnostic_for_fixture(fixture_name);
+    let actual = render_diagnostic_for_fixture(fixture_name)
+        .expect("fixture should fail with a structured schema diagnostic");
     let expected = expected_snapshot.trim_end();
     assert_eq!(actual, expected);
 }
