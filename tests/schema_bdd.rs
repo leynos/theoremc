@@ -7,7 +7,7 @@
 mod common;
 
 use common::load_fixture;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use theoremc::schema::load_theorem_docs;
 
 /// Helper: assert that loading the named fixture fails with an error
@@ -30,6 +30,13 @@ fn assert_fixture_err_contains(fixture: &str, expected_fragment: &str) {
     );
 }
 
+#[fixture]
+fn fixture_loader() -> impl Fn(&str) -> String {
+    |fixture| {
+        load_fixture(fixture).unwrap_or_else(|error| panic!("failed to load fixture: {error}"))
+    }
+}
+
 // ── Given valid documents, deserialization succeeds ──────────────────
 
 #[rstest]
@@ -38,10 +45,12 @@ fn assert_fixture_err_contains(fixture: &str, expected_fragment: &str) {
 #[case::multi_document("valid_multi.theorem")]
 #[case::lowercase_aliases("valid_lowercase.theorem")]
 #[case::vacuous_allowed("valid_vacuous.theorem")]
-fn given_a_valid_theorem_file_when_loaded_then_it_succeeds(#[case] fixture: &str) {
-    let yaml =
-        load_fixture(fixture).unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
-    let result = load_theorem_docs(&yaml);
+fn given_a_valid_theorem_file_when_loaded_then_it_succeeds(
+    #[case] fixture: &str,
+    fixture_loader: impl Fn(&str) -> String,
+) {
+    let fixture_yaml = fixture_loader(fixture);
+    let result = load_theorem_docs(&fixture_yaml);
     assert!(
         result.is_ok(),
         "expected {fixture} to parse successfully, got: {:?}",
@@ -68,10 +77,12 @@ fn given_a_structurally_invalid_file_when_loaded_then_error_is_actionable(
 #[case::missing_about("invalid_missing_about.theorem")]
 #[case::missing_prove("invalid_missing_prove.theorem")]
 #[case::missing_evidence("invalid_missing_evidence.theorem")]
-fn given_a_missing_required_field_when_loaded_then_it_fails(#[case] fixture: &str) {
-    let yaml =
-        load_fixture(fixture).unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
-    let result = load_theorem_docs(&yaml);
+fn given_a_missing_required_field_when_loaded_then_it_fails(
+    #[case] fixture: &str,
+    fixture_loader: impl Fn(&str) -> String,
+) {
+    let fixture_yaml = fixture_loader(fixture);
+    let result = load_theorem_docs(&fixture_yaml);
     assert!(
         result.is_err(),
         "expected {fixture} to fail due to missing field"
@@ -94,10 +105,12 @@ fn given_an_invalid_theorem_name_when_loaded_then_error_mentions_reason(
 
 #[rstest]
 #[case::tags_as_string("invalid_wrong_type.theorem")]
-fn given_wrong_scalar_type_when_loaded_then_it_fails(#[case] fixture: &str) {
-    let yaml =
-        load_fixture(fixture).unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
-    let result = load_theorem_docs(&yaml);
+fn given_wrong_scalar_type_when_loaded_then_it_fails(
+    #[case] fixture: &str,
+    fixture_loader: impl Fn(&str) -> String,
+) {
+    let fixture_yaml = fixture_loader(fixture);
+    let result = load_theorem_docs(&fixture_yaml);
     assert!(
         result.is_err(),
         "expected {fixture} to fail due to wrong type"
@@ -106,11 +119,15 @@ fn given_wrong_scalar_type_when_loaded_then_it_fails(#[case] fixture: &str) {
 
 // ── Given multi-document YAML, document order is preserved ──────────
 
-#[test]
-fn given_multi_doc_yaml_when_loaded_then_order_is_preserved() {
-    let yaml = load_fixture("valid_multi.theorem")
-        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
-    let docs = load_theorem_docs(&yaml).expect("should parse");
+#[rstest]
+#[case("valid_multi.theorem")]
+fn given_multi_doc_yaml_when_loaded_then_order_is_preserved(
+    #[case] fixture: &str,
+    fixture_loader: impl Fn(&str) -> String,
+) {
+    let fixture_yaml = fixture_loader(fixture);
+    let docs = load_theorem_docs(&fixture_yaml)
+        .unwrap_or_else(|error| panic!("expected {fixture} to parse: {error}"));
     let names: Vec<&str> = docs.iter().map(|d| d.theorem.as_str()).collect();
     assert_eq!(names, vec!["FirstTheorem", "SecondTheorem", "ThirdTheorem"]);
 }

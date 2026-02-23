@@ -43,14 +43,12 @@ fn invalid_fixture_corpus_fails_with_diagnostic_source(#[case] fixture_name: &st
     let yaml = load_fixture(fixture_name)
         .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
     let result = load_theorem_docs_with_source(&SourceId::new(&source), &yaml);
-    assert!(result.is_err(), "expected {fixture_name} to fail");
-
-    let Err(error) = result else {
-        panic!("error should be present");
-    };
-    let Some(diagnostic) = error.diagnostic() else {
-        panic!("diagnostic should be present");
-    };
+    let error = result
+        .err()
+        .unwrap_or_else(|| panic!("expected {fixture_name} to fail"));
+    let diagnostic = error
+        .diagnostic()
+        .unwrap_or_else(|| panic!("diagnostic should be present"));
     assert_eq!(diagnostic.location.source, source);
     assert!(diagnostic.location.line > 0);
     assert!(diagnostic.location.column > 0);

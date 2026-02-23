@@ -294,6 +294,11 @@ fn indexed_error_position(reason: ValidationReason<'_>, prefix: &str) -> Option<
     parsed.checked_sub(1)
 }
 
+/// Deserializes optional `allow_vacuous` values as `Option<Spanned<bool>>`.
+///
+/// This helper is used with `#[serde(default)]`, so omitted fields deserialize
+/// as `None` before this function runs. Explicit YAML `null` values are
+/// rejected, while present values must deserialize as booleans.
 fn deserialize_optional_allow_vacuous<'de, D>(
     deserializer: D,
 ) -> Result<Option<Spanned<bool>>, D::Error>

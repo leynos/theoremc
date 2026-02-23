@@ -11,14 +11,9 @@ fn assert_diagnostic_failure(fixture_name: &str, expected_code: &str, failure_ty
     let yaml = load_fixture(fixture_name)
         .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
     let result = load_theorem_docs_with_source(&SourceId::new(&source), &yaml);
-    assert!(
-        result.is_err(),
-        "fixture should fail {failure_type}: {fixture_name}"
-    );
-
-    let Err(error) = result else {
-        panic!("error should be present");
-    };
+    let error = result
+        .err()
+        .unwrap_or_else(|| panic!("fixture should fail {failure_type}: {fixture_name}"));
     let Some(diagnostic) = error.diagnostic() else {
         panic!("diagnostic should be present");
     };

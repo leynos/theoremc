@@ -10,9 +10,9 @@ fn render_diagnostic_for_fixture(fixture_name: &str) -> String {
     let source = format!("tests/fixtures/{fixture_name}");
     let yaml = load_fixture(fixture_name)
         .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
-    let Err(error) = load_theorem_docs_with_source(&SourceId::new(&source), &yaml) else {
-        panic!("fixture should fail");
-    };
+    let error = load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
+        .err()
+        .unwrap_or_else(|| panic!("fixture should fail"));
     let Some(diagnostic) = error.diagnostic() else {
         panic!("schema failures should carry structured diagnostics");
     };
