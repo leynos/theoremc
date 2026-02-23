@@ -83,6 +83,30 @@ The project adds a low-priority `cargo-deny` policy for architectural
 dependency constraints, starting with architecture-sensitive crates such as
 YAML adapters, and extending as backend surface area grows.
 
+### Tooling prerequisites and version alignment
+
+For local and CI parity, architecture checks rely on external Cargo plugins.
+Contributors must install the expected versions and keep local tooling aligned
+with CI pinning:
+
+- `cargo-modules` `0.25.0` for
+  `cargo modules graph --acyclic --lib`
+- `cargo-dylint` `5.0.0` and `dylint-link` `5.0.0` for
+  `cargo dylint ...`
+- `cargo-deny` `0.19.0` for dependency-policy checks
+
+Suggested installation commands:
+
+```shell
+cargo install --locked cargo-modules --version 0.25.0
+cargo install --locked cargo-dylint --version 5.0.0
+cargo install --locked dylint-link --version 5.0.0
+cargo install --locked cargo-deny --version 0.19.0
+```
+
+When these versions change in CI, this ADR section must be updated in the same
+change to prevent local-versus-CI drift.
+
 ## Consequences
 
 Positive consequences:

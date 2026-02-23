@@ -1,9 +1,10 @@
 # Theoremc design specification
 
-Status: draft (design settled for `.theorem` syntax + Kani MVP). Scope: Rust
-workspace toolchain, compile-time correlation, and no inline Rust blocks in
-`.theorem`. Primary audience: Rust engineers who want behaviour-driven
-development (BDD)-level legibility for formal checks. Decision records:
+Status: draft (design settled for `.theorem` syntax + Kani minimum viable
+product (MVP)). Scope: Rust workspace toolchain, compile-time correlation, and
+no inline Rust blocks in `.theorem`. Primary audience: Rust engineers who want
+behaviour-driven development (BDD)-level legibility for formal checks. Decision
+records:
 
 - [Architecture Decision Record (ADR) 001](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
 - [Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md)
@@ -152,22 +153,19 @@ The current schema subsystem (`src/schema`) follows a layered architecture with
 hexagonal influences and an anti-corruption boundary between YAML input and
 domain types.
 
-| Layer                       | Primary modules                                                                  | Allowed direct dependencies                       |
-| --------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------- |
-| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier`       | Rust/core modelling dependencies only             |
-| Raw anti-corruption adapter | `schema::raw` (planned extraction from current loader-side deserialization path) | Domain model, YAML adapter dependencies           |
-| Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                               | Domain model, raw adapter, diagnostics            |
-| Loader orchestration        | `schema::loader`                                                                 | Validator, raw adapter, diagnostics, domain model |
-| Diagnostic infrastructure   | `schema::diagnostic` (currently `schema::error`)                                 | Shared diagnostic contracts only                  |
+Normative boundary rules live in
+[ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
+ and
+[ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
+ This section is intentionally informative and maps current module placement.
 
-Layer dependencies are unidirectional:
-
-- raw adapter depends on domain model,
-- validator depends on raw adapter and domain model,
-- loader depends on validator/raw adapter/diagnostics.
-
-Domain model modules must not depend on raw adapter, validator, or loader
-modules.
+| Layer                       | Current primary modules                                                          |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier`       |
+| Raw anti-corruption adapter | `schema::raw` (planned extraction from current loader-side deserialization path) |
+| Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                               |
+| Loader orchestration        | `schema::loader`                                                                 |
+| Diagnostic infrastructure   | `schema::diagnostic` (currently `schema::error`)                                 |
 
 ______________________________________________________________________
 
@@ -1035,16 +1033,11 @@ inside the schema subsystem. The boundary policy is defined by ADR 003.
 
 ### 10.1 Architectural boundary rules
 
-Theoremc enforces the following layer rules:
-
-- Public schema domain types must not import raw adapter, validator, or loader
-  modules.
-- Raw adapter internals are not part of the public API surface.
-- Validator modules may depend on raw adapter and diagnostics, but not on
-  loader orchestration.
-- Loader modules orchestrate but do not define domain-rule invariants.
-- Diagnostic contracts remain shared infrastructure rather than an orchestration
-  entry point.
+The normative boundary rules are defined in
+[ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
+ and
+[ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
+ This section focuses on enforcement tooling and rollout.
 
 ### 10.2 Enforcement stack and priority
 
@@ -1069,7 +1062,10 @@ cargo clippy --workspace --all-targets --all-features -- \
 # cargo dylint theoremc_arch_lint --all -- -D warnings
 ```
 
-MVP Dylint rules:
+Required external tools and expected versions are documented in
+[ADR 003 tooling prerequisites](adr-003-architectural-boundary-enforcement.md#tooling-prerequisites-and-version-alignment).
+
+Minimum viable product (MVP) Dylint rules:
 
 - forbid `kani::assume` outside theoremc-generated harness modules,
 - forbid `#[kani::proof]` harnesses that don’t carry a theoremc marker
