@@ -5,11 +5,12 @@
 //! column coordinates deterministically.
 
 use indexmap::IndexMap;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer, de::Error};
 use serde_saphyr::{Location, Spanned};
 
 use super::newtypes::{ForallVar, TheoremName};
 use super::types::{Evidence, KaniEvidence, KaniExpectation, LetBinding, Step, TheoremDoc};
+use super::validate::reason_markers;
 use super::value::TheoremValue;
 
 /// Semantic wrapper for validation failure reason strings.
@@ -24,6 +25,53 @@ impl<'a> ValidationReason<'a> {
     pub(crate) const fn as_str(&self) -> &'a str {
         self.0
     }
+
+    fn kind(self) -> Option<ValidationKind> {
+        let reason = self.as_str();
+        let is_because = reason.contains(reason_markers::BECAUSE_FIELD_FRAGMENT);
+
+        if reason.starts_with(reason_markers::ABOUT_NON_EMPTY) {
+            return Some(ValidationKind::AboutEmpty);
+        }
+
+        if let Some(index) = indexed_error_position(self, reason_markers::PROVE_ASSERTION) {
+            return Some(ValidationKind::Prove { index, is_because });
+        }
+
+        if let Some(index) = indexed_error_position(self, reason_markers::ASSUME_CONSTRAINT) {
+            return Some(ValidationKind::Assume { index, is_because });
+        }
+
+        if let Some(index) = indexed_error_position(self, reason_markers::WITNESS) {
+            return Some(ValidationKind::Witness { index, is_because });
+        }
+
+        if reason.starts_with(reason_markers::KANI_UNWIND_NON_ZERO) {
+            return Some(ValidationKind::KaniUnwind);
+        }
+
+        if reason.starts_with(reason_markers::KANI_VACUITY_REASON_REQUIRED) {
+            return Some(ValidationKind::KaniAllowVacuousRequired);
+        }
+
+        if reason.starts_with(reason_markers::KANI_VACUITY_REASON_NON_EMPTY) {
+            return Some(ValidationKind::KaniVacuityBecauseNonEmpty);
+        }
+
+        None
+    }
+}
+
+/// Classification of validation reason shapes used for location mapping.
+#[derive(Debug, Clone, Copy)]
+enum ValidationKind {
+    AboutEmpty,
+    Prove { index: usize, is_because: bool },
+    Assume { index: usize, is_because: bool },
+    Witness { index: usize, is_because: bool },
+    KaniUnwind,
+    KaniAllowVacuousRequired,
+    KaniVacuityBecauseNonEmpty,
 }
 
 /// Raw theorem document with location-carrying fields.
@@ -60,6 +108,7 @@ pub(crate) struct RawTheoremDoc {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawAssumption {
+    #[serde(rename = "expr", alias = "assume")]
     pub(crate) expr: Spanned<String>,
     pub(crate) because: Spanned<String>,
 }
@@ -99,7 +148,7 @@ pub(crate) struct RawEvidence {
 pub(crate) struct RawKaniEvidence {
     pub(crate) unwind: Spanned<u32>,
     pub(crate) expect: KaniExpectation,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_optional_allow_vacuous")]
     pub(crate) allow_vacuous: Option<Spanned<bool>>,
     #[serde(default)]
     pub(crate) vacuity_because: Option<Spanned<String>>,
@@ -160,82 +209,52 @@ impl RawTheoremDoc {
     }
 
     fn location_for_reason(&self, reason: ValidationReason<'_>) -> Option<Location> {
-        if reason.as_str().starts_with("About must be non-empty") {
-            return Some(self.about.referenced);
-        }
-
-        if let Some(location) = self.prove_field_location(reason) {
-            return Some(location);
-        }
-        if let Some(location) = self.assume_field_location(reason) {
-            return Some(location);
-        }
-        if let Some(location) = self.witness_field_location(reason) {
-            return Some(location);
-        }
-        if let Some(location) = self.kani_field_location(reason) {
-            return Some(location);
-        }
-
-        None
-    }
-
-    fn prove_field_location(&self, reason: ValidationReason<'_>) -> Option<Location> {
-        let index = indexed_error_position(reason, "Prove assertion ")?;
-        let prove = self.prove.get(index)?;
-        if reason.as_str().contains(": because ") {
-            Some(prove.because.referenced)
-        } else {
-            Some(prove.assert_expr.referenced)
-        }
-    }
-
-    fn assume_field_location(&self, reason: ValidationReason<'_>) -> Option<Location> {
-        let index = indexed_error_position(reason, "Assume constraint ")?;
-        let assume = self.assume.get(index)?;
-        if reason.as_str().contains(": because ") {
-            Some(assume.because.referenced)
-        } else {
-            Some(assume.expr.referenced)
-        }
-    }
-
-    fn witness_field_location(&self, reason: ValidationReason<'_>) -> Option<Location> {
-        let index = indexed_error_position(reason, "Witness ")?;
-        let witness = self.witness.get(index)?;
-        if reason.as_str().contains(": because ") {
-            Some(witness.because.referenced)
-        } else {
-            Some(witness.cover.referenced)
-        }
-    }
-
-    fn kani_field_location(&self, reason: ValidationReason<'_>) -> Option<Location> {
-        let kani = self.evidence.kani.as_ref()?;
-
-        if reason.as_str().starts_with("Evidence.kani.unwind") {
-            return Some(kani.unwind.referenced);
-        }
-        if reason
-            .as_str()
-            .starts_with("vacuity_because is required when allow_vacuous is true")
-        {
-            return kani
-                .allow_vacuous
+        match reason.kind()? {
+            ValidationKind::AboutEmpty => Some(self.about.referenced),
+            ValidationKind::Prove { index, is_because } => {
+                let prove = self.prove.get(index)?;
+                Some(if is_because {
+                    prove.because.referenced
+                } else {
+                    prove.assert_expr.referenced
+                })
+            }
+            ValidationKind::Assume { index, is_because } => {
+                let assume = self.assume.get(index)?;
+                Some(if is_because {
+                    assume.because.referenced
+                } else {
+                    assume.expr.referenced
+                })
+            }
+            ValidationKind::Witness { index, is_because } => {
+                let witness = self.witness.get(index)?;
+                Some(if is_because {
+                    witness.because.referenced
+                } else {
+                    witness.cover.referenced
+                })
+            }
+            ValidationKind::KaniUnwind => self
+                .evidence
+                .kani
                 .as_ref()
-                .map(|allow_vacuous| allow_vacuous.referenced);
+                .map(|kani| kani.unwind.referenced),
+            ValidationKind::KaniAllowVacuousRequired => {
+                self.evidence.kani.as_ref().and_then(|kani| {
+                    kani.allow_vacuous
+                        .as_ref()
+                        .map(|allow_vacuous| allow_vacuous.referenced)
+                })
+            }
+            ValidationKind::KaniVacuityBecauseNonEmpty => {
+                self.evidence.kani.as_ref().and_then(|kani| {
+                    kani.vacuity_because
+                        .as_ref()
+                        .map(|vacuity_because| vacuity_because.referenced)
+                })
+            }
         }
-        if reason
-            .as_str()
-            .starts_with("Evidence.kani.vacuity_because must be non-empty")
-        {
-            return kani
-                .vacuity_because
-                .as_ref()
-                .map(|vacuity_because| vacuity_because.referenced);
-        }
-
-        None
     }
 }
 
@@ -268,8 +287,25 @@ impl RawKaniEvidence {
 
 /// Parses indexed validation reason prefixes like `Prove assertion 2: …`.
 fn indexed_error_position(reason: ValidationReason<'_>, prefix: &str) -> Option<usize> {
-    let tail = reason.as_str().strip_prefix(prefix)?;
-    let (raw_index, _) = tail.split_once(':')?;
+    let prefixed_tail = reason.as_str().strip_prefix(prefix)?;
+    let indexed_tail = prefixed_tail.strip_prefix(' ')?;
+    let (raw_index, _) = indexed_tail.split_once(':')?;
     let parsed = raw_index.trim().parse::<usize>().ok()?;
     parsed.checked_sub(1)
+}
+
+fn deserialize_optional_allow_vacuous<'de, D>(
+    deserializer: D,
+) -> Result<Option<Spanned<bool>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<Spanned<bool>>::deserialize(deserializer)?.map_or_else(
+        || {
+            Err(D::Error::custom(
+                "allow_vacuous must be a boolean when provided",
+            ))
+        },
+        |value| Ok(Some(value)),
+    )
 }

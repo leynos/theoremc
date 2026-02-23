@@ -207,6 +207,33 @@ Witness:
 }
 
 #[rstest]
+fn accept_assume_field_alias() {
+    let yaml = r"
+Theorem: AssumeAlias
+About: Assumption alias key should parse
+Assume:
+  - assume: 'x > 0'
+    because: positive input domain
+Prove:
+  - assert: 'x > 0'
+    because: assumption carries through
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'x == 1'
+    because: concrete witness
+";
+    let docs = load_theorem_docs(yaml).expect("should parse");
+    let assume_expr = docs
+        .first()
+        .and_then(|doc| doc.assume.first())
+        .map(|assumption| assumption.expr.as_str());
+    assert_eq!(assume_expr, Some("x > 0"));
+}
+
+#[rstest]
 #[case("reject_missing_witness_when_kani_not_vacuous", "")]
 #[case(
     "reject_missing_witness_when_kani_explicitly_not_vacuous",
@@ -246,6 +273,26 @@ Evidence:
 ";
     let docs = load_theorem_docs(yaml).expect("should parse");
     assert_eq!(docs.len(), 1);
+}
+
+#[rstest]
+fn reject_null_allow_vacuous() {
+    let yaml = r"
+Theorem: NullAllowVacuous
+About: Null allow_vacuous should fail
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+    allow_vacuous: null
+Witness:
+  - cover: 'true'
+    because: always reachable
+";
+    assert_parse_error_contains(yaml, "allow_vacuous must be a boolean when provided");
 }
 
 #[rstest]
@@ -296,8 +343,8 @@ fn parse_diagnostics_include_explicit_source() {
         diagnostic.location.source,
         "tests/fixtures/invalid_unknown_key.theorem"
     );
-    assert!(diagnostic.location.line > 0);
-    assert!(diagnostic.location.column > 0);
+    assert_eq!(diagnostic.location.line, 3);
+    assert_eq!(diagnostic.location.column, 1);
 }
 
 #[rstest]

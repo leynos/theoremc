@@ -111,8 +111,9 @@ Observable success:
 - `docs/rstest-bdd-users-guide.md` is not present in this repository. Existing
   guidance is in `docs/rust-testing-with-rstest-fixtures.md`, and current code
   already includes `rstest-bdd = "0.5.0"` and `rstest-bdd-macros = "0.5.0"`.
-- Project-memory MCP/qdrant resources are not available in this environment,
-  so no historical notes were retrievable for this planning session.
+- Project-memory Model Context Protocol (MCP)/qdrant resources are not
+  available in this environment, so no historical notes were retrievable for
+  this planning session.
 - `src/schema/loader.rs` exceeded the 400-line module limit when diagnostics
   tests were added inline. The tests were moved to `src/schema/loader_tests.rs`
   and wired via `#[path = "loader_tests.rs"]` to keep `loader.rs` concise.

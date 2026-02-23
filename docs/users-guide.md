@@ -30,16 +30,16 @@ The function:
 - Enforces non-empty constraints on string fields (see below).
 - Returns `Err(SchemaError)` with an actionable message on failure.
 
-When you have a concrete source path (for example, a fixture path or project
-file path), prefer `load_theorem_docs_with_source` so diagnostics include that
-source identifier:
+When a concrete source path is available (for example, a fixture path or
+project file path), prefer `load_theorem_docs_with_source` so diagnostics
+include that source identifier:
 
 ```rust
-use theoremc::schema::load_theorem_docs_with_source;
+use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 
 let source = "theorems/my_theorem.theorem";
 let yaml = std::fs::read_to_string(source)?;
-let docs = load_theorem_docs_with_source(source, &yaml)?;
+let docs = load_theorem_docs_with_source(&SourceId::new(source), &yaml)?;
 ```
 
 ### Top-level fields

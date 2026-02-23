@@ -5,7 +5,7 @@
 //! identifiers at deserialization time (via `TheoremName` / `ForallVar`
 //! newtypes) and enforcing structural constraints post-deserialization.
 
-use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, SourceLocation};
+use super::diagnostic::SchemaDiagnostic;
 use super::error::SchemaError;
 use super::raw::{RawTheoremDoc, ValidationReason};
 use super::source_id::SourceId;
@@ -77,14 +77,7 @@ pub fn load_theorem_docs_with_source(
 ) -> Result<Vec<TheoremDoc>, SchemaError> {
     let raw_docs: Vec<RawTheoremDoc> = serde_saphyr::from_multiple(input).map_err(|error| {
         let message = error.to_string();
-        let diagnostic = error.location().map(|location| {
-            create_diagnostic(
-                SchemaDiagnosticCode::ParseFailure,
-                source,
-                first_line(&message),
-                location,
-            )
-        });
+        let diagnostic = build_parse_diagnostic(source, input, &error, &message);
         SchemaError::Deserialize {
             message,
             diagnostic,
@@ -112,12 +105,7 @@ fn attach_validation_diagnostic(
             theorem, reason, ..
         } => {
             let location = raw_doc.location_for_validation_reason(ValidationReason::new(&reason));
-            let diagnostic = create_diagnostic(
-                SchemaDiagnosticCode::ValidationFailure,
-                source,
-                reason.clone(),
-                location,
-            );
+            let diagnostic = SchemaDiagnostic::validation_failure(source, reason.clone(), location);
             SchemaError::ValidationFailed {
                 theorem,
                 reason,
@@ -128,33 +116,70 @@ fn attach_validation_diagnostic(
     }
 }
 
-fn location_for_source(source: &SourceId, location: serde_saphyr::Location) -> SourceLocation {
-    let line = usize::try_from(location.line()).ok().unwrap_or(usize::MAX);
-    let column = usize::try_from(location.column())
-        .ok()
-        .unwrap_or(usize::MAX);
-    SourceLocation {
-        source: source.as_str().to_owned(),
-        line,
-        column,
-    }
-}
-
-fn create_diagnostic(
-    code: SchemaDiagnosticCode,
+fn build_parse_diagnostic(
     source: &SourceId,
-    message: String,
-    location: serde_saphyr::Location,
-) -> SchemaDiagnostic {
-    SchemaDiagnostic {
-        code,
-        location: location_for_source(source, location),
-        message,
+    input: &str,
+    error: &serde_saphyr::Error,
+    message: &str,
+) -> Option<SchemaDiagnostic> {
+    let location = error.location()?;
+    let mut diagnostic = SchemaDiagnostic::parse_failure(source, message, location);
+
+    // `serde_saphyr` may report unknown-field deserialization failures at
+    // document-start (1:1). Re-anchor to the offending key when possible.
+    if diagnostic.location.line == 1
+        && diagnostic.location.column == 1
+        && let Some((line, column)) = locate_unknown_field(input, message)
+    {
+        diagnostic.location.line = line;
+        diagnostic.location.column = column;
     }
+
+    Some(diagnostic)
 }
 
-fn first_line(message: &str) -> String {
-    message.lines().next().unwrap_or(message).to_owned()
+fn locate_unknown_field(input: &str, message: &str) -> Option<(usize, usize)> {
+    let field = unknown_field_name(message)?;
+
+    for (line_index, line) in input.lines().enumerate() {
+        if let Some(column) = mapping_key_column(line, field) {
+            return Some((line_index + 1, column));
+        }
+    }
+
+    None
+}
+
+fn unknown_field_name(message: &str) -> Option<&str> {
+    let (_, tail) = message.split_once("unknown field `")?;
+    let (field, _) = tail.split_once('`')?;
+    Some(field)
+}
+
+fn mapping_key_column(line: &str, field: &str) -> Option<usize> {
+    let trimmed = line.trim_start();
+    if trimmed.is_empty() || trimmed.starts_with('#') {
+        return None;
+    }
+
+    let leading = line.len() - trimmed.len();
+    let is_plain = trimmed
+        .strip_prefix(field)
+        .is_some_and(|tail| tail.starts_with(':'));
+    let is_single_quoted = trimmed
+        .strip_prefix('\'')
+        .and_then(|tail| tail.strip_prefix(field))
+        .is_some_and(|tail| tail.starts_with("':"));
+    let is_double_quoted = trimmed
+        .strip_prefix('"')
+        .and_then(|tail| tail.strip_prefix(field))
+        .is_some_and(|tail| tail.starts_with("\":"));
+
+    if is_plain || is_single_quoted || is_double_quoted {
+        return Some(leading + 1);
+    }
+
+    None
 }
 
 #[cfg(test)]
