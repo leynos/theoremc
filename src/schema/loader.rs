@@ -105,7 +105,12 @@ fn attach_validation_diagnostic(
             theorem, reason, ..
         } => {
             let location = raw_doc.location_for_validation_reason(ValidationReason::new(&reason));
-            let diagnostic = validation_diagnostic(source, &reason, location);
+            let diagnostic = create_diagnostic(
+                SchemaDiagnosticCode::ValidationFailure,
+                source,
+                reason.clone(),
+                location,
+            );
             SchemaError::ValidationFailed {
                 theorem,
                 reason,
@@ -123,7 +128,12 @@ fn build_parse_diagnostic(
     message: &str,
 ) -> Option<SchemaDiagnostic> {
     let location = error.location()?;
-    let mut diagnostic = parse_diagnostic(source, message, location);
+    let mut diagnostic = create_diagnostic(
+        SchemaDiagnosticCode::ParseFailure,
+        source,
+        first_line(message),
+        location,
+    );
 
     if should_reanchor_unknown_field(&diagnostic) {
         // `serde_saphyr` may report unknown-field deserialization failures at
@@ -135,32 +145,6 @@ fn build_parse_diagnostic(
     }
 
     Some(diagnostic)
-}
-
-fn parse_diagnostic(
-    source: &SourceId,
-    message: &str,
-    location: serde_saphyr::Location,
-) -> SchemaDiagnostic {
-    create_diagnostic(
-        SchemaDiagnosticCode::ParseFailure,
-        source,
-        first_line(message),
-        location,
-    )
-}
-
-fn validation_diagnostic(
-    source: &SourceId,
-    reason: &str,
-    location: serde_saphyr::Location,
-) -> SchemaDiagnostic {
-    create_diagnostic(
-        SchemaDiagnosticCode::ValidationFailure,
-        source,
-        reason.to_owned(),
-        location,
-    )
 }
 
 const fn should_reanchor_unknown_field(diagnostic: &SchemaDiagnostic) -> bool {
