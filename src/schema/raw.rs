@@ -108,7 +108,7 @@ pub(crate) struct RawTheoremDoc {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawAssumption {
-    #[serde(rename = "expr", alias = "assume")]
+    #[serde(rename = "assume", alias = "expr")]
     pub(crate) expr: Spanned<String>,
     pub(crate) because: Spanned<String>,
 }

@@ -8,7 +8,8 @@ use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 
 fn assert_diagnostic_failure(fixture_name: &str, expected_code: &str, failure_type: &str) {
     let source = format!("tests/fixtures/{fixture_name}");
-    let yaml = load_fixture(fixture_name);
+    let yaml = load_fixture(fixture_name)
+        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
     let result = load_theorem_docs_with_source(&SourceId::new(&source), &yaml);
     assert!(
         result.is_err(),
@@ -58,7 +59,8 @@ fn given_valid_theorem_fixture_for_diagnostics() {}
 #[then("loading succeeds with explicit source")]
 fn then_loading_succeeds_with_explicit_source() {
     let source = "tests/fixtures/valid_aliases_and_must.theorem";
-    let yaml = load_fixture("valid_aliases_and_must.theorem");
+    let yaml = load_fixture("valid_aliases_and_must.theorem")
+        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
     let result = load_theorem_docs_with_source(&SourceId::new(source), &yaml);
     assert!(result.is_ok(), "fixture should parse successfully");
 }

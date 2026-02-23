@@ -4,6 +4,8 @@
 //! the schema loader to report parser and validator failures with source
 //! locations.
 
+use super::source_id::SourceId;
+
 /// Stable diagnostic classification codes for schema loading failures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SchemaDiagnosticCode {
@@ -60,4 +62,33 @@ impl SchemaDiagnostic {
             self.message
         )
     }
+}
+
+fn location_for_source(source: &SourceId, location: serde_saphyr::Location) -> SourceLocation {
+    let line = usize::try_from(location.line()).ok().unwrap_or(usize::MAX);
+    let column = usize::try_from(location.column())
+        .ok()
+        .unwrap_or(usize::MAX);
+    SourceLocation {
+        source: source.as_str().to_owned(),
+        line,
+        column,
+    }
+}
+
+pub(crate) fn create_diagnostic(
+    code: SchemaDiagnosticCode,
+    source: &SourceId,
+    message: String,
+    location: serde_saphyr::Location,
+) -> SchemaDiagnostic {
+    SchemaDiagnostic {
+        code,
+        location: location_for_source(source, location),
+        message,
+    }
+}
+
+pub(crate) fn first_line(message: &str) -> String {
+    message.lines().next().unwrap_or(message).to_owned()
 }

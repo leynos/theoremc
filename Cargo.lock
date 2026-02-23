@@ -1611,6 +1611,7 @@ dependencies = [
 name = "theoremc"
 version = "0.1.0"
 dependencies = [
+ "cap-std",
  "indexmap",
  "rstest",
  "rstest-bdd",

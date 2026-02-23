@@ -27,12 +27,12 @@ not implement backend-specific rendering logic.
 Observable success:
 
 - representative parser and validator failures produce stable diagnostics with
-  source file, line, and column,
-- snapshot tests lock diagnostic output shape and content,
+  source file, line, and column.
+- snapshot tests lock diagnostic output shape and content.
 - fixture corpus covers valid and invalid theorem documents for aliases,
-  nested `maybe`, `must` semantics preconditions, and witness policy,
+  nested `maybe`, `must` semantics preconditions, and witness policy.
 - unit and behavioural coverage (using `rstest-bdd` v0.5.0 where applicable)
-  cover happy, unhappy, and edge paths,
+  cover happy, unhappy, and edge paths.
 - `docs/theoremc-design.md`, `docs/users-guide.md`, and `docs/roadmap.md`
   reflect the completed behaviour.
 
@@ -334,15 +334,15 @@ Run all commands from repository root.
 Step 1.3 is complete only when all are true:
 
 - parser and validator failures are wrapped into structured diagnostics with
-  source file, line, and column,
-- snapshot tests assert stable diagnostic output for representative failures,
+  source file, line, and column.
+- snapshot tests assert stable diagnostic output for representative failures.
 - fixture corpus covers aliases, nested `maybe`, `must` preconditions, and
-  witness policy,
+  witness policy.
 - unit and behavioural tests (`rstest-bdd` v0.5.0 where applicable) cover happy,
-  unhappy, and edge cases,
-- `docs/theoremc-design.md` records Step 1.3 design decisions,
-- `docs/users-guide.md` documents any consumer-visible behaviour/API changes,
-- `docs/roadmap.md` Step 1.3 entries are marked done,
+  unhappy, and edge cases.
+- `docs/theoremc-design.md` records Step 1.3 design decisions.
+- `docs/users-guide.md` documents any consumer-visible behaviour/API changes.
+- `docs/roadmap.md` Step 1.3 entries are marked done.
 - `make check-fmt`, `make lint`, and `make test` pass.
 
 ## Idempotence and recovery

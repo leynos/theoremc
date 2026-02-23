@@ -12,7 +12,7 @@ fn fixture_source(fixture_name: &str) -> String {
 
 fn load_from_fixture(fixture_name: &str) -> Result<(), String> {
     let source = fixture_source(fixture_name);
-    let yaml = load_fixture(fixture_name);
+    let yaml = load_fixture(fixture_name).map_err(|error| error.to_string())?;
     load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
         .map(|_| ())
         .map_err(|error| error.to_string())
@@ -40,7 +40,8 @@ fn valid_fixture_corpus_parses(#[case] fixture_name: &str) {
 #[case::missing_witness_default("invalid_missing_witness_default.theorem")]
 fn invalid_fixture_corpus_fails_with_diagnostic_source(#[case] fixture_name: &str) {
     let source = fixture_source(fixture_name);
-    let yaml = load_fixture(fixture_name);
+    let yaml = load_fixture(fixture_name)
+        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
     let result = load_theorem_docs_with_source(&SourceId::new(&source), &yaml);
     assert!(result.is_err(), "expected {fixture_name} to fail");
 

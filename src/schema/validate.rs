@@ -10,8 +10,9 @@ use super::expr;
 use super::step;
 use super::types::{KaniEvidence, LetBinding, TheoremDoc};
 
-/// Stable validation reason markers shared across validator and location mapping.
 pub(crate) mod reason_markers {
+    //! Stable message fragments shared across validation and location mapping.
+
     /// Message marker for blank `About`.
     pub(crate) const ABOUT_NON_EMPTY: &str = "About must be non-empty after trimming";
     /// Section marker for indexed `Prove` failures.

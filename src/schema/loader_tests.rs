@@ -1,5 +1,6 @@
 //! Unit tests for schema document loading.
 
+use cap_std::{ambient_authority, fs_utf8::Dir};
 use rstest::*;
 
 use super::*;
@@ -23,8 +24,11 @@ Witness:
 /// Parsed `valid_full.theorem` fixture document.
 #[fixture]
 fn full_doc() -> TheoremDoc {
-    let yaml =
-        std::fs::read_to_string("tests/fixtures/valid_full.theorem").expect("should read fixture");
+    let fixtures_dir =
+        Dir::open_ambient_dir("tests/fixtures", ambient_authority()).expect("should open fixtures");
+    let yaml = fixtures_dir
+        .read_to_string("valid_full.theorem")
+        .expect("should read fixture");
     let docs = load_theorem_docs(&yaml).expect("should parse fixture");
     docs.into_iter()
         .next()
@@ -37,10 +41,7 @@ fn assert_parse_error(yaml: &str) {
 }
 
 fn assert_parse_error_contains(yaml: &str, expected_substring: &str) {
-    let result = load_theorem_docs(yaml);
-    let Err(error) = result else {
-        panic!("expected parser to reject fixture");
-    };
+    let error = load_theorem_docs(yaml).expect_err("expected parser to reject fixture");
     let message = error.to_string();
     assert!(
         message.contains(expected_substring),
@@ -276,10 +277,25 @@ Evidence:
 }
 
 #[rstest]
-fn reject_null_allow_vacuous() {
-    let yaml = r"
+#[case(
+    "reject_null_allow_vacuous",
+    "    allow_vacuous: null",
+    "allow_vacuous must be a boolean when provided"
+)]
+#[case(
+    "reject_vacuous_without_reason",
+    "    allow_vacuous: true",
+    "vacuity_because is required"
+)]
+fn reject_invalid_vacuity_configuration(
+    #[case] case_name: &str,
+    #[case] allow_vacuous_config: &str,
+    #[case] expected_message: &str,
+) {
+    let yaml = format!(
+        r"
 Theorem: NullAllowVacuous
-About: Null allow_vacuous should fail
+About: Invalid vacuity configuration ({case_name})
 Prove:
   - assert: 'true'
     because: trivially true
@@ -287,32 +303,13 @@ Evidence:
   kani:
     unwind: 1
     expect: SUCCESS
-    allow_vacuous: null
+{allow_vacuous_config}
 Witness:
   - cover: 'true'
     because: always reachable
-";
-    assert_parse_error_contains(yaml, "allow_vacuous must be a boolean when provided");
-}
-
-#[rstest]
-fn reject_vacuous_without_reason() {
-    let yaml = r"
-Theorem: BadVacuous
-About: Vacuous without reason
-Prove:
-  - assert: 'true'
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-    allow_vacuous: true
-Witness:
-  - cover: 'true'
-    because: always reachable
-";
-    assert_parse_error_contains(yaml, "vacuity_because is required");
+",
+    );
+    assert_parse_error_contains(&yaml, expected_message);
 }
 
 #[rstest]

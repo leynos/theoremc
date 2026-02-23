@@ -5,7 +5,7 @@
 //! identifiers at deserialization time (via `TheoremName` / `ForallVar`
 //! newtypes) and enforcing structural constraints post-deserialization.
 
-use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, SourceLocation};
+use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, create_diagnostic, first_line};
 use super::error::SchemaError;
 use super::raw::{RawTheoremDoc, ValidationReason};
 use super::source_id::SourceId;
@@ -105,7 +105,7 @@ fn attach_validation_diagnostic(
             theorem, reason, ..
         } => {
             let location = raw_doc.location_for_validation_reason(ValidationReason::new(&reason));
-            let diagnostic = validation_diagnostic(source.as_str(), &reason, location);
+            let diagnostic = validation_diagnostic(source, &reason, location);
             SchemaError::ValidationFailed {
                 theorem,
                 reason,
@@ -123,23 +123,22 @@ fn build_parse_diagnostic(
     message: &str,
 ) -> Option<SchemaDiagnostic> {
     let location = error.location()?;
-    let mut diagnostic = parse_diagnostic(source.as_str(), message, location);
+    let mut diagnostic = parse_diagnostic(source, message, location);
 
-    // `serde_saphyr` may report unknown-field deserialization failures at
-    // document-start (1:1). Re-anchor to the offending key when possible.
-    if diagnostic.location.line == 1
-        && diagnostic.location.column == 1
-        && let Some((line, column)) = locate_unknown_field(input, message)
-    {
-        diagnostic.location.line = line;
-        diagnostic.location.column = column;
+    if should_reanchor_unknown_field(&diagnostic) {
+        // `serde_saphyr` may report unknown-field deserialization failures at
+        // document-start (1:1). Re-anchor to the offending key when possible.
+        if let Some((line, column)) = locate_unknown_field(input, message) {
+            diagnostic.location.line = line;
+            diagnostic.location.column = column;
+        }
     }
 
     Some(diagnostic)
 }
 
 fn parse_diagnostic(
-    source: &str,
+    source: &SourceId,
     message: &str,
     location: serde_saphyr::Location,
 ) -> SchemaDiagnostic {
@@ -152,7 +151,7 @@ fn parse_diagnostic(
 }
 
 fn validation_diagnostic(
-    source: &str,
+    source: &SourceId,
     reason: &str,
     location: serde_saphyr::Location,
 ) -> SchemaDiagnostic {
@@ -164,33 +163,8 @@ fn validation_diagnostic(
     )
 }
 
-fn location_for_source(source: &str, location: serde_saphyr::Location) -> SourceLocation {
-    let line = usize::try_from(location.line()).ok().unwrap_or(usize::MAX);
-    let column = usize::try_from(location.column())
-        .ok()
-        .unwrap_or(usize::MAX);
-    SourceLocation {
-        source: source.to_owned(),
-        line,
-        column,
-    }
-}
-
-fn create_diagnostic(
-    code: SchemaDiagnosticCode,
-    source: &str,
-    message: String,
-    location: serde_saphyr::Location,
-) -> SchemaDiagnostic {
-    SchemaDiagnostic {
-        code,
-        location: location_for_source(source, location),
-        message,
-    }
-}
-
-fn first_line(message: &str) -> String {
-    message.lines().next().unwrap_or(message).to_owned()
+const fn should_reanchor_unknown_field(diagnostic: &SchemaDiagnostic) -> bool {
+    diagnostic.location.line == 1 && diagnostic.location.column == 1
 }
 
 fn locate_unknown_field(input: &str, message: &str) -> Option<(usize, usize)> {
@@ -218,23 +192,36 @@ fn mapping_key_column(line: &str, field: &str) -> Option<usize> {
     }
 
     let leading = line.len() - trimmed.len();
-    let is_plain = trimmed
-        .strip_prefix(field)
-        .is_some_and(|tail| tail.starts_with(':'));
-    let is_single_quoted = trimmed
-        .strip_prefix('\'')
-        .and_then(|tail| tail.strip_prefix(field))
-        .is_some_and(|tail| tail.starts_with("':"));
-    let is_double_quoted = trimmed
-        .strip_prefix('"')
-        .and_then(|tail| tail.strip_prefix(field))
-        .is_some_and(|tail| tail.starts_with("\":"));
+    if is_plain_mapping_key(trimmed, field) {
+        return Some(leading + 1);
+    }
 
-    if is_plain || is_single_quoted || is_double_quoted {
+    if is_single_quoted_mapping_key(trimmed, field) {
+        return Some(leading + 1);
+    }
+
+    if is_double_quoted_mapping_key(trimmed, field) {
         return Some(leading + 1);
     }
 
     None
+}
+
+fn is_plain_mapping_key(line: &str, field: &str) -> bool {
+    line.strip_prefix(field)
+        .is_some_and(|tail| tail.starts_with(':'))
+}
+
+fn is_single_quoted_mapping_key(line: &str, field: &str) -> bool {
+    line.strip_prefix('\'')
+        .and_then(|tail| tail.strip_prefix(field))
+        .is_some_and(|tail| tail.starts_with("':"))
+}
+
+fn is_double_quoted_mapping_key(line: &str, field: &str) -> bool {
+    line.strip_prefix('"')
+        .and_then(|tail| tail.strip_prefix(field))
+        .is_some_and(|tail| tail.starts_with("\":"))
 }
 
 #[cfg(test)]

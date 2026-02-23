@@ -12,7 +12,8 @@ use theoremc::schema::{KaniExpectation, load_theorem_docs};
 
 /// Helper to assert that loading a fixture fails.
 fn assert_fixture_fails(fixture_name: &str) -> String {
-    let yaml = load_fixture(fixture_name);
+    let yaml = load_fixture(fixture_name)
+        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
     let result = load_theorem_docs(&yaml);
     assert!(
         result.is_err(),
