@@ -159,6 +159,8 @@ Normative boundary rules live in
 [ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
  This section is intentionally informative and maps current module placement.
 
+Table 1: Current schema layer to module mapping (informative).
+
 | Layer                       | Current primary modules                                                          |
 | --------------------------- | -------------------------------------------------------------------------------- |
 | Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier`       |
@@ -1070,8 +1072,8 @@ Minimum viable product (MVP) Dylint rules:
 - forbid `kani::assume` outside theoremc-generated harness modules,
 - forbid `#[kani::proof]` harnesses that don’t carry a theoremc marker
   attribute, and
-- forbid forbidden schema layer edges (for example, domain types importing raw
-  adapter modules),
+- flag schema layer edges that violate boundary rules (for example, domain
+  types importing raw adapter modules),
 - optionally flag direct use of “trust-introducing” constructs in future
   backends (Verus TCB guard).
 
