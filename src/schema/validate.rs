@@ -42,10 +42,7 @@ fn require_non_blank_fields(
         if is_blank(value) {
             return Err(fail(
                 doc,
-                format!(
-                    "{section} {pos}: {label} must be \
-                     non-empty after trimming"
-                ),
+                format!("{section} {pos}: {label} must be non-empty after trimming"),
             ));
         }
     }
