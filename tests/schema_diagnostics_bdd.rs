@@ -7,17 +7,27 @@ use rstest_bdd_macros::{given, scenario, then};
 use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 
 #[expect(
-    clippy::expect_used,
-    reason = "Tests intentionally use expect_err for clearer fixture failure diagnostics."
+    clippy::manual_let_else,
+    reason = "This helper intentionally uses explicit match arms for clarity."
+)]
+#[expect(
+    clippy::option_if_let_else,
+    reason = "This helper intentionally uses explicit match arms for clarity."
 )]
 fn assert_diagnostic_failure(fixture_name: &str, expected_code: &str, failure_type: &str) {
     let source = format!("tests/fixtures/{fixture_name}");
-    let yaml = load_fixture(fixture_name).expect("failed to load fixture: {fixture_name}");
-    let result = load_theorem_docs_with_source(&SourceId::new(&source), &yaml);
-    let error = result.expect_err(&format!(
-        "fixture should fail {failure_type}: {fixture_name}"
-    ));
-    let diagnostic = error.diagnostic().expect("diagnostic should be present");
+    let yaml = match load_fixture(fixture_name) {
+        Ok(yaml) => yaml,
+        Err(error) => panic!("failed to load fixture: {error}"),
+    };
+    let error = match load_theorem_docs_with_source(&SourceId::new(&source), &yaml) {
+        Err(error) => error,
+        Ok(_) => panic!("fixture should fail {failure_type}: {fixture_name}"),
+    };
+    let diagnostic = match error.diagnostic() {
+        Some(diagnostic) => diagnostic,
+        None => panic!("diagnostic should be present"),
+    };
 
     assert_eq!(diagnostic.code.as_str(), expected_code);
     assert_eq!(diagnostic.location.source, source);
@@ -53,15 +63,16 @@ fn then_loading_fails_with_source_located_validator_diagnostics() {
 fn given_valid_theorem_fixture_for_diagnostics() {}
 
 #[then("loading succeeds with explicit source")]
-#[expect(
-    clippy::expect_used,
-    reason = "Tests intentionally use expect for clearer fixture loading diagnostics."
-)]
 fn then_loading_succeeds_with_explicit_source() {
     let source = "tests/fixtures/valid_aliases_and_must.theorem";
-    let yaml = load_fixture("valid_aliases_and_must.theorem").expect("failed to load fixture");
-    let result = load_theorem_docs_with_source(&SourceId::new(source), &yaml);
-    assert!(result.is_ok(), "fixture should parse successfully");
+    let yaml = match load_fixture("valid_aliases_and_must.theorem") {
+        Ok(yaml) => yaml,
+        Err(error) => panic!("failed to load fixture: {error}"),
+    };
+    match load_theorem_docs_with_source(&SourceId::new(source), &yaml) {
+        Ok(_) => {}
+        Err(error) => panic!("fixture should parse successfully: {error}"),
+    }
 }
 
 #[scenario(
