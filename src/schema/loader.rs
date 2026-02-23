@@ -5,7 +5,7 @@
 //! identifiers at deserialization time (via `TheoremName` / `ForallVar`
 //! newtypes) and enforcing structural constraints post-deserialization.
 
-use super::diagnostic::SchemaDiagnostic;
+use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, SourceLocation};
 use super::error::SchemaError;
 use super::raw::{RawTheoremDoc, ValidationReason};
 use super::source_id::SourceId;
@@ -105,7 +105,7 @@ fn attach_validation_diagnostic(
             theorem, reason, ..
         } => {
             let location = raw_doc.location_for_validation_reason(ValidationReason::new(&reason));
-            let diagnostic = SchemaDiagnostic::validation_failure(source, reason.clone(), location);
+            let diagnostic = validation_diagnostic(source.as_str(), &reason, location);
             SchemaError::ValidationFailed {
                 theorem,
                 reason,
@@ -123,7 +123,7 @@ fn build_parse_diagnostic(
     message: &str,
 ) -> Option<SchemaDiagnostic> {
     let location = error.location()?;
-    let mut diagnostic = SchemaDiagnostic::parse_failure(source, message, location);
+    let mut diagnostic = parse_diagnostic(source.as_str(), message, location);
 
     // `serde_saphyr` may report unknown-field deserialization failures at
     // document-start (1:1). Re-anchor to the offending key when possible.
@@ -136,6 +136,61 @@ fn build_parse_diagnostic(
     }
 
     Some(diagnostic)
+}
+
+fn parse_diagnostic(
+    source: &str,
+    message: &str,
+    location: serde_saphyr::Location,
+) -> SchemaDiagnostic {
+    create_diagnostic(
+        SchemaDiagnosticCode::ParseFailure,
+        source,
+        first_line(message),
+        location,
+    )
+}
+
+fn validation_diagnostic(
+    source: &str,
+    reason: &str,
+    location: serde_saphyr::Location,
+) -> SchemaDiagnostic {
+    create_diagnostic(
+        SchemaDiagnosticCode::ValidationFailure,
+        source,
+        reason.to_owned(),
+        location,
+    )
+}
+
+fn location_for_source(source: &str, location: serde_saphyr::Location) -> SourceLocation {
+    let line = usize::try_from(location.line()).ok().unwrap_or(usize::MAX);
+    let column = usize::try_from(location.column())
+        .ok()
+        .unwrap_or(usize::MAX);
+    SourceLocation {
+        source: source.to_owned(),
+        line,
+        column,
+    }
+}
+
+fn create_diagnostic(
+    code: SchemaDiagnosticCode,
+    source: &str,
+    message: String,
+    location: serde_saphyr::Location,
+) -> SchemaDiagnostic {
+    SchemaDiagnostic {
+        code,
+        location: location_for_source(source, location),
+        message,
+    }
+}
+
+fn first_line(message: &str) -> String {
+    message.lines().next().unwrap_or(message).to_owned()
 }
 
 fn locate_unknown_field(input: &str, message: &str) -> Option<(usize, usize)> {

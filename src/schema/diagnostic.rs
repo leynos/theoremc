@@ -4,8 +4,6 @@
 //! the schema loader to report parser and validator failures with source
 //! locations.
 
-use super::source_id::SourceId;
-
 /// Stable diagnostic classification codes for schema loading failures.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SchemaDiagnosticCode {
@@ -49,51 +47,6 @@ pub struct SchemaDiagnostic {
 }
 
 impl SchemaDiagnostic {
-    /// Builds a parser-failure diagnostic with normalized message text.
-    #[must_use]
-    pub(crate) fn parse_failure(
-        source: &SourceId,
-        message: &str,
-        location: serde_saphyr::Location,
-    ) -> Self {
-        Self::new(
-            SchemaDiagnosticCode::ParseFailure,
-            source,
-            first_line(message),
-            location,
-        )
-    }
-
-    /// Builds a validation-failure diagnostic using the full reason message.
-    #[must_use]
-    pub(crate) fn validation_failure(
-        source: &SourceId,
-        message: String,
-        location: serde_saphyr::Location,
-    ) -> Self {
-        Self::new(
-            SchemaDiagnosticCode::ValidationFailure,
-            source,
-            message,
-            location,
-        )
-    }
-
-    /// Builds a diagnostic from fully prepared components.
-    #[must_use]
-    pub(crate) fn new(
-        code: SchemaDiagnosticCode,
-        source: &SourceId,
-        message: String,
-        location: serde_saphyr::Location,
-    ) -> Self {
-        Self {
-            code,
-            location: location_for_source(source, location),
-            message,
-        }
-    }
-
     /// Renders the diagnostic into a deterministic single-line format suitable
     /// for snapshot tests.
     #[must_use]
@@ -107,20 +60,4 @@ impl SchemaDiagnostic {
             self.message
         )
     }
-}
-
-fn location_for_source(source: &SourceId, location: serde_saphyr::Location) -> SourceLocation {
-    let line = usize::try_from(location.line()).ok().unwrap_or(usize::MAX);
-    let column = usize::try_from(location.column())
-        .ok()
-        .unwrap_or(usize::MAX);
-    SourceLocation {
-        source: source.as_str().to_owned(),
-        line,
-        column,
-    }
-}
-
-fn first_line(message: &str) -> String {
-    message.lines().next().unwrap_or(message).to_owned()
 }
