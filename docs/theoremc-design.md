@@ -1,12 +1,14 @@
 # Theoremc design specification
 
-Status: draft (design settled for `.theorem` syntax + Kani MVP). Scope: Rust
-workspace toolchain, compile-time correlation, and no inline Rust blocks in
-`.theorem`. Primary audience: Rust engineers who want behaviour-driven
-development (BDD)-level legibility for formal checks. Decision records:
-[Architecture Decision Record (ADR) 001](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
- and
-[Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md).
+Status: draft (design settled for `.theorem` syntax + Kani minimum viable
+product (MVP)). Scope: Rust workspace toolchain, compile-time correlation, and
+no inline Rust blocks in `.theorem`. Primary audience: Rust engineers who want
+behaviour-driven development (BDD)-level legibility for formal checks. Decision
+records:
+
+- [Architecture Decision Record (ADR) 001](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- [Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+- [Architecture Decision Record (ADR) 003](adr-003-architectural-boundary-enforcement.md)
 
 This specification incorporates several useful structural elements (repo layout
 sketch, risk framing, and some diagrams) from the attached Blitzy exploration,
@@ -29,6 +31,8 @@ reduce drift risk, normative definitions are centralized:
 - `docs/adr-002-library-first-internationalization-and-localization-with-fluent.md`
   is normative for localization architecture, diagnostic rendering boundaries,
   and Fluent backend policy.
+- `docs/adr-003-architectural-boundary-enforcement.md` is normative for schema
+  layer boundaries and architecture enforcement policy.
 
 If wording differs between documents, the normative references above take
 precedence.
@@ -142,6 +146,28 @@ flowchart TD
 
 (Adapted from the attached exploration’s architecture sketch, updated to match
 the “no inline Rust blocks” rule and to use `serde-saphyr`.)
+
+### 3.2 Schema layering boundary contract
+
+The current schema subsystem (`src/schema`) follows a layered architecture with
+hexagonal influences and an anti-corruption boundary between YAML input and
+domain types.
+
+Normative boundary rules live in
+[ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
+ and
+[ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
+ This section is intentionally informative and maps current module placement.
+
+Table 1: Current schema layer to module mapping (informative).
+
+| Layer                       | Current primary modules                                                          |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier`       |
+| Raw anti-corruption adapter | `schema::raw` (planned extraction from current loader-side deserialization path) |
+| Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                               |
+| Loader orchestration        | `schema::loader`                                                                 |
+| Diagnostic infrastructure   | `schema::diagnostic` (currently `schema::error`)                                 |
 
 ______________________________________________________________________
 
@@ -1004,16 +1030,50 @@ ______________________________________________________________________
 
 ## 10. Enforcement (guardrails, not the primary binding mechanism)
 
-Enforcement is used to discourage bypass, not to keep things in sync.
+Enforcement is used to discourage bypass and to prevent architectural drift
+inside the schema subsystem. The boundary policy is defined by ADR 003.
+
+### 10.1 Architectural boundary rules
+
+The normative boundary rules are defined in
+[ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
+ and
+[ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
+ This section focuses on enforcement tooling and rollout.
+
+### 10.2 Enforcement stack and priority
+
+| Tool                                     | Purpose                                                                     | Priority |
+| ---------------------------------------- | --------------------------------------------------------------------------- | -------- |
+| Module visibility and curated re-exports | Prevent accidental public exposure of internal adapter/diagnostic internals | High     |
+| `cargo modules graph --acyclic --lib`    | Detect cycles in module dependencies                                        | High     |
+| Clippy with wildcard-import deny         | Keep dependency edges explicit and reviewable                               | High     |
+| Dylint custom lints                      | Catch forbidden layer-edge imports that visibility alone cannot express     | Medium   |
+| `cargo-deny` policy checks               | Enforce architecture-sensitive dependency policy                            | Low      |
 
 `theoremc-dylint` provides lints using Dylint, which runs Rust lints from
 dynamic libraries.[^10]
 
-MVP lints:
+### 10.3 Minimal CI architecture gate
+
+```shell
+cargo modules graph --acyclic --lib
+cargo clippy --workspace --all-targets --all-features -- \
+  -D warnings -D clippy::wildcard_imports
+# Optional in early rollout:
+# cargo dylint theoremc_arch_lint --all -- -D warnings
+```
+
+Required external tools and expected versions are documented in
+[ADR 003 tooling prerequisites](adr-003-architectural-boundary-enforcement.md#tooling-prerequisites-and-version-alignment).
+
+Minimum viable product (MVP) Dylint rules:
 
 - forbid `kani::assume` outside theoremc-generated harness modules,
 - forbid `#[kani::proof]` harnesses that don’t carry a theoremc marker
-  attribute,
+  attribute, and
+- flag schema layer edges that violate boundary rules (for example, domain
+  types importing raw adapter modules),
 - optionally flag direct use of “trust-introducing” constructs in future
   backends (Verus TCB guard).
 
