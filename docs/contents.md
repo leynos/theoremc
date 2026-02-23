@@ -8,6 +8,9 @@
 - [Architecture Decision Record (ADR) 002: library-first internationalization and localization with Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
   - Decision record for Fluent-based, library-safe localization via injected
   localizers, structured diagnostic codes, and deterministic fallback policy.
+- [Architecture Decision Record (ADR) 003: architectural boundary enforcement for schema layers](adr-003-architectural-boundary-enforcement.md)
+  - Decision record for schema layering constraints, module boundary policy,
+  and an incremental architecture-enforcement stack.
 - [Navigating code complexity: a guide for implementers and maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring
   strategies for long-lived codebases.

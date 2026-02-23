@@ -14,6 +14,9 @@ Use these signposts to trace each roadmap task to the defining requirement.
 - `DES-3`:
   [docs/theoremc-design.md §3](theoremc-design.md#3-high-level-architecture)
   (high-level architecture and pipeline shape).
+- `DES-3.2`:
+  [docs/theoremc-design.md §3.2](theoremc-design.md#32-schema-layering-boundary-contract)
+   (schema layering boundary contract).
 - `DES-4`:
   [docs/theoremc-design.md §4](theoremc-design.md#4-the-theorem-file-format)
   (theorem format and step semantics).
@@ -36,6 +39,9 @@ Use these signposts to trace each roadmap task to the defining requirement.
 - `DES-10`:
   [docs/theoremc-design.md §10](theoremc-design.md#10-enforcement-guardrails-not-the-primary-binding-mechanism)
    (optional enforcement via lints).
+- `DES-10.1`:
+  [docs/theoremc-design.md §10.1](theoremc-design.md#101-architectural-boundary-rules)
+   (architectural layer-boundary rules).
 - `DES-4.7`:
   [docs/theoremc-design.md §4.7](theoremc-design.md#47-theorem-schema-internationalization-scope)
    (theorem schema keyword internationalization scope).
@@ -87,6 +93,21 @@ Use these signposts to trace each roadmap task to the defining requirement.
 - `ADR2-5`:
   [ADR 002 decision 5](adr-002-library-first-internationalization-and-localization-with-fluent.md)
    (parser keyword internationalization deferred to future ADR).
+- `ADR3-1`:
+  [ADR 003 decision 1](adr-003-architectural-boundary-enforcement.md) (explicit
+  schema layer contract and dependency direction).
+- `ADR3-2`:
+  [ADR 003 decision 2](adr-003-architectural-boundary-enforcement.md) (module
+  visibility as first-layer enforcement).
+- `ADR3-3`:
+  [ADR 003 decision 3](adr-003-architectural-boundary-enforcement.md) (baseline
+  CI architecture checks).
+- `ADR3-4`:
+  [ADR 003 decision 4](adr-003-architectural-boundary-enforcement.md) (custom
+  Dylint checks for forbidden edges).
+- `ADR3-5`:
+  [ADR 003 decision 5](adr-003-architectural-boundary-enforcement.md) (optional
+  `cargo-deny` dependency policy checks).
 
 ## Phase 1: schema and validation foundation
 
@@ -429,7 +450,38 @@ Out of scope: mandatory lint enforcement for all adopters.
   test crate demonstrates expected warnings and zero false positives in
   generated modules. Signposts: `DES-10`.
 
-### Step 6.2: provide examples and authoring guidance
+### Step 6.2: enforce schema architectural boundaries
+
+Dependencies: phase 1 and step 6.1.
+
+In scope: schema-layer visibility boundaries, dependency-graph enforcement, and
+lint-based forbidden-edge checks.
+
+Out of scope: splitting schema layers into separate crates.
+
+- [ ] Introduce and stabilize explicit schema-layer module boundaries (domain,
+  raw adapter, validator, loader, diagnostics) using non-public internals and
+  curated re-exports. Acceptance: public `schema` exports include only approved
+  API types and loader entry points, and contract tests prove raw adapter
+  internals are not importable by consumers. Signposts: `DES-3.2`, `DES-10.1`,
+  `ADR3-1`, `ADR3-2`.
+- [ ] Add CI acyclicity checks with `cargo modules graph --acyclic --lib`.
+  Acceptance: current module graph passes, and a synthetic cycle fixture causes
+  the architecture check to fail. Signposts: `DES-10`, `ADR3-3`.
+- [ ] Enforce explicit imports by denying wildcard imports in CI. Acceptance:
+  schema modules fail lint checks when wildcard imports are introduced, and CI
+  runs with `-D clippy::wildcard_imports` enabled. Signposts: `DES-10`,
+  `ADR3-3`.
+- [ ] Implement `theoremc_arch_lint` Dylint rules for forbidden import edges
+  (for example, `schema::types` importing `schema::raw`). Acceptance: lint
+  fixtures demonstrate expected failures for forbidden edges and no failures
+  for allowed edges. Signposts: `DES-10`, `ADR3-4`.
+- [ ] Add optional `cargo-deny` policy checks for architecture-sensitive
+  dependencies (for example, constraining YAML adapter dependencies to adapter
+  contexts). Acceptance: dependency policy checks pass in CI and fail on
+  deliberate policy violations in fixtures. Signposts: `DES-10`, `ADR3-5`.
+
+### Step 6.3: provide examples and authoring guidance
 
 Dependencies: phases 1 to 5.
 
@@ -542,5 +594,7 @@ Out of scope: implementation of localized theorem schema keys.
   stable.
 - Treat vacuity policy implementation as a release gate, not an optional
   enhancement.
+- Land schema architecture boundary checks before broadening examples and
+  contributor workflow guidance.
 - Start localization integration only after core diagnostics are structured and
   stable.
