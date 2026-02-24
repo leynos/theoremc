@@ -7,13 +7,21 @@
 mod common;
 
 use common::load_fixture;
+use rstest::rstest;
 use theoremc::schema::{LetBinding, Step, load_theorem_docs};
+
+#[rstest::fixture]
+fn fixture_loader() -> impl Fn(&str) -> String {
+    |fixture_name| {
+        load_fixture(fixture_name).unwrap_or_else(|error| panic!("failed to load fixture: {error}"))
+    }
+}
 
 // ── Happy-path tests ────────────────────────────────────────────────
 
-#[test]
-fn valid_minimal_document_deserializes() {
-    let yaml = load_fixture("valid_minimal.theorem");
+#[rstest]
+fn valid_minimal_document_deserializes(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_minimal.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse valid_minimal");
     assert_eq!(docs.len(), 1);
     let doc = docs.first().expect("should have one document");
@@ -25,9 +33,9 @@ fn valid_minimal_document_deserializes() {
     assert!(doc.assume.is_empty());
 }
 
-#[test]
-fn valid_minimal_has_required_prove() {
-    let yaml = load_fixture("valid_minimal.theorem");
+#[rstest]
+fn valid_minimal_has_required_prove(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_minimal.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse");
     let doc = docs.first().expect("should have one document");
     assert_eq!(doc.prove.len(), 1);
@@ -41,11 +49,11 @@ fn valid_minimal_has_required_prove() {
     );
 }
 
-#[test]
-fn valid_minimal_has_kani_evidence() {
+#[rstest]
+fn valid_minimal_has_kani_evidence(fixture_loader: impl Fn(&str) -> String) {
     use theoremc::schema::KaniExpectation;
 
-    let yaml = load_fixture("valid_minimal.theorem");
+    let yaml = fixture_loader("valid_minimal.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse");
     let doc = docs.first().expect("should have one document");
     let kani = doc
@@ -59,9 +67,9 @@ fn valid_minimal_has_kani_evidence() {
     assert!(kani.vacuity_because.is_none());
 }
 
-#[test]
-fn valid_full_populates_all_sections() {
-    let yaml = load_fixture("valid_full.theorem");
+#[rstest]
+fn valid_full_populates_all_sections(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_full.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse valid_full");
     let doc = docs.first().expect("should have one document");
     assert_eq!(doc.theorem.as_str(), "FullExample");
@@ -71,9 +79,9 @@ fn valid_full_populates_all_sections() {
     assert!(doc.forall.contains_key("amount"));
 }
 
-#[test]
-fn valid_full_has_let_bindings() {
-    let yaml = load_fixture("valid_full.theorem");
+#[rstest]
+fn valid_full_has_let_bindings(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_full.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse");
     let doc = docs.first().expect("should have one document");
     assert_eq!(doc.let_bindings.len(), 2);
@@ -90,9 +98,9 @@ fn valid_full_has_let_bindings() {
     ));
 }
 
-#[test]
-fn valid_full_has_maybe_step() {
-    let yaml = load_fixture("valid_full.theorem");
+#[rstest]
+fn valid_full_has_maybe_step(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_full.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse");
     let doc = docs.first().expect("should have one document");
     assert_eq!(doc.do_steps.len(), 2);
@@ -100,9 +108,9 @@ fn valid_full_has_maybe_step() {
     assert!(matches!(doc.do_steps.get(1), Some(Step::Maybe(..))));
 }
 
-#[test]
-fn valid_full_has_multiple_prove_assertions() {
-    let yaml = load_fixture("valid_full.theorem");
+#[rstest]
+fn valid_full_has_multiple_prove_assertions(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_full.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse");
     let doc = docs.first().expect("should have one document");
     assert_eq!(doc.prove.len(), 2);
@@ -110,24 +118,24 @@ fn valid_full_has_multiple_prove_assertions() {
 
 // ── Multi-document tests ────────────────────────────────────────────
 
-#[test]
-fn multi_document_loads_all_theorems() {
-    let yaml = load_fixture("valid_multi.theorem");
+#[rstest]
+fn multi_document_loads_all_theorems(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_multi.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse valid_multi");
     assert_eq!(docs.len(), 3);
 }
 
-#[test]
-fn multi_document_preserves_order() {
-    let yaml = load_fixture("valid_multi.theorem");
+#[rstest]
+fn multi_document_preserves_order(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_multi.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse");
     let names: Vec<&str> = docs.iter().map(|d| d.theorem.as_str()).collect();
     assert_eq!(names, vec!["FirstTheorem", "SecondTheorem", "ThirdTheorem"]);
 }
 
-#[test]
-fn multi_document_has_independent_sections() {
-    let yaml = load_fixture("valid_multi.theorem");
+#[rstest]
+fn multi_document_has_independent_sections(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_multi.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse");
     // Only the second document has tags.
     assert!(docs.first().is_some_and(|d| d.tags.is_empty()));
@@ -140,9 +148,9 @@ fn multi_document_has_independent_sections() {
 
 // ── Lowercase alias tests ───────────────────────────────────────────
 
-#[test]
-fn lowercase_aliases_deserialize_identically() {
-    let yaml = load_fixture("valid_lowercase.theorem");
+#[rstest]
+fn lowercase_aliases_deserialize_identically(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_lowercase.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse lowercase");
     let doc = docs.first().expect("should have one document");
     assert_eq!(doc.theorem.as_str(), "LowercaseAliases");
@@ -154,9 +162,9 @@ fn lowercase_aliases_deserialize_identically() {
 
 // ── Vacuous configuration test ──────────────────────────────────────
 
-#[test]
-fn vacuous_allowed_with_reason() {
-    let yaml = load_fixture("valid_vacuous.theorem");
+#[rstest]
+fn vacuous_allowed_with_reason(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_vacuous.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse vacuous");
     let doc = docs.first().expect("should have one document");
     let kani = doc.evidence.kani.as_ref().expect("should have kani");
@@ -166,17 +174,17 @@ fn vacuous_allowed_with_reason() {
 
 // ── Schema version test ─────────────────────────────────────────────
 
-#[test]
-fn schema_version_defaults_to_none() {
-    let yaml = load_fixture("valid_minimal.theorem");
+#[rstest]
+fn schema_version_defaults_to_none(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_minimal.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse");
     let doc = docs.first().expect("should have one document");
     assert_eq!(doc.schema, None);
 }
 
-#[test]
-fn schema_version_can_be_set() {
-    let yaml = load_fixture("valid_full.theorem");
+#[rstest]
+fn schema_version_can_be_set(fixture_loader: impl Fn(&str) -> String) {
+    let yaml = fixture_loader("valid_full.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse");
     let doc = docs.first().expect("should have one document");
     assert_eq!(doc.schema, Some(1));

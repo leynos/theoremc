@@ -1,11 +1,12 @@
 //! Shared test helpers for integration tests.
 
+use cap_std::{ambient_authority, fs_utf8::Dir};
+
 /// Loads a fixture file from the `tests/fixtures/` directory.
 ///
-/// # Panics
+/// # Errors
 ///
-/// Panics if the file cannot be read.
-pub fn load_fixture(name: &str) -> String {
-    std::fs::read_to_string(format!("tests/fixtures/{name}"))
-        .unwrap_or_else(|e| panic!("failed to read fixture {name}: {e}"))
+/// Returns an I/O error when the fixture cannot be read.
+pub fn load_fixture(name: &str) -> std::io::Result<String> {
+    Dir::open_ambient_dir("tests/fixtures", ambient_authority())?.read_to_string(name)
 }

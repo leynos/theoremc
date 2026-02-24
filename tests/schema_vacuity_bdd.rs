@@ -8,7 +8,8 @@ use theoremc::schema::load_theorem_docs;
 
 /// Asserts that loading a fixture succeeds.
 fn assert_fixture_ok(fixture_name: &str) {
-    let yaml = load_fixture(fixture_name);
+    let yaml = load_fixture(fixture_name)
+        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
     let result = load_theorem_docs(&yaml);
     assert!(
         result.is_ok(),
@@ -19,7 +20,8 @@ fn assert_fixture_ok(fixture_name: &str) {
 
 /// Asserts that loading a fixture fails with a message fragment.
 fn assert_fixture_err_contains(fixture_name: &str, expected_fragment: &str) {
-    let yaml = load_fixture(fixture_name);
+    let yaml = load_fixture(fixture_name)
+        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
     let result = load_theorem_docs(&yaml);
     assert!(result.is_err(), "expected fixture {fixture_name} to fail");
 

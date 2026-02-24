@@ -10,6 +10,9 @@ use super::expr;
 use super::step;
 use super::types::{KaniEvidence, LetBinding, TheoremDoc};
 
+#[path = "validate_reason_markers.rs"]
+pub(crate) mod reason_markers;
+
 // ── Helpers ─────────────────────────────────────────────────────────
 
 /// Returns `true` if the string is empty or contains only whitespace.
@@ -22,6 +25,7 @@ fn fail(doc: &TheoremDoc, reason: String) -> SchemaError {
     SchemaError::ValidationFailed {
         theorem: doc.theorem.to_string(),
         reason,
+        diagnostic: None,
     }
 }
 
@@ -38,10 +42,7 @@ fn require_non_blank_fields(
         if is_blank(value) {
             return Err(fail(
                 doc,
-                format!(
-                    "{section} {pos}: {label} must be \
-                     non-empty after trimming"
-                ),
+                format!("{section} {pos}: {label} must be non-empty after trimming"),
             ));
         }
     }
@@ -114,10 +115,7 @@ pub(crate) fn validate_theorem_doc(doc: &TheoremDoc) -> Result<(), SchemaError> 
 /// `About` must be non-empty after trimming (`TFS-1` §3.3).
 fn validate_about(doc: &TheoremDoc) -> Result<(), SchemaError> {
     if is_blank(&doc.about) {
-        return Err(fail(
-            doc,
-            "About must be non-empty after trimming".to_owned(),
-        ));
+        return Err(fail(doc, reason_markers::ABOUT_NON_EMPTY.to_owned()));
     }
     Ok(())
 }
@@ -136,7 +134,7 @@ fn validate_prove_non_empty(doc: &TheoremDoc) -> Result<(), SchemaError> {
 /// Every `Assertion` must have non-empty `assert` and `because`
 /// fields after trimming (`TFS-1` §3.10).
 fn validate_assertions(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    validate_collection_fields(doc, "Prove assertion", &doc.prove, |a| {
+    validate_collection_fields(doc, reason_markers::PROVE_ASSERTION, &doc.prove, |a| {
         vec![
             ("assert", a.assert_expr.as_str()),
             ("because", a.because.as_str()),
@@ -147,7 +145,7 @@ fn validate_assertions(doc: &TheoremDoc) -> Result<(), SchemaError> {
 /// Every `Assumption` must have non-empty `expr` and `because`
 /// fields after trimming (`TFS-1` §3.7).
 fn validate_assumptions(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    validate_collection_fields(doc, "Assume constraint", &doc.assume, |a| {
+    validate_collection_fields(doc, reason_markers::ASSUME_CONSTRAINT, &doc.assume, |a| {
         vec![("expr", a.expr.as_str()), ("because", a.because.as_str())]
     })
 }
@@ -155,7 +153,7 @@ fn validate_assumptions(doc: &TheoremDoc) -> Result<(), SchemaError> {
 /// Every `WitnessCheck` must have non-empty `cover` and `because`
 /// fields after trimming (`TFS-1` §3.7.1).
 fn validate_witnesses(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    validate_collection_fields(doc, "Witness", &doc.witness, |w| {
+    validate_collection_fields(doc, reason_markers::WITNESS, &doc.witness, |w| {
         vec![("cover", w.cover.as_str()), ("because", w.because.as_str())]
     })
 }
@@ -228,10 +226,7 @@ fn validate_evidence(doc: &TheoremDoc) -> Result<(), SchemaError> {
 /// Kani `unwind` must be a positive integer (`TFS-6` §6.2).
 fn validate_kani_unwind(doc: &TheoremDoc, kani: &KaniEvidence) -> Result<(), SchemaError> {
     if kani.unwind == 0 {
-        return Err(fail(
-            doc,
-            concat!("Evidence.kani.unwind must be a positive ", "integer (> 0)",).to_owned(),
-        ));
+        return Err(fail(doc, reason_markers::KANI_UNWIND_NON_ZERO.to_owned()));
     }
     Ok(())
 }
@@ -247,18 +242,14 @@ fn validate_kani_vacuity(doc: &TheoremDoc, kani: &KaniEvidence) -> Result<(), Sc
     if requires_reason && !has_reason {
         return Err(fail(
             doc,
-            concat!("vacuity_because is required when ", "allow_vacuous is true",).to_owned(),
+            reason_markers::KANI_VACUITY_REASON_REQUIRED.to_owned(),
         ));
     }
 
     if has_reason && reason_is_blank {
         return Err(fail(
             doc,
-            concat!(
-                "Evidence.kani.vacuity_because must be ",
-                "non-empty after trimming",
-            )
-            .to_owned(),
+            reason_markers::KANI_VACUITY_REASON_NON_EMPTY.to_owned(),
         ));
     }
 

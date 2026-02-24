@@ -1,0 +1,21 @@
+theorem: LowerAliasMustFlow
+about: Lowercase aliases with must bindings remain supported.
+let:
+  start:
+    must:
+      action: account.params
+      args: { max_balance: 1000 }
+do:
+  - must:
+      action: account.validate
+      args: { account: { ref: start } }
+prove:
+  - assert: "true"
+    because: flow uses lowercase aliases and must
+evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+witness:
+  - cover: "true"
+    because: witness policy remains satisfied
