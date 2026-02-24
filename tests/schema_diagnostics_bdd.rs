@@ -63,16 +63,12 @@ fn then_loading_fails_with_source_located_validator_diagnostics() -> Result<(), 
 fn given_valid_theorem_fixture_for_diagnostics() {}
 
 #[then("loading succeeds with explicit source")]
-#[expect(
-    clippy::expect_used,
-    reason = "Test step uses expect to give direct failure context."
-)]
-fn then_loading_succeeds_with_explicit_source() {
+fn then_loading_succeeds_with_explicit_source() -> Result<(), Box<dyn std::error::Error>> {
     let source = "tests/fixtures/valid_aliases_and_must.theorem";
-    let yaml = load_fixture("valid_aliases_and_must.theorem")
-        .expect("failed to load fixture valid_aliases_and_must.theorem");
-    load_theorem_docs_with_source(&SourceId::new(source), &yaml)
-        .expect("failed to parse theorem docs with explicit source");
+    let yaml = load_fixture("valid_aliases_and_must.theorem")?;
+    load_theorem_docs_with_source(&SourceId::new(source), &yaml)?;
+
+    Ok(())
 }
 
 #[scenario(
