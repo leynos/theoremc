@@ -6,17 +6,16 @@ use common::load_fixture;
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 
-fn assert_diagnostic_failure(fixture_name: &str, expected_code: &str, failure_type: &str) {
+#[expect(
+    clippy::expect_used,
+    reason = "Tests intentionally use expect-style diagnostics in this helper."
+)]
+fn assert_diagnostic_failure(fixture_name: &str, expected_code: &str, _failure_type: &str) {
     let source = format!("tests/fixtures/{fixture_name}");
-    let Ok(yaml) = load_fixture(fixture_name) else {
-        panic!("failed to load fixture {fixture_name}");
-    };
-    let Err(error) = load_theorem_docs_with_source(&SourceId::new(&source), &yaml) else {
-        panic!("fixture should fail {failure_type}: {fixture_name}");
-    };
-    let Some(diagnostic) = error.diagnostic() else {
-        panic!("diagnostic should be present");
-    };
+    let yaml = load_fixture(fixture_name).expect("failed to load fixture");
+    let error = load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
+        .expect_err("fixture should fail");
+    let diagnostic = error.diagnostic().expect("diagnostic should be present");
 
     assert_eq!(diagnostic.code.as_str(), expected_code);
     assert_eq!(diagnostic.location.source, source);
