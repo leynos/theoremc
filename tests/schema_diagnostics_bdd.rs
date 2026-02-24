@@ -6,61 +6,73 @@ use common::load_fixture;
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 
-#[expect(
-    clippy::expect_used,
-    reason = "Tests intentionally use expect-style diagnostics in this helper."
-)]
-fn assert_diagnostic_failure(fixture_name: &str, expected_code: &str, _failure_type: &str) {
+fn assert_diagnostic_failure(fixture_name: &str, expected_code: &str) -> Result<(), String> {
     let source = format!("tests/fixtures/{fixture_name}");
-    let yaml = load_fixture(fixture_name).expect("failed to load fixture");
+    let yaml = load_fixture(fixture_name)
+        .map_err(|error| format!("failed to load fixture {fixture_name}: {error}"))?;
     let error = load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
-        .expect_err("fixture should fail");
-    let diagnostic = error.diagnostic().expect("diagnostic should be present");
+        .err()
+        .ok_or_else(|| format!("fixture should fail: {fixture_name}"))?;
+    let diagnostic = error
+        .diagnostic()
+        .ok_or_else(|| String::from("diagnostic should be present"))?;
 
-    assert_eq!(diagnostic.code.as_str(), expected_code);
-    assert_eq!(diagnostic.location.source, source);
-    assert!(diagnostic.location.line > 0);
-    assert!(diagnostic.location.column > 0);
+    if diagnostic.code.as_str() != expected_code {
+        return Err(format!(
+            "unexpected diagnostic code: expected {expected_code}, got {}",
+            diagnostic.code.as_str()
+        ));
+    }
+    if diagnostic.location.source != source {
+        return Err(format!(
+            "unexpected diagnostic source: expected {source}, got {}",
+            diagnostic.location.source
+        ));
+    }
+    if diagnostic.location.line == 0 {
+        return Err(String::from("diagnostic line should be greater than 0"));
+    }
+    if diagnostic.location.column == 0 {
+        return Err(String::from("diagnostic column should be greater than 0"));
+    }
+
+    Ok(())
 }
 
 #[given("a parser-invalid theorem fixture")]
 fn given_parser_invalid_theorem_fixture() {}
 
 #[then("loading fails with source-located parser diagnostics")]
-fn then_loading_fails_with_source_located_parser_diagnostics() {
-    assert_diagnostic_failure(
-        "invalid_unknown_key.theorem",
-        "schema.parse_failure",
-        "parsing",
-    );
+fn then_loading_fails_with_source_located_parser_diagnostics() -> Result<(), String> {
+    assert_diagnostic_failure("invalid_unknown_key.theorem", "schema.parse_failure")?;
+
+    Ok(())
 }
 
 #[given("a validator-invalid theorem fixture")]
 fn given_validator_invalid_theorem_fixture() {}
 
 #[then("loading fails with source-located validator diagnostics")]
-fn then_loading_fails_with_source_located_validator_diagnostics() {
-    assert_diagnostic_failure(
-        "invalid_empty_about.theorem",
-        "schema.validation_failure",
-        "validation",
-    );
+fn then_loading_fails_with_source_located_validator_diagnostics() -> Result<(), String> {
+    assert_diagnostic_failure("invalid_empty_about.theorem", "schema.validation_failure")?;
+
+    Ok(())
 }
 
 #[given("a valid theorem fixture for diagnostics")]
 fn given_valid_theorem_fixture_for_diagnostics() {}
 
 #[then("loading succeeds with explicit source")]
+#[expect(
+    clippy::expect_used,
+    reason = "Test step uses expect to give direct failure context."
+)]
 fn then_loading_succeeds_with_explicit_source() {
     let source = "tests/fixtures/valid_aliases_and_must.theorem";
-    let yaml = match load_fixture("valid_aliases_and_must.theorem") {
-        Ok(yaml) => yaml,
-        Err(error) => panic!("failed to load fixture: {error}"),
-    };
-    match load_theorem_docs_with_source(&SourceId::new(source), &yaml) {
-        Ok(_) => {}
-        Err(error) => panic!("fixture should parse successfully: {error}"),
-    }
+    let yaml = load_fixture("valid_aliases_and_must.theorem")
+        .expect("failed to load fixture valid_aliases_and_must.theorem");
+    load_theorem_docs_with_source(&SourceId::new(source), &yaml)
+        .expect("failed to parse theorem docs with explicit source");
 }
 
 #[scenario(
