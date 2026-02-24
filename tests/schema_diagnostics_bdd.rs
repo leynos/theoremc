@@ -18,7 +18,7 @@ fn assert_diagnostic_failure(fixture_name: &str, expected_code: &str, failure_ty
     let source = format!("tests/fixtures/{fixture_name}");
     let yaml = match load_fixture(fixture_name) {
         Ok(yaml) => yaml,
-        Err(error) => panic!("failed to load fixture: {error}"),
+        Err(error) => panic!("failed to load fixture {fixture_name}: {error}"),
     };
     let error = match load_theorem_docs_with_source(&SourceId::new(&source), &yaml) {
         Err(error) => error,

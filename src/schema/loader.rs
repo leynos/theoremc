@@ -203,8 +203,8 @@ fn mapping_key_column(line: &str, field: FieldName<'_>) -> Option<usize> {
         return None;
     }
 
-    let leading = line.len() - trimmed.len();
     if is_mapping_key_for_field(trimmed, field) {
+        let leading = line.len() - trimmed.len();
         return Some(leading + 1);
     }
 
