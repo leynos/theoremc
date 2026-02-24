@@ -5,7 +5,7 @@ This Execution Plan (ExecPlan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -84,12 +84,17 @@ Observable success:
 ## Progress
 
 - [x] (2026-02-24 19:29Z) Draft ExecPlan for Step 2.1.1.
-- [ ] Milestone 0: baseline audit and test gap mapping.
-- [ ] Milestone 1: implement canonical action-name validator module.
-- [ ] Milestone 2: integrate validation into `Let` and `Do` action-call paths.
-- [ ] Milestone 3: add unit + behavioural (`rstest-bdd` v0.5.0) coverage.
-- [ ] Milestone 4: update user/design docs and mark roadmap checkbox done.
-- [ ] Milestone 5: run full quality gates and capture logs.
+- [x] (2026-02-24 20:24Z) Milestone 0: baseline audit and test gap mapping.
+- [x] (2026-02-24 20:24Z) Milestone 1: implement canonical action-name
+  validator module.
+- [x] (2026-02-24 20:24Z) Milestone 2: integrate validation into `Let` and
+  `Do` action-call paths.
+- [x] (2026-02-24 20:24Z) Milestone 3: add unit + behavioural
+  (`rstest-bdd` v0.5.0) coverage.
+- [x] (2026-02-24 20:24Z) Milestone 4: update user/design docs and mark
+  roadmap checkbox done.
+- [x] (2026-02-24 20:24Z) Milestone 5: run full quality gates and capture
+  logs.
 
 ## Surprises & discoveries
 
@@ -102,6 +107,18 @@ Observable success:
   environment. Evidence: `list_mcp_resources` and `list_mcp_resource_templates`
   returned empty lists. Impact: planning proceeded from repository docs and
   current code only.
+
+- Observation: `qdrant-find` calls returned
+  `"tools/call failed: Unexpected response type"` even when queried with exact
+  error strings. Evidence: all recall calls (startup and follow-up on lint
+  failure) returned the same tool error. Impact: no project-memory recall was
+  available during implementation.
+
+- Observation: Clippy denied `uninlined_format_args` in
+  `src/schema/action_name.rs`. Evidence: `make lint` failed on
+  `"variables can be used directly in the format! string"` for a named-arg
+  `format!` call. Impact: simplified the `format!` call to inline args; lint
+  then passed.
 
 ## Decision log
 
@@ -116,18 +133,51 @@ Observable success:
   readability, avoids high cognitive complexity in `step.rs`, and creates
   reusable logic for upcoming Step 2.1.2 work. Date/Author: 2026-02-24 / Codex.
 
+- Decision: enforce the canonical grammar's minimum of two segments (at least
+  one dot) now, not as a warning. Rationale: `NMR-1` and `TFS-4` treat
+  canonical dotted names as the accepted grammar shape for deterministic
+  resolution. Date/Author: 2026-02-24 / Codex.
+
 ## Outcomes & retrospective
 
-Pending implementation.
+Step 2.1.1 is complete.
 
-Success criteria at completion:
+Implemented outcomes:
 
-- Canonical action-name grammar and keyword checks enforced for all action
-  references.
-- Regression coverage exists across unit and behavioural tests.
-- Documentation reflects new validation behaviour.
-- Roadmap Step 2.1 first checkbox is marked done.
-- All required quality gates pass.
+- Added canonical action-name validator module:
+  `src/schema/action_name.rs`.
+- Reused shared identifier lexical predicates via new crate-visible helpers in
+  `src/schema/identifier.rs`.
+- Integrated canonical validation into `ActionCall` validation path in
+  `src/schema/step.rs`, which applies to `Let`, `Do`, and nested `maybe.do`.
+- Added new fixtures for malformed and keyword-segment action names:
+  - `tests/fixtures/invalid_action_missing_dot.theorem`
+  - `tests/fixtures/invalid_action_empty_segment.theorem`
+  - `tests/fixtures/invalid_action_keyword_segment.theorem`
+  - `tests/fixtures/invalid_let_action_keyword_segment.theorem`
+- Added behavioural coverage with `rstest-bdd` v0.5.0:
+  - `tests/features/schema_action_name.feature`
+  - `tests/schema_action_name_bdd.rs`
+- Extended `tests/schema_bdd.rs` invalid-step/let cases to include canonical
+  grammar and keyword-segment failures.
+- Updated user/design/roadmap docs:
+  - `docs/users-guide.md`
+  - `docs/theoremc-design.md`
+  - `docs/roadmap.md` (Step 2.1.1 checkbox marked done)
+
+Quality-gate result:
+
+- Documentation gates: `make fmt`, `make markdownlint`, `make nixie` passed.
+- Rust gates: `make check-fmt`, `make lint`, and `make test` passed.
+- Test suite now includes 118 unit tests in `src/lib.rs`, plus the new
+  `schema_action_name_bdd` behavioural scenarios.
+
+Retrospective:
+
+- Isolating canonical grammar in its own module avoided bloating `step.rs` and
+  keeps Step 2.1.2 (mangling + resolution) implementation-ready.
+- Reusing shared identifier predicates kept lexical rules consistent across
+  theorem identifiers and action segments, reducing drift risk.
 
 ## Context and orientation
 
@@ -366,3 +416,9 @@ Dependency stance for this sub-step:
 - No new dependencies.
 - Reuse existing `identifier`/keyword logic to keep lexical rules consistent
   across theorem-name and action-segment validation.
+
+Revision note (2026-02-24): Updated status from `DRAFT` to `COMPLETE`, marked
+all milestones done with timestamps, recorded implementation discoveries
+(qdrant tool failures and clippy formatting constraint), and replaced
+placeholder outcomes with concrete delivered artefacts, documentation updates,
+and passing gate results.

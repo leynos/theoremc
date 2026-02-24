@@ -1,0 +1,16 @@
+Theorem: InvalidActionMissingDot
+About: Action names must include at least one namespace separator.
+Do:
+  - call:
+      action: deposit
+      args: {}
+Prove:
+  - assert: "true"
+    because: placeholder assertion
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: placeholder witness

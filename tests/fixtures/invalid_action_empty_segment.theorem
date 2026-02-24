@@ -1,0 +1,16 @@
+Theorem: InvalidActionEmptySegment
+About: Action names must not contain empty dot-separated segments.
+Do:
+  - call:
+      action: account..deposit
+      args: {}
+Prove:
+  - assert: "true"
+    because: placeholder assertion
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: placeholder witness

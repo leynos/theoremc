@@ -787,6 +787,25 @@ diagnostics and parser regression corpus work (Step 1.3 of the roadmap):
   witness policy scenarios, and behavioural tests with `rstest-bdd` v0.5.0 for
   source-located diagnostics behaviour.
 
+### 6.7.3 Implementation decisions (Step 2.1.1)
+
+The following decisions were taken during implementation of canonical
+action-name validation (Step 2.1.1 of the roadmap):
+
+- Canonical action-name grammar is now enforced during schema validation for
+  every `ActionCall.action` path (`Let`, `Do`, and nested `maybe.do`):
+  `Segment ("." Segment)+`. This means at least one `.` is required, and empty
+  segments are rejected.
+- Segment-level checks reuse the existing identifier lexical predicates from
+  `src/schema/identifier.rs`, ensuring theorem identifiers and action-name
+  segments stay aligned on ASCII identifier and Rust keyword rules.
+- A dedicated `src/schema/action_name.rs` module isolates canonical action-name
+  checks from step-shape checks in `src/schema/step.rs`, keeping complexity low
+  and preserving headroom under the 400-line limit.
+- Behavioural coverage for this step uses `rstest-bdd` v0.5.0 with a dedicated
+  feature file and scenarios for canonical happy path, malformed names, and
+  reserved-keyword segments.
+
 ### 6.8 Localized diagnostics contract (ADR 002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:

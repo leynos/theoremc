@@ -191,7 +191,7 @@ detection, and binding to `crate::theorem_actions`.
 
 Out of scope: runtime action registries.
 
-- [ ] Implement canonical action-name validation for dot-separated segments with
+- [x] Implement canonical action-name validation for dot-separated segments with
   per-segment identifier and keyword rules. Acceptance: tests reject malformed
   names and reserved-keyword segments. Signposts: `NMR-1`, `TFS-4`, `ADR-1`.
 - [ ] Implement action mangling (`segment_escape`, `action_slug`,

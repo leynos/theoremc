@@ -1,0 +1,16 @@
+Theorem: InvalidActionKeywordSegment
+About: Action-name segments must not use Rust reserved keywords.
+Do:
+  - call:
+      action: account.fn
+      args: {}
+Prove:
+  - assert: "true"
+    because: placeholder assertion
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: placeholder witness
