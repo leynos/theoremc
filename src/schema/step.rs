@@ -2,15 +2,18 @@
 //! `MaybeBlock`, and `ActionCall` shapes.
 //!
 //! These checks enforce constraints that `serde` attributes cannot express,
-//! such as "action name must be non-empty" and "maybe.do must contain at
-//! least one step". The functions return `Result<(), String>` so the
-//! caller in [`super::validate`] can attach theorem-level context when
-//! constructing [`super::error::SchemaError`].
+//! such as "action name must be non-empty", "action names must follow
+//! canonical dot-path grammar", and "maybe.do must contain at least one
+//! step". The functions return `Result<(), String>` so the caller in
+//! [`super::validate`] can attach theorem-level context when constructing
+//! [`super::error::SchemaError`].
 
+use super::action_name::validate_canonical_action_name;
+use super::error::SchemaError;
 use super::types::{ActionCall, Step};
 
 /// Validates that an action call's `action` field is non-empty after
-/// trimming.
+/// trimming and satisfies canonical dot-path grammar rules.
 ///
 /// Returns `Ok(())` if valid, or `Err(reason)` with a human-readable
 /// reason string.
@@ -30,7 +33,15 @@ pub(crate) fn validate_action_call(action_call: &ActionCall) -> Result<(), Strin
     if action_call.action.trim().is_empty() {
         return Err("action must be non-empty after trimming".to_owned());
     }
+    validate_canonical_action_name(&action_call.action).map_err(action_name_error_reason)?;
     Ok(())
+}
+
+fn action_name_error_reason(error: SchemaError) -> String {
+    match error {
+        SchemaError::InvalidActionName { reason, .. } => reason,
+        other => other.to_string(),
+    }
 }
 
 /// Validates a list of steps, used for both top-level `Do` and nested
@@ -160,7 +171,7 @@ mod tests {
     #[rstest]
     #[case::non_empty("account.deposit")]
     #[case::dotted("hnsw.attach_node")]
-    #[case::single_segment("deposit")]
+    #[case::with_underscore("hnsw.graph_with_capacity")]
     fn action_call_with_valid_action_passes(#[case] name: &str) {
         let ac = action(name);
         assert!(validate_action_call(&ac).is_ok());
@@ -177,6 +188,16 @@ mod tests {
             err.contains("action must be non-empty"),
             "expected 'action must be non-empty', got: {err}"
         );
+    }
+
+    #[rstest]
+    #[case::missing_dot("deposit", "dot-separated canonical name")]
+    #[case::double_dot("account..deposit", "segment 2 must be non-empty")]
+    #[case::keyword_segment("account.fn", "Rust reserved keyword")]
+    fn action_call_with_non_canonical_action_fails(#[case] name: &str, #[case] expected: &str) {
+        let ac = action(name);
+        let err = validate_action_call(&ac).expect_err("should fail");
+        assert!(err.contains(expected), "expected '{expected}', got: {err}");
     }
 
     // ── Step list validation ──────────────────────────────────────

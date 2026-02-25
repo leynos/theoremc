@@ -54,7 +54,7 @@ pub fn validate_identifier(s: &str) -> Result<(), SchemaError> {
         });
     }
 
-    if !is_valid_identifier_pattern(s) {
+    if !is_valid_ascii_identifier_pattern(s) {
         return Err(SchemaError::InvalidIdentifier {
             identifier: s.to_owned(),
             reason: concat!(
@@ -67,7 +67,7 @@ pub fn validate_identifier(s: &str) -> Result<(), SchemaError> {
         });
     }
 
-    if is_rust_keyword(s) {
+    if is_rust_reserved_keyword(s) {
         return Err(SchemaError::InvalidIdentifier {
             identifier: s.to_owned(),
             reason: concat!(
@@ -83,7 +83,7 @@ pub fn validate_identifier(s: &str) -> Result<(), SchemaError> {
 
 /// Returns `true` if the string matches `^[A-Za-z_][A-Za-z0-9_]*$`.
 #[must_use]
-fn is_valid_identifier_pattern(s: &str) -> bool {
+pub(crate) fn is_valid_ascii_identifier_pattern(s: &str) -> bool {
     let mut chars = s.chars();
     let Some(first) = chars.next() else {
         return false;
@@ -96,7 +96,7 @@ fn is_valid_identifier_pattern(s: &str) -> bool {
 
 /// Returns `true` if the string is a Rust reserved keyword.
 #[must_use]
-fn is_rust_keyword(s: &str) -> bool {
+pub(crate) fn is_rust_reserved_keyword(s: &str) -> bool {
     RUST_KEYWORDS.contains(&s)
 }
 

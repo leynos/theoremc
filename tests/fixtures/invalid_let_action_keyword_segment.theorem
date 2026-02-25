@@ -1,0 +1,21 @@
+Theorem: InvalidLetActionKeywordSegment
+About: Let binding actions also enforce canonical segment rules.
+Let:
+  params:
+    must:
+      action: account.fn
+      args: {}
+Do:
+  - call:
+      action: account.deposit
+      args: {}
+Prove:
+  - assert: "true"
+    because: placeholder assertion
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: placeholder witness
