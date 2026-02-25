@@ -2,10 +2,11 @@
 //! `MaybeBlock`, and `ActionCall` shapes.
 //!
 //! These checks enforce constraints that `serde` attributes cannot express,
-//! such as "action name must be non-empty" and "maybe.do must contain at
-//! least one step". The functions return `Result<(), String>` so the
-//! caller in [`super::validate`] can attach theorem-level context when
-//! constructing [`super::error::SchemaError`].
+//! such as "action name must be non-empty", "action names must follow
+//! canonical dot-path grammar", and "maybe.do must contain at least one
+//! step". The functions return `Result<(), String>` so the caller in
+//! [`super::validate`] can attach theorem-level context when constructing
+//! [`super::error::SchemaError`].
 
 use super::action_name::validate_canonical_action_name;
 use super::error::SchemaError;
@@ -38,8 +39,7 @@ pub(crate) fn validate_action_call(action_call: &ActionCall) -> Result<(), Strin
 
 fn action_name_error_reason(error: SchemaError) -> String {
     match error {
-        SchemaError::InvalidActionName { reason, .. }
-        | SchemaError::ValidationFailed { reason, .. } => reason,
+        SchemaError::InvalidActionName { reason, .. } => reason,
         other => other.to_string(),
     }
 }

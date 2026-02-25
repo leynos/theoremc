@@ -74,6 +74,8 @@ fn invalid_action_name_error(name: &str, reason: String) -> SchemaError {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for canonical action-name parsing and validation behaviour.
+
     use rstest::rstest;
 
     use crate::schema::error::SchemaError;
