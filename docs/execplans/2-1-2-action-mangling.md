@@ -121,8 +121,10 @@ Observable success:
   produced unresolved link warnings. Impact: replaced `[`fn_name`]` with
   plain `` `fn_name` `` in module-level documentation.
 
-- Observation: rustdoc link `[`validate_canonical_action_name`](crate::schema::action_name)` fails because `action_name` is
-  a private module. Evidence: `cargo doc --no-deps` warned about missing item.
+- Observation: rustdoc link
+  `` [`validate_canonical_action_name`](crate::schema::action_name) ``
+  fails because `action_name` is a private module. Evidence:
+  `cargo doc --no-deps` warned about missing item.
   Impact: replaced with plain prose reference to avoid coupling public docs to
   private module paths.
 
