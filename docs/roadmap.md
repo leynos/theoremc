@@ -194,7 +194,7 @@ Out of scope: runtime action registries.
 - [x] Implement canonical action-name validation for dot-separated segments with
   per-segment identifier and keyword rules. Acceptance: tests reject malformed
   names and reserved-keyword segments. Signposts: `NMR-1`, `TFS-4`, `ADR-1`.
-- [ ] Implement action mangling (`segment_escape`, `action_slug`,
+- [x] Implement action mangling (`segment_escape`, `action_slug`,
   `hash12(blake3)`) and canonical path resolution into
   `crate::theorem_actions`. Acceptance: golden tests cover representative names
   and underscore edge cases. Signposts: `NMR-1`, `ADR-1`, `DES-5`.
