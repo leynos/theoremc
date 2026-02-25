@@ -23,6 +23,15 @@ pub enum SchemaError {
         reason: String,
     },
 
+    /// An action name failed canonical grammar or keyword validation.
+    #[error("invalid action name '{action}': {reason}")]
+    InvalidActionName {
+        /// The action name string that failed validation.
+        action: String,
+        /// A human-readable explanation of why the action name is invalid.
+        reason: String,
+    },
+
     /// A structural constraint was violated after deserialization.
     #[error("validation failed for theorem '{theorem}': {reason}")]
     ValidationFailed {
@@ -43,7 +52,7 @@ impl SchemaError {
             Self::Deserialize { diagnostic, .. } | Self::ValidationFailed { diagnostic, .. } => {
                 diagnostic.as_ref()
             }
-            Self::InvalidIdentifier { .. } => None,
+            Self::InvalidIdentifier { .. } | Self::InvalidActionName { .. } => None,
         }
     }
 }

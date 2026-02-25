@@ -38,7 +38,8 @@ pub(crate) fn validate_action_call(action_call: &ActionCall) -> Result<(), Strin
 
 fn action_name_error_reason(error: SchemaError) -> String {
     match error {
-        SchemaError::ValidationFailed { reason, .. } => reason,
+        SchemaError::InvalidActionName { reason, .. }
+        | SchemaError::ValidationFailed { reason, .. } => reason,
         other => other.to_string(),
     }
 }

@@ -66,16 +66,17 @@ fn validate_segment(name: &str, segment: &str, position: usize) -> Result<(), Sc
 }
 
 fn invalid_action_name_error(name: &str, reason: String) -> SchemaError {
-    SchemaError::ValidationFailed {
-        theorem: name.to_owned(),
+    SchemaError::InvalidActionName {
+        action: name.to_owned(),
         reason,
-        diagnostic: None,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use rstest::rstest;
+
+    use crate::schema::error::SchemaError;
 
     use super::validate_canonical_action_name;
 
@@ -115,5 +116,17 @@ mod tests {
             message.contains("Rust reserved keyword"),
             "expected keyword error, got: {message}"
         );
+    }
+
+    #[test]
+    fn malformed_action_name_returns_invalid_action_name_error() {
+        let error = validate_canonical_action_name("deposit").expect_err("should fail");
+        match error {
+            SchemaError::InvalidActionName { action, reason } => {
+                assert_eq!(action, "deposit");
+                assert!(reason.contains("dot-separated canonical name"));
+            }
+            other => panic!("expected InvalidActionName, got {other}"),
+        }
     }
 }
