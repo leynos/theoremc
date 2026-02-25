@@ -55,5 +55,6 @@
     - ExecPlan for vacuity policy defaults and override validation.
   - [Step 1.3.1: Structured diagnostics for parser failures](execplans/1-3-1-structured-diagnostics-for-parser-failures.md)
     - ExecPlan for source-located diagnostics and parser regression fixtures.
-  - [Step 2.1.1: Canonical action-name validation](execplans/2-1-1-canonical-action-name-validation.md)
+  - [Step 2.1.1: Canonical action-name
+    validation](execplans/2-1-1-canonical-action-name-validation.md)
     - ExecPlan for dot-separated action-name grammar and keyword validation.

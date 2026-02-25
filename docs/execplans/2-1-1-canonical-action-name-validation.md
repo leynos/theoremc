@@ -331,36 +331,46 @@ Run from repository root: `/home/user/project`.
 
 1. Baseline and focused verification:
 
-       set -o pipefail
-       make test 2>&1 | tee /tmp/2-1-1-baseline-test.log
+   ```shell
+   set -o pipefail
+   make test 2>&1 | tee /tmp/2-1-1-baseline-test.log
+   ```
 
    Expected signal: existing suite passes before changes.
 
 2. After code + test edits, run formatting gate:
 
-       set -o pipefail
-       make check-fmt 2>&1 | tee /tmp/2-1-1-check-fmt.log
+   ```shell
+   set -o pipefail
+   make check-fmt 2>&1 | tee /tmp/2-1-1-check-fmt.log
+   ```
 
    Expected signal: formatter check exits 0.
 
 3. Run lint gate:
 
-       set -o pipefail
-       make lint 2>&1 | tee /tmp/2-1-1-lint.log
+   ```shell
+   set -o pipefail
+   make lint 2>&1 | tee /tmp/2-1-1-lint.log
+   ```
 
    Expected signal: rustdoc + clippy exit 0 with no denied warnings.
 
 4. Run full tests:
 
-       set -o pipefail
-       make test 2>&1 | tee /tmp/2-1-1-test.log
+   ```shell
+   set -o pipefail
+   make test 2>&1 | tee /tmp/2-1-1-test.log
+   ```
 
    Expected signal: all tests pass, including new action-name unit and
    behavioural tests.
 
 5. Review logs for deterministic proof of success:
 
-       rg -n "error:|FAILED|failures:" /tmp/2-1-1-*.log
+   ```shell
+   rg -n "error:|FAILED|failures:" /tmp/2-1-1-*.log
+   ```
 
    Expected signal: no failure markers found.
 
