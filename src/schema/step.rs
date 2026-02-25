@@ -8,6 +8,7 @@
 //! constructing [`super::error::SchemaError`].
 
 use super::action_name::validate_canonical_action_name;
+use super::error::SchemaError;
 use super::types::{ActionCall, Step};
 
 /// Validates that an action call's `action` field is non-empty after
@@ -31,8 +32,15 @@ pub(crate) fn validate_action_call(action_call: &ActionCall) -> Result<(), Strin
     if action_call.action.trim().is_empty() {
         return Err("action must be non-empty after trimming".to_owned());
     }
-    validate_canonical_action_name(&action_call.action)?;
+    validate_canonical_action_name(&action_call.action).map_err(action_name_error_reason)?;
     Ok(())
+}
+
+fn action_name_error_reason(error: SchemaError) -> String {
+    match error {
+        SchemaError::ValidationFailed { reason, .. } => reason,
+        other => other.to_string(),
+    }
 }
 
 /// Validates a list of steps, used for both top-level `Do` and nested

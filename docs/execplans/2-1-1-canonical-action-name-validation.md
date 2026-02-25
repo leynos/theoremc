@@ -103,10 +103,10 @@ Observable success:
   Impact: rely on existing `rstest-bdd` usage in `tests/schema_vacuity_bdd.rs`
   and `tests/schema_diagnostics_bdd.rs` as local implementation reference.
 
-- Observation: project-memory MCP/qdrant resources are not available in this
-  environment. Evidence: `list_mcp_resources` and `list_mcp_resource_templates`
-  returned empty lists. Impact: planning proceeded from repository docs and
-  current code only.
+- Observation: project-memory Model Context Protocol (MCP)/qdrant resources
+  are not available in this environment. Evidence: `list_mcp_resources` and
+  `list_mcp_resource_templates` returned empty lists. Impact: planning
+  proceeded from repository docs and current code only.
 
 - Observation: `qdrant-find` calls returned
   `"tools/call failed: Unexpected response type"` even when queried with exact
@@ -227,7 +227,7 @@ validation.
 
 Planned interface:
 
-- `pub(crate) fn validate_canonical_action_name(name: &str) -> Result<(), String>`
+- `pub(crate) fn validate_canonical_action_name(name: &str) -> Result<(), SchemaError>`
 
 Validation rules to enforce:
 
@@ -390,7 +390,7 @@ Quality criteria:
 - If scope exceeds tolerances, stop and record escalation options in
   `Decision Log` before continuing.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Expected new/updated artefacts during implementation:
 
@@ -408,7 +408,7 @@ Expected new/updated artefacts during implementation:
 Planned internal interfaces:
 
 - `crate::schema::action_name::validate_canonical_action_name(&str)` returns a
-  deterministic `Result<(), String>` used by
+  deterministic `Result<(), SchemaError>` used by
   `crate::schema::step::validate_action_call`.
 
 Dependency stance for this sub-step:

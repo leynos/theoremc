@@ -4,6 +4,7 @@
 //! follows the restricted ASCII identifier pattern and is not a Rust reserved
 //! keyword.
 
+use super::error::SchemaError;
 use super::identifier::{is_rust_reserved_keyword, is_valid_ascii_identifier_pattern};
 
 const CANONICAL_ACTION_HINT: &str =
@@ -17,42 +18,59 @@ const CANONICAL_ACTION_HINT: &str =
 /// - has no empty segments,
 /// - uses only segments matching `^[A-Za-z_][A-Za-z0-9_]*$`,
 /// - and has no Rust reserved-keyword segment.
-pub(crate) fn validate_canonical_action_name(name: &str) -> Result<(), String> {
-    let segments: Vec<&str> = name.split('.').collect();
-    if segments.len() < 2 {
-        return Err(CANONICAL_ACTION_HINT.to_owned());
+pub(crate) fn validate_canonical_action_name(name: &str) -> Result<(), SchemaError> {
+    if !name.contains('.') {
+        return Err(invalid_action_name_error(
+            name,
+            CANONICAL_ACTION_HINT.to_owned(),
+        ));
     }
 
-    for (index, segment) in segments.iter().enumerate() {
-        validate_segment(segment, index + 1)?;
+    for (index, segment) in name.split('.').enumerate() {
+        validate_segment(name, segment, index + 1)?;
     }
 
     Ok(())
 }
 
-fn validate_segment(segment: &str, position: usize) -> Result<(), String> {
+fn validate_segment(name: &str, segment: &str, position: usize) -> Result<(), SchemaError> {
     if segment.is_empty() {
-        return Err(format!("action segment {position} must be non-empty"));
+        return Err(invalid_action_name_error(
+            name,
+            format!("action segment {position} must be non-empty"),
+        ));
     }
 
     if !is_valid_ascii_identifier_pattern(segment) {
-        return Err(format!(
-            concat!(
-                "action segment {position} ('{segment}') must match ",
-                "identifier pattern ^[A-Za-z_][A-Za-z0-9_]*"
+        return Err(invalid_action_name_error(
+            name,
+            format!(
+                concat!(
+                    "action segment {position} ('{segment}') must match ",
+                    "identifier pattern ^[A-Za-z_][A-Za-z0-9_]*"
+                ),
+                position = position,
+                segment = segment,
             ),
-            position = position,
-            segment = segment,
         ));
     }
 
     if is_rust_reserved_keyword(segment) {
-        return Err(format!(
-            "action segment {position} ('{segment}') must not be a Rust reserved keyword"
+        return Err(invalid_action_name_error(
+            name,
+            format!("action segment {position} ('{segment}') must not be a Rust reserved keyword"),
         ));
     }
 
     Ok(())
+}
+
+fn invalid_action_name_error(name: &str, reason: String) -> SchemaError {
+    SchemaError::ValidationFailed {
+        theorem: name.to_owned(),
+        reason,
+        diagnostic: None,
+    }
 }
 
 #[cfg(test)]
@@ -79,9 +97,10 @@ mod tests {
     #[case::leading_whitespace(" account.deposit", "must match identifier pattern")]
     fn malformed_canonical_action_name_fails(#[case] name: &str, #[case] expected: &str) {
         let error = validate_canonical_action_name(name).expect_err("should fail");
+        let message = error.to_string();
         assert!(
-            error.contains(expected),
-            "expected '{expected}' in '{error}'"
+            message.contains(expected),
+            "expected '{expected}' in '{message}'"
         );
     }
 
@@ -91,9 +110,10 @@ mod tests {
     #[case::third_segment("graph.path.type")]
     fn keyword_segment_fails(#[case] name: &str) {
         let error = validate_canonical_action_name(name).expect_err("should fail");
+        let message = error.to_string();
         assert!(
-            error.contains("Rust reserved keyword"),
-            "expected keyword error, got: {error}"
+            message.contains("Rust reserved keyword"),
+            "expected keyword error, got: {message}"
         );
     }
 }
