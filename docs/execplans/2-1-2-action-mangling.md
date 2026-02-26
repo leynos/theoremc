@@ -11,14 +11,13 @@ Status: COMPLETE
 
 Implement Roadmap Phase 2, Step 2.1, second acceptance item: deterministic,
 injective action name mangling (`segment_escape`, `action_slug`,
-`hash12(blake3)`) and canonical path resolution into
-`crate::theorem_actions`.
+`hash12(blake3)`) and canonical path resolution into `crate::theorem_actions`.
 
-After this change, library consumers can transform a validated canonical
-action name (e.g., `account.deposit`) into a stable mangled Rust identifier
-(`account__deposit__h05158894bfb4`) that resolves to a fully qualified path
-in `crate::theorem_actions`. The mangling is injective: different canonical
-names always produce different identifiers.
+After this change, library consumers can transform a validated canonical action
+name (e.g., `account.deposit`) into a stable mangled Rust identifier
+(`account__deposit__h05158894bfb4`) that resolves to a fully qualified path in
+`crate::theorem_actions`. The mangling is injective: different canonical names
+always produce different identifiers.
 
 This fulfils signposts `NMR-1`, `ADR-1`, and `DES-5` for the mangling slice.
 Collision detection remains a separate follow-up step (roadmap Step 2.1.3).
@@ -69,13 +68,13 @@ Observable success:
 ## Risks
 
 - Risk: blake3 dependency adds compile time. Severity: low. Likelihood: low.
-  Mitigation: blake3 is well-optimised; measure before/after if significant.
+  Mitigation: blake3 is well-optimized; measure before/after if significant.
 
 - Risk: Clippy lint `string_slice = "deny"` triggered by hash hex slicing.
   Severity: medium. Likelihood: medium. Mitigation: use
   `.get(..12).unwrap_or_default()` instead of `&hex[..12]`.
 
-- Risk: Clippy lint `too_many_arguments` triggered by rstest parameterised
+- Risk: Clippy lint `too_many_arguments` triggered by rstest parameterized
   golden tests. Severity: medium. Likelihood: high. Mitigation: use a helper
   struct (`Golden`) instead of 5+ function parameters.
 
@@ -108,33 +107,32 @@ Observable success:
 ## Surprises & discoveries
 
 - Observation: Clippy lint `too_many_arguments` is triggered by rstest
-  parameterised test functions with 5+ `#[case]` parameters, because rstest
+  parameterized test functions with 5+ `#[case]` parameters, because rstest
   expands each case set into a function with that many arguments. Evidence:
   `make lint` failed with `too-many-arguments` on the `golden_mangle` test
   function. Impact: refactored golden tests to use a `Golden` helper struct
-  whose `assert()` method validates all fields, keeping each test function
-  at zero parameters.
+  whose `assert()` method validates all fields, keeping each test function at
+  zero parameters.
 
 - Observation: rustdoc intra-doc links like
-  `[`segment_escape`]` in module-level `//!` comments do not
-  resolve when `cargo doc` runs. Evidence: `RUSTDOCFLAGS="-D warnings"`
-  produced unresolved link warnings. Impact: replaced `[`fn_name`]` with
-  plain `` `fn_name` `` in module-level documentation.
+  `[`segment_escape`]` in module-level `//!` comments do not resolve when
+  `cargo doc` runs. Evidence: `RUSTDOCFLAGS="-D warnings"` produced unresolved
+  link warnings. Impact: replaced `[`fn_name`]` with plain `` `fn_name` `` in
+  module-level documentation.
 
 - Observation: rustdoc link
-  `` [`validate_canonical_action_name`](crate::schema::action_name) ``
-  fails because `action_name` is a private module. Evidence:
-  `cargo doc --no-deps` warned about missing item.
-  Impact: replaced with plain prose reference to avoid coupling public docs to
-  private module paths.
+  `` [`validate_canonical_action_name`](crate::schema::action_name) `` fails
+  because `action_name` is a private module. Evidence: `cargo doc --no-deps`
+  warned about missing item. Impact: replaced with plain prose reference to
+  avoid coupling public docs to private module paths.
 
 ## Decision log
 
 - Decision: place mangling in a new top-level `src/mangle.rs` module, not
   inside `src/schema/`. Rationale: mangling is an action-resolution concern,
   not a schema concern (ADR-003 boundary rules). The `schema` module validates
-  action name grammar; the `mangle` module transforms validated names into
-  Rust identifiers. Keeping them separate preserves architectural boundaries.
+  action name grammar; the `mangle` module transforms validated names into Rust
+  identifiers. Keeping them separate preserves architectural boundaries.
   Date/Author: 2026-02-25 / DevBoxer.
 
 - Decision: all mangling functions are infallible (return concrete types, not
@@ -150,15 +148,15 @@ Observable success:
 
 - Decision: expose `segment_escape`, `action_slug`, and `hash12` as public
   functions. Rationale: Step 2.2 (harness naming) reuses `hash12` and
-  downstream consumers may need the building blocks. A public API is cheaper
-  to narrow later than to broaden. Date/Author: 2026-02-25 / DevBoxer.
+  downstream consumers may need the building blocks. A public API is cheaper to
+  narrow later than to broaden. Date/Author: 2026-02-25 / DevBoxer.
 
 - Decision: use a `Golden` helper struct for golden tests instead of rstest
-  parameterised cases with 5 parameters. Rationale: Clippy denies
+  parameterized cases with 5 parameters. Rationale: Clippy denies
   `too_many_arguments` and rstest expands each case set into a function whose
   argument count equals the number of `#[case]` parameters. A struct keeps the
-  test data cohesive and the function signature at zero parameters. Date/Author:
-  2026-02-25 / DevBoxer.
+  test data cohesive and the function signature at zero parameters.
+  Date/Author: 2026-02-25 / DevBoxer.
 
 ## Outcomes & retrospective
 
@@ -270,7 +268,7 @@ Create `src/mangle.rs` with:
 - `action_slug(canonical_name: &str) -> String` — split, escape, join.
 - `hash12(value: &str) -> String` — blake3 first 12 hex chars.
 - `mangle_action_name(canonical_name: &str) -> MangledAction` — composite.
-- Comprehensive `#[cfg(test)]` section with rstest parameterised cases and
+- Comprehensive `#[cfg(test)]` section with rstest parameterized cases and
   golden tests.
 
 Wire into `src/lib.rs` with `pub mod mangle;`.
@@ -302,8 +300,8 @@ Go/no-go check: documentation reflects actual implemented behaviour.
 
 ### Milestone 6: quality gates
 
-Run `make check-fmt`, `make lint`, `make test` with `set -o pipefail` and
-`tee` for log capture.
+Run `make check-fmt`, `make lint`, `make test` with `set -o pipefail` and `tee`
+for log capture.
 
 Go/no-go check: all three gates pass with zero errors and zero warnings.
 
@@ -345,8 +343,8 @@ Run from repository root: `/home/user/project`.
    make test 2>&1 | tee /tmp/2-1-2-test.log
    ```
 
-   Expected signal: all tests pass, including 33 new mangle unit tests and
-   3 new BDD scenarios.
+   Expected signal: all tests pass, including 33 new mangle unit tests and 3
+   new BDD scenarios.
 
 5. Review logs:
 

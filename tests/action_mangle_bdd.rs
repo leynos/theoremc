@@ -1,7 +1,7 @@
 //! Behavioural tests for action name mangling.
 
 use rstest_bdd_macros::{given, scenario, then};
-use theoremc::mangle::{hash12, mangle_action_name};
+use theoremc::mangle::{RESOLUTION_TARGET, hash12, mangle_action_name};
 
 #[given("representative canonical action names")]
 fn given_representative_canonical_action_names() {}
@@ -67,10 +67,11 @@ fn then_the_resolution_path_begins_with_resolution_target() {
         "_a._b",
     ];
 
+    let prefix = format!("{RESOLUTION_TARGET}::");
     for name in &names {
         let m = mangle_action_name(name);
         assert!(
-            m.path().starts_with("crate::theorem_actions::"),
+            m.path().starts_with(&prefix),
             "path for {name} must start with resolution target: {}",
             m.path(),
         );

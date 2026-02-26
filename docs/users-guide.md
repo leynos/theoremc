@@ -278,6 +278,28 @@ snapshot assertions, or editor integration.
 All variants produce actionable error messages suitable for display to theorem
 authors.
 
+### Minimal example
+
+```yaml
+Theorem: DepositInvariant
+About: Depositing into an account preserves the balance invariant.
+Forall:
+  amount: u64
+Assume:
+  - expr: "amount <= u64::MAX - balance"
+    because: "prevent overflow"
+Witness:
+  - cover: "amount == 50"
+    because: "mid-range deposit is exercised"
+Prove:
+  - assert: "new_balance == balance + amount"
+    because: "deposit adds exactly the deposited amount"
+Evidence:
+  kani:
+    unwind: 10
+    expect: SUCCESS
+```
+
 ## Action name mangling
 
 The `theoremc::mangle` module provides deterministic, injective transformation
@@ -330,27 +352,5 @@ The individual building blocks are also public for reuse:
 
 The escaping rule ensures that different canonical action names always produce
 different mangled identifiers. For example, `a.b_c` (slug: `a__b_uc`) and
-`a_b.c` (slug: `a_ub__c`) produce distinct slugs because `_` is escaped to
-`_u` while segment boundaries use `__`.
-
-### Minimal example
-
-```yaml
-Theorem: DepositInvariant
-About: Depositing into an account preserves the balance invariant.
-Forall:
-  amount: u64
-Assume:
-  - expr: "amount <= u64::MAX - balance"
-    because: "prevent overflow"
-Witness:
-  - cover: "amount == 50"
-    because: "mid-range deposit is exercised"
-Prove:
-  - assert: "new_balance == balance + amount"
-    because: "deposit adds exactly the deposited amount"
-Evidence:
-  kani:
-    unwind: 10
-    expect: SUCCESS
-```
+`a_b.c` (slug: `a_ub__c`) produce distinct slugs because `_` is escaped to `_u`
+while segment boundaries use `__`.

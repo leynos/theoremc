@@ -16,7 +16,11 @@
 //!    resolution path.
 
 /// The module path into which mangled action identifiers resolve.
-const RESOLUTION_TARGET: &str = "crate::theorem_actions";
+///
+/// All mangled action names resolve to identifiers within this module.
+/// Use this constant (or [`MangledAction::path`]) instead of
+/// hard-coding the resolution target string.
+pub const RESOLUTION_TARGET: &str = "crate::theorem_actions";
 
 /// The result of mangling a canonical action name.
 ///
@@ -135,11 +139,16 @@ pub fn segment_escape(segment: &str) -> String {
 ///     );
 #[must_use]
 pub fn action_slug(canonical_name: &str) -> String {
-    canonical_name
-        .split('.')
-        .map(segment_escape)
-        .collect::<Vec<_>>()
-        .join("__")
+    let mut slug = String::with_capacity(canonical_name.len() * 2);
+    let mut segments = canonical_name.split('.');
+    if let Some(first) = segments.next() {
+        slug.push_str(&segment_escape(first));
+    }
+    for segment in segments {
+        slug.push_str("__");
+        slug.push_str(&segment_escape(segment));
+    }
+    slug
 }
 
 /// Computes the first 12 lowercase hex characters of the blake3 hash
@@ -204,8 +213,6 @@ mod tests {
 
     use super::*;
 
-    // ── segment_escape ─────────────────────────────────────────────
-
     #[rstest]
     #[case::no_underscores("deposit", "deposit")]
     #[case::single_underscore("attach_node", "attach_unode")]
@@ -221,8 +228,6 @@ mod tests {
         assert_eq!(segment_escape(input), expected);
     }
 
-    // ── action_slug ────────────────────────────────────────────────
-
     #[rstest]
     #[case::two_segments("account.deposit", "account__deposit")]
     #[case::underscore_segment("hnsw.attach_node", "hnsw__attach_unode")]
@@ -233,8 +238,6 @@ mod tests {
     fn action_slug_cases(#[case] input: &str, #[case] expected: &str) {
         assert_eq!(action_slug(input), expected);
     }
-
-    // ── hash12 ─────────────────────────────────────────────────────
 
     #[rstest]
     #[case::account_deposit("account.deposit", "05158894bfb4")]
@@ -274,18 +277,16 @@ mod tests {
         assert_eq!(first, second);
     }
 
-    // ── mangle_action_name golden tests ────────────────────────────
-
     /// Expected golden values for a mangled action name.
-    struct Golden {
-        canonical: &'static str,
-        slug: &'static str,
-        hash: &'static str,
-        identifier: &'static str,
-        path: &'static str,
+    struct Golden<'a> {
+        canonical: &'a str,
+        slug: &'a str,
+        hash: &'a str,
+        identifier: &'a str,
+        path: &'a str,
     }
 
-    impl Golden {
+    impl Golden<'_> {
         fn assert(&self) {
             let m = mangle_action_name(self.canonical);
             assert_eq!(m.slug(), self.slug, "slug");
@@ -295,6 +296,12 @@ mod tests {
         }
     }
 
+    /// Builds the expected resolution path from `RESOLUTION_TARGET`
+    /// and the given identifier, so the target is not duplicated.
+    fn expected_path(identifier: &str) -> String {
+        format!("{RESOLUTION_TARGET}::{identifier}")
+    }
+
     #[test]
     fn golden_account_deposit() {
         Golden {
@@ -302,7 +309,7 @@ mod tests {
             slug: "account__deposit",
             hash: "05158894bfb4",
             identifier: "account__deposit__h05158894bfb4",
-            path: "crate::theorem_actions::account__deposit__h05158894bfb4",
+            path: &expected_path("account__deposit__h05158894bfb4"),
         }
         .assert();
     }
@@ -314,10 +321,7 @@ mod tests {
             slug: "hnsw__attach_unode",
             hash: "8d74e77b55f2",
             identifier: "hnsw__attach_unode__h8d74e77b55f2",
-            path: concat!(
-                "crate::theorem_actions::",
-                "hnsw__attach_unode__h8d74e77b55f2",
-            ),
+            path: &expected_path("hnsw__attach_unode__h8d74e77b55f2"),
         }
         .assert();
     }
@@ -329,10 +333,7 @@ mod tests {
             slug: "hnsw__graph__with_ucapacity",
             hash: "9eafdf8834ec",
             identifier: "hnsw__graph__with_ucapacity__h9eafdf8834ec",
-            path: concat!(
-                "crate::theorem_actions::",
-                "hnsw__graph__with_ucapacity__h9eafdf8834ec",
-            ),
+            path: &expected_path("hnsw__graph__with_ucapacity__h9eafdf8834ec"),
         }
         .assert();
     }
@@ -344,12 +345,10 @@ mod tests {
             slug: "_ua___ub",
             hash: "0a39aa24f512",
             identifier: "_ua___ub__h0a39aa24f512",
-            path: "crate::theorem_actions::_ua___ub__h0a39aa24f512",
+            path: &expected_path("_ua___ub__h0a39aa24f512"),
         }
         .assert();
     }
-
-    // ── injectivity edge cases ─────────────────────────────────────
 
     #[test]
     fn underscore_placement_produces_distinct_slugs() {
@@ -378,8 +377,9 @@ mod tests {
     #[test]
     fn path_starts_with_resolution_target() {
         let m = mangle_action_name("account.deposit");
+        let prefix = format!("{RESOLUTION_TARGET}::");
         assert!(
-            m.path().starts_with("crate::theorem_actions::"),
+            m.path().starts_with(&prefix),
             "path must begin with resolution target: {}",
             m.path(),
         );
