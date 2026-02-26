@@ -806,6 +806,30 @@ action-name validation (Step 2.1.1 of the roadmap):
   feature file and scenarios for canonical happy path, malformed names, and
   reserved-keyword segments.
 
+### 6.7.4 Implementation decisions (Step 2.1.2)
+
+The following decisions were taken during implementation of action name
+mangling (Step 2.1.2 of the roadmap):
+
+- Action mangling is placed in a new top-level `mangle` module
+  (`src/mangle.rs`), separate from the `schema` module, because mangling is an
+  action-resolution concern, not a schema concern (see ADR-003 boundary rules).
+  The `schema` and `mangle` modules have no cross-dependency; callers wire them
+  together.
+- The `blake3` crate (version 1.8.3) is added as a regular dependency for
+  `hash12` computation. blake3 is deterministic, platform-independent, and
+  licensed under CC0/Apache-2.0.
+- All mangling functions (`segment_escape`, `action_slug`, `hash12`,
+  `mangle_action_name`) are infallible, assuming pre-validated input from
+  `validate_canonical_action_name` (Step 2.1.1). This keeps the API clean and
+  avoids redundant error paths.
+- Building-block functions (`segment_escape`, `action_slug`, `hash12`) are
+  public for reuse in Step 2.2 (harness naming) and by downstream consumers.
+- Golden tests with hardcoded blake3 hash values guard against accidental
+  algorithm or dependency changes.
+- Behavioural coverage uses `rstest-bdd` v0.5.0 with scenarios for slug
+  correctness, underscore injectivity, and resolution path structure.
+
 ### 6.8 Localized diagnostics contract (ADR 002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:

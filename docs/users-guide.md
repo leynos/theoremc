@@ -299,3 +299,58 @@ Evidence:
     unwind: 10
     expect: SUCCESS
 ```
+
+## Action name mangling
+
+The `theoremc::mangle` module provides deterministic, injective transformation
+of canonical action names into Rust identifiers. Each canonical action name
+(e.g., `account.deposit`) is mangled into a unique identifier that resolves
+into the `crate::theorem_actions` module.
+
+### Mangling a canonical action name
+
+Use `mangle_action_name` to transform a validated canonical action name:
+
+```rust
+use theoremc::mangle::mangle_action_name;
+
+let mangled = mangle_action_name("account.deposit");
+assert_eq!(mangled.slug(), "account__deposit");
+assert_eq!(mangled.hash(), "05158894bfb4");
+assert_eq!(mangled.identifier(), "account__deposit__h05158894bfb4");
+assert_eq!(
+    mangled.path(),
+    "crate::theorem_actions::account__deposit__h05158894bfb4",
+);
+```
+
+The function assumes its input has already passed canonical action-name
+validation. It does not re-validate.
+
+### Mangling algorithm
+
+The algorithm follows `docs/name-mangling-rules.md`:
+
+1. **Segment escape**: replace each `_` in a segment with `_u`. ASCII letters
+   and digits are unchanged.
+2. **Action slug**: split the canonical name on `.`, escape each segment, and
+   join the escaped segments with `__`.
+3. **Hash suffix**: compute `blake3(canonical_name.as_bytes())` and take the
+   first 12 lowercase hex characters.
+4. **Mangled identifier**: `{slug}__h{hash12}`.
+5. **Resolution path**: `crate::theorem_actions::{identifier}`.
+
+### Building-block functions
+
+The individual building blocks are also public for reuse:
+
+- `segment_escape(segment)` — escapes underscores in a single segment.
+- `action_slug(canonical_name)` — produces the escaped slug.
+- `hash12(value)` — computes the 12-character blake3 hash prefix.
+
+### Injectivity guarantee
+
+The escaping rule ensures that different canonical action names always produce
+different mangled identifiers. For example, `a.b_c` (slug: `a__b_uc`) and
+`a_b.c` (slug: `a_ub__c`) produce distinct slugs because `_` is escaped to `_u`
+while segment boundaries use `__`.

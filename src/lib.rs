@@ -4,5 +4,8 @@
 //! This crate provides the core library functionality for parsing, validating,
 //! and processing theorem documents written in YAML.
 
+/// Action name mangling for deterministic, injective resolution.
+pub mod mangle;
+
 /// Schema types for `.theorem` document deserialization and validation.
 pub mod schema;
