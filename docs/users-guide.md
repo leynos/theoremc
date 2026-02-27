@@ -354,3 +354,39 @@ The escaping rule ensures that different canonical action names always produce
 different mangled identifiers. For example, `a.b_c` (slug: `a__b_uc`) and
 `a_b.c` (slug: `a_ub__c`) produce distinct slugs because `_` is escaped to `_u`
 while segment boundaries use `__`.
+
+## Action name collision detection
+
+The `theoremc::collision` module provides build-time collision detection for
+action names across loaded theorem documents. The check runs automatically as
+part of `load_theorem_docs` and `load_theorem_docs_with_source`.
+
+### What is checked
+
+Two collision classes are detected:
+
+1. **Duplicate canonical action names** — the same dot-separated action name
+   string appearing in the collected set of unique canonical names. Within a
+   single loaded file, this is inherently deduplicated. The infrastructure
+   supports future cross-file collision detection.
+2. **Duplicate mangled identifiers** — two different canonical action names
+   that produce the same mangled Rust identifier. This is a defensive safety
+   net; the mangling algorithm is injective by design.
+
+When a collision is detected, the loader returns
+`Err(SchemaError::DuplicateActionName { message })` with a human-readable
+report listing all colliding names.
+
+### Calling the check directly
+
+The collision check can also be called independently:
+
+```rust
+use theoremc::collision::check_action_collisions;
+use theoremc::schema::load_theorem_docs;
+
+let docs = load_theorem_docs(yaml)?;
+// The check already ran inside load_theorem_docs, but you can
+// re-check after combining documents from multiple files:
+check_action_collisions(&docs)?;
+```

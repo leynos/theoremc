@@ -198,7 +198,7 @@ Out of scope: runtime action registries.
   `hash12(blake3)`) and canonical path resolution into
   `crate::theorem_actions`. Acceptance: golden tests cover representative names
   and underscore edge cases. Signposts: `NMR-1`, `ADR-1`, `DES-5`.
-- [ ] Fail compilation on duplicate canonical action names and duplicate mangled
+- [x] Fail compilation on duplicate canonical action names and duplicate mangled
   identifiers, reporting all colliding sources. Acceptance: integration tests
   prove both collision classes are detected before backend execution.
   Signposts: `NMR-1`, `ADR-1`, `DES-5`.

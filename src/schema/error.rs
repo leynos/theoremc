@@ -42,6 +42,15 @@ pub enum SchemaError {
         /// Optional structured diagnostic payload.
         diagnostic: Option<SchemaDiagnostic>,
     },
+
+    /// Two or more action names collide on canonical form or mangled
+    /// identifier.
+    #[error("action name collision: {message}")]
+    DuplicateActionName {
+        /// Human-readable collision report listing all colliding names
+        /// and their source theorems.
+        message: String,
+    },
 }
 
 impl SchemaError {
@@ -52,7 +61,9 @@ impl SchemaError {
             Self::Deserialize { diagnostic, .. } | Self::ValidationFailed { diagnostic, .. } => {
                 diagnostic.as_ref()
             }
-            Self::InvalidIdentifier { .. } | Self::InvalidActionName { .. } => None,
+            Self::InvalidIdentifier { .. }
+            | Self::InvalidActionName { .. }
+            | Self::DuplicateActionName { .. } => None,
         }
     }
 }

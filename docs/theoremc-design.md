@@ -830,6 +830,29 @@ mangling (Step 2.1.2 of the roadmap):
 - Behavioural coverage uses `rstest-bdd` v0.5.0 with scenarios for slug
   correctness, underscore injectivity, and resolution path structure.
 
+### 6.7.5 Implementation decisions (Step 2.1.3)
+
+The following decisions were taken during implementation of action name
+collision detection (Step 2.1.3 of the roadmap):
+
+- Collision detection is placed in a new top-level `collision` module
+  (`src/collision.rs`), separate from both `schema` and `mangle`. This
+  preserves the ADR-003 boundary: `schema` and `mangle` do not cross-depend.
+  The `collision` module wires both together as a cross-cutting concern.
+- Two collision classes are checked: duplicate canonical action names (same
+  string) and duplicate mangled identifiers (different canonical names
+  producing the same mangled Rust identifier). The mangled-identifier check is
+  a defensive safety net since the mangling algorithm is injective by design.
+- `BTreeMap` and `BTreeSet` are used for all collision grouping to ensure
+  deterministic iteration order and stable error messages.
+- The collision check is called from the loader
+  (`load_theorem_docs_with_source`) after per-document validation, before
+  returning the parsed documents. This makes collision detection transparent to
+  callers of `load_theorem_docs`.
+- Within a single loaded file, the set of unique canonical names is inherently
+  deduplicated. The infrastructure is structured for future cross-file
+  collision detection when multi-file loading arrives (Step 3.x).
+
 ### 6.8 Localized diagnostics contract (ADR 002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:
