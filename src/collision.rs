@@ -422,38 +422,32 @@ mod tests {
 
     // ── Grouping tests ──────────────────────────────────────────────
 
-    #[test]
-    fn group_by_canonical_deduplicates_within_theorem() {
-        let occurrences = vec![
-            ActionOccurrence {
+    #[rstest]
+    #[case::deduplicates_within_theorem(
+        &["T", "T"],
+        1,
+        "same theorem should deduplicate",
+    )]
+    #[case::tracks_multiple_theorems(
+        &["Alpha", "Beta"],
+        2,
+        "different theorems should both appear",
+    )]
+    fn group_by_canonical_behaviour(
+        #[case] theorem_names: &[&str],
+        #[case] expected_theorem_count: usize,
+        #[case] message: &str,
+    ) {
+        let occurrences: Vec<ActionOccurrence<'_>> = theorem_names
+            .iter()
+            .map(|&name| ActionOccurrence {
                 canonical: "account.deposit",
-                theorem: "T",
-            },
-            ActionOccurrence {
-                canonical: "account.deposit",
-                theorem: "T",
-            },
-        ];
+                theorem: name,
+            })
+            .collect();
         let grouped = group_by_canonical(&occurrences);
         assert_eq!(grouped.len(), 1);
         let theorems = grouped.get("account.deposit").expect("key should exist");
-        assert_eq!(theorems.len(), 1, "same theorem should deduplicate");
-    }
-
-    #[test]
-    fn group_by_canonical_tracks_multiple_theorems() {
-        let occurrences = vec![
-            ActionOccurrence {
-                canonical: "account.deposit",
-                theorem: "Alpha",
-            },
-            ActionOccurrence {
-                canonical: "account.deposit",
-                theorem: "Beta",
-            },
-        ];
-        let grouped = group_by_canonical(&occurrences);
-        let theorems = grouped.get("account.deposit").expect("key should exist");
-        assert_eq!(theorems.len(), 2);
+        assert_eq!(theorems.len(), expected_theorem_count, "{message}");
     }
 }
