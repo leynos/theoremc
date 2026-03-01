@@ -2,8 +2,9 @@
 //!
 //! This module detects **mangled-identifier collisions** before code
 //! generation: two different canonical action names that produce the same
-//! mangled Rust identifier. This is a defensive safety net since the
-//! mangling algorithm is injective by design.
+//! mangled Rust identifier. This is a defensive safety net: the mangling
+//! algorithm is designed to be collision-resistant, but the fixed-width
+//! hash suffix means it cannot be strictly one-to-one.
 //!
 //! Multiple theorems referencing the same canonical action name is
 //! expected and accepted — only distinct canonical names that collide
@@ -56,10 +57,22 @@ use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc};
 ///     let docs = load_theorem_docs(yaml).expect("failed to load theorem docs");
 ///     assert!(check_action_collisions(&docs).is_ok());
 pub fn check_action_collisions(docs: &[TheoremDoc]) -> Result<(), SchemaError> {
+    check_action_collisions_with(docs, |name| {
+        mangle_action_name(name).identifier().to_owned()
+    })
+}
+
+/// Checks for mangled-identifier collisions using a caller-supplied
+/// mangler function, allowing tests to inject deterministic manglers
+/// that force collisions.
+fn check_action_collisions_with(
+    docs: &[TheoremDoc],
+    mangler: impl Fn(&str) -> String,
+) -> Result<(), SchemaError> {
     let occurrences = collect_all_occurrences(docs);
     let by_canonical = group_by_canonical(&occurrences);
     let unique_names = unique_canonical_names(&by_canonical);
-    let mangled_collisions = find_mangled_collisions(&unique_names);
+    let mangled_collisions = find_mangled_collisions_with(&unique_names, mangler);
 
     if mangled_collisions.is_empty() {
         return Ok(());
@@ -113,14 +126,16 @@ fn let_binding_action(binding: &LetBinding) -> &str {
     }
 }
 
-/// Recursively collects action names from a step list, including
-/// nested `maybe` blocks.
+/// Iteratively collects action names from a step list, including
+/// nested `maybe` blocks, using an explicit stack to avoid
+/// unbounded recursion on deeply nested inputs.
 fn collect_step_actions<'a>(
     steps: &'a [Step],
     theorem: &'a str,
     out: &mut Vec<ActionOccurrence<'a>>,
 ) {
-    for step in steps {
+    let mut stack: Vec<&'a Step> = steps.iter().rev().collect();
+    while let Some(step) = stack.pop() {
         match step {
             Step::Call(c) => {
                 out.push(ActionOccurrence {
@@ -135,7 +150,9 @@ fn collect_step_actions<'a>(
                 });
             }
             Step::Maybe(s) => {
-                collect_step_actions(&s.maybe.do_steps, theorem, out);
+                for nested in s.maybe.do_steps.iter().rev() {
+                    stack.push(nested);
+                }
             }
         }
     }
@@ -163,15 +180,26 @@ fn unique_canonical_names<'a>(
     by_canonical.keys().copied().collect()
 }
 
-/// Mangles each unique canonical name and groups by mangled identifier.
-/// Returns only groups where two or more different canonical names
-/// produce the same mangled identifier.
+/// Mangles each unique canonical name using the production mangler and
+/// groups by mangled identifier. Returns only groups where two or more
+/// different canonical names produce the same mangled identifier.
+#[cfg(test)]
 fn find_mangled_collisions(canonical_names: &BTreeSet<&str>) -> BTreeMap<String, BTreeSet<String>> {
+    find_mangled_collisions_with(canonical_names, |name| {
+        mangle_action_name(name).identifier().to_owned()
+    })
+}
+
+/// Groups canonical names by the identifier produced by `mangler`,
+/// returning only groups where two or more names collide.
+fn find_mangled_collisions_with(
+    canonical_names: &BTreeSet<&str>,
+    mangler: impl Fn(&str) -> String,
+) -> BTreeMap<String, BTreeSet<String>> {
     let mut by_identifier: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for &name in canonical_names {
-        let mangled = mangle_action_name(name);
         by_identifier
-            .entry(mangled.identifier().to_owned())
+            .entry(mangler(name))
             .or_default()
             .insert(name.to_owned());
     }

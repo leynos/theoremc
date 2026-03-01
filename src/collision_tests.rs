@@ -237,20 +237,25 @@ fn format_message_includes_identifier_and_names() {
     );
 }
 
-#[test]
-fn crafted_collision_returns_mangled_identifier_collision_error() {
-    // The mangling algorithm is injective, so a real collision cannot
-    // occur through normal inputs. This test crafts a collision map
-    // directly to exercise the error-construction path and verify the
-    // correct SchemaError variant is returned.
-    let mut collisions = BTreeMap::new();
-    let mut names = BTreeSet::new();
-    names.insert("alpha.beta".to_owned());
-    names.insert("gamma.delta".to_owned());
-    collisions.insert("fake__identifier__h000000000000".to_owned(), names);
+#[rstest]
+fn crafted_collision_returns_mangled_identifier_collision_error(boilerplate: DocBoilerplate) {
+    // The mangling algorithm is collision-resistant, so a real collision
+    // is unlikely through normal inputs. This test injects a deterministic
+    // mangler that maps all names to the same identifier, forcing the
+    // collision path through the public pipeline.
+    let docs = vec![
+        doc_with_do_actions("Alpha", &["alpha.beta"], &boilerplate),
+        doc_with_do_actions("Gamma", &["gamma.delta"], &boilerplate),
+    ];
 
-    let message = format_collision_message(&collisions);
-    let error = SchemaError::MangledIdentifierCollision { message };
+    let always_collide = |_: &str| "colliding__identifier__h000000000000".to_owned();
+    let result = check_action_collisions_with(&docs, always_collide);
+
+    let error = result.expect_err("should return MangledIdentifierCollision");
+    assert!(
+        matches!(error, SchemaError::MangledIdentifierCollision { .. }),
+        "expected MangledIdentifierCollision variant, got: {error}",
+    );
     let display = error.to_string();
     assert!(
         display.contains("mangled identifier collision"),
