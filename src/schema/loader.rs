@@ -120,6 +120,8 @@ pub fn load_theorem_docs_with_source(
         docs.push(doc);
     }
 
+    crate::collision::check_action_collisions(&docs)?;
+
     Ok(docs)
 }
 

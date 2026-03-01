@@ -1,0 +1,42 @@
+Theorem: AlphaTheorem
+About: First theorem referencing account.deposit
+Let:
+  result:
+    call:
+      action: account.deposit
+      args:
+        amount: 100
+Do:
+  - must:
+      action: account.validate
+      args:
+        account: { ref: result }
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: reachable
+---
+Theorem: BetaTheorem
+About: Second theorem also referencing account.deposit
+Let:
+  result:
+    call:
+      action: account.deposit
+      args:
+        amount: 200
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: "true"
+    because: reachable

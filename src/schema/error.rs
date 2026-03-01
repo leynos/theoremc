@@ -42,6 +42,15 @@ pub enum SchemaError {
         /// Optional structured diagnostic payload.
         diagnostic: Option<SchemaDiagnostic>,
     },
+
+    /// Two or more different canonical action names produce the same
+    /// mangled Rust identifier.
+    #[error("mangled identifier collision: {message}")]
+    MangledIdentifierCollision {
+        /// Human-readable collision report listing all colliding
+        /// canonical names per mangled identifier.
+        message: String,
+    },
 }
 
 impl SchemaError {
@@ -52,7 +61,9 @@ impl SchemaError {
             Self::Deserialize { diagnostic, .. } | Self::ValidationFailed { diagnostic, .. } => {
                 diagnostic.as_ref()
             }
-            Self::InvalidIdentifier { .. } | Self::InvalidActionName { .. } => None,
+            Self::InvalidIdentifier { .. }
+            | Self::InvalidActionName { .. }
+            | Self::MangledIdentifierCollision { .. } => None,
         }
     }
 }
