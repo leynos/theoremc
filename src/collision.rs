@@ -53,7 +53,7 @@ use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc};
 ///       - cover: "true"
 ///         because: reachable
 ///     "#;
-///     let docs = load_theorem_docs(yaml).unwrap();
+///     let docs = load_theorem_docs(yaml).expect("failed to load theorem docs");
 ///     assert!(check_action_collisions(&docs).is_ok());
 pub fn check_action_collisions(docs: &[TheoremDoc]) -> Result<(), SchemaError> {
     let occurrences = collect_all_occurrences(docs);

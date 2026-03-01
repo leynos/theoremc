@@ -11,20 +11,11 @@ use rstest::rstest;
 // ── rstest fixtures ─────────────────────────────────────────────────
 
 /// Shared boilerplate fields required by every `TheoremDoc` in tests.
+#[derive(Clone)]
 struct DocBoilerplate {
     evidence: Evidence,
     assertions: Vec<Assertion>,
     witnesses: Vec<WitnessCheck>,
-}
-
-impl Clone for DocBoilerplate {
-    fn clone(&self) -> Self {
-        Self {
-            evidence: self.evidence.clone(),
-            assertions: self.assertions.clone(),
-            witnesses: self.witnesses.clone(),
-        }
-    }
 }
 
 /// Minimal valid boilerplate for constructing test documents.
