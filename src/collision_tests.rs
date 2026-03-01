@@ -194,11 +194,7 @@ fn same_action_across_theorems_is_accepted(boilerplate: DocBoilerplate) {
 #[rstest]
 fn same_action_within_one_theorem_is_accepted(boilerplate: DocBoilerplate) {
     // Calling the same action twice in one theorem is normal.
-    let doc = doc_with_do_actions(
-        "T",
-        &["account.deposit", "account.deposit"],
-        &boilerplate,
-    );
+    let doc = doc_with_do_actions("T", &["account.deposit", "account.deposit"], &boilerplate);
     assert!(check_action_collisions(&[doc]).is_ok());
 }
 
