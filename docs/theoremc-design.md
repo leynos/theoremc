@@ -839,10 +839,11 @@ collision detection (Step 2.1.3 of the roadmap):
   (`src/collision.rs`), separate from both `schema` and `mangle`. This
   preserves the ADR-003 boundary: `schema` and `mangle` do not cross-depend.
   The `collision` module wires both together as a cross-cutting concern.
-- Two collision classes are checked: duplicate canonical action names (same
-  string) and duplicate mangled identifiers (different canonical names
-  producing the same mangled Rust identifier). The mangled-identifier check is
-  a defensive safety net since the mangling algorithm is injective by design.
+- The collision check detects **mangled-identifier collisions**: different
+  canonical names that produce the same mangled Rust identifier. This is a
+  defensive safety net since the mangling algorithm is injective by design.
+  Multiple theorems referencing the same canonical action name is expected and
+  accepted.
 - `BTreeMap` and `BTreeSet` are used for all collision grouping to ensure
   deterministic iteration order and stable error messages.
 - The collision check is called from the loader

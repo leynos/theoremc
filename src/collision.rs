@@ -1,14 +1,13 @@
-//! Action name collision detection across loaded theorem documents.
+//! Mangled-identifier collision detection across loaded theorem documents.
 //!
-//! This module detects two collision classes before code generation:
+//! This module detects **mangled-identifier collisions** before code
+//! generation: two different canonical action names that produce the same
+//! mangled Rust identifier. This is a defensive safety net since the
+//! mangling algorithm is injective by design.
 //!
-//! 1. **Duplicate canonical action names** — the same dot-separated action
-//!    name string collected from two or more distinct theorem documents.
-//!    Within a single loaded file, the unique set is inherently deduplicated;
-//!    this check supports future cross-file collision detection.
-//! 2. **Duplicate mangled identifiers** — two different canonical names
-//!    that produce the same mangled Rust identifier. This is a defensive
-//!    safety net since mangling is injective by design.
+//! Multiple theorems referencing the same canonical action name is
+//! expected and accepted — only distinct canonical names that collide
+//! after mangling trigger an error.
 //!
 //! Collision detection is a cross-cutting concern that wires together
 //! `crate::schema` (document traversal) and `crate::mangle` (identifier
@@ -22,19 +21,18 @@ use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc};
 
 // ── Public entry point ──────────────────────────────────────────────
 
-/// Checks for action name collisions across loaded theorem documents.
+/// Checks for mangled-identifier collisions across loaded theorem
+/// documents.
 ///
-/// Detects two collision classes:
-///
-/// 1. Duplicate canonical action names: the same canonical dot-separated
-///    action name referenced from two or more distinct theorem documents.
-/// 2. Duplicate mangled identifiers: two different canonical action names
-///    that produce the same mangled Rust identifier.
+/// Collects all canonical action names, mangles each one, and reports
+/// an error when two or more different canonical names produce the
+/// same mangled Rust identifier. Multiple theorems referencing the
+/// same canonical name is accepted and does not trigger a collision.
 ///
 /// # Errors
 ///
-/// Returns [`SchemaError::DuplicateActionName`] listing all colliding
-/// names when any collision is detected.
+/// Returns [`SchemaError::MangledIdentifierCollision`] listing all
+/// colliding canonical names per mangled identifier.
 ///
 /// # Examples
 ///
@@ -67,7 +65,7 @@ pub fn check_action_collisions(docs: &[TheoremDoc]) -> Result<(), SchemaError> {
         return Ok(());
     }
 
-    Err(SchemaError::DuplicateActionName {
+    Err(SchemaError::MangledIdentifierCollision {
         message: format_collision_message(&mangled_collisions),
     })
 }
@@ -200,254 +198,5 @@ fn format_collision_message(mangled_collisions: &BTreeMap<String, BTreeSet<Strin
 }
 
 #[cfg(test)]
-mod tests {
-    //! Unit tests for action name collision detection.
-
-    use super::*;
-    use crate::schema::{
-        ActionCall, Assertion, Evidence, KaniEvidence, KaniExpectation, LetCall, StepCall,
-        StepMaybe, StepMust, TheoremDoc, TheoremName, WitnessCheck,
-    };
-    use indexmap::IndexMap;
-    use rstest::rstest;
-
-    /// Builds a minimal valid `TheoremDoc` with the given name and
-    /// action names in `Let` bindings.
-    fn doc_with_let_actions(name: &str, actions: &[&str]) -> TheoremDoc {
-        let mut let_bindings = IndexMap::new();
-        for (i, action) in actions.iter().enumerate() {
-            let_bindings.insert(
-                format!("binding_{i}"),
-                LetBinding::Call(LetCall {
-                    call: action_call(action),
-                }),
-            );
-        }
-        theorem_doc(name, let_bindings, Vec::new())
-    }
-
-    /// Builds a minimal valid `TheoremDoc` with the given name and
-    /// action names in `Do` steps.
-    fn doc_with_do_actions(name: &str, actions: &[&str]) -> TheoremDoc {
-        let steps: Vec<Step> = actions
-            .iter()
-            .map(|a| {
-                Step::Call(StepCall {
-                    call: action_call(a),
-                })
-            })
-            .collect();
-        theorem_doc(name, IndexMap::new(), steps)
-    }
-
-    /// Builds an `ActionCall` with the given action name and empty args.
-    fn action_call(name: &str) -> ActionCall {
-        ActionCall {
-            action: name.to_owned(),
-            args: IndexMap::new(),
-            as_binding: None,
-        }
-    }
-
-    /// Builds a minimal valid `TheoremDoc` with custom bindings and
-    /// steps.
-    fn theorem_doc(
-        name: &str,
-        let_bindings: IndexMap<String, LetBinding>,
-        do_steps: Vec<Step>,
-    ) -> TheoremDoc {
-        TheoremDoc {
-            schema: None,
-            theorem: TheoremName::new(name.to_owned()).expect("valid theorem name"),
-            about: "test theorem".to_owned(),
-            tags: Vec::new(),
-            given: Vec::new(),
-            forall: IndexMap::new(),
-            assume: Vec::new(),
-            witness: vec![WitnessCheck {
-                cover: "true".to_owned(),
-                because: "reachable".to_owned(),
-            }],
-            let_bindings,
-            do_steps,
-            prove: vec![Assertion {
-                assert_expr: "true".to_owned(),
-                because: "trivial".to_owned(),
-            }],
-            evidence: Evidence {
-                kani: Some(KaniEvidence {
-                    unwind: 1,
-                    expect: KaniExpectation::Success,
-                    allow_vacuous: false,
-                    vacuity_because: None,
-                }),
-                verus: None,
-                stateright: None,
-            },
-        }
-    }
-
-    // ── Collection tests ─────────────────────────────────────────────
-
-    #[test]
-    fn collect_from_let_bindings() {
-        let doc = doc_with_let_actions("T", &["account.deposit", "account.withdraw"]);
-        let mut out = Vec::new();
-        collect_doc_actions(&doc, &mut out);
-        let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
-        assert_eq!(names, vec!["account.deposit", "account.withdraw"]);
-    }
-
-    #[test]
-    fn collect_from_do_steps() {
-        let doc = doc_with_do_actions("T", &["hnsw.attach_node", "hnsw.detach_node"]);
-        let mut out = Vec::new();
-        collect_doc_actions(&doc, &mut out);
-        let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
-        assert_eq!(names, vec!["hnsw.attach_node", "hnsw.detach_node"]);
-    }
-
-    #[test]
-    fn collect_from_nested_maybe() {
-        let inner_step = Step::Must(StepMust {
-            must: action_call("inner.action"),
-        });
-        let maybe = Step::Maybe(StepMaybe {
-            maybe: crate::schema::MaybeBlock {
-                because: "optional branch".to_owned(),
-                do_steps: vec![inner_step],
-            },
-        });
-        let doc = theorem_doc("T", IndexMap::new(), vec![maybe]);
-        let mut out = Vec::new();
-        collect_doc_actions(&doc, &mut out);
-        let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
-        assert_eq!(names, vec!["inner.action"]);
-    }
-
-    #[test]
-    fn collect_from_let_and_do_combined() {
-        let mut let_bindings = IndexMap::new();
-        let_bindings.insert(
-            "result".to_owned(),
-            LetBinding::Call(LetCall {
-                call: action_call("account.deposit"),
-            }),
-        );
-        let steps = vec![Step::Call(StepCall {
-            call: action_call("account.validate"),
-        })];
-        let doc = theorem_doc("T", let_bindings, steps);
-        let mut out = Vec::new();
-        collect_doc_actions(&doc, &mut out);
-        let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
-        assert_eq!(names, vec!["account.deposit", "account.validate"]);
-    }
-
-    // ── Collision detection tests ────────────────────────────────────
-
-    #[test]
-    fn no_collisions_returns_ok() {
-        let docs = vec![
-            doc_with_let_actions("Alpha", &["account.deposit"]),
-            doc_with_do_actions("Beta", &["hnsw.attach_node"]),
-        ];
-        assert!(check_action_collisions(&docs).is_ok());
-    }
-
-    #[test]
-    fn same_action_across_theorems_is_accepted() {
-        // Multiple theorems referencing the same action is normal usage.
-        let docs = vec![
-            doc_with_let_actions("Alpha", &["account.deposit"]),
-            doc_with_do_actions("Beta", &["account.deposit"]),
-        ];
-        assert!(check_action_collisions(&docs).is_ok());
-    }
-
-    #[test]
-    fn same_action_within_one_theorem_is_accepted() {
-        // Calling the same action twice in one theorem is normal.
-        let doc = doc_with_do_actions("T", &["account.deposit", "account.deposit"]);
-        assert!(check_action_collisions(&[doc]).is_ok());
-    }
-
-    #[test]
-    fn empty_docs_returns_ok() {
-        assert!(check_action_collisions(&[]).is_ok());
-    }
-
-    #[rstest]
-    fn doc_without_actions_returns_ok() {
-        let doc = theorem_doc("T", IndexMap::new(), Vec::new());
-        assert!(check_action_collisions(&[doc]).is_ok());
-    }
-
-    // ── Mangled collision detection ──────────────────────────────────
-
-    #[test]
-    fn find_mangled_collisions_with_distinct_names_returns_empty() {
-        let names: BTreeSet<&str> = ["account.deposit", "hnsw.attach_node"]
-            .into_iter()
-            .collect();
-        let collisions = find_mangled_collisions(&names);
-        assert!(
-            collisions.is_empty(),
-            "distinct names should not collide: {collisions:?}",
-        );
-    }
-
-    #[test]
-    fn format_message_includes_identifier_and_names() {
-        let mut collisions = BTreeMap::new();
-        let mut names = BTreeSet::new();
-        names.insert("alpha.beta".to_owned());
-        names.insert("gamma.delta".to_owned());
-        collisions.insert("fake__identifier__h000000000000".to_owned(), names);
-
-        let msg = format_collision_message(&collisions);
-        assert!(
-            msg.contains("fake__identifier__h000000000000"),
-            "message should include the identifier: {msg}",
-        );
-        assert!(
-            msg.contains("alpha.beta"),
-            "message should include first name: {msg}",
-        );
-        assert!(
-            msg.contains("gamma.delta"),
-            "message should include second name: {msg}",
-        );
-    }
-
-    // ── Grouping tests ──────────────────────────────────────────────
-
-    #[rstest]
-    #[case::deduplicates_within_theorem(
-        &["T", "T"],
-        1,
-        "same theorem should deduplicate",
-    )]
-    #[case::tracks_multiple_theorems(
-        &["Alpha", "Beta"],
-        2,
-        "different theorems should both appear",
-    )]
-    fn group_by_canonical_behaviour(
-        #[case] theorem_names: &[&str],
-        #[case] expected_theorem_count: usize,
-        #[case] message: &str,
-    ) {
-        let occurrences: Vec<ActionOccurrence<'_>> = theorem_names
-            .iter()
-            .map(|&name| ActionOccurrence {
-                canonical: "account.deposit",
-                theorem: name,
-            })
-            .collect();
-        let grouped = group_by_canonical(&occurrences);
-        assert_eq!(grouped.len(), 1);
-        let theorems = grouped.get("account.deposit").expect("key should exist");
-        assert_eq!(theorems.len(), expected_theorem_count, "{message}");
-    }
-}
+#[path = "collision_tests.rs"]
+mod tests;

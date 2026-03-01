@@ -1,7 +1,7 @@
-Feature: Action name collision detection
+Feature: Mangled-identifier collision detection
   To prevent ambiguous code generation bindings
   As a theorem compiler
-  I want duplicate action names detected before backend execution
+  I want mangled-identifier collisions detected before backend execution
 
   Scenario: Distinct action names across theorems are accepted
     Given a multi-theorem file with distinct action names
@@ -11,6 +11,6 @@ Feature: Action name collision detection
     Given a single theorem with repeated action calls
     Then loading succeeds without collision errors
 
-  Scenario: Mangled identifier collision is detected
-    Given two canonical names that produce the same mangled identifier
-    Then the collision is reported with both canonical names
+  Scenario: Distinct canonical names produce distinct mangled identifiers
+    Given two canonical names that produce distinct mangled identifiers
+    Then loading succeeds without collision errors for distinct names

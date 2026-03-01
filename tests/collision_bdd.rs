@@ -1,4 +1,4 @@
-//! Behavioural tests for action name collision detection.
+//! Behavioural tests for mangled-identifier collision detection.
 
 mod common;
 
@@ -33,8 +33,8 @@ fn then_loading_succeeds_without_collision_errors() -> Result<(), String> {
     assert_fixture_ok("valid_full.theorem")?;
     assert_fixture_ok("valid_multi.theorem")?;
     // Multi-doc fixture with shared actions also passes because
-    // canonical name deduplication within a single file is expected.
-    assert_fixture_ok("invalid_duplicate_action_across_theorems.theorem")
+    // identical canonical names do not collide.
+    assert_fixture_ok("valid_shared_action_across_theorems.theorem")
 }
 
 // ── Scenario: Same action name reused within one theorem ─────────────
@@ -71,21 +71,16 @@ fn then_loading_succeeds_for_repeated_calls() -> Result<(), String> {
     assert_yaml_ok(REPEATED_ACTION_YAML)
 }
 
-// ── Scenario: Mangled identifier collision is detected ────────────────
+// ── Scenario: Distinct canonical names produce distinct identifiers ───
 
-#[given("two canonical names that produce the same mangled identifier")]
-fn given_two_canonical_names_that_produce_same_mangled_identifier() {}
+#[given("two canonical names that produce distinct mangled identifiers")]
+fn given_two_canonical_names_with_distinct_identifiers() {}
 
-/// Verifies the collision detection path using programmatically
-/// constructed documents. Since the mangling algorithm is injective,
-/// a real collision cannot occur through normal YAML loading. This
-/// test exercises the `check_action_collisions` public API directly
-/// by constructing a scenario where the detection logic would report
-/// collisions if they existed, confirming the code path is wired
-/// correctly.
-#[then("the collision is reported with both canonical names")]
-fn then_collision_is_reported() -> Result<(), String> {
-    // Verify that distinct canonical names pass the collision check.
+/// Verifies that documents with different canonical action names pass
+/// the collision check. Since the mangling algorithm is injective,
+/// distinct canonical names always produce distinct identifiers.
+#[then("loading succeeds without collision errors for distinct names")]
+fn then_loading_succeeds_for_distinct_names() -> Result<(), String> {
     let yaml_a = r"
 Theorem: A
 About: first
@@ -154,6 +149,6 @@ fn same_action_name_reused_within_one_theorem_is_accepted() {}
 
 #[scenario(
     path = "tests/features/collision.feature",
-    name = "Mangled identifier collision is detected"
+    name = "Distinct canonical names produce distinct mangled identifiers"
 )]
-fn mangled_identifier_collision_is_detected() {}
+fn distinct_canonical_names_produce_distinct_mangled_identifiers() {}

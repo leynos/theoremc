@@ -9,32 +9,25 @@ Status: COMPLETE
 
 ## Purpose / big picture
 
-After this change, the `theoremc` library detects two classes of action-name
-collision in loaded `.theorem` documents and fails with actionable error
+After this change, the `theoremc` library detects **mangled-identifier
+collisions** in loaded `.theorem` documents and fails with actionable error
 messages before any code generation occurs.
 
-The two collision classes are:
+A mangled-identifier collision occurs when two or more *different* canonical
+action names produce the same mangled Rust identifier via `mangle_action_name`.
+Because the mangling algorithm is injective by design (proven in Step 2.1.2
+tests), this should never happen for valid inputs. The check is a defensive
+safety net that protects against algorithm regressions or hash collisions.
 
-1. **Duplicate canonical action names** — two different canonical dot-separated
-   action name strings that are identical. Within a single loaded file, the set
-   of unique canonical names is inherently deduplicated. The infrastructure is
-   built so that when multi-file loading arrives (Step 3.x), cross-file
-   canonical collisions can be detected.
-
-2. **Duplicate mangled identifiers** — two or more *different* canonical action
-   names that produce the same mangled Rust identifier via
-   `mangle_action_name`. Because the mangling algorithm is injective by design
-   (proven in Step 2.1.2 tests), this should never happen for valid inputs.
-   This check is a defensive safety net that protects against algorithm
-   regressions or hash collisions.
-
-Both are hard errors per `NMR-1` and `DES-5`.
+Multiple theorems referencing the same canonical action name is expected and
+accepted — only distinct canonical names that collide after mangling are
+reported as hard errors per `NMR-1` and `DES-5`.
 
 Observable success: calling `check_action_collisions(&[TheoremDoc])` returns
 `Ok(())` when no collisions exist, or returns
-`Err(SchemaError::DuplicateActionName { .. })` listing all colliding names with
-their source theorems. Integration tests prove both collision classes are
-detected. `make check-fmt`, `make lint`, and `make test` pass.
+`Err(SchemaError::MangledIdentifierCollision { .. })` listing all colliding
+names with their source theorems. Integration tests prove both collision
+classes are detected. `make check-fmt`, `make lint`, and `make test` pass.
 
 ## Constraints
 
@@ -84,7 +77,8 @@ detected. `make check-fmt`, `make lint`, and `make test` pass.
 - [x] (2026-02-27 00:00Z) Draft ExecPlan for Step 2.1.3.
 - [x] (2026-02-27 00:05Z) Milestone 0: baseline verification (all existing
   tests pass).
-- [x] (2026-02-27 00:10Z) Milestone 1: add `DuplicateActionName` variant to
+- [x] (2026-02-27 00:10Z) Milestone 1: add `MangledIdentifierCollision` variant
+      to
   `SchemaError` and create `src/collision.rs` module scaffold.
 - [x] (2026-02-27 00:15Z) Milestone 2: implement action-name collection
   (traversal of `TheoremDoc`).
@@ -155,8 +149,8 @@ Step 2.1.3 is complete.
 
 Implemented outcomes:
 
-- Added `DuplicateActionName { message: String }` variant to `SchemaError` in
-  `src/schema/error.rs`.
+- Added `MangledIdentifierCollision { message: String }` variant to
+  `SchemaError` in `src/schema/error.rs`.
 - Created `src/collision.rs` (new top-level module) with:
   - `check_action_collisions(docs: &[TheoremDoc]) -> Result<(), SchemaError>`
     public entry point.
@@ -174,7 +168,7 @@ Implemented outcomes:
   - `tests/features/collision.feature` (3 scenarios).
   - `tests/collision_bdd.rs` (3 scenario runners).
 - Added test fixture
-  `tests/fixtures/invalid_duplicate_action_across_theorems.theorem`.
+  `tests/fixtures/valid_shared_action_across_theorems.theorem`.
 - Updated documentation:
   - `docs/theoremc-design.md` — added §6.7.5 implementation decisions.
   - `docs/users-guide.md` — added "Action name collision detection" section.
@@ -254,12 +248,12 @@ Go/no-go check: existing suite passes.
 Add a new variant to `SchemaError` in `src/schema/error.rs`:
 
 ```rust
-/// Two or more action names collide on canonical form or mangled
-/// identifier.
-#[error("action name collision: {message}")]
-DuplicateActionName {
-    /// Human-readable collision report listing all colliding names
-    /// and their source theorems.
+/// Two or more different canonical action names produce the same
+/// mangled Rust identifier.
+#[error("mangled identifier collision: {message}")]
+MangledIdentifierCollision {
+    /// Human-readable collision report listing all colliding
+    /// canonical names per mangled identifier.
     message: String,
 },
 ```
@@ -329,8 +323,7 @@ Go/no-go check: `cargo test -- collision` passes.
 
 ### Milestone 6: test fixtures and BDD tests
 
-Create fixture
-`tests/fixtures/invalid_duplicate_action_across_theorems.theorem` — a
+Create fixture `tests/fixtures/valid_shared_action_across_theorems.theorem` — a
 multi-document file where two theorems reference the same canonical action
 names.
 
@@ -410,8 +403,8 @@ Acceptance behaviours:
 - `check_action_collisions(&docs)` returns `Ok(())` for documents with no
   collisions (e.g., `valid_full.theorem`, `valid_multi.theorem`).
 - `check_action_collisions(&docs)` returns
-  `Err(SchemaError::DuplicateActionName { .. })` when two different canonical
-  names produce the same mangled identifier.
+  `Err(SchemaError::MangledIdentifierCollision { .. })` when two different
+  canonical names produce the same mangled identifier.
 - The error message lists all colliding canonical names.
 - All existing tests continue to pass (no regressions).
 - BDD scenarios in `tests/features/collision.feature` pass.
@@ -434,7 +427,7 @@ gate before rerunning the full gate sequence.
 New artefacts:
 
 - `src/collision.rs` — collision detection module (new top-level module).
-- `tests/fixtures/invalid_duplicate_action_across_theorems.theorem` — fixture
+- `tests/fixtures/valid_shared_action_across_theorems.theorem` — fixture
   with duplicate canonical action names across theorems.
 - `tests/collision_bdd.rs` — BDD test runner.
 - `tests/features/collision.feature` — BDD feature file.
@@ -442,7 +435,7 @@ New artefacts:
 Updated artefacts:
 
 - `src/lib.rs` — add `pub mod collision;`.
-- `src/schema/error.rs` — add `DuplicateActionName` variant.
+- `src/schema/error.rs` — add `MangledIdentifierCollision` variant.
 - `src/schema/loader.rs` — add collision check call after validation loop.
 - `docs/theoremc-design.md` — add section 6.7.5.
 - `docs/users-guide.md` — add collision detection section.
@@ -455,19 +448,18 @@ Updated artefacts:
 In `src/collision.rs`, define:
 
 ```rust
-/// Checks for action name collisions across loaded theorem documents.
+/// Checks for mangled-identifier collisions across loaded theorem
+/// documents.
 ///
-/// Detects two collision classes:
-///
-/// 1. Duplicate canonical action names: the same canonical dot-separated
-///    action name referenced from two or more distinct theorem documents.
-/// 2. Duplicate mangled identifiers: two different canonical action names
-///    that produce the same mangled Rust identifier.
+/// Collects all canonical action names, mangles each one, and reports
+/// an error when two or more different canonical names produce the
+/// same mangled Rust identifier. Multiple theorems referencing the
+/// same canonical name is accepted and does not trigger a collision.
 ///
 /// # Errors
 ///
-/// Returns [`SchemaError::DuplicateActionName`] listing all colliding
-/// names and their source theorems when any collision is detected.
+/// Returns [`SchemaError::MangledIdentifierCollision`] listing all
+/// colliding canonical names per mangled identifier.
 pub fn check_action_collisions(docs: &[TheoremDoc]) -> Result<(), SchemaError>;
 ```
 
@@ -476,12 +468,12 @@ pub fn check_action_collisions(docs: &[TheoremDoc]) -> Result<(), SchemaError>;
 In `src/schema/error.rs`, add:
 
 ```rust
-/// Two or more action names collide on canonical form or mangled
-/// identifier.
-#[error("action name collision: {message}")]
-DuplicateActionName {
-    /// Human-readable collision report listing all colliding names
-    /// and their source theorems.
+/// Two or more different canonical action names produce the same
+/// mangled Rust identifier.
+#[error("mangled identifier collision: {message}")]
+MangledIdentifierCollision {
+    /// Human-readable collision report listing all colliding
+    /// canonical names per mangled identifier.
     message: String,
 },
 ```

@@ -43,12 +43,12 @@ pub enum SchemaError {
         diagnostic: Option<SchemaDiagnostic>,
     },
 
-    /// Two or more action names collide on canonical form or mangled
-    /// identifier.
-    #[error("action name collision: {message}")]
-    DuplicateActionName {
-        /// Human-readable collision report listing all colliding names
-        /// and their source theorems.
+    /// Two or more different canonical action names produce the same
+    /// mangled Rust identifier.
+    #[error("mangled identifier collision: {message}")]
+    MangledIdentifierCollision {
+        /// Human-readable collision report listing all colliding
+        /// canonical names per mangled identifier.
         message: String,
     },
 }
@@ -63,7 +63,7 @@ impl SchemaError {
             }
             Self::InvalidIdentifier { .. }
             | Self::InvalidActionName { .. }
-            | Self::DuplicateActionName { .. } => None,
+            | Self::MangledIdentifierCollision { .. } => None,
         }
     }
 }
