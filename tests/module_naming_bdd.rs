@@ -1,7 +1,11 @@
 //! Behavioural tests for per-file module naming.
 
+mod common;
+
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::mangle::{hash12, mangle_module_path};
+
+use common::MODULE_GOLDEN_TUPLES;
 
 // ── Scenario: Simple paths produce deterministic module names ─────
 
@@ -10,28 +14,7 @@ fn given_representative_theorem_file_paths() {}
 
 #[then("each path produces the expected module name")]
 fn then_each_path_produces_the_expected_module_name() {
-    let cases: &[(&str, &str, &str, &str)] = &[
-        (
-            "theorems/bidirectional.theorem",
-            "theorems/bidirectional",
-            "theorems_bidirectional",
-            "1fc14bdf614f",
-        ),
-        (
-            "theorems/nested/deep/path.theorem",
-            "theorems/nested/deep/path",
-            "theorems_nested_deep_path",
-            "5cb0a56a3468",
-        ),
-        (
-            "no_extension",
-            "no_extension",
-            "no_extension",
-            "afb36ed5206f",
-        ),
-    ];
-
-    for (path, expected_stem, expected_mangled, expected_hash) in cases {
+    for (path, expected_stem, expected_mangled, expected_hash) in MODULE_GOLDEN_TUPLES {
         let m = mangle_module_path(path);
         assert_eq!(m.stem(), *expected_stem, "stem mismatch for {path}");
         assert_eq!(

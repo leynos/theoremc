@@ -1,24 +1,18 @@
 //! Behavioural tests for action name mangling.
 
+mod common;
+
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::mangle::{CanonicalActionName, RESOLUTION_TARGET, hash12, mangle_action_name};
+
+use common::ACTION_GOLDEN_TRIPLES;
 
 #[given("representative canonical action names")]
 fn given_representative_canonical_action_names() {}
 
 #[then("each name produces the expected mangled identifier")]
 fn then_each_name_produces_the_expected_mangled_identifier() {
-    let cases: &[(&str, &str, &str)] = &[
-        ("account.deposit", "account__deposit", "05158894bfb4"),
-        ("hnsw.attach_node", "hnsw__attach_unode", "8d74e77b55f2"),
-        (
-            "hnsw.graph.with_capacity",
-            "hnsw__graph__with_ucapacity",
-            "9eafdf8834ec",
-        ),
-    ];
-
-    for (canonical, expected_slug, expected_hash) in cases {
+    for (canonical, expected_slug, expected_hash) in ACTION_GOLDEN_TRIPLES {
         let name = CanonicalActionName::new_unchecked(canonical);
         let m = mangle_action_name(&name);
         assert_eq!(m.slug(), *expected_slug, "slug mismatch for {canonical}",);

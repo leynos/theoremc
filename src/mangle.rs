@@ -38,6 +38,9 @@
 ///
 ///     let name = CanonicalActionName::new_unchecked("account.deposit");
 ///     assert_eq!(name.as_str(), "account.deposit");
+///
+///     let from_str: CanonicalActionName = "account.deposit".into();
+///     assert_eq!(from_str.as_str(), "account.deposit");
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanonicalActionName(String);
 
@@ -58,6 +61,18 @@ impl CanonicalActionName {
 impl AsRef<str> for CanonicalActionName {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl From<&str> for CanonicalActionName {
+    fn from(s: &str) -> Self {
+        Self(s.to_owned())
+    }
+}
+
+impl From<String> for CanonicalActionName {
+    fn from(s: String) -> Self {
+        Self(s)
     }
 }
 
@@ -89,6 +104,12 @@ impl AsRef<str> for PathStem {
 impl From<&str> for PathStem {
     fn from(s: &str) -> Self {
         Self(s.to_owned())
+    }
+}
+
+impl From<String> for PathStem {
+    fn from(s: String) -> Self {
+        Self(s)
     }
 }
 
@@ -305,15 +326,13 @@ pub fn path_mangle(stem: &PathStem) -> String {
             _ => '_',
         };
 
-        if mapped == '_' {
-            if !prev_underscore {
-                buf.push('_');
-            }
-            prev_underscore = true;
-        } else {
-            buf.push(mapped);
-            prev_underscore = false;
+        // Skip consecutive underscores.
+        if mapped == '_' && prev_underscore {
+            continue;
         }
+
+        buf.push(mapped);
+        prev_underscore = mapped == '_';
     }
 
     // Step 5: prefix `_` if leading char is a digit.

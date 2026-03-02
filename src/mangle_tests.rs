@@ -229,101 +229,61 @@ impl ModuleGolden<'_> {
     }
 }
 
-#[test]
-fn golden_simple_path() {
+#[rstest]
+#[case::simple_path(
+    "theorems/bidirectional.theorem",
+    "theorems_bidirectional",
+    "1fc14bdf614f",
+    "__theoremc__file__theorems_bidirectional__1fc14bdf614f"
+)]
+#[case::nested_path(
+    "theorems/nested/deep/path.theorem",
+    "theorems_nested_deep_path",
+    "5cb0a56a3468",
+    "__theoremc__file__theorems_nested_deep_path__5cb0a56a3468"
+)]
+#[case::backslash_path(
+    "theorems\\windows\\style.theorem",
+    "theorems_windows_style",
+    "38b12c01ea29",
+    "__theoremc__file__theorems_windows_style__38b12c01ea29"
+)]
+#[case::uppercase_path(
+    "theorems/UPPER-case.theorem",
+    "theorems_upper_case",
+    "7ee5f747b4c1",
+    "__theoremc__file__theorems_upper_case__7ee5f747b4c1"
+)]
+#[case::no_extension(
+    "no_extension",
+    "no_extension",
+    "afb36ed5206f",
+    "__theoremc__file__no_extension__afb36ed5206f"
+)]
+#[case::digit_leading(
+    "theorems/123_digit_leading.theorem",
+    "theorems_123_digit_leading",
+    "76c6c1009e0d",
+    concat!(
+        "__theoremc__file__theorems_123_digit_leading",
+        "__76c6c1009e0d",
+    ),
+)]
+#[case::empty_path("", "", "af1349b9f5f9", "__theoremc__file____af1349b9f5f9")]
+#[case::dot_theorem(".theorem", "", "f9d6885cf913", "__theoremc__file____f9d6885cf913")]
+fn mangle_module_path_golden_cases(
+    #[case] path: &str,
+    #[case] expected_mangled_stem: &str,
+    #[case] expected_hash: &str,
+    #[case] expected_module_name: &str,
+) {
+    let stem = path_stem(path);
     ModuleGolden {
-        path: "theorems/bidirectional.theorem",
-        stem: "theorems/bidirectional",
-        mangled_stem: "theorems_bidirectional",
-        hash: "1fc14bdf614f",
-        module_name: "__theoremc__file__theorems_bidirectional__1fc14bdf614f",
-    }
-    .assert();
-}
-
-#[test]
-fn golden_nested_path() {
-    ModuleGolden {
-        path: "theorems/nested/deep/path.theorem",
-        stem: "theorems/nested/deep/path",
-        mangled_stem: "theorems_nested_deep_path",
-        hash: "5cb0a56a3468",
-        module_name: "__theoremc__file__theorems_nested_deep_path__5cb0a56a3468",
-    }
-    .assert();
-}
-
-#[test]
-fn golden_backslash_path() {
-    ModuleGolden {
-        path: "theorems\\windows\\style.theorem",
-        stem: "theorems\\windows\\style",
-        mangled_stem: "theorems_windows_style",
-        hash: "38b12c01ea29",
-        module_name: "__theoremc__file__theorems_windows_style__38b12c01ea29",
-    }
-    .assert();
-}
-
-#[test]
-fn golden_uppercase_path() {
-    ModuleGolden {
-        path: "theorems/UPPER-case.theorem",
-        stem: "theorems/UPPER-case",
-        mangled_stem: "theorems_upper_case",
-        hash: "7ee5f747b4c1",
-        module_name: "__theoremc__file__theorems_upper_case__7ee5f747b4c1",
-    }
-    .assert();
-}
-
-#[test]
-fn golden_no_extension() {
-    ModuleGolden {
-        path: "no_extension",
-        stem: "no_extension",
-        mangled_stem: "no_extension",
-        hash: "afb36ed5206f",
-        module_name: "__theoremc__file__no_extension__afb36ed5206f",
-    }
-    .assert();
-}
-
-#[test]
-fn golden_digit_leading() {
-    ModuleGolden {
-        path: "theorems/123_digit_leading.theorem",
-        stem: "theorems/123_digit_leading",
-        mangled_stem: "theorems_123_digit_leading",
-        hash: "76c6c1009e0d",
-        module_name: concat!(
-            "__theoremc__file__theorems_123_digit_leading",
-            "__76c6c1009e0d",
-        ),
-    }
-    .assert();
-}
-
-#[test]
-fn golden_empty_path() {
-    ModuleGolden {
-        path: "",
-        stem: "",
-        mangled_stem: "",
-        hash: "af1349b9f5f9",
-        module_name: "__theoremc__file____af1349b9f5f9",
-    }
-    .assert();
-}
-
-#[test]
-fn golden_dot_theorem() {
-    ModuleGolden {
-        path: ".theorem",
-        stem: "",
-        mangled_stem: "",
-        hash: "f9d6885cf913",
-        module_name: "__theoremc__file____f9d6885cf913",
+        path,
+        stem: stem.as_str(),
+        mangled_stem: expected_mangled_stem,
+        hash: expected_hash,
+        module_name: expected_module_name,
     }
     .assert();
 }
