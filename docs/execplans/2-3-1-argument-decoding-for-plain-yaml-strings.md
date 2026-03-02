@@ -399,9 +399,9 @@ pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, RawDocDecodeError> {
 }
 ```
 
-Since `to_theorem_doc` now returns `Result<..., RawDocDecodeError>`, the
-loader stringifies the error at the boundary and attaches a source-location
-diagnostic via `attach_validation_diagnostic`:
+Since `to_theorem_doc` now returns `Result<..., RawDocDecodeError>`, the loader
+stringifies the error at the boundary and attaches a source-location diagnostic
+via `attach_validation_diagnostic`:
 
 ```rust
 let doc = raw_doc.to_theorem_doc().map_err(|decode_err| {
@@ -467,10 +467,9 @@ Create `tests/features/arg_decode.feature` with Gherkin scenarios:
 
 ```gherkin
 Feature: Argument value decoding
-  To ensure theorem argument values have stable, explicit semantics
-  As a theorem author
-  I want plain YAML strings treated as literals and variable
-  references to require explicit { ref: name } wrappers
+  Requirement: plain YAML strings must be treated as literals
+  and variable references must use explicit { ref: name } wrappers,
+  ensuring theorem argument values have stable, explicit semantics
 
   Scenario: Plain string arguments are decoded as literals
     Given a theorem file with plain string arguments
@@ -547,7 +546,7 @@ Go/no-go check: all three gates pass with zero errors and zero warnings.
 
 ## Concrete steps
 
-Run from repository root: `/home/user/project`.
+Run from the repository root.
 
 1. Baseline verification:
 

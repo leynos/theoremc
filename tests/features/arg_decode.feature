@@ -1,8 +1,7 @@
 Feature: Argument value decoding
-  To ensure theorem argument values have stable, explicit semantics
-  As a theorem author
-  I want plain YAML strings treated as literals and variable
-  references to require explicit { ref: name } wrappers
+  Requirement: plain YAML strings must be treated as literals
+  and variable references must use explicit { ref: name } wrappers,
+  ensuring theorem argument values have stable, explicit semantics
 
   Scenario: Plain string arguments are decoded as literals
     Given a theorem file with plain string arguments
