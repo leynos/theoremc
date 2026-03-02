@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -120,26 +120,48 @@ follow-up steps (roadmap items 2.2.2 and 2.2.3).
 
 ## Progress
 
-- [ ] Draft ExecPlan for Step 2.2.1.
-- [ ] Milestone 0: baseline verification (all existing tests pass).
-- [ ] Milestone 1: compute golden values for representative paths.
-- [ ] Milestone 2: implement `path_stem`, `path_mangle`, and
+- [x] Draft ExecPlan for Step 2.2.1.
+- [x] Milestone 0: baseline verification (all existing tests pass).
+- [x] Milestone 1: compute golden values for representative paths.
+- [x] Milestone 2: implement `path_stem`, `path_mangle`, and
   `mangle_module_path` in `src/mangle.rs` with unit tests.
-- [ ] Milestone 3: add BDD feature file and test runner.
-- [ ] Milestone 4: update design docs, users guide, and roadmap.
-- [ ] Milestone 5: run full quality gates and capture logs.
+- [x] Milestone 3: add BDD feature file and test runner.
+- [x] Milestone 4: update design docs, users guide, and roadmap.
+- [x] Milestone 5: run full quality gates and capture logs.
 
 ## Surprises & discoveries
 
-(None yet — to be filled during implementation.)
+- The `make fmt` markdown linter catches duplicate heading names across the
+  entire document. "Building-block functions" was already used in the action
+  mangling section, so the new per-file section required a distinct heading
+  ("Path mangling functions").
+- Existing tests extracted cleanly to `src/mangle_tests.rs` via the
+  `#[path = ...]` pattern. The `Golden` struct needed renaming to
+  `ActionGolden` to distinguish it from `ModuleGolden`.
 
 ## Decision log
 
-(To be filled during implementation.)
+- **2026-03-01:** `path_mangle` inlines all five steps in a single function
+  body (three short loops). No decomposition was needed because the function
+  stayed well within Clippy's cognitive-complexity threshold.
+- **2026-03-01:** `MODULE_PREFIX` is a private `const` (not `pub`). Callers
+  use `MangledModule::module_name()` rather than assembling the prefix
+  themselves.
+- **2026-03-01:** Users guide section renamed from "Building-block functions"
+  to "Path mangling functions" to avoid duplicate-heading lint violation
+  with the existing action mangling section.
 
 ## Outcomes & retrospective
 
-(To be filled on completion.)
+Implementation completed with:
+
+- 3 new public functions (`path_stem`, `path_mangle`, `mangle_module_path`)
+  and 1 new public struct (`MangledModule`).
+- 32 new unit tests and 3 BDD scenarios (total suite: 361 tests, 0 failures).
+- No new dependencies; reuses existing `blake3`.
+- All quality gates pass: `make check-fmt`, `make lint`, `make test`,
+  `make markdownlint`.
+- 7 files changed, 0 files deleted. Well within the 12-file tolerance.
 
 ## Context and orientation
 

@@ -439,3 +439,53 @@ let docs = load_theorem_docs(yaml)?;
 // re-run after combining documents from multiple files:
 check_action_collisions(&docs)?;
 ```
+
+## Per-file module naming
+
+The `theoremc::mangle` module provides per-file module naming for `.theorem`
+file paths. Each path is transformed into a deterministic, collision-resistant
+Rust module name of the form:
+
+```plaintext
+__theoremc__file__{path_mangle(path_stem(P))}__{hash12(P)}
+```
+
+### Path mangling functions
+
+- `path_stem(path)` — removes a trailing `.theorem` extension if present;
+  otherwise returns `path` unchanged.
+- `path_mangle(stem)` — sanitises a path stem into a Rust-identifier-safe
+  fragment using the five-step algorithm from `docs/name-mangling-rules.md` §1:
+  1. Replace `/` and `\` with `__`.
+  2. Replace any character not in `[A-Za-z0-9_]` with `_`.
+  3. Collapse consecutive `_` to a single `_`.
+  4. Lowercase the result.
+  5. If the result starts with a digit, prefix `_`.
+- `hash12(path)` — computes the first 12 lowercase hex characters of the blake3
+  digest of the **original** path string (not the mangled stem).
+
+### Composite entry point
+
+`mangle_module_path(path)` combines the building blocks and returns a
+`MangledModule` struct with accessors:
+
+```rust
+use theoremc::mangle::mangle_module_path;
+
+let m = mangle_module_path("theorems/bidirectional.theorem");
+assert_eq!(m.stem(), "theorems/bidirectional");
+assert_eq!(m.mangled_stem(), "theorems_bidirectional");
+assert_eq!(m.hash(), "1fc14bdf614f");
+assert_eq!(
+    m.module_name(),
+    "__theoremc__file__theorems_bidirectional__1fc14bdf614f",
+);
+```
+
+### Collision resistance
+
+Paths that differ only in characters lost during sanitisation (e.g.,
+`theorems/my-file.theorem` and `theorems/my_file.theorem`) produce the same
+mangled stem but different module names because `hash12` operates on the
+original path string. The 12-character blake3 hash suffix provides the real
+disambiguator.

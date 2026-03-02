@@ -212,7 +212,7 @@ checks.
 
 Out of scope: report-level ID alias resolution.
 
-- [ ] Implement per-file module naming using `path_mangle(path_stem(P))` and
+- [x] Implement per-file module naming using `path_mangle(path_stem(P))` and
   `hash12(P)`. Acceptance: snapshot tests confirm deterministic names for mixed
   separators and punctuation-heavy paths. Signposts: `NMR-1`, `ADR-2`, `DES-7`.
 - [ ] Implement harness naming
