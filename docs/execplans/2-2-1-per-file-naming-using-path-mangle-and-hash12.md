@@ -32,8 +32,8 @@ Observable success:
 - Snapshot tests confirm deterministic names for mixed separators,
   punctuation-heavy paths, digit-leading stems, deeply nested directories, and
   Unicode edge cases.
-- BDD scenarios cover the happy path, separator normalisation, and
-  punctuation-heavy collision disambiguation.
+- Behaviour-driven development (BDD) scenarios cover the happy path, separator
+  normalization, and punctuation-heavy collision disambiguation.
 - `make check-fmt`, `make lint`, and `make test` pass.
 - `docs/theoremc-design.md`, `docs/users-guide.md`, and the relevant roadmap
   checkbox are updated.
@@ -49,7 +49,8 @@ follow-up steps (roadmap items 2.2.2 and 2.2.3).
   in this change.
 - Do not modify the existing `schema` module or its public API. The new
   functions extend the existing `mangle` module.
-- Do not modify the existing `collision` module.
+- The `collision` module was updated to use `CanonicalActionName` newtypes
+  introduced during a follow-up refactoring pass.
 - All mangling functions assume the input path `P` is the literal path string
   that would be passed to a future `theorem_file!("P")` macro invocation. No
   filesystem access or canonicalization is performed; the input is a plain
@@ -184,7 +185,7 @@ The `mangle` module already provides the building blocks this task reuses:
 
 The normative specification for per-file module naming lives in
 `docs/name-mangling-rules.md` §1 ("Per-file module name"). The algorithm is
-also summarised in `docs/theorem-file-specification.md` §7.3.
+also summarized in `docs/theorem-file-specification.md` §7.3.
 
 ### Key files
 
@@ -208,7 +209,7 @@ also summarised in `docs/theorem-file-specification.md` §7.3.
   root (e.g., `"theorems/bidirectional.theorem"`).
 - `path_stem(P)` — `P` with a trailing `.theorem` extension removed if
   present.
-- `path_mangle(S)` — the 5-step sanitisation algorithm that transforms a
+- `path_mangle(S)` — the 5-step sanitization algorithm that transforms a
   path stem into a valid Rust identifier fragment.
 - `hash12(P)` — the first 12 lowercase hex characters of the blake3 digest
   of the original path string `P`.
@@ -236,8 +237,10 @@ directory module.
 
 New types and functions:
 
-1. `path_stem(path: &str) -> &str` — removes trailing `.theorem` if present.
-2. `path_mangle(stem: &str) -> String` — applies the 5-step sanitisation.
+1. `path_stem(path: &str) -> PathStem` — removes trailing `.theorem` if
+   present.
+2. `path_mangle(stem: &PathStem) -> String` — applies the 5-step
+   sanitization.
 3. `MangledModule` — struct holding `stem`, `mangled_stem`, `hash`, and
    `module_name`.
 4. `mangle_module_path(path: &str) -> MangledModule` — composite entry point.
@@ -247,7 +250,7 @@ Unit tests cover:
 - `path_stem` — extension removal, no extension, double extension, empty
   string.
 - `path_mangle` — separator replacement, non-alphanumeric replacement,
-  underscore collapse, lowercasing, digit-leading prefix. Parameterised with
+  underscore collapse, lowercasing, digit-leading prefix. Parameterized with
   `rstest #[case]`.
 - `mangle_module_path` — golden tests using the `Golden` struct pattern
   (established in the action-mangling tests). Cover at least: simple path,
@@ -391,7 +394,7 @@ Acceptance behaviours:
 
 - `mangle_module_path("theorems\\windows\\style.theorem")` produces the
   same mangled stem as `mangle_module_path("theorems/windows/style.theorem")`
-  would if path separators were normalised, but different `module_name()`
+  would if path separators were normalized, but different `module_name()`
   values because `hash12` operates on the original path string.
 
 - `mangle_module_path("theorems/123_digit.theorem")` produces a mangled
@@ -414,8 +417,9 @@ Quality criteria:
 - If a gate fails, inspect `/tmp/2-2-1-*.log`, apply minimal corrective
   edits, and rerun only the failing gate before rerunning the full gate
   sequence.
-- The implementation is additive (new functions and tests only); no existing
-  code is modified apart from documentation files.
+- The implementation is largely additive. The `collision` module received minor
+  updates to adopt `CanonicalActionName` newtypes from a follow-up refactoring
+  pass; its public API is unchanged.
 
 ## Artefacts and notes
 
@@ -449,7 +453,7 @@ pub struct MangledModule { /* private fields */ }
 impl MangledModule {
     /// The original path stem (P with `.theorem` removed).
     pub fn stem(&self) -> &str;
-    /// The sanitised stem after `path_mangle`.
+    /// The sanitized stem after `path_mangle`.
     pub fn mangled_stem(&self) -> &str;
     /// The 12-character blake3 hash of the original path.
     pub fn hash(&self) -> &str;
@@ -458,9 +462,9 @@ impl MangledModule {
 }
 
 /// Removes a trailing `.theorem` extension from `path`, if present.
-pub fn path_stem(path: &str) -> &str;
+pub fn path_stem(path: &str) -> PathStem;
 
-/// Sanitises a path stem into a Rust-identifier-safe fragment.
+/// Sanitizes a path stem into a Rust-identifier-safe fragment.
 ///
 /// Algorithm (per `docs/name-mangling-rules.md`):
 /// 1. Replace `/` and `\` with `__`.
@@ -468,7 +472,7 @@ pub fn path_stem(path: &str) -> &str;
 /// 3. Collapse consecutive `_` to a single `_`.
 /// 4. Lowercase the result.
 /// 5. If the result starts with a digit, prefix `_`.
-pub fn path_mangle(stem: &str) -> String;
+pub fn path_mangle(stem: &PathStem) -> String;
 
 /// Mangles a `.theorem` file path into a [`MangledModule`].
 ///

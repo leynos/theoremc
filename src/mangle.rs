@@ -23,7 +23,7 @@
 //! `__theoremc__file__{path_mangle(path_stem(P))}__{hash12(P)}`.
 //!
 //! 1. `path_stem` removes a trailing `.theorem` extension.
-//! 2. `path_mangle` sanitises the stem into an identifier-safe
+//! 2. `path_mangle` sanitizes the stem into an identifier-safe
 //!    fragment (replace separators, collapse underscores, lowercase).
 //! 3. `mangle_module_path` assembles the full module name using
 //!    `hash12` of the **original** path for disambiguation.
@@ -240,7 +240,7 @@ impl MangledModule {
         self.stem.as_str()
     }
 
-    /// The sanitised stem after `path_mangle`.
+    /// The sanitized stem after `path_mangle`.
     #[must_use]
     pub fn mangled_stem(&self) -> &str {
         &self.mangled_stem
@@ -274,43 +274,7 @@ pub fn path_stem(path: &str) -> PathStem {
     PathStem(path.strip_suffix(".theorem").unwrap_or(path).to_owned())
 }
 
-fn replace_separators_and_special_chars(stem: &str) -> String {
-    let mut buf = String::with_capacity(stem.len() + 4);
-    for ch in stem.chars() {
-        match ch {
-            '/' | '\\' => buf.push_str("__"),
-            _ if ch.is_ascii_alphanumeric() || ch == '_' => buf.push(ch),
-            _ => buf.push('_'),
-        }
-    }
-    buf
-}
-
-fn collapse_consecutive_underscores(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    let mut prev_underscore = false;
-    for ch in s.chars() {
-        if ch == '_' {
-            if !prev_underscore {
-                result.push('_');
-            }
-            prev_underscore = true;
-        } else {
-            result.push(ch);
-            prev_underscore = false;
-        }
-    }
-    result
-}
-
-fn prefix_if_digit(mut s: String) -> String {
-    if s.as_bytes().first().is_some_and(u8::is_ascii_digit) {
-        s.insert(0, '_');
-    }
-    s
-}
-
-/// Sanitises a [`PathStem`] into a Rust-identifier-safe fragment.
+/// Sanitizes a [`PathStem`] into a Rust-identifier-safe fragment.
 ///
 /// Algorithm (per `docs/name-mangling-rules.md` §1):
 ///
@@ -328,16 +292,42 @@ fn prefix_if_digit(mut s: String) -> String {
 ///     assert_eq!(path_mangle(&PathStem::from("123foo")), "_123foo");
 #[must_use]
 pub fn path_mangle(stem: &PathStem) -> String {
-    let sanitized = replace_separators_and_special_chars(stem.as_str());
-    let collapsed = collapse_consecutive_underscores(&sanitized);
-    let lowered = collapsed.to_ascii_lowercase();
-    prefix_if_digit(lowered)
+    let s = stem.as_str();
+    let mut buf = String::with_capacity(s.len() + 4);
+    let mut prev_underscore = false;
+
+    // Steps 1–4: map chars, replace separators/specials, collapse `_`,
+    // lowercase.
+    for ch in s.chars() {
+        let mapped = match ch {
+            '/' | '\\' => '_',
+            _ if ch.is_ascii_alphanumeric() || ch == '_' => ch.to_ascii_lowercase(),
+            _ => '_',
+        };
+
+        if mapped == '_' {
+            if !prev_underscore {
+                buf.push('_');
+            }
+            prev_underscore = true;
+        } else {
+            buf.push(mapped);
+            prev_underscore = false;
+        }
+    }
+
+    // Step 5: prefix `_` if leading char is a digit.
+    if buf.as_bytes().first().is_some_and(u8::is_ascii_digit) {
+        buf.insert(0, '_');
+    }
+
+    buf
 }
 
 /// Mangles a `.theorem` file path into a [`MangledModule`].
 ///
 /// The `hash12` is computed from the **original** path, not the
-/// mangled stem, so paths that sanitise identically still produce
+/// mangled stem, so paths that sanitize identically still produce
 /// distinct module names.
 ///
 /// # Examples

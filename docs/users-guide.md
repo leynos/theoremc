@@ -452,9 +452,9 @@ __theoremc__file__{path_mangle(path_stem(P))}__{hash12(P)}
 
 ### Path mangling functions
 
-- `path_stem(path)` — removes a trailing `.theorem` extension if present;
-  otherwise returns `path` unchanged.
-- `path_mangle(stem)` — sanitises a path stem into a Rust-identifier-safe
+- `path_stem(path) -> PathStem` — removes a trailing `.theorem` extension if
+  present; otherwise returns `path` unchanged.
+- `path_mangle(&PathStem)` — sanitizes a path stem into a Rust-identifier-safe
   fragment using the five-step algorithm from `docs/name-mangling-rules.md` §1:
   1. Replace `/` and `\` with `__`.
   2. Replace any character not in `[A-Za-z0-9_]` with `_`.
@@ -484,7 +484,7 @@ assert_eq!(
 
 ### Collision resistance
 
-Paths that differ only in characters lost during sanitisation (e.g.,
+Paths that differ only in characters lost during sanitization (e.g.,
 `theorems/my-file.theorem` and `theorems/my_file.theorem`) produce the same
 mangled stem but different module names because `hash12` operates on the
 original path string. The 12-character blake3 hash suffix provides the real

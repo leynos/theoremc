@@ -154,47 +154,24 @@ fn golden_leading_underscores() {
 
 #[test]
 fn underscore_placement_produces_distinct_slugs() {
-    // "a.b_c" and "a_b.c" must produce different slugs to preserve
-    // injectivity.
     let slug_a = action_slug(&can("a.b_c"));
     let slug_b = action_slug(&can("a_b.c"));
-    assert_ne!(
-        slug_a, slug_b,
-        "different canonical names must produce different slugs: \
-         {slug_a} vs {slug_b}",
-    );
+    assert_ne!(slug_a, slug_b);
 }
 
 #[test]
 fn underscore_placement_produces_distinct_identifiers() {
     let m_a = mangle_action_name(&can("a.b_c"));
     let m_b = mangle_action_name(&can("a_b.c"));
-    assert_ne!(
-        m_a.identifier(),
-        m_b.identifier(),
-        "different canonical names must produce different identifiers",
-    );
+    assert_ne!(m_a.identifier(), m_b.identifier());
 }
 
 #[test]
-fn path_starts_with_resolution_target() {
+fn action_path_structural_properties() {
     let m = mangle_action_name(&can("account.deposit"));
     let prefix = format!("{RESOLUTION_TARGET}::");
-    assert!(
-        m.path().starts_with(&prefix),
-        "path must begin with resolution target: {}",
-        m.path(),
-    );
-}
-
-#[test]
-fn path_ends_with_identifier() {
-    let m = mangle_action_name(&can("account.deposit"));
-    assert!(
-        m.path().ends_with(m.identifier()),
-        "path must end with identifier: {}",
-        m.path(),
-    );
+    assert!(m.path().starts_with(&prefix));
+    assert!(m.path().ends_with(m.identifier()));
 }
 
 // ── path_stem tests ───────────────────────────────────────────────
@@ -226,6 +203,7 @@ fn path_stem_cases(#[case] input: &str, #[case] expected: &str) {
 #[case::consecutive_specials("a--b..c", "a_b_c")]
 #[case::trailing_separator("dir/", "dir_")]
 #[case::no_transform("simple", "simple")]
+#[case::unicode_non_ascii("théorèmes/αβ", "th_or_mes_")]
 fn path_mangle_cases(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(path_mangle(&PathStem::from(input)), expected);
 }
@@ -326,67 +304,52 @@ fn golden_digit_leading() {
     .assert();
 }
 
+#[test]
+fn golden_empty_path() {
+    ModuleGolden {
+        path: "",
+        stem: "",
+        mangled_stem: "",
+        hash: "af1349b9f5f9",
+        module_name: "__theoremc__file____af1349b9f5f9",
+    }
+    .assert();
+}
+
+#[test]
+fn golden_dot_theorem() {
+    ModuleGolden {
+        path: ".theorem",
+        stem: "",
+        mangled_stem: "",
+        hash: "f9d6885cf913",
+        module_name: "__theoremc__file____f9d6885cf913",
+    }
+    .assert();
+}
+
 // ── Disambiguation tests ─────────────────────────────────────────
 
 #[test]
 fn hyphen_vs_underscore_disambiguation() {
-    // "my-file" and "my_file" both mangle to the same stem but
-    // the hash of the original path disambiguates.
     let m_hyphen = mangle_module_path("theorems/my-file.theorem");
     let m_under = mangle_module_path("theorems/my_file.theorem");
-    assert_eq!(
-        m_hyphen.mangled_stem(),
-        m_under.mangled_stem(),
-        "mangled stems should be identical",
-    );
-    assert_ne!(
-        m_hyphen.module_name(),
-        m_under.module_name(),
-        "module names must differ due to hash",
-    );
+    assert_eq!(m_hyphen.mangled_stem(), m_under.mangled_stem());
+    assert_ne!(m_hyphen.module_name(), m_under.module_name());
 }
 
 #[test]
 fn forward_vs_backslash_disambiguation() {
-    // Forward and backslash paths mangle identically but the
-    // original-path hash keeps module names distinct.
     let m_fwd = mangle_module_path("theorems/windows/style.theorem");
     let m_back = mangle_module_path("theorems\\windows\\style.theorem");
-    assert_eq!(
-        m_fwd.mangled_stem(),
-        m_back.mangled_stem(),
-        "mangled stems should be identical",
-    );
-    assert_ne!(
-        m_fwd.module_name(),
-        m_back.module_name(),
-        "module names must differ due to hash",
-    );
+    assert_eq!(m_fwd.mangled_stem(), m_back.mangled_stem());
+    assert_ne!(m_fwd.module_name(), m_back.module_name());
 }
 
 #[test]
-fn module_name_starts_with_prefix() {
+fn module_name_structural_properties() {
     let m = mangle_module_path("theorems/bidirectional.theorem");
-    assert!(
-        m.module_name().starts_with("__theoremc__file__"),
-        "module name must start with prefix: {}",
-        m.module_name(),
-    );
-}
-
-#[test]
-fn module_name_ends_with_hash() {
-    let m = mangle_module_path("theorems/bidirectional.theorem");
-    assert!(
-        m.module_name().ends_with(m.hash()),
-        "module name must end with hash: {}",
-        m.module_name(),
-    );
-}
-
-#[test]
-fn module_name_is_deterministic() {
-    let first = mangle_module_path("theorems/bidirectional.theorem");
-    let second = mangle_module_path("theorems/bidirectional.theorem");
-    assert_eq!(first, second);
+    assert!(m.module_name().starts_with("__theoremc__file__"));
+    assert!(m.module_name().ends_with(m.hash()));
+    assert_eq!(m, mangle_module_path("theorems/bidirectional.theorem"));
 }

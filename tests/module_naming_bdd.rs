@@ -85,7 +85,7 @@ fn then_module_names_distinct_because_hash_suffixes_differ() {
     let m_hyphen = mangle_module_path("theorems/my-file.theorem");
     let m_under = mangle_module_path("theorems/my_file.theorem");
 
-    // Both sanitise to the same mangled stem.
+    // Both sanitize to the same mangled stem.
     assert_eq!(
         m_hyphen.mangled_stem(),
         m_under.mangled_stem(),

@@ -20,6 +20,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::mangle::{CanonicalActionName, mangle_action_name};
 use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc};
 
+/// Mangles a canonical action name string and returns the identifier.
+fn mangle_to_identifier(name: &str) -> String {
+    let can = CanonicalActionName::new_unchecked(name);
+    mangle_action_name(&can).identifier().to_owned()
+}
+
 // ── Public entry point ──────────────────────────────────────────────
 
 /// Checks for mangled-identifier collisions across loaded theorem
@@ -57,10 +63,7 @@ use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc};
 ///     let docs = load_theorem_docs(yaml).expect("failed to load theorem docs");
 ///     assert!(check_action_collisions(&docs).is_ok());
 pub fn check_action_collisions(docs: &[TheoremDoc]) -> Result<(), SchemaError> {
-    check_action_collisions_with(docs, |name| {
-        let can = CanonicalActionName::new_unchecked(name);
-        mangle_action_name(&can).identifier().to_owned()
-    })
+    check_action_collisions_with(docs, mangle_to_identifier)
 }
 
 /// Checks for mangled-identifier collisions using a caller-supplied
@@ -186,10 +189,7 @@ fn unique_canonical_names<'a>(
 /// different canonical names produce the same mangled identifier.
 #[cfg(test)]
 fn find_mangled_collisions(canonical_names: &BTreeSet<&str>) -> BTreeMap<String, BTreeSet<String>> {
-    find_mangled_collisions_with(canonical_names, |name| {
-        let can = CanonicalActionName::new_unchecked(name);
-        mangle_action_name(&can).identifier().to_owned()
-    })
+    find_mangled_collisions_with(canonical_names, mangle_to_identifier)
 }
 
 /// Groups canonical names by the identifier produced by `mangler`,
