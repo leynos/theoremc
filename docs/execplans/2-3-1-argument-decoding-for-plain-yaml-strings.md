@@ -399,18 +399,19 @@ pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, RawDocDecodeError> {
 }
 ```
 
-Since `to_theorem_doc` now returns `Result<..., RawDocDecodeError>`, the loader
-stringifies the error at the boundary when building
-`SchemaError::ValidationFailed`:
+Since `to_theorem_doc` now returns `Result<..., RawDocDecodeError>`, the
+loader stringifies the error at the boundary and attaches a source-location
+diagnostic via `attach_validation_diagnostic`:
 
 ```rust
 let doc = raw_doc.to_theorem_doc().map_err(|decode_err| {
     let reason = decode_err.to_string();
-    SchemaError::ValidationFailed {
+    let error = SchemaError::ValidationFailed {
         theorem: raw_doc.theorem.value.to_string(),
         reason,
         diagnostic: None,
-    }
+    };
+    attach_validation_diagnostic(error, source, &raw_doc)
 })?;
 ```
 
