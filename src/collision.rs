@@ -17,13 +17,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::mangle::{CanonicalActionName, mangle_action_name};
+use crate::mangle::mangle_action_name;
 use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc};
 
 /// Mangles a canonical action name string and returns the identifier.
 fn mangle_to_identifier(name: &str) -> String {
-    let can = CanonicalActionName::new_unchecked(name);
-    mangle_action_name(&can).identifier().to_owned()
+    mangle_action_name(name).identifier().to_owned()
 }
 
 // ── Public entry point ──────────────────────────────────────────────

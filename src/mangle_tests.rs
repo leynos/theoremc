@@ -39,7 +39,7 @@ fn segment_escape_cases(#[case] input: &str, #[case] expected: &str) {
 #[case::lone_underscore_segment("ns._", "ns___u")]
 #[case::minimal("x.y", "x__y")]
 fn action_slug_cases(#[case] input: &str, #[case] expected: &str) {
-    assert_eq!(action_slug(&can(input)), expected);
+    assert_eq!(action_slug(can(input)), expected);
 }
 
 #[rstest]
@@ -79,96 +79,46 @@ fn hash12_is_deterministic() {
     assert_eq!(first, second);
 }
 
-/// Expected golden values for a mangled action name.
-struct ActionGolden<'a> {
-    canonical: &'a str,
-    slug: &'a str,
-    hash: &'a str,
-    identifier: &'a str,
-    path: &'a str,
-}
-
-impl ActionGolden<'_> {
-    fn assert(&self) {
-        let m = mangle_action_name(&can(self.canonical));
-        assert_eq!(m.slug(), self.slug, "slug");
-        assert_eq!(m.hash(), self.hash, "hash");
-        assert_eq!(m.identifier(), self.identifier, "identifier");
-        assert_eq!(m.path(), self.path, "path");
-    }
-}
-
-/// Builds the expected resolution path from `RESOLUTION_TARGET`
-/// and the given identifier, so the target is not duplicated.
-fn expected_path(identifier: &str) -> String {
-    format!("{RESOLUTION_TARGET}::{identifier}")
-}
-
-#[test]
-fn golden_account_deposit() {
-    ActionGolden {
-        canonical: "account.deposit",
-        slug: "account__deposit",
-        hash: "05158894bfb4",
-        identifier: "account__deposit__h05158894bfb4",
-        path: &expected_path("account__deposit__h05158894bfb4"),
-    }
-    .assert();
-}
-
-#[test]
-fn golden_hnsw_attach_node() {
-    ActionGolden {
-        canonical: "hnsw.attach_node",
-        slug: "hnsw__attach_unode",
-        hash: "8d74e77b55f2",
-        identifier: "hnsw__attach_unode__h8d74e77b55f2",
-        path: &expected_path("hnsw__attach_unode__h8d74e77b55f2"),
-    }
-    .assert();
-}
-
-#[test]
-fn golden_three_segments() {
-    ActionGolden {
-        canonical: "hnsw.graph.with_capacity",
-        slug: "hnsw__graph__with_ucapacity",
-        hash: "9eafdf8834ec",
-        identifier: "hnsw__graph__with_ucapacity__h9eafdf8834ec",
-        path: &expected_path("hnsw__graph__with_ucapacity__h9eafdf8834ec"),
-    }
-    .assert();
-}
-
-#[test]
-fn golden_leading_underscores() {
-    ActionGolden {
-        canonical: "_a._b",
-        slug: "_ua___ub",
-        hash: "0a39aa24f512",
-        identifier: "_ua___ub__h0a39aa24f512",
-        path: &expected_path("_ua___ub__h0a39aa24f512"),
-    }
-    .assert();
+#[rstest]
+#[case::account_deposit("account.deposit", "account__deposit", "05158894bfb4")]
+#[case::hnsw_attach_node("hnsw.attach_node", "hnsw__attach_unode", "8d74e77b55f2")]
+#[case::three_segments(
+    "hnsw.graph.with_capacity",
+    "hnsw__graph__with_ucapacity",
+    "9eafdf8834ec"
+)]
+#[case::leading_underscores("_a._b", "_ua___ub", "0a39aa24f512")]
+fn mangle_action_name_golden_cases(
+    #[case] canonical: &str,
+    #[case] expected_slug: &str,
+    #[case] expected_hash: &str,
+) {
+    let m = mangle_action_name(can(canonical));
+    assert_eq!(m.slug(), expected_slug, "slug");
+    assert_eq!(m.hash(), expected_hash, "hash");
+    let expected_ident = format!("{expected_slug}__h{expected_hash}");
+    assert_eq!(m.identifier(), expected_ident, "identifier");
+    let expected_path = format!("{RESOLUTION_TARGET}::{expected_ident}");
+    assert_eq!(m.path(), expected_path, "path");
 }
 
 #[test]
 fn underscore_placement_produces_distinct_slugs() {
-    let slug_a = action_slug(&can("a.b_c"));
-    let slug_b = action_slug(&can("a_b.c"));
+    let slug_a = action_slug(can("a.b_c"));
+    let slug_b = action_slug(can("a_b.c"));
     assert_ne!(slug_a, slug_b);
 }
 
 #[test]
 fn underscore_placement_produces_distinct_identifiers() {
-    let m_a = mangle_action_name(&can("a.b_c"));
-    let m_b = mangle_action_name(&can("a_b.c"));
+    let m_a = mangle_action_name(can("a.b_c"));
+    let m_b = mangle_action_name(can("a_b.c"));
     assert_ne!(m_a.identifier(), m_b.identifier());
 }
 
 #[test]
 fn action_path_structural_properties() {
-    let m = mangle_action_name(&can("account.deposit"));
+    let m = mangle_action_name(can("account.deposit"));
     let prefix = format!("{RESOLUTION_TARGET}::");
     assert!(m.path().starts_with(&prefix));
     assert!(m.path().ends_with(m.identifier()));

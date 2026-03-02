@@ -30,22 +30,47 @@
 
 // ── Domain newtypes ───────────────────────────────────────────────
 
+/// Error returned when a string is not a valid canonical action name.
+///
+/// A valid canonical action name has at least two dot-separated
+/// segments, each matching `^[A-Za-z_][A-Za-z0-9_]*$` and not a
+/// Rust reserved keyword.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("invalid canonical action name '{name}': {reason}")]
+pub struct InvalidCanonicalActionName {
+    pub(crate) name: String,
+    pub(crate) reason: String,
+}
+
 /// A validated canonical action name (e.g. `"account.deposit"`).
 ///
-/// # Examples
+/// Construct via [`CanonicalActionName::new`] (fallible) or
+/// [`TryFrom`]. Use [`new_unchecked`](Self::new_unchecked) only
+/// when the input has already been validated upstream.
 ///
 ///     use theoremc::mangle::CanonicalActionName;
-///
-///     let name = CanonicalActionName::new_unchecked("account.deposit");
+///     let name = CanonicalActionName::new("account.deposit")
+///         .expect("valid canonical name");
 ///     assert_eq!(name.as_str(), "account.deposit");
-///
-///     let from_str: CanonicalActionName = "account.deposit".into();
-///     assert_eq!(from_str.as_str(), "account.deposit");
+///     assert!(CanonicalActionName::new("deposit").is_err());
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CanonicalActionName(String);
 
 impl CanonicalActionName {
-    /// Wraps a pre-validated canonical action name.
+    /// Validates and wraps a canonical action name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidCanonicalActionName`] when the input does
+    /// not satisfy the canonical grammar.
+    pub fn new(value: &str) -> Result<Self, InvalidCanonicalActionName> {
+        validate::validate_canonical(value)?;
+        Ok(Self(value.to_owned()))
+    }
+
+    /// Wraps a pre-validated canonical action name without
+    /// re-checking the grammar. Prefer [`new`](Self::new) unless
+    /// the input has already been validated.
     #[must_use]
     pub fn new_unchecked(value: &str) -> Self {
         Self(value.to_owned())
@@ -64,24 +89,27 @@ impl AsRef<str> for CanonicalActionName {
     }
 }
 
-impl From<&str> for CanonicalActionName {
-    fn from(s: &str) -> Self {
-        Self(s.to_owned())
+impl TryFrom<&str> for CanonicalActionName {
+    type Error = InvalidCanonicalActionName;
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Self::new(s)
     }
 }
 
-impl From<String> for CanonicalActionName {
-    fn from(s: String) -> Self {
-        Self(s)
+impl TryFrom<String> for CanonicalActionName {
+    type Error = InvalidCanonicalActionName;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        validate::validate_canonical(&s)?;
+        Ok(Self(s))
     }
 }
+
+#[path = "mangle_validate.rs"]
+mod validate;
 
 /// A path stem: a `.theorem` file path with its extension removed.
 ///
-/// # Examples
-///
 ///     use theoremc::mangle::PathStem;
-///
 ///     let stem = PathStem::from("foo/bar");
 ///     assert_eq!(stem.as_str(), "foo/bar");
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,10 +184,7 @@ impl MangledAction {
 
 /// Escapes a single action-name segment by replacing `_` with `_u`.
 ///
-/// # Examples
-///
 ///     use theoremc::mangle::segment_escape;
-///
 ///     assert_eq!(segment_escape("deposit"), "deposit");
 ///     assert_eq!(segment_escape("attach_node"), "attach_unode");
 #[must_use]
@@ -175,21 +200,21 @@ pub fn segment_escape(segment: &str) -> String {
     result
 }
 
-/// Builds the escaped slug from a [`CanonicalActionName`].
+/// Builds the escaped slug from a canonical action name.
 ///
-/// Splits the name on `.`, applies [`segment_escape`] to each
-/// segment, and joins the escaped segments with `__`.
-///
-/// # Examples
+/// Splits on `.`, applies [`segment_escape`] to each segment, and
+/// joins with `__`. Accepts `&str`, `String`, or
+/// `&CanonicalActionName`.
 ///
 ///     use theoremc::mangle::{CanonicalActionName, action_slug};
-///
+///     assert_eq!(action_slug("account.deposit"), "account__deposit");
 ///     let name = CanonicalActionName::new_unchecked("account.deposit");
 ///     assert_eq!(action_slug(&name), "account__deposit");
 #[must_use]
-pub fn action_slug(canonical_name: &CanonicalActionName) -> String {
-    let mut slug = String::with_capacity(canonical_name.as_str().len() * 2);
-    let mut segments = canonical_name.as_str().split('.');
+pub fn action_slug(canonical_name: impl AsRef<str>) -> String {
+    let s = canonical_name.as_ref();
+    let mut slug = String::with_capacity(s.len() * 2);
+    let mut segments = s.split('.');
     if let Some(first) = segments.next() {
         slug.push_str(&segment_escape(first));
     }
@@ -200,15 +225,11 @@ pub fn action_slug(canonical_name: &CanonicalActionName) -> String {
     slug
 }
 
-/// Computes the first 12 lowercase hex characters of the blake3 hash
-/// of the given value.
-///
-/// # Examples
+/// Computes the first 12 lowercase hex characters of the blake3
+/// hash of the given value.
 ///
 ///     use theoremc::mangle::hash12;
-///
-///     let h = hash12("account.deposit");
-///     assert_eq!(h, "05158894bfb4");
+///     assert_eq!(hash12("account.deposit"), "05158894bfb4");
 #[must_use]
 pub fn hash12(value: &str) -> String {
     let digest = blake3::hash(value.as_bytes());
@@ -216,19 +237,17 @@ pub fn hash12(value: &str) -> String {
     hex.as_str().get(..12).unwrap_or_default().to_owned()
 }
 
-/// Mangles a [`CanonicalActionName`] into a [`MangledAction`].
+/// Mangles a canonical action name into a [`MangledAction`].
+/// Accepts `&str`, `String`, or `&CanonicalActionName`.
 ///
-/// # Examples
-///
-///     use theoremc::mangle::{CanonicalActionName, mangle_action_name};
-///
-///     let name = CanonicalActionName::new_unchecked("account.deposit");
-///     let m = mangle_action_name(&name);
+///     use theoremc::mangle::mangle_action_name;
+///     let m = mangle_action_name("account.deposit");
 ///     assert_eq!(m.identifier(), "account__deposit__h05158894bfb4");
 #[must_use]
-pub fn mangle_action_name(canonical_name: &CanonicalActionName) -> MangledAction {
-    let slug = action_slug(canonical_name);
-    let hash = hash12(canonical_name.as_str());
+pub fn mangle_action_name(canonical_name: impl AsRef<str>) -> MangledAction {
+    let s = canonical_name.as_ref();
+    let slug = action_slug(s);
+    let hash = hash12(s);
     let identifier = format!("{slug}__h{hash}");
     let path = format!("{RESOLUTION_TARGET}::{identifier}");
     MangledAction {
@@ -284,10 +303,7 @@ impl MangledModule {
 /// a [`PathStem`]. Returns the path unchanged when no `.theorem`
 /// suffix exists.
 ///
-/// # Examples
-///
 ///     use theoremc::mangle::path_stem;
-///
 ///     assert_eq!(path_stem("foo/bar.theorem").as_str(), "foo/bar");
 ///     assert_eq!(path_stem("no_extension").as_str(), "no_extension");
 #[must_use]
@@ -299,8 +315,8 @@ pub fn path_stem(path: &str) -> PathStem {
 ///
 /// Algorithm (per `docs/name-mangling-rules.md` §1):
 ///
-/// 1. Replace `/` and `\` with `__`.
-/// 2. Replace any character not in `[A-Za-z0-9_]` with `_`.
+/// 1. Map `/` and `\` to `_`.
+/// 2. Map any character not in `[A-Za-z0-9_]` to `_`.
 /// 3. Collapse consecutive `_` to a single `_`.
 /// 4. Lowercase the result.
 /// 5. If the result starts with a digit, prefix `_`.
@@ -308,7 +324,6 @@ pub fn path_stem(path: &str) -> PathStem {
 /// # Examples
 ///
 ///     use theoremc::mangle::{PathStem, path_mangle};
-///
 ///     assert_eq!(path_mangle(&PathStem::from("theorems/bidirectional")), "theorems_bidirectional");
 ///     assert_eq!(path_mangle(&PathStem::from("123foo")), "_123foo");
 #[must_use]
@@ -349,10 +364,7 @@ pub fn path_mangle(stem: &PathStem) -> String {
 /// mangled stem, so paths that sanitize identically still produce
 /// distinct module names.
 ///
-/// # Examples
-///
 ///     use theoremc::mangle::mangle_module_path;
-///
 ///     let m = mangle_module_path("theorems/bidirectional.theorem");
 ///     assert_eq!(m.mangled_stem(), "theorems_bidirectional");
 #[must_use]
