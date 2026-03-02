@@ -1,0 +1,18 @@
+Theorem: ArgRefEmpty
+About: An empty ref target should be rejected
+Let:
+  result:
+    call:
+      action: graph.attach
+      args:
+        target: { ref: "" }
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable

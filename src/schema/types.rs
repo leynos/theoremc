@@ -8,6 +8,7 @@
 use indexmap::IndexMap;
 use serde::Deserialize;
 
+use super::arg_value::ArgValue;
 use super::newtypes::{ForallVar, TheoremName};
 use super::value::TheoremValue;
 
@@ -39,60 +40,47 @@ use super::value::TheoremValue;
 ///     "#;
 ///     let docs = load_theorem_docs(yaml).unwrap();
 ///     assert_eq!(docs.len(), 1);
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TheoremDoc {
     /// Schema version for forwards compatibility.
     ///
     /// When omitted in the YAML source the field is `None`, indicating
     /// "unspecified — treat as current default".
-    #[serde(rename = "Schema", alias = "schema", default)]
     pub schema: Option<u32>,
 
     /// Unique theorem name (must be a valid Rust identifier, not a
     /// reserved keyword). Validated at deserialization time.
-    #[serde(rename = "Theorem", alias = "theorem")]
     pub theorem: TheoremName,
 
     /// Human-readable description of the theorem's intent.
-    #[serde(rename = "About", alias = "about")]
     pub about: String,
 
     /// Metadata tags for filtering, ownership, and reporting.
-    #[serde(rename = "Tags", alias = "tags", default)]
     pub tags: Vec<String>,
 
     /// Narrative context (no codegen impact).
-    #[serde(rename = "Given", alias = "given", default)]
     pub given: Vec<String>,
 
     /// Symbolic quantified variables mapped to Rust types.
-    #[serde(rename = "Forall", alias = "forall", default)]
     pub forall: IndexMap<ForallVar, String>,
 
     /// Constraints on symbolic inputs.
-    #[serde(rename = "Assume", alias = "assume", default)]
     pub assume: Vec<Assumption>,
 
     /// Non-vacuity witnesses (required unless vacuity is explicitly
     /// allowed).
-    #[serde(rename = "Witness", alias = "witness", default)]
     pub witness: Vec<WitnessCheck>,
 
     /// Named fixtures and derived constants.
-    #[serde(rename = "Let", alias = "let", default)]
     pub let_bindings: IndexMap<String, LetBinding>,
 
     /// Ordered sequence of theorem steps.
-    #[serde(rename = "Do", alias = "do", default)]
     pub do_steps: Vec<Step>,
 
     /// Proof obligations (must be non-empty).
-    #[serde(rename = "Prove", alias = "prove")]
     pub prove: Vec<Assertion>,
 
     /// Backend evidence configuration.
-    #[serde(rename = "Evidence", alias = "evidence")]
     pub evidence: Evidence,
 }
 
@@ -148,8 +136,7 @@ pub struct WitnessCheck {
 /// Only `call` and `must` forms are allowed in `Let` bindings. The
 /// `maybe` form is disallowed because conditional existence of
 /// bindings creates scoping complexity.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LetBinding {
     /// Invoke an action and bind the result.
     Call(LetCall),
@@ -159,16 +146,14 @@ pub enum LetBinding {
 }
 
 /// Wrapper for a `call` variant in a `Let` binding.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LetCall {
     /// The action call to execute.
     pub call: ActionCall,
 }
 
 /// Wrapper for a `must` variant in a `Let` binding.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LetMust {
     /// The action call to execute and prove infallible.
     pub must: ActionCall,
@@ -180,8 +165,7 @@ pub struct LetMust {
 ///
 /// Each step is exactly one of `call` (invoke), `must` (invoke and
 /// prove infallible), or `maybe` (symbolic branching).
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Step {
     /// Invoke an action.
     Call(StepCall),
@@ -193,24 +177,21 @@ pub enum Step {
 }
 
 /// Wrapper for a `call` variant in a `Do` step.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StepCall {
     /// The action call to execute.
     pub call: ActionCall,
 }
 
 /// Wrapper for a `must` variant in a `Do` step.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StepMust {
     /// The action call to execute and prove infallible.
     pub must: ActionCall,
 }
 
 /// Wrapper for a `maybe` variant in a `Do` step.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StepMaybe {
     /// The maybe block with a reason and nested steps.
     pub maybe: MaybeBlock,
@@ -222,29 +203,30 @@ pub struct StepMaybe {
 ///
 /// The model checker explores both the branch where the nested steps
 /// execute and the branch where they do not.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MaybeBlock {
     /// Human-readable explanation of why this branch exists.
     pub because: String,
     /// The nested steps to execute in the "taken" branch.
-    #[serde(rename = "do")]
     pub do_steps: Vec<Step>,
 }
 
 // ── Action call ─────────────────────────────────────────────────────
 
-/// An invocation of a theorem action with arguments and optional
-/// result binding.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+/// An invocation of a theorem action with semantically decoded
+/// arguments and optional result binding.
+///
+/// Arguments are decoded from raw YAML values into [`ArgValue`]
+/// variants during the raw-to-public conversion step. Plain YAML
+/// strings are always string literals; variable references require
+/// the explicit `{ ref: <name> }` wrapper (`TFS-5` section 5.2).
+#[derive(Debug, Clone, PartialEq)]
 pub struct ActionCall {
     /// Dot-separated action name (e.g., `hnsw.attach_node`).
     pub action: String,
-    /// Arguments passed to the action, keyed by parameter name.
-    pub args: IndexMap<String, TheoremValue>,
+    /// Semantically decoded arguments, keyed by parameter name.
+    pub args: IndexMap<String, ArgValue>,
     /// Optional binding name for the action's return value.
-    #[serde(rename = "as", default)]
     pub as_binding: Option<String>,
 }
 

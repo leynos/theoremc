@@ -1,0 +1,19 @@
+Theorem: ArgStringLiteral
+About: Plain string arguments are decoded as string literals
+Let:
+  result:
+    call:
+      action: label.set
+      args:
+        name: "hello"
+        tag: world
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable

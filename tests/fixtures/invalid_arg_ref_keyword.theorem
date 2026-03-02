@@ -1,0 +1,18 @@
+Theorem: ArgRefKeyword
+About: A ref target that is a Rust keyword should be rejected
+Let:
+  result:
+    call:
+      action: graph.attach
+      args:
+        target: { ref: fn }
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
