@@ -8,6 +8,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, de::Error};
 use serde_saphyr::{Location, Spanned};
 
+use super::arg_value::ArgDecodeError;
 use super::newtypes::{ForallVar, TheoremName};
 use super::raw_action::{self, RawLetBinding, RawStep};
 use super::types::{Evidence, KaniEvidence, KaniExpectation, TheoremDoc};
@@ -73,6 +74,37 @@ enum ValidationKind {
     KaniUnwind,
     KaniAllowVacuousRequired,
     KaniVacuityBecauseNonEmpty,
+}
+
+/// Errors raised during the raw-to-public conversion in
+/// [`RawTheoremDoc::to_theorem_doc`].
+///
+/// Each variant identifies the location (binding name or step index)
+/// and wraps the underlying [`ArgDecodeError`] as a `#[source]` so
+/// the full error chain is preserved. Stringification is deferred to
+/// the loader boundary when building
+/// [`SchemaError::ValidationFailed`](super::error::SchemaError::ValidationFailed).
+#[derive(Debug, Clone, thiserror::Error)]
+pub(crate) enum RawDocDecodeError {
+    /// An argument in a `Let` binding failed decoding.
+    #[error("Let binding '{name}': {source}")]
+    LetBinding {
+        /// The binding name from the `Let` map.
+        name: String,
+        /// The underlying argument decoding failure.
+        #[source]
+        source: ArgDecodeError,
+    },
+
+    /// An argument in a `Do` step failed decoding.
+    #[error("Do step {index}: {source}")]
+    DoStep {
+        /// One-based step index in the `Do` list.
+        index: usize,
+        /// The underlying argument decoding failure.
+        #[source]
+        source: ArgDecodeError,
+    },
 }
 
 /// Raw theorem document with location-carrying fields.
@@ -161,9 +193,9 @@ impl RawTheoremDoc {
     ///
     /// # Errors
     ///
-    /// Returns an error string when an argument value fails decoding
-    /// (e.g., an invalid `{ ref: ... }` target).
-    pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, String> {
+    /// Returns [`RawDocDecodeError`] when an argument value fails
+    /// decoding (e.g., an invalid `{ ref: ... }` target).
+    pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, RawDocDecodeError> {
         let let_bindings = convert_let_bindings(&self.let_bindings)?;
         let do_steps = convert_steps(&self.do_steps)?;
 
@@ -299,22 +331,29 @@ impl RawKaniEvidence {
 /// Converts a map of raw `Let` bindings, decoding argument values.
 fn convert_let_bindings(
     raw: &IndexMap<String, RawLetBinding>,
-) -> Result<IndexMap<String, super::types::LetBinding>, String> {
+) -> Result<IndexMap<String, super::types::LetBinding>, RawDocDecodeError> {
     let mut out = IndexMap::with_capacity(raw.len());
     for (name, binding) in raw {
-        let converted = raw_action::convert_let_binding(binding)
-            .map_err(|e| format!("Let binding '{name}': {e}"))?;
+        let converted = raw_action::convert_let_binding(binding).map_err(|source| {
+            RawDocDecodeError::LetBinding {
+                name: name.clone(),
+                source,
+            }
+        })?;
         out.insert(name.clone(), converted);
     }
     Ok(out)
 }
 
 /// Converts a list of raw `Do` steps, decoding argument values.
-fn convert_steps(raw: &[RawStep]) -> Result<Vec<super::types::Step>, String> {
+fn convert_steps(raw: &[RawStep]) -> Result<Vec<super::types::Step>, RawDocDecodeError> {
     let mut out = Vec::with_capacity(raw.len());
     for (i, step) in raw.iter().enumerate() {
         let converted =
-            raw_action::convert_step(step).map_err(|e| format!("Do step {}: {e}", i + 1))?;
+            raw_action::convert_step(step).map_err(|source| RawDocDecodeError::DoStep {
+                index: i + 1,
+                source,
+            })?;
         out.push(converted);
     }
     Ok(out)

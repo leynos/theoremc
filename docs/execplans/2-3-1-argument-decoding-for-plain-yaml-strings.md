@@ -74,8 +74,9 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
   conversion step is needed. Severity: high. Likelihood: certain (by design).
   Mitigation: use a two-stage approach — serde deserializes into `TheoremValue`
   in the raw layer as before, then a conversion function
-  `decode_arg_value(TheoremValue) -> Result<ArgValue, String>` runs during the
-  raw-to-public conversion step in `RawTheoremDoc::to_theorem_doc()`.
+  `pub fn decode_arg_value(TheoremValue) -> Result<ArgValue, ArgDecodeError>`
+  runs during the raw-to-public conversion step in
+  `RawTheoremDoc::to_theorem_doc()`.
 
 - Risk: `src/schema/types.rs` is already 312 lines. Adding `ArgValue` and
   `LiteralValue` types could push it near the 400-line limit. Severity: medium.
@@ -308,10 +309,10 @@ In `src/schema/arg_value.rs`, add a public conversion function:
 ///   value is invalid → `Err(...)` with an actionable message.
 /// - `TheoremValue::Mapping(m)` (any other map) →
 ///   `ArgValue::RawMap(m)` (preserved for future lowering).
-pub(crate) fn decode_arg_value(
+pub fn decode_arg_value(
     param_name: &str,
     value: TheoremValue,
-) -> Result<ArgValue, String> { ... }
+) -> Result<ArgValue, ArgDecodeError> { ... }
 ```
 
 The `param_name` argument is used in error messages to identify which argument
@@ -368,11 +369,11 @@ keep `raw.rs` under 400 lines (currently 316 lines).
 - `RawActionCall` — same as current `ActionCall` but with `TheoremValue` args
 - `RawLetCall`, `RawLetMust`, `RawLetBinding` — mirrors of public types
 - `RawStepCall`, `RawStepMust`, `RawStepMaybe`, `RawMaybeBlock`, `RawStep`
-- `convert_action_call(raw: &RawActionCall) -> Result<ActionCall, String>` —
-  decodes args via `decode_arg_value`
-- `convert_let_binding(raw: &RawLetBinding) -> Result<(String, LetBinding), String>`
-- `convert_step(raw: &RawStep) -> Result<Step, String>` — recursive for maybe
-  blocks
+- `convert_action_call(raw: &RawActionCall) -> Result<ActionCall, ArgDecodeError>`
+  — decodes args via `decode_arg_value`
+- `convert_let_binding(raw: &RawLetBinding) -> Result<LetBinding, ArgDecodeError>`
+- `convert_step(raw: &RawStep) -> Result<Step, ArgDecodeError>` — recursive for
+  maybe blocks
 
 All serde attributes (`deny_unknown_fields`, `untagged`, renames) mirror the
 public types exactly.
@@ -386,33 +387,25 @@ pub(crate) do_steps: Vec<RawStep>,                          // was Step
 
 Import from `super::raw_action::{RawLetBinding, RawStep}`.
 
-The `to_theorem_doc()` method changes to call the conversion functions:
+The `to_theorem_doc()` method changes to call the conversion functions.
+`convert_let_bindings` and `convert_steps` construct `RawDocDecodeError`
+variants that wrap the underlying `ArgDecodeError` as a `#[source]`:
 
 ```rust
-pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, String> {
-    let mut let_bindings = IndexMap::with_capacity(self.let_bindings.len());
-    for (name, raw_binding) in &self.let_bindings {
-        let binding = raw_action::convert_let_binding(raw_binding)?;
-        let_bindings.insert(name.clone(), binding);
-    }
-    let mut do_steps = Vec::with_capacity(self.do_steps.len());
-    for raw_step in &self.do_steps {
-        do_steps.push(raw_action::convert_step(raw_step)?);
-    }
+pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, RawDocDecodeError> {
+    let let_bindings = convert_let_bindings(&self.let_bindings)?;
+    let do_steps = convert_steps(&self.do_steps)?;
     Ok(TheoremDoc { ..., let_bindings, do_steps, ... })
 }
 ```
 
-Since `to_theorem_doc` now returns `Result`, update `loader.rs` line 117 from:
+Since `to_theorem_doc` now returns `Result<..., RawDocDecodeError>`, the loader
+stringifies the error at the boundary when building
+`SchemaError::ValidationFailed`:
 
 ```rust
-let doc = raw_doc.to_theorem_doc();
-```
-
-to:
-
-```rust
-let doc = raw_doc.to_theorem_doc().map_err(|reason| {
+let doc = raw_doc.to_theorem_doc().map_err(|decode_err| {
+    let reason = decode_err.to_string();
     SchemaError::ValidationFailed {
         theorem: raw_doc.theorem.value.to_string(),
         reason,
@@ -666,8 +659,8 @@ Updated artefacts:
 - `src/schema/raw.rs` — change `RawTheoremDoc.let_bindings` type from
   `IndexMap<String, LetBinding>` to `IndexMap<String, RawLetBinding>` and
   `do_steps` from `Vec<Step>` to `Vec<RawStep>`. Update `to_theorem_doc()` to
-  return `Result<TheoremDoc, String>` and use conversion functions from
-  `raw_action.rs`. Update imports.
+  return `Result<TheoremDoc, RawDocDecodeError>` and use conversion functions
+  from `raw_action.rs`. Update imports.
 - `src/schema/loader.rs` — update `to_theorem_doc()` call site to handle
   `Result`.
 - `src/schema/step.rs` — no changes needed (validates `action` string only,
@@ -730,10 +723,10 @@ pub struct ActionCall {
 In `src/schema/arg_value.rs`:
 
 ```rust
-pub(crate) fn decode_arg_value(
+pub fn decode_arg_value(
     param_name: &str,
     value: TheoremValue,
-) -> Result<ArgValue, String>
+) -> Result<ArgValue, ArgDecodeError>
 ```
 
 ### Dependencies
