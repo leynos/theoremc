@@ -28,17 +28,76 @@
 //! 3. `mangle_module_path` assembles the full module name using
 //!    `hash12` of the **original** path for disambiguation.
 
-/// The module path into which mangled action identifiers resolve.
+// ── Domain newtypes ───────────────────────────────────────────────
+
+/// A validated canonical action name (e.g. `"account.deposit"`).
 ///
-/// All mangled action names resolve to identifiers within this module.
-/// Use this constant (or [`MangledAction::path`]) instead of
-/// hard-coding the resolution target string.
+/// # Examples
+///
+///     use theoremc::mangle::CanonicalActionName;
+///
+///     let name = CanonicalActionName::new_unchecked("account.deposit");
+///     assert_eq!(name.as_str(), "account.deposit");
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CanonicalActionName(String);
+
+impl CanonicalActionName {
+    /// Wraps a pre-validated canonical action name.
+    #[must_use]
+    pub fn new_unchecked(value: &str) -> Self {
+        Self(value.to_owned())
+    }
+
+    /// Returns the inner string slice.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for CanonicalActionName {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+/// A path stem: a `.theorem` file path with its extension removed.
+///
+/// # Examples
+///
+///     use theoremc::mangle::PathStem;
+///
+///     let stem = PathStem::from("foo/bar");
+///     assert_eq!(stem.as_str(), "foo/bar");
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PathStem(String);
+
+impl PathStem {
+    /// Returns the inner string slice.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for PathStem {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&str> for PathStem {
+    fn from(s: &str) -> Self {
+        Self(s.to_owned())
+    }
+}
+
+// ── Action name mangling ──────────────────────────────────────────
+
+/// The module path into which mangled action identifiers resolve.
 pub const RESOLUTION_TARGET: &str = "crate::theorem_actions";
 
 /// The result of mangling a canonical action name.
-///
-/// Contains the individual components (slug, hash) and the fully
-/// assembled mangled identifier and resolution path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MangledAction {
     slug: String,
@@ -49,39 +108,18 @@ pub struct MangledAction {
 
 impl MangledAction {
     /// The escaped slug portion (segments joined by `__`).
-    ///
-    /// # Examples
-    ///
-    ///     use theoremc::mangle::mangle_action_name;
-    ///
-    ///     let m = mangle_action_name("account.deposit");
-    ///     assert_eq!(m.slug(), "account__deposit");
     #[must_use]
     pub fn slug(&self) -> &str {
         &self.slug
     }
 
     /// The 12-character lowercase hex hash suffix.
-    ///
-    /// # Examples
-    ///
-    ///     use theoremc::mangle::mangle_action_name;
-    ///
-    ///     let m = mangle_action_name("account.deposit");
-    ///     assert_eq!(m.hash().len(), 12);
     #[must_use]
     pub fn hash(&self) -> &str {
         &self.hash
     }
 
     /// The full mangled Rust identifier: `{slug}__h{hash12}`.
-    ///
-    /// # Examples
-    ///
-    ///     use theoremc::mangle::mangle_action_name;
-    ///
-    ///     let m = mangle_action_name("account.deposit");
-    ///     assert_eq!(m.identifier(), "account__deposit__h05158894bfb4");
     #[must_use]
     pub fn identifier(&self) -> &str {
         &self.identifier
@@ -89,13 +127,6 @@ impl MangledAction {
 
     /// The fully qualified resolution path:
     /// `crate::theorem_actions::{identifier}`.
-    ///
-    /// # Examples
-    ///
-    ///     use theoremc::mangle::mangle_action_name;
-    ///
-    ///     let m = mangle_action_name("account.deposit");
-    ///     assert!(m.path().starts_with("crate::theorem_actions::"));
     #[must_use]
     pub fn path(&self) -> &str {
         &self.path
@@ -104,18 +135,12 @@ impl MangledAction {
 
 /// Escapes a single action-name segment by replacing `_` with `_u`.
 ///
-/// ASCII letters and digits are left unchanged. This function assumes
-/// the segment has already passed canonical action-name validation
-/// (i.e. matches `^[A-Za-z_][A-Za-z0-9_]*$`).
-///
 /// # Examples
 ///
 ///     use theoremc::mangle::segment_escape;
 ///
 ///     assert_eq!(segment_escape("deposit"), "deposit");
 ///     assert_eq!(segment_escape("attach_node"), "attach_unode");
-///     assert_eq!(segment_escape("_private"), "_uprivate");
-///     assert_eq!(segment_escape("__double"), "_u_udouble");
 #[must_use]
 pub fn segment_escape(segment: &str) -> String {
     let mut result = String::with_capacity(segment.len() + segment.matches('_').count());
@@ -129,31 +154,21 @@ pub fn segment_escape(segment: &str) -> String {
     result
 }
 
-/// Builds the escaped slug from a canonical dot-separated action name.
+/// Builds the escaped slug from a [`CanonicalActionName`].
 ///
-/// Splits `canonical_name` on `.`, applies [`segment_escape`] to each
+/// Splits the name on `.`, applies [`segment_escape`] to each
 /// segment, and joins the escaped segments with `__`.
-///
-/// This function assumes the input has already passed canonical
-/// action-name validation.
 ///
 /// # Examples
 ///
-///     use theoremc::mangle::action_slug;
+///     use theoremc::mangle::{CanonicalActionName, action_slug};
 ///
-///     assert_eq!(action_slug("account.deposit"), "account__deposit");
-///     assert_eq!(
-///         action_slug("hnsw.attach_node"),
-///         "hnsw__attach_unode",
-///     );
-///     assert_eq!(
-///         action_slug("hnsw.graph.with_capacity"),
-///         "hnsw__graph__with_ucapacity",
-///     );
+///     let name = CanonicalActionName::new_unchecked("account.deposit");
+///     assert_eq!(action_slug(&name), "account__deposit");
 #[must_use]
-pub fn action_slug(canonical_name: &str) -> String {
-    let mut slug = String::with_capacity(canonical_name.len() * 2);
-    let mut segments = canonical_name.split('.');
+pub fn action_slug(canonical_name: &CanonicalActionName) -> String {
+    let mut slug = String::with_capacity(canonical_name.as_str().len() * 2);
+    let mut segments = canonical_name.as_str().split('.');
     if let Some(first) = segments.next() {
         slug.push_str(&segment_escape(first));
     }
@@ -180,31 +195,19 @@ pub fn hash12(value: &str) -> String {
     hex.as_str().get(..12).unwrap_or_default().to_owned()
 }
 
-/// Mangles a canonical action name into a [`MangledAction`].
-///
-/// Produces a deterministic, injective Rust identifier and a fully
-/// qualified resolution path into `crate::theorem_actions`.
-///
-/// This function assumes the input has already passed canonical
-/// action-name validation (see
-/// `validate_canonical_action_name` from the `schema` module).
+/// Mangles a [`CanonicalActionName`] into a [`MangledAction`].
 ///
 /// # Examples
 ///
-///     use theoremc::mangle::mangle_action_name;
+///     use theoremc::mangle::{CanonicalActionName, mangle_action_name};
 ///
-///     let m = mangle_action_name("account.deposit");
-///     assert_eq!(m.slug(), "account__deposit");
-///     assert_eq!(m.hash(), "05158894bfb4");
+///     let name = CanonicalActionName::new_unchecked("account.deposit");
+///     let m = mangle_action_name(&name);
 ///     assert_eq!(m.identifier(), "account__deposit__h05158894bfb4");
-///     assert_eq!(
-///         m.path(),
-///         "crate::theorem_actions::account__deposit__h05158894bfb4",
-///     );
 #[must_use]
-pub fn mangle_action_name(canonical_name: &str) -> MangledAction {
+pub fn mangle_action_name(canonical_name: &CanonicalActionName) -> MangledAction {
     let slug = action_slug(canonical_name);
-    let hash = hash12(canonical_name);
+    let hash = hash12(canonical_name.as_str());
     let identifier = format!("{slug}__h{hash}");
     let path = format!("{RESOLUTION_TARGET}::{identifier}");
     MangledAction {
@@ -222,22 +225,9 @@ const MODULE_PREFIX: &str = "__theoremc__file__";
 
 /// The result of mangling a `.theorem` file path into a per-file
 /// Rust module name.
-///
-/// The module name has the form
-/// `__theoremc__file__{mangled_stem}__{hash}` and is deterministic,
-/// human-recognizable, and collision-resistant thanks to the 12-
-/// character blake3 hash suffix.
-///
-/// # Examples
-///
-///     use theoremc::mangle::mangle_module_path;
-///
-///     let m = mangle_module_path("theorems/bidirectional.theorem");
-///     assert!(m.module_name().starts_with("__theoremc__file__"));
-///     assert_eq!(m.hash().len(), 12);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MangledModule {
-    stem: String,
+    stem: PathStem,
     mangled_stem: String,
     hash: String,
     module_name: String,
@@ -247,7 +237,7 @@ impl MangledModule {
     /// The original path stem (`P` with `.theorem` removed).
     #[must_use]
     pub fn stem(&self) -> &str {
-        &self.stem
+        self.stem.as_str()
     }
 
     /// The sanitised stem after `path_mangle`.
@@ -263,38 +253,64 @@ impl MangledModule {
     }
 
     /// The full generated module name.
-    ///
-    /// # Examples
-    ///
-    ///     use theoremc::mangle::mangle_module_path;
-    ///
-    ///     let m = mangle_module_path("theorems/bidirectional.theorem");
-    ///     assert_eq!(
-    ///         m.module_name(),
-    ///         "__theoremc__file__theorems_bidirectional__1fc14bdf614f",
-    ///     );
     #[must_use]
     pub fn module_name(&self) -> &str {
         &self.module_name
     }
 }
 
-/// Removes a trailing `.theorem` extension from `path`, if present.
-///
-/// Returns the path unchanged when no `.theorem` suffix exists.
+/// Removes a trailing `.theorem` extension from `path`, returning
+/// a [`PathStem`]. Returns the path unchanged when no `.theorem`
+/// suffix exists.
 ///
 /// # Examples
 ///
 ///     use theoremc::mangle::path_stem;
 ///
-///     assert_eq!(path_stem("foo/bar.theorem"), "foo/bar");
-///     assert_eq!(path_stem("no_extension"), "no_extension");
+///     assert_eq!(path_stem("foo/bar.theorem").as_str(), "foo/bar");
+///     assert_eq!(path_stem("no_extension").as_str(), "no_extension");
 #[must_use]
-pub fn path_stem(path: &str) -> &str {
-    path.strip_suffix(".theorem").unwrap_or(path)
+pub fn path_stem(path: &str) -> PathStem {
+    PathStem(path.strip_suffix(".theorem").unwrap_or(path).to_owned())
 }
 
-/// Sanitises a path stem into a Rust-identifier-safe fragment.
+fn replace_separators_and_special_chars(stem: &str) -> String {
+    let mut buf = String::with_capacity(stem.len() + 4);
+    for ch in stem.chars() {
+        match ch {
+            '/' | '\\' => buf.push_str("__"),
+            _ if ch.is_ascii_alphanumeric() || ch == '_' => buf.push(ch),
+            _ => buf.push('_'),
+        }
+    }
+    buf
+}
+
+fn collapse_consecutive_underscores(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut prev_underscore = false;
+    for ch in s.chars() {
+        if ch == '_' {
+            if !prev_underscore {
+                result.push('_');
+            }
+            prev_underscore = true;
+        } else {
+            result.push(ch);
+            prev_underscore = false;
+        }
+    }
+    result
+}
+
+fn prefix_if_digit(mut s: String) -> String {
+    if s.as_bytes().first().is_some_and(u8::is_ascii_digit) {
+        s.insert(0, '_');
+    }
+    s
+}
+
+/// Sanitises a [`PathStem`] into a Rust-identifier-safe fragment.
 ///
 /// Algorithm (per `docs/name-mangling-rules.md` §1):
 ///
@@ -306,53 +322,19 @@ pub fn path_stem(path: &str) -> &str {
 ///
 /// # Examples
 ///
-///     use theoremc::mangle::path_mangle;
+///     use theoremc::mangle::{PathStem, path_mangle};
 ///
-///     assert_eq!(path_mangle("theorems/bidirectional"), "theorems_bidirectional");
-///     assert_eq!(path_mangle("123foo"), "_123foo");
+///     assert_eq!(path_mangle(&PathStem::from("theorems/bidirectional")), "theorems_bidirectional");
+///     assert_eq!(path_mangle(&PathStem::from("123foo")), "_123foo");
 #[must_use]
-pub fn path_mangle(stem: &str) -> String {
-    // Steps 1–2: replace separators and non-identifier characters.
-    let mut buf = String::with_capacity(stem.len() + 4);
-    for ch in stem.chars() {
-        match ch {
-            '/' | '\\' => buf.push_str("__"),
-            _ if ch.is_ascii_alphanumeric() || ch == '_' => buf.push(ch),
-            _ => buf.push('_'),
-        }
-    }
-
-    // Step 3: collapse consecutive underscores.
-    let mut collapsed = String::with_capacity(buf.len());
-    let mut prev_underscore = false;
-    for ch in buf.chars() {
-        if ch == '_' {
-            if !prev_underscore {
-                collapsed.push('_');
-            }
-            prev_underscore = true;
-        } else {
-            collapsed.push(ch);
-            prev_underscore = false;
-        }
-    }
-
-    // Step 4: lowercase.
-    let mut result = collapsed.to_ascii_lowercase();
-
-    // Step 5: prefix `_` if the result starts with a digit.
-    if result.as_bytes().first().is_some_and(u8::is_ascii_digit) {
-        result.insert(0, '_');
-    }
-
-    result
+pub fn path_mangle(stem: &PathStem) -> String {
+    let sanitized = replace_separators_and_special_chars(stem.as_str());
+    let collapsed = collapse_consecutive_underscores(&sanitized);
+    let lowered = collapsed.to_ascii_lowercase();
+    prefix_if_digit(lowered)
 }
 
 /// Mangles a `.theorem` file path into a [`MangledModule`].
-///
-/// Produces a deterministic, collision-resistant Rust module name
-/// of the form
-/// `__theoremc__file__{path_mangle(path_stem(path))}__{hash12(path)}`.
 ///
 /// The `hash12` is computed from the **original** path, not the
 /// mangled stem, so paths that sanitise identically still produce
@@ -363,16 +345,10 @@ pub fn path_mangle(stem: &str) -> String {
 ///     use theoremc::mangle::mangle_module_path;
 ///
 ///     let m = mangle_module_path("theorems/bidirectional.theorem");
-///     assert_eq!(m.stem(), "theorems/bidirectional");
 ///     assert_eq!(m.mangled_stem(), "theorems_bidirectional");
-///     assert_eq!(m.hash(), "1fc14bdf614f");
-///     assert_eq!(
-///         m.module_name(),
-///         "__theoremc__file__theorems_bidirectional__1fc14bdf614f",
-///     );
 #[must_use]
 pub fn mangle_module_path(path: &str) -> MangledModule {
-    let stem = path_stem(path).to_owned();
+    let stem = path_stem(path);
     let mangled_stem = path_mangle(&stem);
     let hash = hash12(path);
     let module_name = format!("{MODULE_PREFIX}{mangled_stem}__{hash}");

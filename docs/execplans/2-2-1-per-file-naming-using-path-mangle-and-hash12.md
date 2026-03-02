@@ -148,8 +148,8 @@ follow-up steps (roadmap items 2.2.2 and 2.2.3).
   use `MangledModule::module_name()` rather than assembling the prefix
   themselves.
 - **2026-03-01:** Users guide section renamed from "Building-block functions"
-  to "Path mangling functions" to avoid duplicate-heading lint violation
-  with the existing action mangling section.
+  to "Path mangling functions" to avoid duplicate-heading lint violation with
+  the existing action mangling section.
 
 ## Outcomes & retrospective
 

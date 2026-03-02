@@ -17,7 +17,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::mangle::mangle_action_name;
+use crate::mangle::{CanonicalActionName, mangle_action_name};
 use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc};
 
 // ── Public entry point ──────────────────────────────────────────────
@@ -58,7 +58,8 @@ use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc};
 ///     assert!(check_action_collisions(&docs).is_ok());
 pub fn check_action_collisions(docs: &[TheoremDoc]) -> Result<(), SchemaError> {
     check_action_collisions_with(docs, |name| {
-        mangle_action_name(name).identifier().to_owned()
+        let can = CanonicalActionName::new_unchecked(name);
+        mangle_action_name(&can).identifier().to_owned()
     })
 }
 
@@ -186,7 +187,8 @@ fn unique_canonical_names<'a>(
 #[cfg(test)]
 fn find_mangled_collisions(canonical_names: &BTreeSet<&str>) -> BTreeMap<String, BTreeSet<String>> {
     find_mangled_collisions_with(canonical_names, |name| {
-        mangle_action_name(name).identifier().to_owned()
+        let can = CanonicalActionName::new_unchecked(name);
+        mangle_action_name(&can).identifier().to_owned()
     })
 }
 

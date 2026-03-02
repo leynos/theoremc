@@ -7,6 +7,13 @@ use rstest::rstest;
 
 use super::*;
 
+// ── Helpers ─────────────────────────────────────────────────────
+
+/// Shorthand for constructing a [`CanonicalActionName`] in tests.
+fn can(name: &str) -> CanonicalActionName {
+    CanonicalActionName::new_unchecked(name)
+}
+
 // ── Action name mangling ──────────────────────────────────────────
 
 #[rstest]
@@ -32,7 +39,7 @@ fn segment_escape_cases(#[case] input: &str, #[case] expected: &str) {
 #[case::lone_underscore_segment("ns._", "ns___u")]
 #[case::minimal("x.y", "x__y")]
 fn action_slug_cases(#[case] input: &str, #[case] expected: &str) {
-    assert_eq!(action_slug(input), expected);
+    assert_eq!(action_slug(&can(input)), expected);
 }
 
 #[rstest]
@@ -83,7 +90,7 @@ struct ActionGolden<'a> {
 
 impl ActionGolden<'_> {
     fn assert(&self) {
-        let m = mangle_action_name(self.canonical);
+        let m = mangle_action_name(&can(self.canonical));
         assert_eq!(m.slug(), self.slug, "slug");
         assert_eq!(m.hash(), self.hash, "hash");
         assert_eq!(m.identifier(), self.identifier, "identifier");
@@ -149,8 +156,8 @@ fn golden_leading_underscores() {
 fn underscore_placement_produces_distinct_slugs() {
     // "a.b_c" and "a_b.c" must produce different slugs to preserve
     // injectivity.
-    let slug_a = action_slug("a.b_c");
-    let slug_b = action_slug("a_b.c");
+    let slug_a = action_slug(&can("a.b_c"));
+    let slug_b = action_slug(&can("a_b.c"));
     assert_ne!(
         slug_a, slug_b,
         "different canonical names must produce different slugs: \
@@ -160,8 +167,8 @@ fn underscore_placement_produces_distinct_slugs() {
 
 #[test]
 fn underscore_placement_produces_distinct_identifiers() {
-    let m_a = mangle_action_name("a.b_c");
-    let m_b = mangle_action_name("a_b.c");
+    let m_a = mangle_action_name(&can("a.b_c"));
+    let m_b = mangle_action_name(&can("a_b.c"));
     assert_ne!(
         m_a.identifier(),
         m_b.identifier(),
@@ -171,7 +178,7 @@ fn underscore_placement_produces_distinct_identifiers() {
 
 #[test]
 fn path_starts_with_resolution_target() {
-    let m = mangle_action_name("account.deposit");
+    let m = mangle_action_name(&can("account.deposit"));
     let prefix = format!("{RESOLUTION_TARGET}::");
     assert!(
         m.path().starts_with(&prefix),
@@ -182,7 +189,7 @@ fn path_starts_with_resolution_target() {
 
 #[test]
 fn path_ends_with_identifier() {
-    let m = mangle_action_name("account.deposit");
+    let m = mangle_action_name(&can("account.deposit"));
     assert!(
         m.path().ends_with(m.identifier()),
         "path must end with identifier: {}",
@@ -201,7 +208,7 @@ fn path_ends_with_identifier() {
 #[case::different_extension("foo.txt", "foo.txt")]
 #[case::theorem_mid_path("theorem/bar.theorem", "theorem/bar")]
 fn path_stem_cases(#[case] input: &str, #[case] expected: &str) {
-    assert_eq!(path_stem(input), expected);
+    assert_eq!(path_stem(input).as_str(), expected);
 }
 
 // ── path_mangle tests ────────────────────────────────────────────
@@ -220,7 +227,7 @@ fn path_stem_cases(#[case] input: &str, #[case] expected: &str) {
 #[case::trailing_separator("dir/", "dir_")]
 #[case::no_transform("simple", "simple")]
 fn path_mangle_cases(#[case] input: &str, #[case] expected: &str) {
-    assert_eq!(path_mangle(input), expected);
+    assert_eq!(path_mangle(&PathStem::from(input)), expected);
 }
 
 // ── mangle_module_path golden tests ──────────────────────────────
