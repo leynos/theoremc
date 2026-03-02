@@ -1,9 +1,12 @@
 //! Strongly-typed schema structs for `.theorem` documents.
 //!
 //! These types mirror the YAML schema defined in
-//! `docs/theorem-file-specification.md` section 8. Deserialization uses
-//! `serde(deny_unknown_fields)` on all struct types and supports both
-//! `TitleCase` (canonical) and lowercase key aliases.
+//! `docs/theorem-file-specification.md` section 8. YAML is first
+//! deserialized into raw serde types (see `raw` and `raw_action`
+//! modules), then converted into these public domain types.
+//! Leaf types that are still directly deserialized use
+//! `serde(deny_unknown_fields)` and support both `TitleCase`
+//! (canonical) and lowercase key aliases.
 
 use indexmap::IndexMap;
 use serde::Deserialize;

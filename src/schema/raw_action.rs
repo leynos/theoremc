@@ -10,7 +10,7 @@
 use indexmap::IndexMap;
 use serde::Deserialize;
 
-use super::arg_value::decode_arg_value;
+use super::arg_value::{ArgDecodeError, decode_arg_value};
 use super::types::{
     ActionCall, LetBinding, LetCall, LetMust, MaybeBlock, Step, StepCall, StepMaybe, StepMust,
 };
@@ -109,7 +109,7 @@ pub(crate) struct RawMaybeBlock {
 
 /// Converts a [`RawActionCall`] into a public [`ActionCall`] by
 /// decoding each argument value.
-pub(crate) fn convert_action_call(raw: &RawActionCall) -> Result<ActionCall, String> {
+pub(crate) fn convert_action_call(raw: &RawActionCall) -> Result<ActionCall, ArgDecodeError> {
     let mut args = IndexMap::with_capacity(raw.args.len());
     for (key, value) in &raw.args {
         let decoded = decode_arg_value(key, value.clone())?;
@@ -123,7 +123,7 @@ pub(crate) fn convert_action_call(raw: &RawActionCall) -> Result<ActionCall, Str
 }
 
 /// Converts a [`RawLetBinding`] into a public [`LetBinding`].
-pub(crate) fn convert_let_binding(raw: &RawLetBinding) -> Result<LetBinding, String> {
+pub(crate) fn convert_let_binding(raw: &RawLetBinding) -> Result<LetBinding, ArgDecodeError> {
     match raw {
         RawLetBinding::Call(c) => {
             let call = convert_action_call(&c.call)?;
@@ -138,7 +138,7 @@ pub(crate) fn convert_let_binding(raw: &RawLetBinding) -> Result<LetBinding, Str
 
 /// Converts a [`RawStep`] into a public [`Step`], recursively
 /// converting nested maybe blocks.
-pub(crate) fn convert_step(raw: &RawStep) -> Result<Step, String> {
+pub(crate) fn convert_step(raw: &RawStep) -> Result<Step, ArgDecodeError> {
     match raw {
         RawStep::Call(c) => {
             let call = convert_action_call(&c.call)?;
@@ -157,13 +157,39 @@ pub(crate) fn convert_step(raw: &RawStep) -> Result<Step, String> {
 
 /// Converts a [`RawMaybeBlock`] into a public [`MaybeBlock`],
 /// recursively converting nested steps.
-fn convert_maybe_block(raw: &RawMaybeBlock) -> Result<MaybeBlock, String> {
+fn convert_maybe_block(raw: &RawMaybeBlock) -> Result<MaybeBlock, ArgDecodeError> {
     let mut do_steps = Vec::with_capacity(raw.do_steps.len());
-    for step in &raw.do_steps {
-        do_steps.push(convert_step(step)?);
+    for (i, step) in raw.do_steps.iter().enumerate() {
+        do_steps.push(convert_step(step).map_err(|e| {
+            // Re-wrap with nested path context so error messages
+            // identify the failing step inside `maybe.do`.
+            remap_with_prefix(e, &format!("maybe.do step {}", i + 1))
+        })?);
     }
     Ok(MaybeBlock {
         because: raw.because.clone(),
         do_steps,
     })
+}
+
+/// Prepends a breadcrumb path prefix to an [`ArgDecodeError`]'s
+/// `param` field so nested decode failures identify their location.
+fn remap_with_prefix(error: ArgDecodeError, prefix: &str) -> ArgDecodeError {
+    match error {
+        ArgDecodeError::EmptyRefTarget { param } => ArgDecodeError::EmptyRefTarget {
+            param: format!("{prefix}: {param}"),
+        },
+        ArgDecodeError::InvalidIdentifier { param, name } => ArgDecodeError::InvalidIdentifier {
+            param: format!("{prefix}: {param}"),
+            name,
+        },
+        ArgDecodeError::ReservedKeyword { param, name } => ArgDecodeError::ReservedKeyword {
+            param: format!("{prefix}: {param}"),
+            name,
+        },
+        ArgDecodeError::NonStringRefTarget { param, kind } => ArgDecodeError::NonStringRefTarget {
+            param: format!("{prefix}: {param}"),
+            kind,
+        },
+    }
 }

@@ -21,7 +21,7 @@ mod types;
 mod validate;
 mod value;
 
-pub use arg_value::{ArgValue, LiteralValue};
+pub use arg_value::{ArgDecodeError, ArgValue, LiteralValue};
 pub use diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, SourceLocation};
 pub use error::SchemaError;
 pub use identifier::validate_identifier;

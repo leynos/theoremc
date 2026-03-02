@@ -49,18 +49,45 @@ fn valid_ref_decodes_as_reference(#[case] name: &str, #[case] expected: &str) {
 
 // ── Invalid reference decoding ──────────────────────────────────────
 
+#[test]
+fn empty_ref_name_is_rejected() {
+    let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(String::new()))]);
+    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    assert_eq!(
+        err,
+        ArgDecodeError::EmptyRefTarget {
+            param: "param".into()
+        }
+    );
+}
+
 #[rstest]
-#[case::empty_name("", "must not be empty")]
-#[case::keyword_fn("fn", "Rust reserved keyword")]
-#[case::keyword_let("let", "Rust reserved keyword")]
-#[case::starts_with_digit("123bad", "not a valid identifier")]
-#[case::contains_hyphen("foo-bar", "not a valid identifier")]
-fn invalid_ref_name_is_rejected(#[case] name: &str, #[case] expected_msg: &str) {
+#[case::keyword_fn("fn")]
+#[case::keyword_let("let")]
+fn keyword_ref_name_is_rejected(#[case] name: &str) {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(name.to_owned()))]);
     let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
-    assert!(
-        err.contains(expected_msg),
-        "expected error containing '{expected_msg}', got: {err}"
+    assert_eq!(
+        err,
+        ArgDecodeError::ReservedKeyword {
+            param: "param".into(),
+            name: name.into(),
+        }
+    );
+}
+
+#[rstest]
+#[case::starts_with_digit("123bad")]
+#[case::contains_hyphen("foo-bar")]
+fn invalid_identifier_ref_name_is_rejected(#[case] name: &str) {
+    let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(name.to_owned()))]);
+    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    assert_eq!(
+        err,
+        ArgDecodeError::InvalidIdentifier {
+            param: "param".into(),
+            name: name.into(),
+        }
     );
 }
 
@@ -68,12 +95,18 @@ fn invalid_ref_name_is_rejected(#[case] name: &str, #[case] expected_msg: &str) 
 #[case::integer_value(TheoremValue::Integer(42), "an integer")]
 #[case::boolean_value(TheoremValue::Bool(true), "a boolean")]
 #[case::float_value(TheoremValue::Float(1.0), "a float")]
-fn ref_with_non_string_value_is_rejected(#[case] value: TheoremValue, #[case] expected_kind: &str) {
+fn ref_with_non_string_value_is_rejected(
+    #[case] value: TheoremValue,
+    #[case] expected_kind: &'static str,
+) {
     let map = IndexMap::from([("ref".to_owned(), value)]);
     let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
-    assert!(
-        err.contains(expected_kind),
-        "expected error containing '{expected_kind}', got: {err}"
+    assert_eq!(
+        err,
+        ArgDecodeError::NonStringRefTarget {
+            param: "param".into(),
+            kind: expected_kind,
+        }
     );
 }
 
@@ -116,8 +149,17 @@ fn sequence_is_raw_sequence() {
 fn error_message_includes_param_name() {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String("fn".into()))]);
     let err = decode_arg_value("graph_ref", TheoremValue::Mapping(map)).expect_err("should fail");
+    assert_eq!(
+        err,
+        ArgDecodeError::ReservedKeyword {
+            param: "graph_ref".into(),
+            name: "fn".into(),
+        }
+    );
+    // Display format also includes the parameter name.
+    let msg = err.to_string();
     assert!(
-        err.contains("graph_ref"),
-        "expected error to mention 'graph_ref', got: {err}"
+        msg.contains("graph_ref"),
+        "expected display to mention 'graph_ref', got: {msg}"
     );
 }

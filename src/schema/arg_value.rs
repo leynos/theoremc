@@ -16,6 +16,55 @@ use super::value::TheoremValue;
 /// The sentinel YAML map key that identifies a variable reference.
 const REF_KEY: &str = "ref";
 
+/// Errors produced when decoding a raw [`TheoremValue`] into an
+/// [`ArgValue`].
+///
+/// Each variant carries the parameter name (`param`) for diagnostic
+/// context. Variants derive `PartialEq` and `Eq` so callers and tests
+/// can match on specific error conditions.
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+pub enum ArgDecodeError {
+    /// The `{ ref: "" }` target was an empty string.
+    #[error("argument '{param}': ref value must not be empty")]
+    EmptyRefTarget {
+        /// Argument parameter name.
+        param: String,
+    },
+
+    /// The `{ ref: <name> }` target is not a valid ASCII identifier.
+    #[error(
+        "argument '{param}': ref value '{name}' is not a valid \
+         identifier (must match ^[A-Za-z_][A-Za-z0-9_]*$)"
+    )]
+    InvalidIdentifier {
+        /// Argument parameter name.
+        param: String,
+        /// The invalid identifier value.
+        name: String,
+    },
+
+    /// The `{ ref: <name> }` target is a Rust reserved keyword.
+    #[error("argument '{param}': ref value '{name}' is a Rust reserved keyword")]
+    ReservedKeyword {
+        /// Argument parameter name.
+        param: String,
+        /// The keyword value.
+        name: String,
+    },
+
+    /// The `ref` value is not a string (e.g. an integer or boolean).
+    #[error(
+        "argument '{param}': ref value must be a string identifier, \
+         not {kind}"
+    )]
+    NonStringRefTarget {
+        /// Argument parameter name.
+        param: String,
+        /// Human-readable kind label (e.g. "an integer").
+        kind: &'static str,
+    },
+}
+
 /// A semantically decoded action-call argument value.
 ///
 /// After YAML deserialization, each [`TheoremValue`] in an action
@@ -97,9 +146,9 @@ pub enum LiteralValue {
 ///
 /// # Errors
 ///
-/// Returns an error string when a `{ ref: ... }` wrapper contains an
-/// invalid target: empty string, non-identifier pattern, Rust reserved
-/// keyword, or non-string value.
+/// Returns [`ArgDecodeError`] when a `{ ref: ... }` wrapper contains
+/// an invalid target: empty string, non-identifier pattern, Rust
+/// reserved keyword, or non-string value.
 ///
 /// # Examples
 ///
@@ -108,7 +157,7 @@ pub enum LiteralValue {
 ///
 ///     let result = decode_arg_value("name", TheoremValue::String("hello".into()));
 ///     assert_eq!(result.unwrap(), ArgValue::Literal(LiteralValue::String("hello".into())));
-pub fn decode_arg_value(param_name: &str, value: TheoremValue) -> Result<ArgValue, String> {
+pub fn decode_arg_value(param_name: &str, value: TheoremValue) -> Result<ArgValue, ArgDecodeError> {
     match value {
         TheoremValue::Bool(b) => Ok(ArgValue::Literal(LiteralValue::Bool(b))),
         TheoremValue::Integer(n) => Ok(ArgValue::Literal(LiteralValue::Integer(n))),
@@ -125,7 +174,7 @@ pub fn decode_arg_value(param_name: &str, value: TheoremValue) -> Result<ArgValu
 fn decode_mapping(
     param_name: &str,
     map: IndexMap<String, TheoremValue>,
-) -> Result<ArgValue, String> {
+) -> Result<ArgValue, ArgDecodeError> {
     if !is_ref_wrapper(&map) {
         return Ok(ArgValue::RawMap(map));
     }
@@ -144,45 +193,32 @@ fn is_ref_wrapper(map: &IndexMap<String, TheoremValue>) -> bool {
 }
 
 /// Validates the `ref` target value and produces an `ArgValue::Reference`.
-fn decode_ref_target(param_name: &str, value: TheoremValue) -> Result<ArgValue, String> {
+fn decode_ref_target(param_name: &str, value: TheoremValue) -> Result<ArgValue, ArgDecodeError> {
     let TheoremValue::String(name) = value else {
-        return Err(format!(
-            concat!(
-                "argument '{param}': ref value must be a string ",
-                "identifier, not {kind}"
-            ),
-            param = param_name,
-            kind = non_string_kind(&value),
-        ));
+        return Err(ArgDecodeError::NonStringRefTarget {
+            param: param_name.to_owned(),
+            kind: non_string_kind(&value),
+        });
     };
 
     if name.is_empty() {
-        return Err(format!(
-            "argument '{param_name}': ref value must not be empty"
-        ));
+        return Err(ArgDecodeError::EmptyRefTarget {
+            param: param_name.to_owned(),
+        });
     }
 
     if !is_valid_ascii_identifier_pattern(&name) {
-        return Err(format!(
-            concat!(
-                "argument '{param}': ref value '{name}' is not a ",
-                "valid identifier (must match ",
-                "^[A-Za-z_][A-Za-z0-9_]*$)"
-            ),
-            param = param_name,
-            name = name,
-        ));
+        return Err(ArgDecodeError::InvalidIdentifier {
+            param: param_name.to_owned(),
+            name,
+        });
     }
 
     if is_rust_reserved_keyword(&name) {
-        return Err(format!(
-            concat!(
-                "argument '{param}': ref value '{name}' is a Rust ",
-                "reserved keyword"
-            ),
-            param = param_name,
-            name = name,
-        ));
+        return Err(ArgDecodeError::ReservedKeyword {
+            param: param_name.to_owned(),
+            name,
+        });
     }
 
     Ok(ArgValue::Reference(name))

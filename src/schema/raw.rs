@@ -303,7 +303,7 @@ fn convert_let_bindings(
     let mut out = IndexMap::with_capacity(raw.len());
     for (name, binding) in raw {
         let converted = raw_action::convert_let_binding(binding)
-            .map_err(|reason| format!("Let binding '{name}': {reason}"))?;
+            .map_err(|e| format!("Let binding '{name}': {e}"))?;
         out.insert(name.clone(), converted);
     }
     Ok(out)
@@ -313,8 +313,8 @@ fn convert_let_bindings(
 fn convert_steps(raw: &[RawStep]) -> Result<Vec<super::types::Step>, String> {
     let mut out = Vec::with_capacity(raw.len());
     for (i, step) in raw.iter().enumerate() {
-        let converted = raw_action::convert_step(step)
-            .map_err(|reason| format!("Do step {}: {reason}", i + 1))?;
+        let converted =
+            raw_action::convert_step(step).map_err(|e| format!("Do step {}: {e}", i + 1))?;
         out.push(converted);
     }
     Ok(out)

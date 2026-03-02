@@ -114,13 +114,14 @@ pub fn load_theorem_docs_with_source(
 
     let mut docs = Vec::with_capacity(raw_docs.len());
     for raw_doc in raw_docs {
-        let doc = raw_doc
-            .to_theorem_doc()
-            .map_err(|reason| SchemaError::ValidationFailed {
+        let doc = raw_doc.to_theorem_doc().map_err(|reason| {
+            let error = SchemaError::ValidationFailed {
                 theorem: raw_doc.theorem.value.to_string(),
                 reason,
                 diagnostic: None,
-            })?;
+            };
+            attach_validation_diagnostic(error, source, &raw_doc)
+        })?;
         validate_theorem_doc(&doc)
             .map_err(|error| attach_validation_diagnostic(error, source, &raw_doc))?;
         docs.push(doc);

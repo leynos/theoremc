@@ -261,7 +261,7 @@ and variable references require the explicit `{ ref: <name> }` wrapper.
   (`^[A-Za-z_][A-Za-z0-9_]*$`) and must not be a Rust reserved keyword.
 - `ArgValue::RawSequence(values)` — a YAML sequence (future: `vec![...]`
   synthesis).
-- `ArgValue::RawMap(map)` — a YAML map that is not a recognised wrapper (future:
+- `ArgValue::RawMap(map)` — a YAML map that is not a recognized wrapper (future:
   struct-literal synthesis or `{ literal: ... }` wrapper).
 
 **Semantic stability invariant:** adding a new `Let` binding can never silently

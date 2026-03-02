@@ -58,7 +58,7 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
 
 ## Risks
 
-- Risk: Clippy `too_many_arguments` triggered by rstest parameterised tests
+- Risk: Clippy `too_many_arguments` triggered by rstest parameterized tests
   with 5+ case params. Severity: medium. Likelihood: medium. Mitigation: use
   helper structs as per the `Golden` pattern established in `src/mangle.rs`.
 
@@ -345,10 +345,10 @@ Update the import in `types.rs` to bring in `ArgValue` from `super::arg_value`.
 In `src/schema/raw.rs`, `RawTheoremDoc` currently imports and uses the public
 `LetBinding`, `Step`, and related types directly (line 12):
 `use super::types::{Evidence, KaniEvidence, KaniExpectation, LetBinding, Step, TheoremDoc};`.
- Since `ActionCall.args` will change from `TheoremValue` to `ArgValue`, serde
-can no longer deserialize YAML directly into the public `ActionCall` (the YAML
-contains raw `TheoremValue`-shaped data). We need raw versions of all types
-that contain `ActionCall`.
+ Since `ActionCall.args` changes from `TheoremValue` to `ArgValue`, serde can
+no longer deserialize YAML directly into the public `ActionCall` (the YAML
+contains raw `TheoremValue`-shaped data). Raw versions of all types that
+contain `ActionCall` are therefore required.
 
 The dependency chain requiring raw counterparts:
 
