@@ -179,7 +179,7 @@ documentation files updated. Well within the 15-file / 700-line tolerance.
 
 ## Context and orientation
 
-The `theoremc` crate (`/home/user/project`) compiles `.theorem` YAML files into
+The `theoremc` crate (repository root) compiles `.theorem` YAML files into
 Rust proof harnesses. The current loading pipeline is:
 
 1. `load_theorem_docs(yaml)` in `src/schema/loader.rs` calls
