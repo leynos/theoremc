@@ -107,6 +107,12 @@ impl TryFrom<String> for CanonicalActionName {
 #[path = "mangle_validate.rs"]
 mod validate;
 
+/// Golden test constants for mangling — single source of truth for
+/// unit and integration tests.
+#[doc(hidden)]
+#[path = "mangle_golden.rs"]
+pub mod golden;
+
 /// A path stem: a `.theorem` file path with its extension removed.
 ///
 ///     use theoremc::mangle::PathStem;

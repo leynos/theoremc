@@ -1,11 +1,8 @@
 //! Behavioural tests for per-file module naming.
 
-mod common;
-
 use rstest_bdd_macros::{given, scenario, then};
+use theoremc::mangle::golden::MODULE_GOLDEN_TUPLES;
 use theoremc::mangle::{hash12, mangle_module_path};
-
-use common::MODULE_GOLDEN_TUPLES;
 
 // ── Scenario: Simple paths produce deterministic module names ─────
 

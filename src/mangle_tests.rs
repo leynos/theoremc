@@ -79,27 +79,17 @@ fn hash12_is_deterministic() {
     assert_eq!(first, second);
 }
 
-#[rstest]
-#[case::account_deposit("account.deposit", "account__deposit", "05158894bfb4")]
-#[case::hnsw_attach_node("hnsw.attach_node", "hnsw__attach_unode", "8d74e77b55f2")]
-#[case::three_segments(
-    "hnsw.graph.with_capacity",
-    "hnsw__graph__with_ucapacity",
-    "9eafdf8834ec"
-)]
-#[case::leading_underscores("_a._b", "_ua___ub", "0a39aa24f512")]
-fn mangle_action_name_golden_cases(
-    #[case] canonical: &str,
-    #[case] expected_slug: &str,
-    #[case] expected_hash: &str,
-) {
-    let m = mangle_action_name(can(canonical));
-    assert_eq!(m.slug(), expected_slug, "slug");
-    assert_eq!(m.hash(), expected_hash, "hash");
-    let expected_ident = format!("{expected_slug}__h{expected_hash}");
-    assert_eq!(m.identifier(), expected_ident, "identifier");
-    let expected_path = format!("{RESOLUTION_TARGET}::{expected_ident}");
-    assert_eq!(m.path(), expected_path, "path");
+#[test]
+fn mangle_action_name_golden_cases() {
+    for (canonical, expected_slug, expected_hash) in super::golden::ACTION_GOLDEN_TRIPLES {
+        let m = mangle_action_name(can(canonical));
+        assert_eq!(m.slug(), *expected_slug, "slug for {canonical}");
+        assert_eq!(m.hash(), *expected_hash, "hash for {canonical}");
+        let expected_ident = format!("{expected_slug}__h{expected_hash}");
+        assert_eq!(m.identifier(), expected_ident, "identifier for {canonical}");
+        let expected_path = format!("{RESOLUTION_TARGET}::{expected_ident}");
+        assert_eq!(m.path(), expected_path, "path for {canonical}");
+    }
 }
 
 #[test]
@@ -179,19 +169,27 @@ impl ModuleGolden<'_> {
     }
 }
 
+/// Verifies golden module-path entries from the shared constants.
+#[test]
+fn mangle_module_path_shared_golden_cases() {
+    for (path, expected_stem, expected_mangled, expected_hash) in
+        super::golden::MODULE_GOLDEN_TUPLES
+    {
+        let m = mangle_module_path(path);
+        assert_eq!(m.stem(), *expected_stem, "stem for {path}");
+        assert_eq!(
+            m.mangled_stem(),
+            *expected_mangled,
+            "mangled_stem for {path}"
+        );
+        assert_eq!(m.hash(), *expected_hash, "hash for {path}");
+        let expected_name = format!("__theoremc__file__{expected_mangled}__{expected_hash}");
+        assert_eq!(m.module_name(), expected_name, "module_name for {path}");
+    }
+}
+
+/// Edge-case module-path golden values not in the shared constants.
 #[rstest]
-#[case::simple_path(
-    "theorems/bidirectional.theorem",
-    "theorems_bidirectional",
-    "1fc14bdf614f",
-    "__theoremc__file__theorems_bidirectional__1fc14bdf614f"
-)]
-#[case::nested_path(
-    "theorems/nested/deep/path.theorem",
-    "theorems_nested_deep_path",
-    "5cb0a56a3468",
-    "__theoremc__file__theorems_nested_deep_path__5cb0a56a3468"
-)]
 #[case::backslash_path(
     "theorems\\windows\\style.theorem",
     "theorems_windows_style",
@@ -204,12 +202,6 @@ impl ModuleGolden<'_> {
     "7ee5f747b4c1",
     "__theoremc__file__theorems_upper_case__7ee5f747b4c1"
 )]
-#[case::no_extension(
-    "no_extension",
-    "no_extension",
-    "afb36ed5206f",
-    "__theoremc__file__no_extension__afb36ed5206f"
-)]
 #[case::digit_leading(
     "theorems/123_digit_leading.theorem",
     "theorems_123_digit_leading",
@@ -221,7 +213,7 @@ impl ModuleGolden<'_> {
 )]
 #[case::empty_path("", "", "af1349b9f5f9", "__theoremc__file____af1349b9f5f9")]
 #[case::dot_theorem(".theorem", "", "f9d6885cf913", "__theoremc__file____f9d6885cf913")]
-fn mangle_module_path_golden_cases(
+fn mangle_module_path_edge_cases(
     #[case] path: &str,
     #[case] expected_mangled_stem: &str,
     #[case] expected_hash: &str,

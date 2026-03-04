@@ -1,11 +1,8 @@
 //! Behavioural tests for action name mangling.
 
-mod common;
-
 use rstest_bdd_macros::{given, scenario, then};
+use theoremc::mangle::golden::ACTION_GOLDEN_TRIPLES;
 use theoremc::mangle::{RESOLUTION_TARGET, hash12, mangle_action_name};
-
-use common::ACTION_GOLDEN_TRIPLES;
 
 #[given("representative canonical action names")]
 fn given_representative_canonical_action_names() {}
