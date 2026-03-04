@@ -8,7 +8,7 @@
 //! Transforms canonical dot-separated action names into mangled Rust
 //! identifiers suitable for binding in `crate::theorem_actions`.
 //!
-//! 1. `segment_escape` replaces `_` with `_u` in each segment.
+//! 1. Each segment's `_` is escaped to `_u`.
 //! 2. `action_slug` splits on `.`, escapes each segment, and joins
 //!    with `__`.
 //! 3. `hash12` computes the first 12 lowercase hex characters of
@@ -27,6 +27,8 @@
 //!    fragment (replace separators, collapse underscores, lowercase).
 //! 3. `mangle_module_path` assembles the full module name using
 //!    `hash12` of the **original** path for disambiguation.
+
+use camino::Utf8Path;
 
 // ── Domain newtypes ───────────────────────────────────────────────
 
@@ -190,11 +192,12 @@ impl MangledAction {
 
 /// Escapes a single action-name segment by replacing `_` with `_u`.
 ///
-///     use theoremc::mangle::segment_escape;
-///     assert_eq!(segment_escape("deposit"), "deposit");
-///     assert_eq!(segment_escape("attach_node"), "attach_unode");
+///     # use theoremc::mangle::action_slug;
+///     // segment_escape("deposit") == "deposit"
+///     // segment_escape("attach_node") == "attach_unode"
+///     assert_eq!(action_slug("ns.attach_node"), "ns__attach_unode");
 #[must_use]
-pub fn segment_escape(segment: &str) -> String {
+pub(crate) fn segment_escape(segment: &str) -> String {
     let mut result = String::with_capacity(segment.len() + segment.matches('_').count());
     for ch in segment.chars() {
         if ch == '_' {
@@ -208,7 +211,7 @@ pub fn segment_escape(segment: &str) -> String {
 
 /// Builds the escaped slug from a canonical action name.
 ///
-/// Splits on `.`, applies [`segment_escape`] to each segment, and
+/// Splits on `.`, escapes underscores in each segment, and
 /// joins with `__`. Accepts `&str`, `String`, or
 /// `&CanonicalActionName`.
 ///
@@ -313,8 +316,9 @@ impl MangledModule {
 ///     assert_eq!(path_stem("foo/bar.theorem").as_str(), "foo/bar");
 ///     assert_eq!(path_stem("no_extension").as_str(), "no_extension");
 #[must_use]
-pub fn path_stem(path: &str) -> PathStem {
-    PathStem(path.strip_suffix(".theorem").unwrap_or(path).to_owned())
+pub fn path_stem(path: impl AsRef<Utf8Path>) -> PathStem {
+    let s = path.as_ref().as_str();
+    PathStem(s.strip_suffix(".theorem").unwrap_or(s).to_owned())
 }
 
 /// Sanitizes a [`PathStem`] into a Rust-identifier-safe fragment.
@@ -374,10 +378,12 @@ pub fn path_mangle(stem: &PathStem) -> String {
 ///     let m = mangle_module_path("theorems/bidirectional.theorem");
 ///     assert_eq!(m.mangled_stem(), "theorems_bidirectional");
 #[must_use]
-pub fn mangle_module_path(path: &str) -> MangledModule {
-    let stem = path_stem(path);
+pub fn mangle_module_path(path: impl AsRef<Utf8Path>) -> MangledModule {
+    let path_ref = path.as_ref();
+    let s = path_ref.as_str();
+    let stem = path_stem(path_ref);
     let mangled_stem = path_mangle(&stem);
-    let hash = hash12(path);
+    let hash = hash12(s);
     let module_name = format!("{MODULE_PREFIX}{mangled_stem}__{hash}");
     MangledModule {
         stem,
