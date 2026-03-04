@@ -11,7 +11,7 @@ use super::*;
 
 /// Shorthand for constructing a [`CanonicalActionName`] in tests.
 fn can(name: &str) -> CanonicalActionName {
-    CanonicalActionName::new_unchecked(name)
+    CanonicalActionName::new(name).expect("test input must be a valid canonical action name")
 }
 
 // ── Action name mangling ──────────────────────────────────────────

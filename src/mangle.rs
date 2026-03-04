@@ -47,8 +47,7 @@ pub struct InvalidCanonicalActionName {
 /// A validated canonical action name (e.g. `"account.deposit"`).
 ///
 /// Construct via [`CanonicalActionName::new`] (fallible) or
-/// [`TryFrom`]. Use [`new_unchecked`](Self::new_unchecked) only
-/// when the input has already been validated upstream.
+/// [`TryFrom`].
 ///
 ///     use theoremc::mangle::CanonicalActionName;
 ///     let name = CanonicalActionName::new("account.deposit")
@@ -68,14 +67,6 @@ impl CanonicalActionName {
     pub fn new(value: &str) -> Result<Self, InvalidCanonicalActionName> {
         validate::validate_canonical(value)?;
         Ok(Self(value.to_owned()))
-    }
-
-    /// Wraps a pre-validated canonical action name without
-    /// re-checking the grammar. Prefer [`new`](Self::new) unless
-    /// the input has already been validated.
-    #[must_use]
-    pub fn new_unchecked(value: &str) -> Self {
-        Self(value.to_owned())
     }
 
     /// Returns the inner string slice.
@@ -217,7 +208,8 @@ pub(crate) fn segment_escape(segment: &str) -> String {
 ///
 ///     use theoremc::mangle::{CanonicalActionName, action_slug};
 ///     assert_eq!(action_slug("account.deposit"), "account__deposit");
-///     let name = CanonicalActionName::new_unchecked("account.deposit");
+///     let name = CanonicalActionName::new("account.deposit")
+///         .expect("valid canonical name");
 ///     assert_eq!(action_slug(&name), "account__deposit");
 #[must_use]
 pub fn action_slug(canonical_name: impl AsRef<str>) -> String {
