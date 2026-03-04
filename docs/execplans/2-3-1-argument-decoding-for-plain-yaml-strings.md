@@ -75,8 +75,8 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
   Mitigation: use a two-stage approach — serde deserializes into
   `TheoremValue` in the raw layer as before, then a conversion function
   `decode_arg_value(param_name, value)` (with signature
-  `pub fn decode_arg_value(&str, TheoremValue) ->
-  Result<ArgValue, ArgDecodeError>`) runs during the raw-to-public
+  `pub fn decode_arg_value(param_name: &str, value: TheoremValue)
+  -> Result<ArgValue, ArgDecodeError>`) runs during the raw-to-public
   conversion step in `RawTheoremDoc::to_theorem_doc()`.
 
 - Risk: `src/schema/types.rs` is already 312 lines. Adding `ArgValue` and
