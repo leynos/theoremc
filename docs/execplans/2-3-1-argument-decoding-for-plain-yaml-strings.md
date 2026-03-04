@@ -72,11 +72,12 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
   `ActionCall.args`. Changing the args type to `ArgValue` means serde must
   deserialize YAML into `ArgValue` directly, or a post-deserialization
   conversion step is needed. Severity: high. Likelihood: certain (by design).
-  Mitigation: use a two-stage approach — serde deserializes into `TheoremValue`
-  in the raw layer as before, then a conversion function
-  `pub fn decode_arg_value(TheoremValue) -> Result<ArgValue, ArgDecodeError>`
-  runs during the raw-to-public conversion step in
-  `RawTheoremDoc::to_theorem_doc()`.
+  Mitigation: use a two-stage approach — serde deserializes into
+  `TheoremValue` in the raw layer as before, then a conversion function
+  `decode_arg_value(param_name, value)` (with signature
+  `pub fn decode_arg_value(&str, TheoremValue) ->
+  Result<ArgValue, ArgDecodeError>`) runs during the raw-to-public
+  conversion step in `RawTheoremDoc::to_theorem_doc()`.
 
 - Risk: `src/schema/types.rs` is already 312 lines. Adding `ArgValue` and
   `LiteralValue` types could push it near the 400-line limit. Severity: medium.
@@ -112,7 +113,7 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
 - [x] Milestone 6: add BDD behavioural tests and fixture files.
 - [x] Milestone 7: add semantic-stability acceptance test (binding addition
   cannot alter literal semantics).
-- [x] Milestone 8: update documentation (design doc, users guide, roadmap).
+- [x] Milestone 8: update the design doc, the user's guide, and the roadmap.
 - [x] Milestone 9: run full quality gates and capture logs.
 
 ## Surprises & discoveries
