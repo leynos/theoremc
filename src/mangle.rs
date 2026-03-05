@@ -102,6 +102,7 @@ mod validate;
 
 /// Golden test constants for mangling — single source of truth for
 /// unit and integration tests.
+#[cfg(any(test, feature = "test-support"))]
 #[doc(hidden)]
 #[path = "mangle_golden.rs"]
 pub mod golden;
@@ -313,6 +314,19 @@ pub fn path_stem(path: impl AsRef<Utf8Path>) -> PathStem {
     PathStem(s.strip_suffix(".theorem").unwrap_or(s).to_owned())
 }
 
+/// Maps a single character to its mangled equivalent.
+///
+/// Path separators (`/`, `\`) and non-ASCII-alphanumeric characters
+/// become `_`; ASCII alphanumerics and `_` are lowercased.
+#[must_use]
+const fn mangle_char(ch: char) -> char {
+    match ch {
+        '/' | '\\' => '_',
+        _ if ch.is_ascii_alphanumeric() || ch == '_' => ch.to_ascii_lowercase(),
+        _ => '_',
+    }
+}
+
 /// Sanitizes a [`PathStem`] into a Rust-identifier-safe fragment.
 ///
 /// Algorithm (per `docs/name-mangling-rules.md` §1):
@@ -334,16 +348,10 @@ pub fn path_mangle(stem: &PathStem) -> String {
     let mut buf = String::with_capacity(s.len() + 4);
     let mut prev_underscore = false;
 
-    // Steps 1–4: map chars, replace separators/specials, collapse `_`,
-    // lowercase.
     for ch in s.chars() {
-        let mapped = match ch {
-            '/' | '\\' => '_',
-            _ if ch.is_ascii_alphanumeric() || ch == '_' => ch.to_ascii_lowercase(),
-            _ => '_',
-        };
+        let mapped = mangle_char(ch);
 
-        // Skip consecutive underscores.
+        // Collapse consecutive underscores.
         if mapped == '_' && prev_underscore {
             continue;
         }

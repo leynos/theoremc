@@ -42,15 +42,14 @@ fn action_slug_cases(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(action_slug(can(input)), expected);
 }
 
-#[rstest]
-#[case::account_deposit("account.deposit", "05158894bfb4")]
-#[case::hnsw_attach_node("hnsw.attach_node", "8d74e77b55f2")]
-#[case::three_segments("hnsw.graph.with_capacity", "9eafdf8834ec")]
-#[case::leading_underscores("_a._b", "0a39aa24f512")]
-#[case::lone_underscore("ns._", "ef4f43e71ce0")]
-#[case::minimal("x.y", "f12518d733b0")]
-fn hash12_golden_values(#[case] input: &str, #[case] expected: &str) {
-    assert_eq!(hash12(input), expected);
+#[test]
+fn hash12_golden_values() {
+    for (canonical, _slug, expected_hash) in super::golden::ACTION_GOLDEN_TRIPLES {
+        assert_eq!(hash12(canonical), *expected_hash, "hash12({canonical})");
+    }
+    // Extra cases not in the shared fixture.
+    assert_eq!(hash12("ns._"), "ef4f43e71ce0");
+    assert_eq!(hash12("x.y"), "f12518d733b0");
 }
 
 #[test]
@@ -183,7 +182,7 @@ fn mangle_module_path_shared_golden_cases() {
             "mangled_stem for {path}"
         );
         assert_eq!(m.hash(), *expected_hash, "hash for {path}");
-        let expected_name = format!("__theoremc__file__{expected_mangled}__{expected_hash}");
+        let expected_name = format!("{MODULE_PREFIX}{expected_mangled}__{expected_hash}");
         assert_eq!(m.module_name(), expected_name, "module_name for {path}");
     }
 }
@@ -251,7 +250,7 @@ fn forward_vs_backslash_disambiguation() {
 #[test]
 fn module_name_structural_properties() {
     let m = mangle_module_path("theorems/bidirectional.theorem");
-    assert!(m.module_name().starts_with("__theoremc__file__"));
+    assert!(m.module_name().starts_with(MODULE_PREFIX));
     assert!(m.module_name().ends_with(m.hash()));
     assert_eq!(m, mangle_module_path("theorems/bidirectional.theorem"));
 }
