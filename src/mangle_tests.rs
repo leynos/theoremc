@@ -192,39 +192,29 @@ fn mangle_module_path_shared_golden_cases() {
 #[case::backslash_path(
     "theorems\\windows\\style.theorem",
     "theorems_windows_style",
-    "38b12c01ea29",
-    "__theoremc__file__theorems_windows_style__38b12c01ea29"
+    "38b12c01ea29"
 )]
-#[case::uppercase_path(
-    "theorems/UPPER-case.theorem",
-    "theorems_upper_case",
-    "7ee5f747b4c1",
-    "__theoremc__file__theorems_upper_case__7ee5f747b4c1"
-)]
+#[case::uppercase_path("theorems/UPPER-case.theorem", "theorems_upper_case", "7ee5f747b4c1")]
 #[case::digit_leading(
     "theorems/123_digit_leading.theorem",
     "theorems_123_digit_leading",
-    "76c6c1009e0d",
-    concat!(
-        "__theoremc__file__theorems_123_digit_leading",
-        "__76c6c1009e0d",
-    ),
+    "76c6c1009e0d"
 )]
-#[case::empty_path("", "", "af1349b9f5f9", "__theoremc__file____af1349b9f5f9")]
-#[case::dot_theorem(".theorem", "", "f9d6885cf913", "__theoremc__file____f9d6885cf913")]
+#[case::empty_path("", "", "af1349b9f5f9")]
+#[case::dot_theorem(".theorem", "", "f9d6885cf913")]
 fn mangle_module_path_edge_cases(
     #[case] path: &str,
     #[case] expected_mangled_stem: &str,
     #[case] expected_hash: &str,
-    #[case] expected_module_name: &str,
 ) {
     let stem = path_stem(path);
+    let expected_module_name = format!("{MODULE_PREFIX}{expected_mangled_stem}__{expected_hash}");
     ModuleGolden {
         path,
         stem: stem.as_str(),
         mangled_stem: expected_mangled_stem,
         hash: expected_hash,
-        module_name: expected_module_name,
+        module_name: &expected_module_name,
     }
     .assert();
 }
