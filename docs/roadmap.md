@@ -236,7 +236,7 @@ Out of scope: implicit reference inference.
   variable references require `{ ref: name }`. Acceptance: tests prove adding a
   new binding cannot alter existing literal argument semantics. Signposts:
   `TFS-5`, `ADR-3`, `DES-5`.
-- [ ] Implement optional `{ literal: "text" }` wrapper and reject ambiguous
+- [x] Implement optional `{ literal: "text" }` wrapper and reject ambiguous
   wrapper maps containing unsupported sentinel keys. Acceptance: parser tests
   cover valid wrapper use and deterministic rejection cases. Signposts:
   `TFS-5`, `ADR-3`.

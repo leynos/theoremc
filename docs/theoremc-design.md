@@ -946,6 +946,29 @@ roadmap):
   theorem-key rejection stay explicit rather than being folded into unrelated
   module-naming scenarios.
 
+### 6.7.9 Implementation decisions (Step 2.3.2)
+
+The following decisions were taken during implementation of the optional
+`{ literal: "text" }` wrapper and sentinel key rejection (Step 2.3.2 of the
+roadmap):
+
+- A new `NonStringLiteralValue` variant is added to `ArgDecodeError`, analogous
+  to `NonStringRefTarget` but for `{ literal: <non-string> }` maps.
+- The `is_ref_wrapper` private predicate is replaced with a unified
+  `classify_sentinel` function that returns an `Option<SentinelKind>` enum,
+  dispatching between `Ref` and `Literal` sentinel keys. This keeps the
+  sentinel check extensible and eliminates the risk of inconsistent predicate
+  behaviour.
+- Empty strings are accepted in `{ literal: "" }` because empty strings are
+  valid string literals. This differs from `{ ref: "" }`, which is rejected
+  because an empty string is not a valid identifier.
+- Multi-key maps containing `literal` or `ref` as one of their keys pass
+  through as `ArgValue::RawMap` per TFS-5 section 5.3. Only single-key maps
+  with exactly one recognized sentinel key are intercepted.
+- The "reject ambiguous wrapper maps" acceptance criterion is satisfied by
+  ensuring that `{ literal: <non-string> }` produces a deterministic error
+  rather than silently passing through as a struct literal candidate.
+
 ### 6.8 Localized diagnostics contract (ADR 002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:

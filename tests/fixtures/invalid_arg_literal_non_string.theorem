@@ -1,0 +1,18 @@
+Theorem: ArgLiteralNonString
+About: Non-string literal wrapper value is rejected
+Let:
+  result:
+    call:
+      action: label.set
+      args:
+        label: { literal: 42 }
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable

@@ -4,9 +4,10 @@
 //! action-call arguments after YAML deserialization and semantic
 //! decoding. Plain YAML scalars become [`Literal`](ArgValue::Literal)
 //! variants, explicit `{ ref: <Identifier> }` maps become
-//! [`Reference`](ArgValue::Reference) variants, and other composite
-//! forms are preserved as raw values for future lowering steps
-//! (`TFS-5`, `ADR-3`, `DES-5`).
+//! [`Reference`](ArgValue::Reference) variants, explicit
+//! `{ literal: <String> }` maps also become `Literal` variants, and
+//! other composite forms are preserved as raw values for future
+//! lowering steps (`TFS-5`, `ADR-3`, `DES-5`).
 
 use indexmap::IndexMap;
 
@@ -15,6 +16,17 @@ use super::value::TheoremValue;
 
 /// The sentinel YAML map key that identifies a variable reference.
 const REF_KEY: &str = "ref";
+
+/// The sentinel YAML map key that identifies an explicit string literal.
+const LITERAL_KEY: &str = "literal";
+
+/// Discriminates recognized sentinel map keys for dispatch.
+enum SentinelKind {
+    /// The `{ ref: <Identifier> }` sentinel.
+    Ref,
+    /// The `{ literal: <String> }` sentinel.
+    Literal,
+}
 
 /// Errors produced when decoding a raw [`TheoremValue`] into an
 /// [`ArgValue`].
@@ -63,6 +75,18 @@ pub enum ArgDecodeError {
         /// Human-readable kind label (e.g. "an integer").
         kind: &'static str,
     },
+
+    /// The `literal` value is not a string (e.g. an integer or boolean).
+    #[error(
+        "argument '{param}': literal value must be a string, \
+         not {kind}"
+    )]
+    NonStringLiteralValue {
+        /// Argument parameter name.
+        param: String,
+        /// Human-readable kind label (e.g. "an integer").
+        kind: &'static str,
+    },
 }
 
 /// A semantically decoded action-call argument value.
@@ -89,8 +113,7 @@ pub enum ArgValue {
     Reference(String),
     /// A YAML sequence not yet lowered (future: `vec![...]` synthesis).
     RawSequence(Vec<TheoremValue>),
-    /// A YAML map not yet lowered (future: struct-literal synthesis or
-    /// `{ literal: ... }` wrapper recognition).
+    /// A YAML map not yet lowered (future: struct-literal synthesis).
     RawMap(IndexMap<String, TheoremValue>),
 }
 
@@ -116,7 +139,7 @@ pub enum LiteralValue {
     /// A floating-point literal.
     Float(f64),
     /// A string literal (plain YAML string or explicit
-    /// `{ literal: "..." }` wrapper in future steps).
+    /// `{ literal: "..." }` wrapper).
     String(String),
 }
 
@@ -138,6 +161,11 @@ pub enum LiteralValue {
 ///   `ArgValue::Reference(name)`
 /// - `TheoremValue::Mapping(m)` with exactly one key `"ref"` whose
 ///   value is invalid → `Err(...)` with an actionable message
+/// - `TheoremValue::Mapping(m)` with exactly one key `"literal"` whose
+///   value is `TheoremValue::String(s)` →
+///   `ArgValue::Literal(LiteralValue::String(s))`
+/// - `TheoremValue::Mapping(m)` with exactly one key `"literal"` whose
+///   value is not a string → `Err(...)` with an actionable message
 /// - `TheoremValue::Mapping(m)` (any other map) →
 ///   `ArgValue::RawMap(m)` (preserved for future lowering)
 ///
@@ -148,7 +176,8 @@ pub enum LiteralValue {
 ///
 /// Returns [`ArgDecodeError`] when a `{ ref: ... }` wrapper contains
 /// an invalid target: empty string, non-identifier pattern, Rust
-/// reserved keyword, or non-string value.
+/// reserved keyword, or non-string value. Also returns an error when
+/// a `{ literal: ... }` wrapper contains a non-string value.
 ///
 /// # Examples
 ///
@@ -168,28 +197,41 @@ pub fn decode_arg_value(param_name: &str, value: TheoremValue) -> Result<ArgValu
     }
 }
 
-/// Decodes a YAML mapping into either a `Reference` (if the map is a
-/// single-key `{ ref: <name> }` wrapper) or a `RawMap` (for all other
-/// maps).
+/// Decodes a YAML mapping into a sentinel wrapper (`Reference` or
+/// `Literal`) if the map has exactly one recognized sentinel key, or
+/// a `RawMap` for all other maps (struct literal candidates).
 fn decode_mapping(
     param_name: &str,
     map: IndexMap<String, TheoremValue>,
 ) -> Result<ArgValue, ArgDecodeError> {
-    if !is_ref_wrapper(&map) {
+    let Some(kind) = classify_sentinel(&map) else {
         return Ok(ArgValue::RawMap(map));
-    }
+    };
 
-    // `is_ref_wrapper` confirmed exactly one key == "ref", so the
-    // iterator always yields a value.
-    let Some(ref_value) = map.into_values().next() else {
+    // `classify_sentinel` confirmed exactly one key, so the iterator
+    // always yields a value.
+    let Some(value) = map.into_values().next() else {
         return Ok(ArgValue::RawMap(IndexMap::new()));
     };
-    decode_ref_target(param_name, ref_value)
+    match kind {
+        SentinelKind::Ref => decode_ref_target(param_name, value),
+        SentinelKind::Literal => decode_literal_target(param_name, value),
+    }
 }
 
-/// Returns `true` if the map has exactly one key and that key is `"ref"`.
-fn is_ref_wrapper(map: &IndexMap<String, TheoremValue>) -> bool {
-    map.len() == 1 && map.contains_key(REF_KEY)
+/// Classifies a single-key map as a recognized sentinel wrapper, or
+/// returns `None` for maps that should pass through as struct literal
+/// candidates.
+fn classify_sentinel(map: &IndexMap<String, TheoremValue>) -> Option<SentinelKind> {
+    if map.len() != 1 {
+        return None;
+    }
+    let key = map.keys().next()?;
+    match key.as_str() {
+        REF_KEY => Some(SentinelKind::Ref),
+        LITERAL_KEY => Some(SentinelKind::Literal),
+        _ => None,
+    }
 }
 
 /// Validates the `ref` target value and produces an `ArgValue::Reference`.
@@ -222,6 +264,24 @@ fn decode_ref_target(param_name: &str, value: TheoremValue) -> Result<ArgValue, 
     }
 
     Ok(ArgValue::Reference(name))
+}
+
+/// Validates the `literal` wrapper value and produces an
+/// `ArgValue::Literal(LiteralValue::String(...))`.
+///
+/// Unlike [`decode_ref_target`], empty strings are accepted because
+/// an empty string is a valid string literal.
+fn decode_literal_target(
+    param_name: &str,
+    value: TheoremValue,
+) -> Result<ArgValue, ArgDecodeError> {
+    let TheoremValue::String(s) = value else {
+        return Err(ArgDecodeError::NonStringLiteralValue {
+            param: param_name.to_owned(),
+            kind: non_string_kind(&value),
+        });
+    };
+    Ok(ArgValue::Literal(LiteralValue::String(s)))
 }
 
 /// Returns a human-readable kind label for non-string `TheoremValue`

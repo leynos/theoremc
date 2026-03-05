@@ -143,6 +143,58 @@ fn sequence_is_raw_sequence() {
     assert_eq!(result.expect("should decode"), ArgValue::RawSequence(seq));
 }
 
+// ── Literal wrapper decoding ────────────────────────────────────────
+
+#[rstest]
+#[case::simple_string("hello", "hello")]
+#[case::empty_string("", "")]
+#[case::whitespace_string("  spaces  ", "  spaces  ")]
+fn valid_literal_wrapper_decodes_as_string_literal(#[case] input: &str, #[case] expected: &str) {
+    let map = IndexMap::from([("literal".to_owned(), TheoremValue::String(input.to_owned()))]);
+    let result = decode_arg_value("param", TheoremValue::Mapping(map));
+    assert_eq!(
+        result.expect("should decode"),
+        ArgValue::Literal(LiteralValue::String(expected.to_owned()))
+    );
+}
+
+#[rstest]
+#[case::integer_value(TheoremValue::Integer(42), "an integer")]
+#[case::boolean_value(TheoremValue::Bool(true), "a boolean")]
+#[case::float_value(TheoremValue::Float(1.0), "a float")]
+#[case::sequence_value(
+    TheoremValue::Sequence(vec![TheoremValue::Integer(1)]),
+    "a sequence"
+)]
+#[case::mapping_value(
+    TheoremValue::Mapping(IndexMap::from([("nested".to_owned(), TheoremValue::String("map".into()))])),
+    "a mapping"
+)]
+fn literal_with_non_string_value_is_rejected(
+    #[case] value: TheoremValue,
+    #[case] expected_kind: &'static str,
+) {
+    let map = IndexMap::from([("literal".to_owned(), value)]);
+    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    assert_eq!(
+        err,
+        ArgDecodeError::NonStringLiteralValue {
+            param: "param".into(),
+            kind: expected_kind,
+        }
+    );
+}
+
+#[test]
+fn multi_key_map_with_literal_is_raw_map() {
+    let map = IndexMap::from([
+        ("literal".to_owned(), TheoremValue::String("text".into())),
+        ("extra".to_owned(), TheoremValue::Integer(1)),
+    ]);
+    let result = decode_arg_value("param", TheoremValue::Mapping(map.clone()));
+    assert_eq!(result.expect("should decode"), ArgValue::RawMap(map));
+}
+
 // ── Error message includes parameter name ───────────────────────────
 
 #[test]
@@ -161,5 +213,23 @@ fn error_message_includes_param_name() {
     assert!(
         msg.contains("graph_ref"),
         "expected display to mention 'graph_ref', got: {msg}"
+    );
+}
+
+#[test]
+fn literal_error_message_includes_param_name() {
+    let map = IndexMap::from([("literal".to_owned(), TheoremValue::Integer(7))]);
+    let err = decode_arg_value("my_label", TheoremValue::Mapping(map)).expect_err("should fail");
+    assert_eq!(
+        err,
+        ArgDecodeError::NonStringLiteralValue {
+            param: "my_label".into(),
+            kind: "an integer",
+        }
+    );
+    let msg = err.to_string();
+    assert!(
+        msg.contains("my_label"),
+        "expected display to mention 'my_label', got: {msg}"
     );
 }

@@ -22,3 +22,11 @@ Feature: Argument value decoding
   Scenario: Adding a binding cannot alter literal argument semantics
     Given a theorem with a plain string argument matching a binding name
     Then the argument remains a string literal regardless of bindings
+
+  Scenario: Explicit literal wrapper is decoded as string literal
+    Given a theorem file with an explicit literal wrapper
+    Then loading succeeds and the argument is a string literal
+
+  Scenario: Non-string literal wrapper value is rejected
+    Given a theorem file with a non-string literal wrapper value
+    Then loading fails with a literal type error message
