@@ -6,6 +6,7 @@
 //! and support for both TitleCase and lowercase key aliases.
 
 mod action_name;
+pub mod arg_value;
 mod diagnostic;
 mod error;
 mod expr;
@@ -13,12 +14,14 @@ mod identifier;
 mod loader;
 mod newtypes;
 mod raw;
+mod raw_action;
 mod source_id;
 mod step;
 mod types;
 mod validate;
 mod value;
 
+pub use arg_value::{ArgDecodeError, ArgValue, LiteralValue};
 pub use diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, SourceLocation};
 pub use error::SchemaError;
 pub use identifier::validate_identifier;

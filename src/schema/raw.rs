@@ -8,8 +8,10 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, de::Error};
 use serde_saphyr::{Location, Spanned};
 
+use super::arg_value::ArgDecodeError;
 use super::newtypes::{ForallVar, TheoremName};
-use super::types::{Evidence, KaniEvidence, KaniExpectation, LetBinding, Step, TheoremDoc};
+use super::raw_action::{self, RawLetBinding, RawStep};
+use super::types::{Evidence, KaniEvidence, KaniExpectation, TheoremDoc};
 use super::validate::reason_markers;
 use super::value::TheoremValue;
 
@@ -74,6 +76,37 @@ enum ValidationKind {
     KaniVacuityBecauseNonEmpty,
 }
 
+/// Errors raised during the raw-to-public conversion in
+/// [`RawTheoremDoc::to_theorem_doc`].
+///
+/// Each variant identifies the location (binding name or step index)
+/// and wraps the underlying [`ArgDecodeError`] as a `#[source]` so
+/// the full error chain is preserved. Stringification is deferred to
+/// the loader boundary when building
+/// [`SchemaError::ValidationFailed`](super::error::SchemaError::ValidationFailed).
+#[derive(Debug, Clone, thiserror::Error)]
+pub(crate) enum RawDocDecodeError {
+    /// An argument in a `Let` binding failed decoding.
+    #[error("Let binding '{name}': {source}")]
+    LetBinding {
+        /// The binding name from the `Let` map.
+        name: String,
+        /// The underlying argument decoding failure.
+        #[source]
+        source: ArgDecodeError,
+    },
+
+    /// An argument in a `Do` step failed decoding.
+    #[error("Do step {index}: {source}")]
+    DoStep {
+        /// One-based step index in the `Do` list.
+        index: usize,
+        /// The underlying argument decoding failure.
+        #[source]
+        source: ArgDecodeError,
+    },
+}
+
 /// Raw theorem document with location-carrying fields.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -95,9 +128,9 @@ pub(crate) struct RawTheoremDoc {
     #[serde(rename = "Witness", alias = "witness", default)]
     pub(crate) witness: Vec<RawWitnessCheck>,
     #[serde(rename = "Let", alias = "let", default)]
-    pub(crate) let_bindings: IndexMap<String, LetBinding>,
+    pub(crate) let_bindings: IndexMap<String, RawLetBinding>,
     #[serde(rename = "Do", alias = "do", default)]
-    pub(crate) do_steps: Vec<Step>,
+    pub(crate) do_steps: Vec<RawStep>,
     #[serde(rename = "Prove", alias = "prove")]
     pub(crate) prove: Vec<RawAssertion>,
     #[serde(rename = "Evidence", alias = "evidence")]
@@ -155,10 +188,18 @@ pub(crate) struct RawKaniEvidence {
 }
 
 impl RawTheoremDoc {
-    /// Converts this raw document into the public theorem document type.
-    #[must_use]
-    pub(crate) fn to_theorem_doc(&self) -> TheoremDoc {
-        TheoremDoc {
+    /// Converts this raw document into the public theorem document type,
+    /// decoding argument values from raw YAML into [`ArgValue`] variants.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RawDocDecodeError`] when an argument value fails
+    /// decoding (e.g., an invalid `{ ref: ... }` target).
+    pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, RawDocDecodeError> {
+        let let_bindings = convert_let_bindings(&self.let_bindings)?;
+        let do_steps = convert_steps(&self.do_steps)?;
+
+        Ok(TheoremDoc {
             schema: self.schema,
             theorem: self.theorem.value.clone(),
             about: self.about.value.clone(),
@@ -181,8 +222,8 @@ impl RawTheoremDoc {
                     because: w.because.value.clone(),
                 })
                 .collect(),
-            let_bindings: self.let_bindings.clone(),
-            do_steps: self.do_steps.clone(),
+            let_bindings,
+            do_steps,
             prove: self
                 .prove
                 .iter()
@@ -192,7 +233,7 @@ impl RawTheoremDoc {
                 })
                 .collect(),
             evidence: self.evidence.to_evidence(),
-        }
+        })
     }
 
     /// Returns the canonical theorem-level fallback location.
@@ -283,6 +324,39 @@ impl RawKaniEvidence {
                 .map(|vacuity_because| vacuity_because.value.clone()),
         }
     }
+}
+
+// ── Argument decoding helpers ────────────────────────────────────────
+
+/// Converts a map of raw `Let` bindings, decoding argument values.
+fn convert_let_bindings(
+    raw: &IndexMap<String, RawLetBinding>,
+) -> Result<IndexMap<String, super::types::LetBinding>, RawDocDecodeError> {
+    let mut out = IndexMap::with_capacity(raw.len());
+    for (name, binding) in raw {
+        let converted = raw_action::convert_let_binding(binding).map_err(|source| {
+            RawDocDecodeError::LetBinding {
+                name: name.clone(),
+                source,
+            }
+        })?;
+        out.insert(name.clone(), converted);
+    }
+    Ok(out)
+}
+
+/// Converts a list of raw `Do` steps, decoding argument values.
+fn convert_steps(raw: &[RawStep]) -> Result<Vec<super::types::Step>, RawDocDecodeError> {
+    let mut out = Vec::with_capacity(raw.len());
+    for (i, step) in raw.iter().enumerate() {
+        let converted =
+            raw_action::convert_step(step).map_err(|source| RawDocDecodeError::DoStep {
+                index: i + 1,
+                source,
+            })?;
+        out.push(converted);
+    }
+    Ok(out)
 }
 
 /// Parses indexed validation reason prefixes like `Prove assertion 2: …`.

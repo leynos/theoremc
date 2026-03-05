@@ -243,15 +243,59 @@ Evidence:
 
 ### Value forms in arguments
 
-Action arguments accept:
+After YAML deserialization, each action argument value is decoded into an
+`ArgValue` that distinguishes literals from variable references. This encoding
+ensures that plain YAML strings are unconditionally treated as string literals
+and variable references require the explicit `{ ref: <name> }` wrapper.
+
+**Decoded argument types (`ArgValue`):**
+
+- `ArgValue::Literal(LiteralValue::Bool(b))` — a YAML boolean (`true`/`false`).
+- `ArgValue::Literal(LiteralValue::Integer(n))` — a YAML integer.
+- `ArgValue::Literal(LiteralValue::Float(f))` — a YAML float.
+- `ArgValue::Literal(LiteralValue::String(s))` — a plain YAML string. Plain
+  strings are **always** string literals, regardless of whether a `Let` binding
+  with the same name exists in the same theorem.
+- `ArgValue::Reference(name)` — an explicit variable reference via
+  `{ ref: <name> }`. The `name` must be a valid ASCII identifier
+  (`^[A-Za-z_][A-Za-z0-9_]*$`) and must not be a Rust reserved keyword.
+- `ArgValue::RawSequence(values)` — a YAML sequence (future: `vec![...]`
+  synthesis).
+- `ArgValue::RawMap(map)` — a YAML map that is not a recognized wrapper (future:
+  struct-literal synthesis or `{ literal: ... }` wrapper).
+
+**Semantic stability invariant:** adding a new `Let` binding can never silently
+change the meaning of an existing argument that was previously a plain string.
+A plain string `"x"` always decodes as `ArgValue::Literal(String("x"))`, even
+if a binding named `x` exists. To reference a binding, use `{ ref: x }`.
+
+**Examples:**
+
+```yaml
+args:
+  name: "hello"           # → ArgValue::Literal(String("hello"))
+  count: 42               # → ArgValue::Literal(Integer(42))
+  enabled: true           # → ArgValue::Literal(Bool(true))
+  graph_ref: { ref: graph }  # → ArgValue::Reference("graph")
+```
+
+**Invalid reference targets** produce actionable error messages:
+
+- `{ ref: "" }` — "ref value must not be empty"
+- `{ ref: fn }` — "ref value 'fn' is a Rust reserved keyword"
+- `{ ref: 123bad }` — "ref value '123bad' is not a valid identifier"
+- `{ ref: 42 }` — "ref value must be a string identifier, not an integer"
+
+**Supported YAML value forms** (summary):
 
 - YAML booleans → Rust boolean literals.
 - YAML integers → Rust integer literals.
+- YAML floats → Rust float literals.
 - YAML strings → Rust string literals (plain strings are always literals).
-- YAML lists → `vec![...]`.
-- YAML maps → struct literals or explicit wrappers.
+- YAML lists → `vec![...]` (future lowering).
+- YAML maps → struct literals or explicit wrappers (future lowering).
 - `{ ref: name }` → variable reference (explicit).
-- `{ literal: "text" }` → explicit string literal.
+- `{ literal: "text" }` → explicit string literal (future).
 
 ### Error handling
 

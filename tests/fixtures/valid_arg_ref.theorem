@@ -1,0 +1,22 @@
+Theorem: ArgRef
+About: Explicit ref arguments are decoded as variable references
+Let:
+  graph:
+    call:
+      action: graph.create
+      args: {}
+  result:
+    call:
+      action: graph.attach
+      args:
+        target: { ref: graph }
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable

@@ -854,6 +854,40 @@ collision detection (Step 2.1.3 of the roadmap):
   deduplicated. The infrastructure is structured for future cross-file
   collision detection when multi-file loading arrives (Step 3.x).
 
+### 6.7.6 Implementation decisions (Step 2.3.1)
+
+The following decisions were taken during implementation of argument value
+decoding for plain YAML strings (Step 2.3.1 of the roadmap):
+
+- Two new domain types `ArgValue` and `LiteralValue` are placed in a dedicated
+  `src/schema/arg_value.rs` module to keep `src/schema/types.rs` under the
+  400-line limit. `ArgValue` is re-exported from `theoremc::schema`.
+- `ActionCall.args` is changed from `IndexMap<String, TheoremValue>` to
+  `IndexMap<String, ArgValue>`. This is the correct semantic representation for
+  action arguments at the domain level. `TheoremValue` remains available for
+  `Evidence` configs and other raw YAML values.
+- Decoding is performed in `RawTheoremDoc::to_theorem_doc()` rather than in a
+  separate post-validation pass. The raw-to-public conversion is the natural
+  boundary where YAML-level types become domain-level types, consistent with
+  how `Spanned<String>` becomes `String` for other fields.
+- Nine raw serde-compatible types (`RawActionCall`, `RawLetCall`, `RawLetMust`,
+  `RawLetBinding`, `RawStepCall`, `RawStepMust`, `RawStepMaybe`,
+  `RawMaybeBlock`, `RawStep`) are extracted into `src/schema/raw_action.rs` to
+  keep `src/schema/raw.rs` under the 400-line limit. These mirror the public
+  types but retain `TheoremValue` in `args` for serde compatibility.
+- YAML maps that are not `{ ref: <name> }` are passed through as
+  `ArgValue::RawMap(IndexMap<String, TheoremValue>)`, preserving forward
+  compatibility for Step 2.3.2 (`{ literal: ... }` wrapper) and Step 2.3.3
+  (struct-literal synthesis). Sequences are similarly passed through as
+  `ArgValue::RawSequence(Vec<TheoremValue>)`.
+- The `{ ref: <name> }` target is validated using the existing
+  `is_valid_ascii_identifier_pattern` and `is_rust_reserved_keyword` functions
+  from `src/schema/identifier.rs`, ensuring argument reference targets and
+  theorem identifiers follow the same lexical rules.
+- Decoding errors are routed through `SchemaError::ValidationFailed` with a
+  descriptive reason string. A distinct error variant is not warranted at this
+  stage and may need to change when Steps 2.3.2 and 2.3.3 extend decoding.
+
 ### 6.8 Localized diagnostics contract (ADR 002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:

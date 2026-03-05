@@ -232,7 +232,7 @@ literal synthesis.
 
 Out of scope: implicit reference inference.
 
-- [ ] Implement argument decoding so plain YAML strings are always literals and
+- [x] Implement argument decoding so plain YAML strings are always literals and
   variable references require `{ ref: name }`. Acceptance: tests prove adding a
   new binding cannot alter existing literal argument semantics. Signposts:
   `TFS-5`, `ADR-3`, `DES-5`.

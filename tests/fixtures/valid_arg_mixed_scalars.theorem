@@ -1,0 +1,20 @@
+Theorem: ArgMixedScalars
+About: Integer, boolean, and string arguments are scalar literals
+Let:
+  result:
+    call:
+      action: config.set
+      args:
+        count: 42
+        enabled: true
+        label: "test"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
