@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -131,20 +131,27 @@ out of scope until the later reporting work.
   implementations, and current user guide coverage.
 - [x] 2026-03-06: drafted this ExecPlan for deterministic harness naming and
   theorem-key checks.
-- [ ] Milestone 0: confirm the precise insertion point for duplicate
-  theorem-key validation.
-- [ ] Milestone 1: add failing unit tests for theorem slugging, theorem-key
-  construction, and harness identifier generation.
-- [ ] Milestone 2: add failing behavioural tests for harness naming happy
-  paths and duplicate theorem-key rejection.
-- [ ] Milestone 3: implement public theorem-harness naming helpers in
-  `src/mangle.rs` (or extracted sibling module if required).
-- [ ] Milestone 4: implement duplicate theorem-key checking with deterministic
-  source-aware errors.
-- [ ] Milestone 5: update design and user documentation and mark the roadmap
-  entry or entries done.
-- [ ] Milestone 6: run formatting, lint, tests, and documentation validation
-  gates and capture logs.
+- [x] 2026-03-06: Milestone 0 complete. Duplicate theorem-key validation is
+  implemented in `src/schema/loader.rs`, after per-document conversion and
+  validation and before cross-document action-collision checks.
+- [x] 2026-03-06: Milestone 1 complete. Unit tests now cover theorem slugging,
+  theorem-key construction, and harness identifier generation in
+  `src/mangle_tests.rs`.
+- [x] 2026-03-06: Milestone 2 complete. Behavioural coverage now lives in
+  `tests/harness_naming_bdd.rs` with scenarios for deterministic harness
+  naming, snake-case preservation, and duplicate theorem-key rejection.
+- [x] 2026-03-06: Milestone 3 complete. Public theorem-harness helpers are
+  implemented in `theoremc::mangle`, with code extracted into
+  `src/mangle_harness.rs` and `src/mangle_path.rs` to keep files under the
+  line-count limit.
+- [x] 2026-03-06: Milestone 4 complete. Duplicate theorem keys now return
+  `SchemaError::DuplicateTheoremKey` with deterministic source-aware
+  diagnostics.
+- [x] 2026-03-06: Milestone 5 complete. Design, user-guide, and roadmap docs
+  now describe the public API and failure mode.
+- [x] 2026-03-06: Milestone 6 complete. Validation gates passed:
+  `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`,
+  and `make test`.
 
 ## Surprises & Discoveries
 
@@ -159,6 +166,9 @@ out of scope until the later reporting work.
   present in this checkout. The plan therefore relies on existing repository
   usage of `rstest-bdd` v0.5.0 and the current BDD tests as the local style
   reference.
+- 2026-03-06: `src/mangle.rs` was already at 398 lines before this step. The
+  implementation therefore had to extract `src/mangle_path.rs` and
+  `src/mangle_harness.rs` rather than extending the root file directly.
 
 ## Decision Log
 
@@ -170,17 +180,25 @@ out of scope until the later reporting work.
   plus loader-level validation, rather than a monolithic new subsystem.
   Rationale: the current code already separates naming derivation from loading
   and uses the loader as the place where cross-document invariants are enforced.
+- 2026-03-06: use a dedicated `SchemaError::DuplicateTheoremKey` variant
+  rather than overloading `ValidationFailed`. Rationale: duplicate theorem-key
+  rejection is a cross-document invariant with different payload needs (theorem
+  key plus duplicate-site diagnostic) than single-document semantic validation.
 
 ## Outcomes & Retrospective
 
-This section is intentionally incomplete until implementation finishes. On
-completion, record:
-
-- whether the final public API stayed additive,
-- which file hosted duplicate theorem-key checking,
-- the number of new unit and behavioural tests,
-- whether documentation updates were sufficient for library consumers, and
-- the exact validation commands and results.
+- The final public API stayed additive. New public helpers are
+  `theorem_key`, `theorem_slug`, `mangle_theorem_harness`, and `MangledHarness`.
+- Duplicate theorem-key checking is hosted in
+  `src/schema/loader.rs`, where the loader still has access to both `SourceId`
+  and spanned raw theorem identifiers.
+- New automated coverage consists of 11 unit tests for theorem-key and harness
+  naming plus 3 new behavioural scenarios in `tests/harness_naming_bdd.rs`.
+- Documentation updates were made in `docs/theoremc-design.md`,
+  `docs/users-guide.md`, and `docs/roadmap.md`.
+- Validation results:
+  `make fmt`, `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`,
+  and `make test` all passed on 2026-03-06.
 
 ## Context and orientation
 

@@ -300,7 +300,7 @@ args:
 ### Error handling
 
 `load_theorem_docs` and `load_theorem_docs_with_source` return
-`Result<Vec<TheoremDoc>, SchemaError>`, where `SchemaError` has five variants:
+`Result<Vec<TheoremDoc>, SchemaError>`, where `SchemaError` has six variants:
 
 - `Deserialize { message, diagnostic }` — YAML parsing or schema mismatch
   error.
@@ -311,6 +311,9 @@ args:
   violation (e.g., empty `Prove` section or no Evidence backend).
 - `MangledIdentifierCollision { message }` — two or more different canonical
   action names produce the same mangled Rust identifier.
+- `DuplicateTheoremKey { theorem_key, message, diagnostic }` — two theorem
+  documents loaded from the same source produce the same literal theorem key
+  `{P}#{T}`.
 
 For parse and validation failures, `diagnostic` includes structured location
 metadata when available:
@@ -489,3 +492,74 @@ Paths that differ only in characters lost during sanitization (e.g.,
 mangled stem but different module names because `hash12` operates on the
 original path string. The 12-character blake3 hash suffix provides the real
 disambiguator.
+
+## Theorem harness naming
+
+The `theoremc::mangle` module also provides deterministic theorem harness
+naming for Kani proof functions. Each theorem document maps to a harness
+identifier of the form:
+
+```plaintext
+theorem__{theorem_slug(T)}__h{hash12(P#T)}
+```
+
+Where:
+
+- `P` is the literal theorem file path string supplied by the caller.
+- `T` is the theorem identifier from the `Theorem` field.
+- `theorem_key(P, T)` is the exact string `{P}#{T}`.
+- `theorem_slug(T)` preserves identifiers already matching
+  `^[a-z_][a-z0-9_]*$` and otherwise converts CamelCase deterministically,
+  including acronym and digit boundaries.
+
+### Harness naming helpers
+
+- `theorem_key(path, theorem)` — returns the exact theorem key `{P}#{T}`.
+- `theorem_slug(theorem)` — returns the deterministic harness slug.
+- `mangle_theorem_harness(path, theorem)` — returns a `MangledHarness` with
+  `theorem()`, `slug()`, `theorem_key()`, `hash()`, and `identifier()`
+  accessors.
+
+```rust
+use theoremc::mangle::{hash12, mangle_theorem_harness, theorem_key, theorem_slug};
+
+assert_eq!(
+    theorem_key(
+        "theorems/bidirectional.theorem",
+        "BidirectionalLinksCommitPath3Nodes",
+    ),
+    "theorems/bidirectional.theorem#BidirectionalLinksCommitPath3Nodes",
+);
+assert_eq!(
+    theorem_slug("BidirectionalLinksCommitPath3Nodes"),
+    "bidirectional_links_commit_path_3_nodes",
+);
+
+let harness = mangle_theorem_harness(
+    "theorems/bidirectional.theorem",
+    "BidirectionalLinksCommitPath3Nodes",
+);
+assert_eq!(
+    harness.identifier(),
+    format!(
+        "theorem__bidirectional_links_commit_path_3_nodes__h{}",
+        hash12(&theorem_key(
+            "theorems/bidirectional.theorem",
+            "BidirectionalLinksCommitPath3Nodes",
+        )),
+    ),
+);
+```
+
+### Duplicate theorem-key rejection
+
+`load_theorem_docs_with_source` now rejects duplicate theorem keys before code
+generation. In the current loader boundary this means a multi-document
+`.theorem` source cannot declare the same `Theorem` identifier twice, because
+both documents would produce the same literal theorem key `{source}#{Theorem}`.
+
+The loader returns `SchemaError::DuplicateTheoremKey` with:
+
+- the exact colliding theorem key,
+- a deterministic message naming the original definition location, and
+- a structured diagnostic pointing at the duplicate theorem field.

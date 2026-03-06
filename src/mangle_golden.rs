@@ -2,7 +2,8 @@
 //!
 //! Single source of truth for golden hash values used by both unit
 //! tests (`src/mangle_tests.rs`) and BDD integration tests
-//! (`tests/action_mangle_bdd.rs`, `tests/module_naming_bdd.rs`).
+//! (`tests/action_mangle_bdd.rs`, `tests/module_naming_bdd.rs`, and
+//! `tests/harness_naming_bdd.rs`).
 
 /// `(canonical_name, expected_slug, expected_hash12)`.
 pub const ACTION_GOLDEN_TRIPLES: &[(&str, &str, &str)] = &[
@@ -38,4 +39,16 @@ pub const MODULE_GOLDEN_TUPLES: &[(&str, &str, &str, &str)] = &[
         "no_extension",
         "afb36ed5206f",
     ),
+];
+
+/// `(path, theorem_id, expected_slug)`.
+pub const HARNESS_GOLDEN_TUPLES: &[(&str, &str, &str)] = &[
+    (
+        "theorems/bidirectional.theorem",
+        "BidirectionalLinksCommitPath3Nodes",
+        "bidirectional_links_commit_path_3_nodes",
+    ),
+    ("theorems/hnsw.theorem", "HNSWInvariant", "hnsw_invariant"),
+    ("theorems/http.theorem", "HTTP2StreamID", "http_2_stream_id"),
+    ("theorems/smoke.theorem", "hnsw_smoke", "hnsw_smoke"),
 ];

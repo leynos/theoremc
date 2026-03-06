@@ -5,6 +5,8 @@
 //! identifiers at deserialization time (via `TheoremName` / `ForallVar`
 //! newtypes) and enforcing structural constraints post-deserialization.
 
+use std::collections::BTreeMap;
+
 use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, create_diagnostic, first_line};
 use super::error::SchemaError;
 use super::raw::{RawTheoremDoc, ValidationReason};
@@ -113,7 +115,7 @@ pub fn load_theorem_docs_with_source(
     })?;
 
     let mut docs = Vec::with_capacity(raw_docs.len());
-    for raw_doc in raw_docs {
+    for raw_doc in &raw_docs {
         let doc = raw_doc.to_theorem_doc().map_err(|decode_err| {
             let reason = decode_err.to_string();
             let error = SchemaError::ValidationFailed {
@@ -121,16 +123,81 @@ pub fn load_theorem_docs_with_source(
                 reason,
                 diagnostic: None,
             };
-            attach_validation_diagnostic(error, source, &raw_doc)
+            attach_validation_diagnostic(error, source, raw_doc)
         })?;
         validate_theorem_doc(&doc)
-            .map_err(|error| attach_validation_diagnostic(error, source, &raw_doc))?;
+            .map_err(|error| attach_validation_diagnostic(error, source, raw_doc))?;
         docs.push(doc);
     }
 
+    check_duplicate_theorem_keys(source, &raw_docs)?;
     crate::collision::check_action_collisions(&docs)?;
 
     Ok(docs)
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DuplicateTheoremLocation {
+    first_line: usize,
+    first_column: usize,
+}
+
+fn check_duplicate_theorem_keys(
+    source: &SourceId,
+    raw_docs: &[RawTheoremDoc],
+) -> Result<(), SchemaError> {
+    let mut first_seen: BTreeMap<&str, DuplicateTheoremLocation> = BTreeMap::new();
+
+    for raw_doc in raw_docs {
+        let theorem = raw_doc.theorem.value.as_str();
+        let location = raw_doc.theorem_location();
+        let line = usize::try_from(location.line()).ok().unwrap_or(usize::MAX);
+        let column = usize::try_from(location.column())
+            .ok()
+            .unwrap_or(usize::MAX);
+
+        if let Some(previous) = first_seen.get(theorem) {
+            let theorem_key = format!("{}#{theorem}", source.as_str());
+            let message = format!(
+                concat!(
+                    "theorem '{theorem}' appears more than once in source ",
+                    "'{source}'; previously defined at {source}:{first_line}:{first_column}",
+                ),
+                theorem = theorem,
+                source = source.as_str(),
+                first_line = previous.first_line,
+                first_column = previous.first_column,
+            );
+            let diagnostic = create_diagnostic(
+                SchemaDiagnosticCode::ValidationFailure,
+                source,
+                format!(
+                    "duplicate theorem key '{theorem_key}': previously defined at {source}:{first_line}:{first_column}",
+                    theorem_key = theorem_key,
+                    source = source.as_str(),
+                    first_line = previous.first_line,
+                    first_column = previous.first_column,
+                ),
+                location,
+            );
+
+            return Err(SchemaError::DuplicateTheoremKey {
+                theorem_key,
+                message,
+                diagnostic: Some(diagnostic),
+            });
+        }
+
+        first_seen.insert(
+            theorem,
+            DuplicateTheoremLocation {
+                first_line: line,
+                first_column: column,
+            },
+        );
+    }
+
+    Ok(())
 }
 
 fn attach_validation_diagnostic(

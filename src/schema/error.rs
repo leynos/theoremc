@@ -51,6 +51,18 @@ pub enum SchemaError {
         /// canonical names per mangled identifier.
         message: String,
     },
+
+    /// Two or more theorem documents from the same source share the same
+    /// theorem key `{P}#{T}`.
+    #[error("duplicate theorem key '{theorem_key}': {message}")]
+    DuplicateTheoremKey {
+        /// Exact theorem key that collided.
+        theorem_key: String,
+        /// Human-readable collision report including source context.
+        message: String,
+        /// Optional structured diagnostic payload for the duplicate site.
+        diagnostic: Option<SchemaDiagnostic>,
+    },
 }
 
 impl SchemaError {
@@ -58,9 +70,9 @@ impl SchemaError {
     #[must_use]
     pub const fn diagnostic(&self) -> Option<&SchemaDiagnostic> {
         match self {
-            Self::Deserialize { diagnostic, .. } | Self::ValidationFailed { diagnostic, .. } => {
-                diagnostic.as_ref()
-            }
+            Self::Deserialize { diagnostic, .. }
+            | Self::ValidationFailed { diagnostic, .. }
+            | Self::DuplicateTheoremKey { diagnostic, .. } => diagnostic.as_ref(),
             Self::InvalidIdentifier { .. }
             | Self::InvalidActionName { .. }
             | Self::MangledIdentifierCollision { .. } => None,

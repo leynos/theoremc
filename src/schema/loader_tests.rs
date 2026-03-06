@@ -235,6 +235,60 @@ Witness:
 }
 
 #[rstest]
+fn reject_duplicate_theorem_keys_with_diagnostic() {
+    let yaml = concat!(
+        "Theorem: SharedName\n",
+        "About: First theorem\n",
+        "Prove:\n",
+        "  - assert: 'true'\n",
+        "    because: trivially true\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "Witness:\n",
+        "  - cover: 'true'\n",
+        "    because: reachable\n",
+        "---\n",
+        "Theorem: SharedName\n",
+        "About: Second theorem\n",
+        "Prove:\n",
+        "  - assert: 'true'\n",
+        "    because: trivially true\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "Witness:\n",
+        "  - cover: 'true'\n",
+        "    because: reachable\n",
+    );
+    let source = SourceId::new("theorems/duplicate.theorem");
+
+    let error = load_theorem_docs_with_source(&source, yaml)
+        .expect_err("duplicate theorem keys should fail");
+
+    match error {
+        SchemaError::DuplicateTheoremKey {
+            theorem_key,
+            message,
+            diagnostic,
+        } => {
+            assert_eq!(theorem_key, "theorems/duplicate.theorem#SharedName");
+            assert!(message.contains("previously defined at theorems/duplicate.theorem:1:10"));
+
+            let structured = diagnostic.expect("duplicate theorem keys should expose a diagnostic");
+            assert_eq!(structured.code.as_str(), "schema.validation_failure");
+            assert_eq!(structured.location.source, "theorems/duplicate.theorem");
+            assert_eq!(structured.location.line, 14);
+            assert_eq!(structured.location.column, 10);
+            assert!(structured.message.contains("previously defined at"));
+        }
+        other => panic!("expected duplicate theorem key error, got: {other}"),
+    }
+}
+
+#[rstest]
 #[case("reject_missing_witness_when_kani_not_vacuous", "")]
 #[case(
     "reject_missing_witness_when_kani_explicitly_not_vacuous",

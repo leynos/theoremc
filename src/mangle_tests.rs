@@ -160,6 +160,65 @@ fn path_mangle_cases(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(path_mangle(&PathStem::from(input)), expected);
 }
 
+// ── theorem_slug tests ────────────────────────────────────────────
+
+#[rstest]
+#[case::already_snake("hnsw_smoke", "hnsw_smoke")]
+#[case::upper_camel(
+    "BidirectionalLinksCommitPath3Nodes",
+    "bidirectional_links_commit_path_3_nodes"
+)]
+#[case::acronym_run("HNSWInvariant", "hnsw_invariant")]
+#[case::mixed_acronym_digit("HTTP2StreamID", "http_2_stream_id")]
+#[case::digit_boundary("Path3Nodes", "path_3_nodes")]
+#[case::snake_with_digits("_path_3_nodes", "_path_3_nodes")]
+fn theorem_slug_cases(#[case] input: &str, #[case] expected: &str) {
+    assert_eq!(theorem_slug(input), expected);
+}
+
+#[test]
+fn theorem_key_uses_literal_path_and_identifier() {
+    assert_eq!(
+        theorem_key(
+            "theorems/bidirectional.theorem",
+            "BidirectionalLinksCommitPath3Nodes",
+        ),
+        "theorems/bidirectional.theorem#BidirectionalLinksCommitPath3Nodes",
+    );
+}
+
+#[rstest]
+#[case(
+    "theorems/bidirectional.theorem",
+    "BidirectionalLinksCommitPath3Nodes",
+    "bidirectional_links_commit_path_3_nodes"
+)]
+#[case("theorems/http.theorem", "HTTP2StreamID", "http_2_stream_id")]
+#[case("theorems/hnsw.theorem", "HNSWInvariant", "hnsw_invariant")]
+#[case("theorems/smoke.theorem", "hnsw_smoke", "hnsw_smoke")]
+fn mangle_theorem_harness_golden_cases(
+    #[case] path: &str,
+    #[case] theorem: &str,
+    #[case] expected_slug: &str,
+) {
+    let m = mangle_theorem_harness(path, theorem);
+    let expected_key = theorem_key(path, theorem);
+    let expected_hash = hash12(&expected_key);
+    let expected_identifier = format!("theorem__{expected_slug}__h{expected_hash}");
+
+    assert_eq!(m.theorem(), theorem);
+    assert_eq!(m.slug(), expected_slug);
+    assert_eq!(m.theorem_key(), expected_key);
+    assert_eq!(m.hash(), expected_hash);
+    assert_eq!(m.identifier(), expected_identifier);
+}
+
+#[test]
+fn theorem_slug_preserves_existing_snake_identifiers() {
+    let theorem = "already_snake_42";
+    assert_eq!(theorem_slug(theorem), theorem);
+}
+
 // ── mangle_module_path golden tests ──────────────────────────────
 
 /// Expected golden values for a mangled module path.
