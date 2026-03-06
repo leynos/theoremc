@@ -237,13 +237,14 @@ directory module.
 
 New types and functions:
 
-1. `path_stem(path: &str) -> PathStem` — removes trailing `.theorem` if
-   present.
+1. `path_stem(path: impl AsRef<Utf8Path>) -> PathStem` — removes trailing
+   `.theorem` if present.
 2. `path_mangle(stem: &PathStem) -> String` — applies the 5-step
    sanitization.
 3. `MangledModule` — struct holding `stem`, `mangled_stem`, `hash`, and
    `module_name`.
-4. `mangle_module_path(path: &str) -> MangledModule` — composite entry point.
+4. `mangle_module_path(path: impl AsRef<Utf8Path>) -> MangledModule` —
+   composite entry point.
 
 Unit tests cover:
 
@@ -462,7 +463,7 @@ impl MangledModule {
 }
 
 /// Removes a trailing `.theorem` extension from `path`, if present.
-pub fn path_stem(path: &str) -> PathStem;
+pub fn path_stem(path: impl AsRef<Utf8Path>) -> PathStem;
 
 /// Sanitizes a path stem into a Rust-identifier-safe fragment.
 ///
@@ -479,7 +480,7 @@ pub fn path_mangle(stem: &PathStem) -> String;
 /// Produces a deterministic, collision-resistant Rust module name
 /// of the form:
 /// `__theoremc__file__{path_mangle(path_stem(path))}__{hash12(path)}`
-pub fn mangle_module_path(path: &str) -> MangledModule;
+pub fn mangle_module_path(path: impl AsRef<Utf8Path>) -> MangledModule;
 ```
 
 ### Dependencies
