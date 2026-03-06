@@ -148,7 +148,7 @@ follow-up steps (roadmap items 2.2.2 and 2.2.3).
 - **2026-03-01:** `MODULE_PREFIX` is a private `const` (not `pub`). Callers
   use `MangledModule::module_name()` rather than assembling the prefix
   themselves.
-- **2026-03-01:** Users guide section renamed from "Building-block functions"
+- **2026-03-01:** User's guide section renamed from "Building-block functions"
   to "Path mangling functions" to avoid duplicate-heading lint violation with
   the existing action mangling section.
 
