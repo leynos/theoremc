@@ -75,7 +75,8 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
   Mitigation: use a two-stage approach — serde deserializes into `TheoremValue`
   in the raw layer as before, then a conversion function
   `decode_arg_value(param_name, value)` runs during the raw-to-public
-  conversion step in `RawTheoremDoc::to_theorem_doc()`.
+  conversion step in `RawTheoremDoc::to_theorem_doc()`. Keep the helper
+  signature short and typed:
 
   ```rust
   pub fn decode_arg_value(
