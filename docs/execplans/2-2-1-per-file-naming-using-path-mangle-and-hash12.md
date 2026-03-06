@@ -110,7 +110,7 @@ follow-up steps (roadmap items 2.2.2 and 2.2.3).
 - Risk: the `path_mangle` step 3 (collapse consecutive underscores) interacts
   with step 1 (replace separators with `__`), potentially collapsing the double
   underscore to a single one. Severity: high. Likelihood: high. Mitigation: the
-  spec says "collapse consecutive `_` to a single `_`". This means `a/b`
+  spec says, "collapse consecutive `_` to a single `_`". This means `a/b`
   becomes `a__b` after step 1, then `a_b` after step 3. This is by design — the
   hash suffix provides the real disambiguator. Golden tests must verify the
   exact result.
@@ -127,7 +127,7 @@ follow-up steps (roadmap items 2.2.2 and 2.2.3).
 - [x] Milestone 2: implement `path_stem`, `path_mangle`, and
   `mangle_module_path` in `src/mangle.rs` with unit tests.
 - [x] Milestone 3: add BDD feature file and test runner.
-- [x] Milestone 4: update design docs, users guide, and roadmap.
+- [x] Milestone 4: update design docs, user's guide, and roadmap.
 - [x] Milestone 5: run full quality gates and capture logs.
 
 ## Surprises & discoveries
