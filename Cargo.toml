@@ -2,6 +2,10 @@
 name = "theoremc"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+
+[features]
+test-support = []
 
 [dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
@@ -10,12 +14,21 @@ indexmap = { version = "2.13.0", features = ["serde"] }
 thiserror = "2.0.18"
 syn = { version = "2.0.115", default-features = false, features = ["parsing", "full"] }
 blake3 = "1.8.3"
+camino = "1.2.2"
 
 [dev-dependencies]
 cap-std = { version = "4.0.2", features = ["fs_utf8"] }
 rstest = "0.26.1"
 rstest-bdd = "0.5.0"
 rstest-bdd-macros = "0.5.0"
+
+[[test]]
+name = "action_mangle_bdd"
+required-features = ["test-support"]
+
+[[test]]
+name = "module_naming_bdd"
+required-features = ["test-support"]
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }

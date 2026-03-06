@@ -888,6 +888,31 @@ decoding for plain YAML strings (Step 2.3.1 of the roadmap):
   descriptive reason string. A distinct error variant is not warranted at this
   stage and may need to change when Steps 2.3.2 and 2.3.3 extend decoding.
 
+### 6.7.7 Implementation decisions (Step 2.2.1)
+
+The following decisions were taken during implementation of per-file module
+naming (Step 2.2.1 of the roadmap):
+
+- Per-file module naming functions (`path_stem`, `path_mangle`,
+  `mangle_module_path`, and the `MangledModule` struct) are added to the
+  existing `mangle` module. This is the natural home for all mangling logic and
+  avoids a new top-level module.
+- `path_mangle` implements the five-step sanitization algorithm from
+  `docs/name-mangling-rules.md` §1: replace path separators with `__`, replace
+  non-identifier characters with `_`, collapse consecutive underscores,
+  lowercase the result, and prefix `_` if the result starts with a digit.
+- The underscore-collapse step intentionally reduces `a/b` (step 1: `a__b`)
+  to `a_b` (step 3). This is by design — the `hash12(P)` suffix provides the
+  real disambiguator for paths that sanitize to the same mangled stem.
+- `hash12` receives the **original** path string, not the mangled stem. This
+  ensures two paths that differ only in characters lost during sanitization
+  (e.g., `my-file` vs `my_file`) produce different module names.
+- Unit tests were extracted to `src/mangle_tests.rs` via `#[path = ...]` to
+  keep `src/mangle.rs` under the 400-line code-size rule.
+- Behavioural coverage uses `rstest-bdd` v0.5.0 with scenarios for
+  deterministic naming, separator normalization, and punctuation-collision
+  disambiguation.
+
 ### 6.8 Localized diagnostics contract (ADR 002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:
