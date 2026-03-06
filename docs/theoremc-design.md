@@ -912,6 +912,7 @@ naming (Step 2.2.1 of the roadmap):
 - Behavioural coverage uses `rstest-bdd` v0.5.0 with scenarios for
   deterministic naming, separator normalization, and punctuation-collision
   disambiguation.
+
 ### 6.8 Localized diagnostics contract (ADR 002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:
