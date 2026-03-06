@@ -47,9 +47,6 @@ fn hash12_golden_values() {
     for (canonical, _slug, expected_hash) in super::golden::ACTION_GOLDEN_TRIPLES {
         assert_eq!(hash12(canonical), *expected_hash, "hash12({canonical})");
     }
-    // Extra cases not in the shared fixture.
-    assert_eq!(hash12("ns._"), "ef4f43e71ce0");
-    assert_eq!(hash12("x.y"), "f12518d733b0");
 }
 
 #[test]
@@ -191,27 +188,34 @@ fn mangle_module_path_shared_golden_cases() {
 #[rstest]
 #[case::backslash_path(
     "theorems\\windows\\style.theorem",
+    "theorems\\windows\\style",
     "theorems_windows_style",
     "38b12c01ea29"
 )]
-#[case::uppercase_path("theorems/UPPER-case.theorem", "theorems_upper_case", "7ee5f747b4c1")]
+#[case::uppercase_path(
+    "theorems/UPPER-case.theorem",
+    "theorems/UPPER-case",
+    "theorems_upper_case",
+    "7ee5f747b4c1"
+)]
 #[case::digit_leading(
     "theorems/123_digit_leading.theorem",
+    "theorems/123_digit_leading",
     "theorems_123_digit_leading",
     "76c6c1009e0d"
 )]
-#[case::empty_path("", "", "af1349b9f5f9")]
-#[case::dot_theorem(".theorem", "", "f9d6885cf913")]
+#[case::empty_path("", "", "", "af1349b9f5f9")]
+#[case::dot_theorem(".theorem", "", "", "f9d6885cf913")]
 fn mangle_module_path_edge_cases(
     #[case] path: &str,
+    #[case] expected_stem: &str,
     #[case] expected_mangled_stem: &str,
     #[case] expected_hash: &str,
 ) {
-    let stem = path_stem(path);
     let expected_module_name = format!("{MODULE_PREFIX}{expected_mangled_stem}__{expected_hash}");
     ModuleGolden {
         path,
-        stem: stem.as_str(),
+        stem: expected_stem,
         mangled_stem: expected_mangled_stem,
         hash: expected_hash,
         module_name: &expected_module_name,

@@ -14,6 +14,8 @@ pub const ACTION_GOLDEN_TRIPLES: &[(&str, &str, &str)] = &[
         "9eafdf8834ec",
     ),
     ("_a._b", "_ua___ub", "0a39aa24f512"),
+    ("ns._", "ns___u", "ef4f43e71ce0"),
+    ("x.y", "x__y", "f12518d733b0"),
 ];
 
 /// `(path, expected_stem, expected_mangled_stem, expected_hash12)`.
