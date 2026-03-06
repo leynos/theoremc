@@ -42,11 +42,15 @@ fn action_slug_cases(#[case] input: &str, #[case] expected: &str) {
     assert_eq!(action_slug(can(input)), expected);
 }
 
-#[test]
-fn hash12_golden_values() {
-    for (canonical, _slug, expected_hash) in super::golden::ACTION_GOLDEN_TRIPLES {
-        assert_eq!(hash12(canonical), *expected_hash, "hash12({canonical})");
-    }
+#[rstest]
+#[case::account_deposit("account.deposit", "05158894bfb4")]
+#[case::hnsw_attach_node("hnsw.attach_node", "8d74e77b55f2")]
+#[case::three_segments("hnsw.graph.with_capacity", "9eafdf8834ec")]
+#[case::leading_underscores("_a._b", "0a39aa24f512")]
+#[case::lone_underscore("ns._", "ef4f43e71ce0")]
+#[case::minimal("x.y", "f12518d733b0")]
+fn hash12_golden_values(#[case] input: &str, #[case] expected: &str) {
+    assert_eq!(hash12(input), expected);
 }
 
 #[test]
@@ -75,17 +79,29 @@ fn hash12_is_deterministic() {
     assert_eq!(first, second);
 }
 
-#[test]
-fn mangle_action_name_golden_cases() {
-    for (canonical, expected_slug, expected_hash) in super::golden::ACTION_GOLDEN_TRIPLES {
-        let m = mangle_action_name(can(canonical));
-        assert_eq!(m.slug(), *expected_slug, "slug for {canonical}");
-        assert_eq!(m.hash(), *expected_hash, "hash for {canonical}");
-        let expected_ident = format!("{expected_slug}__h{expected_hash}");
-        assert_eq!(m.identifier(), expected_ident, "identifier for {canonical}");
-        let expected_path = format!("{RESOLUTION_TARGET}::{expected_ident}");
-        assert_eq!(m.path(), expected_path, "path for {canonical}");
-    }
+#[rstest]
+#[case::account_deposit("account.deposit", "account__deposit", "05158894bfb4")]
+#[case::hnsw_attach_node("hnsw.attach_node", "hnsw__attach_unode", "8d74e77b55f2")]
+#[case::three_segments(
+    "hnsw.graph.with_capacity",
+    "hnsw__graph__with_ucapacity",
+    "9eafdf8834ec"
+)]
+#[case::leading_underscores("_a._b", "_ua___ub", "0a39aa24f512")]
+#[case::lone_underscore("ns._", "ns___u", "ef4f43e71ce0")]
+#[case::minimal("x.y", "x__y", "f12518d733b0")]
+fn mangle_action_name_golden_cases(
+    #[case] canonical: &str,
+    #[case] expected_slug: &str,
+    #[case] expected_hash: &str,
+) {
+    let m = mangle_action_name(can(canonical));
+    assert_eq!(m.slug(), expected_slug);
+    assert_eq!(m.hash(), expected_hash);
+    let expected_ident = format!("{expected_slug}__h{expected_hash}");
+    assert_eq!(m.identifier(), expected_ident);
+    let expected_path = format!("{RESOLUTION_TARGET}::{expected_ident}");
+    assert_eq!(m.path(), expected_path);
 }
 
 #[test]
@@ -166,22 +182,32 @@ impl ModuleGolden<'_> {
 }
 
 /// Verifies golden module-path entries from the shared constants.
-#[test]
-fn mangle_module_path_shared_golden_cases() {
-    for (path, expected_stem, expected_mangled, expected_hash) in
-        super::golden::MODULE_GOLDEN_TUPLES
-    {
-        let m = mangle_module_path(path);
-        assert_eq!(m.stem(), *expected_stem, "stem for {path}");
-        assert_eq!(
-            m.mangled_stem(),
-            *expected_mangled,
-            "mangled_stem for {path}"
-        );
-        assert_eq!(m.hash(), *expected_hash, "hash for {path}");
-        let expected_name = format!("{MODULE_PREFIX}{expected_mangled}__{expected_hash}");
-        assert_eq!(m.module_name(), expected_name, "module_name for {path}");
-    }
+#[rstest]
+#[case::bidirectional(
+    "theorems/bidirectional.theorem",
+    "theorems/bidirectional",
+    "theorems_bidirectional",
+    "1fc14bdf614f"
+)]
+#[case::nested_deep(
+    "theorems/nested/deep/path.theorem",
+    "theorems/nested/deep/path",
+    "theorems_nested_deep_path",
+    "5cb0a56a3468"
+)]
+#[case::no_extension("no_extension", "no_extension", "no_extension", "afb36ed5206f")]
+fn mangle_module_path_shared_golden_cases(
+    #[case] path: &str,
+    #[case] expected_stem: &str,
+    #[case] expected_mangled: &str,
+    #[case] expected_hash: &str,
+) {
+    let m = mangle_module_path(path);
+    assert_eq!(m.stem(), expected_stem);
+    assert_eq!(m.mangled_stem(), expected_mangled);
+    assert_eq!(m.hash(), expected_hash);
+    let expected_name = format!("{MODULE_PREFIX}{expected_mangled}__{expected_hash}");
+    assert_eq!(m.module_name(), expected_name);
 }
 
 /// Edge-case module-path golden values not in the shared constants.
