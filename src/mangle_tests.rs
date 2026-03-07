@@ -6,6 +6,7 @@
 use rstest::rstest;
 
 use super::*;
+use crate::mangle::golden::HARNESS_GOLDEN_TUPLES;
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -187,30 +188,28 @@ fn theorem_key_uses_literal_path_and_identifier() {
     );
 }
 
-#[rstest]
-#[case(
-    "theorems/bidirectional.theorem",
-    "BidirectionalLinksCommitPath3Nodes",
-    "bidirectional_links_commit_path_3_nodes"
-)]
-#[case("theorems/http.theorem", "HTTP2StreamID", "http_2_stream_id")]
-#[case("theorems/hnsw.theorem", "HNSWInvariant", "hnsw_invariant")]
-#[case("theorems/smoke.theorem", "hnsw_smoke", "hnsw_smoke")]
-fn mangle_theorem_harness_golden_cases(
-    #[case] path: &str,
-    #[case] theorem: &str,
-    #[case] expected_slug: &str,
-) {
-    let m = mangle_theorem_harness(path, theorem);
-    let expected_key = theorem_key(path, theorem);
-    let expected_hash = hash12(&expected_key);
-    let expected_identifier = format!("theorem__{expected_slug}__h{expected_hash}");
+#[test]
+fn mangle_theorem_harness_golden_cases() {
+    for (path, theorem, expected_slug) in HARNESS_GOLDEN_TUPLES {
+        let m = mangle_theorem_harness(path, theorem);
+        let expected_key = theorem_key(path, theorem);
+        let expected_hash = hash12(&expected_key);
+        let expected_identifier = format!("theorem__{expected_slug}__h{expected_hash}");
 
-    assert_eq!(m.theorem(), theorem);
-    assert_eq!(m.slug(), expected_slug);
-    assert_eq!(m.theorem_key(), expected_key);
-    assert_eq!(m.hash(), expected_hash);
-    assert_eq!(m.identifier(), expected_identifier);
+        assert_eq!(m.theorem(), *theorem);
+        assert_eq!(m.slug(), *expected_slug);
+        assert_eq!(m.theorem_key(), expected_key);
+        assert_eq!(m.hash(), expected_hash);
+        assert_eq!(m.identifier(), expected_identifier);
+    }
+}
+
+#[rstest]
+#[case("my-theorem", "my_theorem")]
+#[case("123Path", "_123_path")]
+#[case("HTTP/2", "http_2")]
+fn theorem_slug_sanitizes_identifier_boundary_inputs(#[case] input: &str, #[case] expected: &str) {
+    assert_eq!(theorem_slug(input), expected);
 }
 
 #[test]

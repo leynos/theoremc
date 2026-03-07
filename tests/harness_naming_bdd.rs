@@ -75,11 +75,11 @@ const DUPLICATE_THEOREM_KEYS_YAML: &str = concat!(
 );
 
 #[then("loading fails with a duplicate theorem key diagnostic")]
-fn then_loading_fails_with_a_duplicate_theorem_key_diagnostic() {
+fn then_loading_fails_with_a_duplicate_theorem_key_diagnostic() -> Result<(), String> {
     let source = SourceId::new("theorems/duplicate.theorem");
-    let Err(error) = load_theorem_docs_with_source(&source, DUPLICATE_THEOREM_KEYS_YAML) else {
-        panic!("duplicate theorem keys should fail");
-    };
+    let error = load_theorem_docs_with_source(&source, DUPLICATE_THEOREM_KEYS_YAML)
+        .err()
+        .ok_or_else(|| "duplicate theorem keys should fail".to_owned())?;
 
     match error {
         SchemaError::DuplicateTheoremKey {
@@ -87,19 +87,45 @@ fn then_loading_fails_with_a_duplicate_theorem_key_diagnostic() {
             diagnostic,
             ..
         } => {
-            assert_eq!(theorem_key, "theorems/duplicate.theorem#SharedName");
+            if theorem_key != "theorems/duplicate.theorem#SharedName" {
+                return Err(format!(
+                    "expected theorem key theorems/duplicate.theorem#SharedName, got {theorem_key}"
+                ));
+            }
 
-            let Some(structured) = diagnostic else {
-                panic!("duplicate theorem key should carry a diagnostic");
-            };
-            assert_eq!(structured.location.source, "theorems/duplicate.theorem");
-            assert_eq!(structured.location.line, 14);
-            assert_eq!(structured.location.column, 10);
-            assert!(structured.message.contains(
-                "duplicate theorem key 'theorems/duplicate.theorem#SharedName' appears at"
-            ));
+            let structured = diagnostic
+                .ok_or_else(|| "duplicate theorem key should carry a diagnostic".to_owned())?;
+            if structured.location.source != "theorems/duplicate.theorem" {
+                return Err(format!(
+                    "expected diagnostic source theorems/duplicate.theorem, got {}",
+                    structured.location.source
+                ));
+            }
+            if structured.location.line != 14 {
+                return Err(format!(
+                    "expected diagnostic line 14, got {}",
+                    structured.location.line
+                ));
+            }
+            if structured.location.column != 10 {
+                return Err(format!(
+                    "expected diagnostic column 10, got {}",
+                    structured.location.column
+                ));
+            }
+            if !structured.message.contains(
+                "duplicate theorem key 'theorems/duplicate.theorem#SharedName' appears at",
+            ) {
+                return Err(format!(
+                    "expected duplicate theorem-key message, got {}",
+                    structured.message
+                ));
+            }
+            Ok(())
         }
-        other => panic!("expected duplicate theorem key error, got: {other}"),
+        other => Err(format!(
+            "expected duplicate theorem key error, got: {other}"
+        )),
     }
 }
 

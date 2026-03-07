@@ -196,7 +196,10 @@ proof harnesses. The current loading pipeline is:
    `raw_doc.to_theorem_doc()` in `src/schema/raw.rs`.
 3. `validate_theorem_doc(&doc)` in `src/schema/validate.rs` validates each
    document (fields, expressions, action name grammar).
-4. `check_action_collisions(&docs)` in `src/collision.rs` detects mangled
+4. `load_theorem_docs_with_source(...)` runs duplicate-theorem-key checks
+   across the loaded source after per-document validation and before returning
+   the accumulated documents.
+5. `check_action_collisions(&docs)` in `src/collision.rs` detects mangled
    identifier collisions.
 
 Action arguments currently live in `ActionCall.args` as

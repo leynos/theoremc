@@ -101,6 +101,37 @@ fn should_insert_slug_separator(previous: char, current: char, next: Option<char
     }
 }
 
+fn sanitize_slug_fragment(raw_slug: &str) -> String {
+    let mut sanitized = String::with_capacity(raw_slug.len());
+
+    for ch in raw_slug.chars() {
+        let normalized = match ch.to_ascii_lowercase() {
+            'a'..='z' | '0'..='9' | '_' => ch.to_ascii_lowercase(),
+            _ => '_',
+        };
+
+        if normalized == '_' && sanitized.ends_with('_') {
+            continue;
+        }
+
+        sanitized.push(normalized);
+    }
+
+    if sanitized.is_empty() {
+        sanitized.push('_');
+    }
+
+    if sanitized
+        .chars()
+        .next()
+        .is_some_and(|first| first.is_ascii_digit())
+    {
+        sanitized.insert(0, '_');
+    }
+
+    sanitized
+}
+
 /// Builds the exact theorem key `{P}#{T}` from the literal theorem path and
 /// theorem identifier.
 ///
@@ -118,7 +149,10 @@ pub fn theorem_key(path: impl AsRef<Utf8Path>, theorem: impl AsRef<str>) -> Stri
 ///
 /// Identifiers already matching `^[a-z_][a-z0-9_]*$` are preserved exactly.
 /// Other identifiers are converted to snake case using deterministic acronym
-/// and numeric-boundary splitting rules.
+/// and numeric-boundary splitting rules, then sanitized so the returned slug
+/// always matches `^[a-z_][a-z0-9_]*$`. Any non-ASCII-alphanumeric character
+/// becomes `_`, consecutive underscores collapse, and digit-leading slugs are
+/// prefixed with `_`.
 ///
 ///     use theoremc::mangle::theorem_slug;
 ///     assert_eq!(
@@ -147,13 +181,15 @@ pub fn theorem_slug(theorem: impl AsRef<str>) -> String {
         slug.push(current.to_ascii_lowercase());
     }
 
-    slug
+    sanitize_slug_fragment(&slug)
 }
 
 /// Mangles a theorem identifier into a deterministic Kani harness name.
 ///
 /// Harnesses follow the normative format
-/// `theorem__{theorem_slug(T)}__h{hash12(P#T)}`.
+/// `theorem__{theorem_slug(T)}__h{hash12(P#T)}`. The slug portion is always an
+/// identifier-safe fragment matching `^[a-z_][a-z0-9_]*$`, even when the input
+/// theorem string contains punctuation or starts with digits.
 ///
 ///     use theoremc::mangle::mangle_theorem_harness;
 ///     let harness = mangle_theorem_harness(

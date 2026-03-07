@@ -4,6 +4,7 @@ use super::diagnostic::SchemaDiagnostic;
 
 /// Errors that can occur when loading or validating `.theorem` documents.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum SchemaError {
     /// YAML deserialization failed (malformed YAML or schema mismatch).
     #[error("YAML deserialization failed: {message}")]

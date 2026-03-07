@@ -438,5 +438,5 @@ The implementation is complete only when all of the following are true:
 
 ## Approval gate
 
-This document is the draft phase only. Do not begin implementation until the
-user explicitly approves the plan or requests revisions.
+Historically this plan contained a draft-only approval gate; the plan is now
+complete and approved.
