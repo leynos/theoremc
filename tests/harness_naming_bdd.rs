@@ -95,7 +95,9 @@ fn then_loading_fails_with_a_duplicate_theorem_key_diagnostic() {
             assert_eq!(structured.location.source, "theorems/duplicate.theorem");
             assert_eq!(structured.location.line, 14);
             assert_eq!(structured.location.column, 10);
-            assert!(structured.message.contains("previously defined at"));
+            assert!(structured.message.contains(
+                "duplicate theorem key 'theorems/duplicate.theorem#SharedName' appears at"
+            ));
         }
         other => panic!("expected duplicate theorem key error, got: {other}"),
     }

@@ -275,14 +275,19 @@ fn reject_duplicate_theorem_keys_with_diagnostic() {
             diagnostic,
         } => {
             assert_eq!(theorem_key, "theorems/duplicate.theorem#SharedName");
-            assert!(message.contains("previously defined at theorems/duplicate.theorem:1:10"));
+            assert!(message.contains(
+                "duplicate theorem key 'theorems/duplicate.theorem#SharedName' appears at \
+theorems/duplicate.theorem:1:10, theorems/duplicate.theorem:14:10"
+            ));
 
             let structured = diagnostic.expect("duplicate theorem keys should expose a diagnostic");
             assert_eq!(structured.code.as_str(), "schema.validation_failure");
             assert_eq!(structured.location.source, "theorems/duplicate.theorem");
             assert_eq!(structured.location.line, 14);
             assert_eq!(structured.location.column, 10);
-            assert!(structured.message.contains("previously defined at"));
+            assert!(structured.message.contains(
+                "duplicate theorem key 'theorems/duplicate.theorem#SharedName' appears at"
+            ));
         }
         other => panic!("expected duplicate theorem key error, got: {other}"),
     }
