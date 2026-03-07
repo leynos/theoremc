@@ -72,12 +72,17 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
   `ActionCall.args`. Changing the args type to `ArgValue` means serde must
   deserialize YAML into `ArgValue` directly, or a post-deserialization
   conversion step is needed. Severity: high. Likelihood: certain (by design).
-  Mitigation: use a two-stage approach — serde deserializes into
-  `TheoremValue` in the raw layer as before, then a conversion function
-  `decode_arg_value(param_name, value)` (with signature
-  `pub fn decode_arg_value(param_name: &str, value: TheoremValue)
-  -> Result<ArgValue, ArgDecodeError>`) runs during the raw-to-public
+  Mitigation: use a two-stage approach — serde deserializes into `TheoremValue`
+  in the raw layer as before, then a conversion function
+  `decode_arg_value(param_name, value)` runs during the raw-to-public
   conversion step in `RawTheoremDoc::to_theorem_doc()`.
+
+  ```rust
+  pub fn decode_arg_value(
+      param_name: &str,
+      value: TheoremValue,
+  ) -> Result<ArgValue, ArgDecodeError>
+  ```
 
 - Risk: `src/schema/types.rs` is already 312 lines. Adding `ArgValue` and
   `LiteralValue` types could push it near the 400-line limit. Severity: medium.
@@ -180,8 +185,8 @@ documentation files updated. Well within the 15-file / 700-line tolerance.
 
 ## Context and orientation
 
-The `theoremc` crate (repository root) compiles `.theorem` YAML files into
-Rust proof harnesses. The current loading pipeline is:
+The `theoremc` crate (repository root) compiles `.theorem` YAML files into Rust
+proof harnesses. The current loading pipeline is:
 
 1. `load_theorem_docs(yaml)` in `src/schema/loader.rs` calls
    `serde_saphyr::from_multiple(input)` to deserialize YAML into
