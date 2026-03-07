@@ -70,7 +70,10 @@ high-value documents with clearly separated audiences and responsibilities.
 These document types are complementary: the contents file helps readers find
 material, the user's guide explains how to use the project, the developer's
 guide explains how the project is built and maintained, and the repository
-layout document explains where important things live.
+layout document explains where important things live. For discoverability, use
+canonical filenames unless a stronger repository-specific constraint applies:
+`docs/contents.md`, `docs/users-guide.md`, `docs/developers-guide.md`, and
+`docs/repository-layout.md`.
 
 ### Contents file
 
@@ -95,22 +98,27 @@ the documentation set.
 
 ### User's guide
 
-Use the user's guide for readers who need to apply the project rather than
-modify its internals. In a library, this means consumers of the application
-programming interface (API). In an application, this means operators, end
-users, or integrators.
+Use the user's guide, canonically `docs/users-guide.md`, for readers who need
+to apply the project rather than modify its internals. In a library, this means
+consumers of the application programming interface (API). In an application,
+this means operators, end users, or integrators.
 
 - Open with one short paragraph that states the audience and scope.
 - Organize the guide around user-facing tasks, concepts, and guarantees rather
   than internal module boundaries.
 - Introduce the primary workflow early, with a minimal working example that a
   reader can adapt immediately.
+- Put public-facing reference material here when users need it to succeed, for
+  example CLI usage, configuration keys, file-format rules, or API surface
+  summaries.
 - Present rules, constraints, defaults, and error behaviour near the feature
   they affect, rather than scattering them across the document.
 - Use tables where they clarify field sets, command options, or compatibility
   matrices.
 - Include concrete examples in code or data form when describing formats,
   schemas, or command usage.
+- Higher-level user workflows belong here, for example "load a document",
+  "configure the service", or "interpret diagnostics".
 - Link to normative references or deeper design documents when detail would
   otherwise overload the guide.
 - Exclude maintainer-only concerns such as internal layering debates, future
@@ -118,10 +126,10 @@ users, or integrators.
 
 ### Developer's guide
 
-Use the developer's guide for maintainers and contributors. This document may
-also be titled a design specification when it carries both implementation
-guidance and architecture rationale, but it should still serve as the primary
-maintainer-oriented manual.
+Use the developer's guide, canonically `docs/developers-guide.md`, for
+maintainers and contributors. This document may also be titled a design
+specification when it carries both implementation guidance and architecture
+rationale, but it should still serve as the primary maintainer-oriented manual.
 
 - State the status, scope, and intended audience near the top when that context
   affects how the document should be interpreted.
@@ -129,12 +137,18 @@ maintainer-oriented manual.
   explain which documents take precedence if wording diverges.
 - Start with the problem statement and constraints before describing the
   implementation, so later choices remain grounded in the repository's goals.
+- Put maintainer-facing architecture material here, for example subsystem
+  boundaries, extension points, build/test/lint workflows, and contributor
+  expectations.
 - Use numbered sections for long-form technical documents to improve
   cross-referencing in reviews and follow-up discussions.
 - Separate normative rules from informative explanation. Mark source-of-truth
   sections clearly.
 - Include architecture diagrams, data-flow sketches, or interface maps where
   they materially improve understanding.
+- Higher-level design rationale belongs here rather than in the user's guide,
+  for example why a parser is layered a certain way or how generated artefacts
+  fit into the build.
 - Record important risks, trade-offs, and future-extension points so the
   document explains not only what exists, but why it exists in that form.
 - Keep the document synchronized with decision records, roadmap items, and the
@@ -142,10 +156,10 @@ maintainer-oriented manual.
 
 ### Repository layout document
 
-Use a repository layout document to explain the shape of the tree and the
-responsibilities of its major paths. This may be a standalone document or a
-clearly labelled section within the developer's guide, provided readers can
-find it easily from the contents file.
+Use a repository layout document, canonically `docs/repository-layout.md`, to
+explain the shape of the tree and the responsibilities of its major paths. This
+may be a standalone document or a clearly labelled section within the
+developer's guide, provided readers can find it easily from the contents file.
 
 - Document the top-level directories and any critical subdirectories that a new
   contributor must understand quickly.
