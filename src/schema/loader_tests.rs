@@ -289,6 +289,92 @@ fn reject_duplicate_theorem_keys_with_diagnostic() {
 }
 
 #[rstest]
+fn reject_all_duplicate_theorem_keys_in_stable_order() {
+    let yaml = concat!(
+        "Theorem: Zebra\n",
+        "About: First zebra theorem\n",
+        "Prove:\n",
+        "  - assert: 'true'\n",
+        "    because: trivially true\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "Witness:\n",
+        "  - cover: 'true'\n",
+        "    because: reachable\n",
+        "---\n",
+        "Theorem: Alpha\n",
+        "About: First alpha theorem\n",
+        "Prove:\n",
+        "  - assert: 'true'\n",
+        "    because: trivially true\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "Witness:\n",
+        "  - cover: 'true'\n",
+        "    because: reachable\n",
+        "---\n",
+        "Theorem: Zebra\n",
+        "About: Second zebra theorem\n",
+        "Prove:\n",
+        "  - assert: 'true'\n",
+        "    because: trivially true\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "Witness:\n",
+        "  - cover: 'true'\n",
+        "    because: reachable\n",
+        "---\n",
+        "Theorem: Alpha\n",
+        "About: Second alpha theorem\n",
+        "Prove:\n",
+        "  - assert: 'true'\n",
+        "    because: trivially true\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "Witness:\n",
+        "  - cover: 'true'\n",
+        "    because: reachable\n",
+    );
+    let source = SourceId::new("theorems/multi-duplicate.theorem");
+
+    let error = load_theorem_docs_with_source(&source, yaml)
+        .expect_err("duplicate theorem keys should fail");
+
+    match error {
+        SchemaError::DuplicateTheoremKey {
+            theorem_key,
+            message,
+            diagnostic,
+        } => {
+            assert_eq!(theorem_key, "theorems/multi-duplicate.theorem#Alpha");
+            let alpha_idx = message
+                .find("duplicate theorem key 'theorems/multi-duplicate.theorem#Alpha'")
+                .expect("message should mention Alpha");
+            let zebra_idx = message
+                .find("duplicate theorem key 'theorems/multi-duplicate.theorem#Zebra'")
+                .expect("message should mention Zebra");
+            assert!(
+                alpha_idx < zebra_idx,
+                "collisions should be reported in key order"
+            );
+
+            let structured = diagnostic.expect("duplicate theorem keys should expose a diagnostic");
+            assert_eq!(structured.location.line, 40);
+            assert_eq!(structured.location.column, 10);
+        }
+        other => panic!("expected duplicate theorem key error, got: {other}"),
+    }
+}
+
+#[rstest]
 #[case("reject_missing_witness_when_kani_not_vacuous", "")]
 #[case(
     "reject_missing_witness_when_kani_explicitly_not_vacuous",

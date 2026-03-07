@@ -138,8 +138,15 @@ pub fn load_theorem_docs_with_source(
 
 #[derive(Debug, Clone, Copy)]
 struct DuplicateTheoremLocation {
+    location: serde_saphyr::Location,
     first_line: usize,
     first_column: usize,
+}
+
+#[derive(Debug, Clone)]
+struct DuplicateTheoremCollision {
+    first: DuplicateTheoremLocation,
+    duplicates: Vec<DuplicateTheoremLocation>,
 }
 
 fn check_duplicate_theorem_keys(
@@ -147,57 +154,98 @@ fn check_duplicate_theorem_keys(
     raw_docs: &[RawTheoremDoc],
 ) -> Result<(), SchemaError> {
     let mut first_seen: BTreeMap<&str, DuplicateTheoremLocation> = BTreeMap::new();
+    let mut collisions: BTreeMap<&str, DuplicateTheoremCollision> = BTreeMap::new();
 
     for raw_doc in raw_docs {
         let theorem = raw_doc.theorem.value.as_str();
         let location = raw_doc.theorem_location();
-        let line = usize::try_from(location.line()).ok().unwrap_or(usize::MAX);
-        let column = usize::try_from(location.column())
-            .ok()
-            .unwrap_or(usize::MAX);
+        let duplicate = DuplicateTheoremLocation {
+            location,
+            first_line: usize::try_from(location.line()).ok().unwrap_or(usize::MAX),
+            first_column: usize::try_from(location.column())
+                .ok()
+                .unwrap_or(usize::MAX),
+        };
 
-        if let Some(previous) = first_seen.get(theorem) {
+        if let Some(first) = first_seen.get(theorem) {
+            collisions
+                .entry(theorem)
+                .and_modify(|collision| collision.duplicates.push(duplicate))
+                .or_insert_with(|| DuplicateTheoremCollision {
+                    first: *first,
+                    duplicates: vec![duplicate],
+                });
+        } else {
+            first_seen.insert(theorem, duplicate);
+        }
+    }
+
+    collisions
+        .first_key_value()
+        .map_or(Ok(()), |(theorem, collision)| {
             let theorem_key = format!("{}#{theorem}", source.as_str());
-            let message = format!(
-                concat!(
-                    "theorem '{theorem}' appears more than once in source ",
-                    "'{source}'; previously defined at {source}:{first_line}:{first_column}",
-                ),
-                theorem = theorem,
-                source = source.as_str(),
-                first_line = previous.first_line,
-                first_column = previous.first_column,
-            );
+            let duplicate_site = collision
+                .duplicates
+                .first()
+                .copied()
+                .unwrap_or(collision.first);
             let diagnostic = create_diagnostic(
                 SchemaDiagnosticCode::ValidationFailure,
                 source,
-                format!(
-                    "duplicate theorem key '{theorem_key}': previously defined at {source}:{first_line}:{first_column}",
-                    theorem_key = theorem_key,
-                    source = source.as_str(),
-                    first_line = previous.first_line,
-                    first_column = previous.first_column,
-                ),
-                location,
+                format_duplicate_theorem_key_summary(source, theorem, collision),
+                duplicate_site.location,
             );
 
-            return Err(SchemaError::DuplicateTheoremKey {
+            Err(SchemaError::DuplicateTheoremKey {
                 theorem_key,
-                message,
+                message: format_duplicate_theorem_key_message(source, &collisions),
                 diagnostic: Some(diagnostic),
-            });
-        }
+            })
+        })
+}
 
-        first_seen.insert(
-            theorem,
-            DuplicateTheoremLocation {
-                first_line: line,
-                first_column: column,
-            },
-        );
-    }
+fn format_duplicate_theorem_key_message(
+    source: &SourceId,
+    collisions: &BTreeMap<&str, DuplicateTheoremCollision>,
+) -> String {
+    let parts: Vec<String> = collisions
+        .iter()
+        .map(|(theorem, collision)| {
+            format_duplicate_theorem_key_summary(source, theorem, collision)
+        })
+        .collect();
+    parts.join("; ")
+}
 
-    Ok(())
+fn format_duplicate_theorem_key_summary(
+    source: &SourceId,
+    theorem: &str,
+    collision: &DuplicateTheoremCollision,
+) -> String {
+    let theorem_key = format!("{}#{theorem}", source.as_str());
+    let mut locations = Vec::with_capacity(collision.duplicates.len() + 1);
+    locations.push(render_duplicate_location(source, collision.first));
+    locations.extend(
+        collision
+            .duplicates
+            .iter()
+            .copied()
+            .map(|location| render_duplicate_location(source, location)),
+    );
+
+    format!(
+        "duplicate theorem key '{theorem_key}' appears at {}",
+        locations.join(", "),
+    )
+}
+
+fn render_duplicate_location(source: &SourceId, location: DuplicateTheoremLocation) -> String {
+    format!(
+        "{}:{}:{}",
+        source.as_str(),
+        location.first_line,
+        location.first_column,
+    )
 }
 
 fn attach_validation_diagnostic(

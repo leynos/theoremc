@@ -99,7 +99,7 @@ out of scope until the later reporting work.
 
 - Risk: acronym-heavy theorem names such as `HNSWInvariant` and
   `HTTP2StreamID` are easy to snake-case incorrectly. Mitigation: encode golden
-  unit tests for acronym runs and mixed acronym-plus- number boundaries before
+  unit tests for acronym runs and mixed acronym-plus-number boundaries before
   implementation, and derive behaviour strictly from the normative text rather
   than a generic case-conversion crate.
 
