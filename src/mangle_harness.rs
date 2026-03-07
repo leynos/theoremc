@@ -63,24 +63,42 @@ fn is_preserved_snake_identifier(value: &str) -> bool {
     chars.all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
 }
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum CharKind {
+    Upper,
+    Lower,
+    Digit,
+    Underscore,
+    Other,
+}
+
+impl CharKind {
+    const fn of(ch: char) -> Self {
+        match ch {
+            '_' => Self::Underscore,
+            'A'..='Z' => Self::Upper,
+            'a'..='z' => Self::Lower,
+            '0'..='9' => Self::Digit,
+            _ => Self::Other,
+        }
+    }
+}
+
 fn should_insert_slug_separator(previous: char, current: char, next: Option<char>) -> bool {
-    if current == '_' || previous == '_' {
+    use CharKind::{Digit, Lower, Underscore, Upper};
+
+    let prev = CharKind::of(previous);
+    let curr = CharKind::of(current);
+
+    if prev == Underscore || curr == Underscore {
         return false;
     }
 
-    let current_is_upper = current.is_ascii_uppercase();
-    let current_is_lower = current.is_ascii_lowercase();
-    let current_is_digit = current.is_ascii_digit();
-    let previous_is_upper = previous.is_ascii_uppercase();
-    let previous_is_lower = previous.is_ascii_lowercase();
-    let previous_is_digit = previous.is_ascii_digit();
-
-    (current_is_upper && (previous_is_lower || previous_is_digit))
-        || (current_is_upper
-            && previous_is_upper
-            && next.is_some_and(|peek| peek.is_ascii_lowercase()))
-        || (current_is_digit && previous.is_ascii_alphabetic())
-        || ((current_is_lower || current_is_upper) && previous_is_digit)
+    match (prev, curr) {
+        (Lower | Digit, Upper) | (Upper | Lower, Digit) | (Digit, Lower) => true,
+        (Upper, Upper) => next.is_some_and(|n| n.is_ascii_lowercase()),
+        _ => false,
+    }
 }
 
 /// Builds the exact theorem key `{P}#{T}` from the literal theorem path and
