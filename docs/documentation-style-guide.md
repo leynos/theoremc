@@ -63,6 +63,119 @@ Apply these rules to keep the documentation clear and consistent for developers.
 - Footnotes must be numbered in order of appearance in the document.
 - Caption every table, and caption every diagram.
 
+## Standard document types
+
+Repositories that adopt this documentation style should keep a small set of
+high-value documents with clearly separated audiences and responsibilities.
+These document types are complementary: the contents file helps readers find
+material, the user's guide explains how to use the project, the developer's
+guide explains how the project is built and maintained, and the repository
+layout document explains where important things live. For discoverability, use
+canonical filenames unless a stronger repository-specific constraint applies:
+`docs/contents.md`, `docs/users-guide.md`, `docs/developers-guide.md`, and
+`docs/repository-layout.md`.
+
+### Contents file
+
+Use a dedicated contents file, typically `docs/contents.md`, as the index for
+the documentation set.
+
+- Make the document title explicit, for example `# Documentation contents`.
+- Begin with the contents file linking to itself so readers can confirm they
+  are at the index.
+- List each document exactly once with an inline link and a short descriptive
+  phrase explaining why someone would open it.
+- Group related material together, such as decision records, reference
+  documents, guides, and plan directories.
+- Keep the descriptions audience-focused. Explain the purpose of the document,
+  not merely its filename.
+- Prefer stable ordering so repeated readers can scan predictably. Grouping by
+  topic is usually better than strict alphabetic ordering.
+- When listing a directory, add one nested level only where it materially
+  improves navigation, for example to enumerate execution plans beneath an
+  `execplans/` entry.
+- Update the contents file whenever a document is added, renamed, or removed.
+
+### User's guide
+
+Use the user's guide, canonically `docs/users-guide.md`, for readers who need
+to apply the project rather than modify its internals. In a library, this means
+consumers of the application programming interface (API). In an application,
+this means operators, end users, or integrators.
+
+- Open with one short paragraph that states the audience and scope.
+- Organize the guide around user-facing tasks, concepts, and guarantees rather
+  than internal module boundaries.
+- Introduce the primary workflow early, with a minimal working example that a
+  reader can adapt immediately.
+- Put public-facing reference material here when users need it to succeed, for
+  example CLI usage, configuration keys, file-format rules, or API surface
+  summaries.
+- Present rules, constraints, defaults, and error behaviour near the feature
+  they affect, rather than scattering them across the document.
+- Use tables where they clarify field sets, command options, or compatibility
+  matrices.
+- Include concrete examples in code or data form when describing formats,
+  schemas, or command usage.
+- Higher-level user workflows belong here, for example "load a document",
+  "configure the service", or "interpret diagnostics".
+- Link to normative references or deeper design documents when detail would
+  otherwise overload the guide.
+- Exclude maintainer-only concerns such as internal layering debates, future
+  refactor plans, or enforcement tooling unless they directly affect users.
+
+### Developer's guide
+
+Use the developer's guide, canonically `docs/developers-guide.md`, for
+maintainers and contributors. This document may also be titled a design
+specification when it carries both implementation guidance and architecture
+rationale, but it should still serve as the primary maintainer-oriented manual.
+
+- State the status, scope, and intended audience near the top when that context
+  affects how the document should be interpreted.
+- Link early to accepted decision records and other normative references, and
+  explain which documents take precedence if wording diverges.
+- Start with the problem statement and constraints before describing the
+  implementation, so later choices remain grounded in the repository's goals.
+- Put maintainer-facing architecture material here, for example subsystem
+  boundaries, extension points, build/test/lint workflows, and contributor
+  expectations.
+- Use numbered sections for long-form technical documents to improve
+  cross-referencing in reviews and follow-up discussions.
+- Separate normative rules from informative explanation. Mark source-of-truth
+  sections clearly.
+- Include architecture diagrams, data-flow sketches, or interface maps where
+  they materially improve understanding.
+- Higher-level design rationale belongs here rather than in the user's guide,
+  for example why a parser is layered a certain way or how generated artefacts
+  fit into the build.
+- Record important risks, trade-offs, and future-extension points so the
+  document explains not only what exists, but why it exists in that form.
+- Keep the document synchronized with decision records, roadmap items, and the
+  codebase. A stale developer's guide is worse than a shorter one.
+
+### Repository layout document
+
+Use a repository layout document, canonically `docs/repository-layout.md`, to
+explain the shape of the tree and the responsibilities of its major paths. This
+may be a standalone document or a clearly labelled section within the
+developer's guide, provided readers can find it easily from the contents file.
+
+- Document the top-level directories and any critical subdirectories that a new
+  contributor must understand quickly.
+- Explain the purpose, ownership boundary, and notable conventions of each
+  path, not just its name.
+- Prefer a compact tree, table, or both. Use the tree for orientation and the
+  prose or table for semantics.
+- Distinguish between authoritative structure and illustrative sketches. If the
+  tree is incomplete or simplified, say so explicitly.
+- Highlight where source code, tests, generated artefacts, plans, and
+  long-lived reference documents belong.
+- Call out any directories with unusual constraints, such as generated output,
+  fixtures, snapshots, or capability-restricted paths.
+- Update the layout document when the repository structure changes enough that
+  a contributor could otherwise follow outdated guidance.
+
 ## Example snippet
 
 ```rust,no_run
