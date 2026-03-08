@@ -4,7 +4,7 @@ use rstest_bdd_macros::{given, scenario, then};
 use theoremc::mangle::golden::HARNESS_GOLDEN_TUPLES;
 use theoremc::mangle::{hash12, mangle_theorem_harness, theorem_key};
 use theoremc::schema::test_fixtures;
-use theoremc::schema::{SchemaError, SourceId, load_theorem_docs_with_source};
+use theoremc::schema::{SchemaDiagnostic, SchemaError, SourceId, load_theorem_docs_with_source};
 
 #[given("representative theorem paths and theorem identifiers")]
 fn given_representative_theorem_paths_and_theorem_identifiers() {}
@@ -47,6 +47,49 @@ fn then_the_harness_slug_stays_unchanged() {
 #[given("a multi-document theorem source with duplicate theorem identifiers")]
 fn given_a_multi_document_theorem_source_with_duplicate_theorem_identifiers() {}
 
+fn check_duplicate_theorem_key_fields(
+    theorem_key: &str,
+    diagnostic: Option<SchemaDiagnostic>,
+) -> Result<(), String> {
+    if theorem_key != "theorems/duplicate.theorem#SharedName" {
+        return Err(format!(
+            "expected theorem key theorems/duplicate.theorem#SharedName, got {theorem_key}"
+        ));
+    }
+
+    let structured =
+        diagnostic.ok_or_else(|| "duplicate theorem key should carry a diagnostic".to_owned())?;
+
+    if structured.location.source != "theorems/duplicate.theorem" {
+        return Err(format!(
+            "expected diagnostic source theorems/duplicate.theorem, got {}",
+            structured.location.source
+        ));
+    }
+    if structured.location.line != 14 {
+        return Err(format!(
+            "expected diagnostic line 14, got {}",
+            structured.location.line
+        ));
+    }
+    if structured.location.column != 10 {
+        return Err(format!(
+            "expected diagnostic column 10, got {}",
+            structured.location.column
+        ));
+    }
+    if !structured
+        .message
+        .contains("duplicate theorem key 'theorems/duplicate.theorem#SharedName' appears at")
+    {
+        return Err(format!(
+            "expected duplicate theorem-key message, got {}",
+            structured.message
+        ));
+    }
+    Ok(())
+}
+
 #[then("loading fails with a duplicate theorem key diagnostic")]
 fn then_loading_fails_with_a_duplicate_theorem_key_diagnostic() -> Result<(), String> {
     let source = SourceId::new("theorems/duplicate.theorem");
@@ -60,43 +103,7 @@ fn then_loading_fails_with_a_duplicate_theorem_key_diagnostic() -> Result<(), St
             theorem_key,
             diagnostic,
             ..
-        } => {
-            if theorem_key != "theorems/duplicate.theorem#SharedName" {
-                return Err(format!(
-                    "expected theorem key theorems/duplicate.theorem#SharedName, got {theorem_key}"
-                ));
-            }
-
-            let structured = diagnostic
-                .ok_or_else(|| "duplicate theorem key should carry a diagnostic".to_owned())?;
-            if structured.location.source != "theorems/duplicate.theorem" {
-                return Err(format!(
-                    "expected diagnostic source theorems/duplicate.theorem, got {}",
-                    structured.location.source
-                ));
-            }
-            if structured.location.line != 14 {
-                return Err(format!(
-                    "expected diagnostic line 14, got {}",
-                    structured.location.line
-                ));
-            }
-            if structured.location.column != 10 {
-                return Err(format!(
-                    "expected diagnostic column 10, got {}",
-                    structured.location.column
-                ));
-            }
-            if !structured.message.contains(
-                "duplicate theorem key 'theorems/duplicate.theorem#SharedName' appears at",
-            ) {
-                return Err(format!(
-                    "expected duplicate theorem-key message, got {}",
-                    structured.message
-                ));
-            }
-            Ok(())
-        }
+        } => check_duplicate_theorem_key_fields(&theorem_key, diagnostic),
         other => Err(format!(
             "expected duplicate theorem key error, got: {other}"
         )),
