@@ -2,6 +2,14 @@
 
 use super::diagnostic::SchemaDiagnostic;
 
+fn format_duplicate_theorem_key_collisions(collisions: &[SchemaDiagnostic]) -> String {
+    collisions
+        .iter()
+        .map(|collision| collision.message.as_str())
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
 /// Errors that can occur when loading or validating `.theorem` documents.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -55,12 +63,16 @@ pub enum SchemaError {
 
     /// Two or more theorem documents from the same source share the same
     /// theorem key `{P}#{T}`.
-    #[error("duplicate theorem key '{theorem_key}': {message}")]
+    #[error(
+        "duplicate theorem key '{theorem_key}': {}",
+        format_duplicate_theorem_key_collisions(.collisions)
+    )]
     DuplicateTheoremKey {
         /// Exact theorem key that collided.
         theorem_key: String,
-        /// Human-readable collision report including source context.
-        message: String,
+        /// Structured diagnostics for every duplicate theorem-key collision in
+        /// deterministic theorem-key order.
+        collisions: Vec<SchemaDiagnostic>,
         /// Optional structured diagnostic payload for the duplicate site.
         diagnostic: Option<SchemaDiagnostic>,
     },

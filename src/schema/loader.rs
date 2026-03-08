@@ -184,37 +184,50 @@ fn check_duplicate_theorem_keys(
         .first_key_value()
         .map_or(Ok(()), |(theorem, collision)| {
             let theorem_key = format!("{}#{theorem}", source.as_str());
+            let collision_diagnostics =
+                build_duplicate_theorem_key_diagnostics(source, &collisions);
+            let diagnostic = collision_diagnostics.first().cloned().or_else(|| {
+                let duplicate_site = collision
+                    .duplicates
+                    .first()
+                    .copied()
+                    .unwrap_or(collision.first);
+                Some(create_diagnostic(
+                    SchemaDiagnosticCode::ValidationFailure,
+                    source,
+                    format_duplicate_theorem_key_summary(source, theorem, collision),
+                    duplicate_site.location,
+                ))
+            });
+
+            Err(SchemaError::DuplicateTheoremKey {
+                theorem_key,
+                collisions: collision_diagnostics,
+                diagnostic,
+            })
+        })
+}
+
+fn build_duplicate_theorem_key_diagnostics(
+    source: &SourceId,
+    collisions: &BTreeMap<&str, DuplicateTheoremCollision>,
+) -> Vec<SchemaDiagnostic> {
+    collisions
+        .iter()
+        .map(|(theorem, collision)| {
             let duplicate_site = collision
                 .duplicates
                 .first()
                 .copied()
                 .unwrap_or(collision.first);
-            let diagnostic = create_diagnostic(
+            create_diagnostic(
                 SchemaDiagnosticCode::ValidationFailure,
                 source,
                 format_duplicate_theorem_key_summary(source, theorem, collision),
                 duplicate_site.location,
-            );
-
-            Err(SchemaError::DuplicateTheoremKey {
-                theorem_key,
-                message: format_duplicate_theorem_key_message(source, &collisions),
-                diagnostic: Some(diagnostic),
-            })
+            )
         })
-}
-
-fn format_duplicate_theorem_key_message(
-    source: &SourceId,
-    collisions: &BTreeMap<&str, DuplicateTheoremCollision>,
-) -> String {
-    let parts: Vec<String> = collisions
-        .iter()
-        .map(|(theorem, collision)| {
-            format_duplicate_theorem_key_summary(source, theorem, collision)
-        })
-        .collect();
-    parts.join("; ")
+        .collect()
 }
 
 fn format_duplicate_theorem_key_summary(
@@ -362,3 +375,7 @@ fn is_mapping_key_for_field(line: &str, field: FieldName<'_>) -> bool {
 #[cfg(test)]
 #[path = "loader_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "loader_duplicate_tests.rs"]
+mod duplicate_theorem_key_tests;

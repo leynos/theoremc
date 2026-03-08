@@ -3,6 +3,7 @@
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::mangle::golden::HARNESS_GOLDEN_TUPLES;
 use theoremc::mangle::{hash12, mangle_theorem_harness, theorem_key};
+use theoremc::schema::test_fixtures;
 use theoremc::schema::{SchemaError, SourceId, load_theorem_docs_with_source};
 
 #[given("representative theorem paths and theorem identifiers")]
@@ -46,40 +47,13 @@ fn then_the_harness_slug_stays_unchanged() {
 #[given("a multi-document theorem source with duplicate theorem identifiers")]
 fn given_a_multi_document_theorem_source_with_duplicate_theorem_identifiers() {}
 
-const DUPLICATE_THEOREM_KEYS_YAML: &str = concat!(
-    "Theorem: SharedName\n",
-    "About: First theorem\n",
-    "Prove:\n",
-    "  - assert: 'true'\n",
-    "    because: trivially true\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 1\n",
-    "    expect: SUCCESS\n",
-    "Witness:\n",
-    "  - cover: 'true'\n",
-    "    because: reachable\n",
-    "---\n",
-    "Theorem: SharedName\n",
-    "About: Second theorem\n",
-    "Prove:\n",
-    "  - assert: 'true'\n",
-    "    because: trivially true\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 1\n",
-    "    expect: SUCCESS\n",
-    "Witness:\n",
-    "  - cover: 'true'\n",
-    "    because: reachable\n",
-);
-
 #[then("loading fails with a duplicate theorem key diagnostic")]
 fn then_loading_fails_with_a_duplicate_theorem_key_diagnostic() -> Result<(), String> {
     let source = SourceId::new("theorems/duplicate.theorem");
-    let error = load_theorem_docs_with_source(&source, DUPLICATE_THEOREM_KEYS_YAML)
-        .err()
-        .ok_or_else(|| "duplicate theorem keys should fail".to_owned())?;
+    let error =
+        load_theorem_docs_with_source(&source, test_fixtures::duplicate_theorem_keys_yaml())
+            .err()
+            .ok_or_else(|| "duplicate theorem keys should fail".to_owned())?;
 
     match error {
         SchemaError::DuplicateTheoremKey {

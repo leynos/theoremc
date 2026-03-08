@@ -311,12 +311,12 @@ args:
   violation (e.g., empty `Prove` section or no Evidence backend).
 - `MangledIdentifierCollision { message }` — two or more different canonical
   action names produce the same mangled Rust identifier.
-- `DuplicateTheoremKey { theorem_key, message, diagnostic }` — two theorem
+- `DuplicateTheoremKey { theorem_key, collisions, diagnostic }` — two theorem
   documents loaded from the same source produce the same literal theorem key
-  `{P}#{T}`.
+  `{P}#{T}`, with structured collision diagnostics for each duplicate key.
 
-For parse and validation failures, `diagnostic` includes structured location
-metadata when available:
+For parse failures, validation failures, and duplicate theorem-key failures,
+`diagnostic` includes structured location metadata when available:
 
 - stable code (`schema.parse_failure` or `schema.validation_failure`),
 - source identifier,
@@ -324,7 +324,10 @@ metadata when available:
 - deterministic fallback message.
 
 Use `SchemaError::diagnostic()` to access this payload for custom rendering,
-snapshot assertions, or editor integration.
+snapshot assertions, or editor integration. For duplicate theorem-key errors,
+callers can also inspect
+`SchemaError::DuplicateTheoremKey { theorem_key, collisions, diagnostic }`
+directly to enumerate every colliding theorem key in stable order.
 
 All variants produce actionable error messages suitable for display to theorem
 authors.
@@ -561,5 +564,6 @@ both documents would produce the same literal theorem key `{source}#{Theorem}`.
 The loader returns `SchemaError::DuplicateTheoremKey` with:
 
 - the exact colliding theorem key,
-- a deterministic message naming the original definition location, and
+- structured collision diagnostics naming every duplicate theorem-key
+  occurrence in deterministic order, and
 - a structured diagnostic pointing at the duplicate theorem field.

@@ -435,8 +435,3 @@ The implementation is complete only when all of the following are true:
 6. `docs/roadmap.md` is updated only for the work actually completed.
 7. `make check-fmt`, `make lint`, and `make test` succeed, with documentation
    validation also passing because this task changes Markdown files.
-
-## Approval gate
-
-Historically this plan contained a draft-only approval gate; the plan is now
-complete and approved.

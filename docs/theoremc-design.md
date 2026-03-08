@@ -938,9 +938,9 @@ roadmap):
   the spanned raw theorem identifiers.
 - Duplicate theorem keys surface as a dedicated
   `SchemaError::DuplicateTheoremKey` variant carrying the exact theorem key, a
-  deterministic message, and a `schema.validation_failure` diagnostic anchored
-  to the duplicate theorem field while naming the earlier definition location
-  in the message text.
+  structured list of deterministic collision diagnostics, and a
+  `schema.validation_failure` diagnostic anchored to the duplicate theorem
+  field.
 - Behavioural coverage uses a dedicated `tests/harness_naming_bdd.rs` suite
   and `tests/features/harness_naming.feature` so harness naming and duplicate
   theorem-key rejection stay explicit rather than being folded into unrelated
