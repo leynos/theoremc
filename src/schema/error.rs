@@ -61,19 +61,20 @@ pub enum SchemaError {
         message: String,
     },
 
-    /// Two or more theorem documents from the same source share the same
-    /// theorem key `{P}#{T}`.
+    /// Two or more theorem documents from the same source share one or more
+    /// theorem keys `{P}#{T}`.
     #[error(
         "duplicate theorem key '{theorem_key}': {}",
         format_duplicate_theorem_key_collisions(.collisions)
     )]
     DuplicateTheoremKey {
-        /// Exact theorem key that collided.
+        /// The first colliding theorem key in deterministic theorem-key order.
         theorem_key: String,
-        /// Structured diagnostics for every duplicate theorem-key collision in
+        /// Structured diagnostics for all colliding theorem keys in
         /// deterministic theorem-key order.
         collisions: Vec<SchemaDiagnostic>,
-        /// Optional structured diagnostic payload for the duplicate site.
+        /// Optional structured diagnostic payload for the duplicate site of the
+        /// first colliding theorem key.
         diagnostic: Option<SchemaDiagnostic>,
     },
 }

@@ -65,7 +65,9 @@ const INLINE_SOURCE: &str = "<inline>";
 /// Returns [`SchemaError::Deserialize`] if the YAML is malformed,
 /// does not match the theorem schema, or contains invalid identifiers.
 /// Returns [`SchemaError::ValidationFailed`] if a structural
-/// constraint is violated.
+/// constraint is violated. Returns [`SchemaError::DuplicateTheoremKey`] if two
+/// or more documents in the same loaded source share the same literal theorem
+/// key `{P}#{T}`.
 ///
 /// # Examples
 ///
@@ -100,7 +102,9 @@ pub fn load_theorem_docs(input: &str) -> Result<Vec<TheoremDoc>, SchemaError> {
 /// # Errors
 ///
 /// Returns [`SchemaError::Deserialize`] when YAML parsing or deserialization
-/// fails and [`SchemaError::ValidationFailed`] when semantic validation fails.
+/// fails, [`SchemaError::ValidationFailed`] when semantic validation fails,
+/// and [`SchemaError::DuplicateTheoremKey`] when the same source declares a
+/// duplicate literal theorem key `{P}#{T}`.
 pub fn load_theorem_docs_with_source(
     source: &SourceId,
     input: &str,
@@ -182,52 +186,47 @@ fn check_duplicate_theorem_keys(
 
     collisions
         .first_key_value()
-        .map_or(Ok(()), |(theorem, collision)| {
+        .map_or(Ok(()), |(theorem, first_collision)| {
             let theorem_key = format!("{}#{theorem}", source.as_str());
-            let collision_diagnostics =
-                build_duplicate_theorem_key_diagnostics(source, &collisions);
-            let diagnostic = collision_diagnostics.first().cloned().or_else(|| {
-                let duplicate_site = collision
+            let first_diagnostic = create_diagnostic(
+                SchemaDiagnosticCode::ValidationFailure,
+                source,
+                format_duplicate_theorem_key_summary(source, theorem, first_collision),
+                first_collision
                     .duplicates
                     .first()
                     .copied()
-                    .unwrap_or(collision.first);
-                Some(create_diagnostic(
-                    SchemaDiagnosticCode::ValidationFailure,
-                    source,
-                    format_duplicate_theorem_key_summary(source, theorem, collision),
-                    duplicate_site.location,
-                ))
-            });
+                    .unwrap_or(first_collision.first)
+                    .location,
+            );
+            let mut collision_diagnostics = Vec::with_capacity(collisions.len());
+            collision_diagnostics.push(first_diagnostic.clone());
+            collision_diagnostics.extend(collisions.iter().skip(1).map(
+                |(other_theorem, other_collision)| {
+                    create_diagnostic(
+                        SchemaDiagnosticCode::ValidationFailure,
+                        source,
+                        format_duplicate_theorem_key_summary(
+                            source,
+                            other_theorem,
+                            other_collision,
+                        ),
+                        other_collision
+                            .duplicates
+                            .first()
+                            .copied()
+                            .unwrap_or(other_collision.first)
+                            .location,
+                    )
+                },
+            ));
 
             Err(SchemaError::DuplicateTheoremKey {
                 theorem_key,
                 collisions: collision_diagnostics,
-                diagnostic,
+                diagnostic: Some(first_diagnostic),
             })
         })
-}
-
-fn build_duplicate_theorem_key_diagnostics(
-    source: &SourceId,
-    collisions: &BTreeMap<&str, DuplicateTheoremCollision>,
-) -> Vec<SchemaDiagnostic> {
-    collisions
-        .iter()
-        .map(|(theorem, collision)| {
-            let duplicate_site = collision
-                .duplicates
-                .first()
-                .copied()
-                .unwrap_or(collision.first);
-            create_diagnostic(
-                SchemaDiagnosticCode::ValidationFailure,
-                source,
-                format_duplicate_theorem_key_summary(source, theorem, collision),
-                duplicate_site.location,
-            )
-        })
-        .collect()
 }
 
 fn format_duplicate_theorem_key_summary(
