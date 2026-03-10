@@ -261,8 +261,9 @@ and variable references require the explicit `{ ref: <name> }` wrapper.
   (`^[A-Za-z_][A-Za-z0-9_]*$`) and must not be a Rust reserved keyword.
 - `ArgValue::RawSequence(values)` — a YAML sequence (future: `vec![...]`
   synthesis).
-- `ArgValue::RawMap(map)` — a YAML map that is not a recognized sentinel wrapper
-  (future: struct-literal synthesis).
+- `ArgValue::RawMap(map)` — any YAML map that is not a single-key sentinel
+  wrapper (future: struct-literal synthesis). Multi-key maps are never treated
+  as wrappers, even when one of their keys is `ref` or `literal`.
 
 **Semantic stability invariant:** adding a new `Let` binding can never silently
 change the meaning of an existing argument that was previously a plain string.
@@ -304,9 +305,11 @@ string. Non-string values are rejected:
 - YAML floats → Rust float literals.
 - YAML strings → Rust string literals (plain strings are always literals).
 - YAML lists → `vec![...]` (future lowering).
-- YAML maps → struct literals or explicit wrappers (future lowering).
-- `{ ref: name }` → variable reference (explicit).
-- `{ literal: "text" }` → explicit string literal.
+- YAML maps with exactly one recognized sentinel key are decoded as explicit
+  wrappers: `{ ref: name }` → `ArgValue::Reference`, `{ literal: "text" }` →
+  `ArgValue::Literal`. All other YAML maps (including multi-key maps such as
+  `{ literal: "x", other: 1 }`) pass through as `ArgValue::RawMap` (future:
+  struct-literal synthesis).
 
 ### Error handling
 
