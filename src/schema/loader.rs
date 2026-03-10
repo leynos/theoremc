@@ -7,8 +7,6 @@
 
 use std::collections::BTreeMap;
 
-use crate::mangle::theorem_key;
-
 use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, create_diagnostic, first_line};
 use super::error::SchemaError;
 use super::raw::{RawTheoremDoc, ValidationReason};
@@ -155,6 +153,48 @@ struct DuplicateTheoremCollision {
     duplicates: Vec<DuplicateTheoremLocation>,
 }
 
+fn build_duplicate_theorem_key_error(
+    source: &SourceId,
+    theorem: &str,
+    first_collision: &DuplicateTheoremCollision,
+    collisions: &BTreeMap<&str, DuplicateTheoremCollision>,
+) -> SchemaError {
+    let theorem_key = crate::mangle::theorem_key(source.as_str(), theorem);
+    let first_diagnostic = create_diagnostic(
+        SchemaDiagnosticCode::ValidationFailure,
+        source,
+        format_duplicate_theorem_key_summary(source, theorem, first_collision),
+        first_collision
+            .duplicates
+            .first()
+            .copied()
+            .unwrap_or(first_collision.first)
+            .location,
+    );
+    let mut collision_diagnostics = Vec::with_capacity(collisions.len());
+    collision_diagnostics.push(first_diagnostic.clone());
+    collision_diagnostics.extend(collisions.iter().skip(1).map(
+        |(other_theorem, other_collision)| {
+            create_diagnostic(
+                SchemaDiagnosticCode::ValidationFailure,
+                source,
+                format_duplicate_theorem_key_summary(source, other_theorem, other_collision),
+                other_collision
+                    .duplicates
+                    .first()
+                    .copied()
+                    .unwrap_or(other_collision.first)
+                    .location,
+            )
+        },
+    ));
+    SchemaError::DuplicateTheoremKey {
+        theorem_key,
+        collisions: collision_diagnostics,
+        diagnostic: Some(first_diagnostic),
+    }
+}
+
 fn check_duplicate_theorem_keys(
     source: &SourceId,
     raw_docs: &[RawTheoremDoc],
@@ -189,45 +229,12 @@ fn check_duplicate_theorem_keys(
     collisions
         .first_key_value()
         .map_or(Ok(()), |(theorem, first_collision)| {
-            let theorem_key = theorem_key(source.as_str(), theorem);
-            let first_diagnostic = create_diagnostic(
-                SchemaDiagnosticCode::ValidationFailure,
+            Err(build_duplicate_theorem_key_error(
                 source,
-                format_duplicate_theorem_key_summary(source, theorem, first_collision),
-                first_collision
-                    .duplicates
-                    .first()
-                    .copied()
-                    .unwrap_or(first_collision.first)
-                    .location,
-            );
-            let mut collision_diagnostics = Vec::with_capacity(collisions.len());
-            collision_diagnostics.push(first_diagnostic.clone());
-            collision_diagnostics.extend(collisions.iter().skip(1).map(
-                |(other_theorem, other_collision)| {
-                    create_diagnostic(
-                        SchemaDiagnosticCode::ValidationFailure,
-                        source,
-                        format_duplicate_theorem_key_summary(
-                            source,
-                            other_theorem,
-                            other_collision,
-                        ),
-                        other_collision
-                            .duplicates
-                            .first()
-                            .copied()
-                            .unwrap_or(other_collision.first)
-                            .location,
-                    )
-                },
-            ));
-
-            Err(SchemaError::DuplicateTheoremKey {
-                theorem_key,
-                collisions: collision_diagnostics,
-                diagnostic: Some(first_diagnostic),
-            })
+                theorem,
+                first_collision,
+                &collisions,
+            ))
         })
 }
 
@@ -236,7 +243,7 @@ fn format_duplicate_theorem_key_summary(
     theorem: &str,
     collision: &DuplicateTheoremCollision,
 ) -> String {
-    let theorem_key = theorem_key(source.as_str(), theorem);
+    let theorem_key = crate::mangle::theorem_key(source.as_str(), theorem);
     let mut locations = Vec::with_capacity(collision.duplicates.len() + 1);
     locations.push(render_duplicate_location(source, collision.first));
     locations.extend(
