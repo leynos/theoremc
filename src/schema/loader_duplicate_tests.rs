@@ -47,8 +47,14 @@ fn multi_duplicate_theorem_keys_yaml() -> &'static str {
     source: "theorems/multi-duplicate.theorem",
     expected_key: "theorems/multi-duplicate.theorem#Alpha",
     expected_collision_messages: &[
-        "duplicate theorem key 'theorems/multi-duplicate.theorem#Alpha'",
-        "duplicate theorem key 'theorems/multi-duplicate.theorem#Zebra'",
+        concat!(
+            "duplicate theorem key 'theorems/multi-duplicate.theorem#Alpha' appears at ",
+            "theorems/multi-duplicate.theorem:14:10, theorems/multi-duplicate.theorem:40:10"
+        ),
+        concat!(
+            "duplicate theorem key 'theorems/multi-duplicate.theorem#Zebra' appears at ",
+            "theorems/multi-duplicate.theorem:1:10, theorems/multi-duplicate.theorem:27:10"
+        ),
     ],
     expected_line: 40,
     expected_column: 10,
@@ -80,7 +86,7 @@ fn reject_duplicate_theorem_keys_with_diagnostic(
                 .iter()
                 .zip(case.expected_collision_messages.iter())
             {
-                assert!(collision.message.contains(expected_message));
+                assert_eq!(collision.message, *expected_message);
             }
 
             let structured = diagnostic.expect("duplicate theorem keys should expose a diagnostic");

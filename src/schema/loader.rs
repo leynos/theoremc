@@ -7,6 +7,8 @@
 
 use std::collections::BTreeMap;
 
+use crate::mangle::theorem_key;
+
 use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, create_diagnostic, first_line};
 use super::error::SchemaError;
 use super::raw::{RawTheoremDoc, ValidationReason};
@@ -187,7 +189,7 @@ fn check_duplicate_theorem_keys(
     collisions
         .first_key_value()
         .map_or(Ok(()), |(theorem, first_collision)| {
-            let theorem_key = format!("{}#{theorem}", source.as_str());
+            let theorem_key = theorem_key(source.as_str(), theorem);
             let first_diagnostic = create_diagnostic(
                 SchemaDiagnosticCode::ValidationFailure,
                 source,
@@ -234,7 +236,7 @@ fn format_duplicate_theorem_key_summary(
     theorem: &str,
     collision: &DuplicateTheoremCollision,
 ) -> String {
-    let theorem_key = format!("{}#{theorem}", source.as_str());
+    let theorem_key = theorem_key(source.as_str(), theorem);
     let mut locations = Vec::with_capacity(collision.duplicates.len() + 1);
     locations.push(render_duplicate_location(source, collision.first));
     locations.extend(
