@@ -48,7 +48,7 @@ decision 3 -- "Literal wrappers remain supported"), `DES-5`
   `arg_value.rs` 243, `arg_value_tests.rs` 166, `raw_action.rs` 196,
   `arg_decode_bdd.rs` 276. There is headroom in all files.
 - Use `rstest` for unit tests, `rstest-bdd` v0.5.0 (`rstest_bdd_macros`) for
-  BDD scenarios.
+  Behaviour-Driven Development (BDD) scenarios.
 - Comments and documentation must use en-GB-oxendict spelling ("-ize" / "-yse"
   / "-our").
 - No new external dependencies beyond what is already in `Cargo.toml`.
@@ -367,7 +367,9 @@ fn decode_mapping(
 
     // `classify_sentinel` confirmed exactly one key, so the iterator
     // always yields a value.
-    let value = map.into_values().next().expect("single-key map");
+    let Some(value) = map.into_values().next() else {
+        return Ok(ArgValue::RawMap(IndexMap::new()));
+    };
     match kind {
         SentinelKind::Ref => decode_ref_target(param_name, value),
         SentinelKind::Literal => decode_literal_target(param_name, value),
@@ -625,7 +627,9 @@ fn decode_mapping(
 
     // `classify_sentinel` confirmed exactly one key, so the iterator
     // always yields a value.
-    let value = map.into_values().next().expect("single-key map");
+    let Some(value) = map.into_values().next() else {
+        return Ok(ArgValue::RawMap(IndexMap::new()));
+    };
     match kind {
         SentinelKind::Ref => decode_ref_target(param_name, value),
         SentinelKind::Literal => decode_literal_target(param_name, value),

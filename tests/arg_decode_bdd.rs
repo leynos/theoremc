@@ -271,6 +271,12 @@ fn then_literal_type_error() -> Result<(), String> {
     if !err.contains("literal value must be a string") {
         return Err(format!("expected literal type error, got: {err}"));
     }
+    // Verify the error includes the specific argument name from the fixture.
+    if !err.contains("label") {
+        return Err(format!(
+            "expected error to reference argument 'label', got: {err}"
+        ));
+    }
     Ok(())
 }
 

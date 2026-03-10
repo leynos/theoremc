@@ -35,6 +35,7 @@ enum SentinelKind {
 /// context. Variants derive `PartialEq` and `Eq` so callers and tests
 /// can match on specific error conditions.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ArgDecodeError {
     /// The `{ ref: "" }` target was an empty string.
     #[error("argument '{param}': ref value must not be empty")]
