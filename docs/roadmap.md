@@ -215,11 +215,11 @@ Out of scope: report-level ID alias resolution.
 - [x] Implement per-file module naming using `path_mangle(path_stem(P))` and
   `hash12(P)`. Acceptance: snapshot tests confirm deterministic names for mixed
   separators and punctuation-heavy paths. Signposts: `NMR-1`, `ADR-2`, `DES-7`.
-- [ ] Implement harness naming
+- [x] Implement harness naming
   `theorem__{theorem_slug(T)}__h{hash12(P#T)}` with deterministic CamelCase to
   snake_case conversion. Acceptance: tests cover acronym runs, numeric
   boundaries, and already-snake identifiers. Signposts: `NMR-1`, `ADR-2`.
-- [ ] Enforce duplicate theorem-key rejection (`P#T`) at build time. Acceptance:
+- [x] Enforce duplicate theorem-key rejection (`P#T`) at build time. Acceptance:
   integration tests prove collisions fail with actionable theorem source
   diagnostics. Signposts: `NMR-1`, `ADR-2`, `TFS-1`.
 

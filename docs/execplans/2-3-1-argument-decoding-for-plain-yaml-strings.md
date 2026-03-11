@@ -75,7 +75,8 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
   Mitigation: use a two-stage approach — serde deserializes into `TheoremValue`
   in the raw layer as before, then a conversion function
   `decode_arg_value(param_name, value)` runs during the raw-to-public
-  conversion step in `RawTheoremDoc::to_theorem_doc()`.
+  conversion step in `RawTheoremDoc::to_theorem_doc()`. Keep the helper
+  signature short and typed:
 
   ```rust
   pub fn decode_arg_value(
@@ -195,7 +196,10 @@ proof harnesses. The current loading pipeline is:
    `raw_doc.to_theorem_doc()` in `src/schema/raw.rs`.
 3. `validate_theorem_doc(&doc)` in `src/schema/validate.rs` validates each
    document (fields, expressions, action name grammar).
-4. `check_action_collisions(&docs)` in `src/collision.rs` detects mangled
+4. `load_theorem_docs_with_source(...)` runs duplicate-theorem-key checks
+   across the loaded source after per-document validation and before returning
+   the accumulated documents.
+5. `check_action_collisions(&docs)` in `src/collision.rs` detects mangled
    identifier collisions.
 
 Action arguments currently live in `ActionCall.args` as

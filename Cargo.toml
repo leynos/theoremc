@@ -30,6 +30,10 @@ required-features = ["test-support"]
 name = "module_naming_bdd"
 required-features = ["test-support"]
 
+[[test]]
+name = "harness_naming_bdd"
+required-features = ["test-support"]
+
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 

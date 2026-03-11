@@ -913,6 +913,39 @@ naming (Step 2.2.1 of the roadmap):
   deterministic naming, separator normalization, and punctuation-collision
   disambiguation.
 
+### 6.7.8 Implementation decisions (Step 2.2.2)
+
+The following decisions were taken during implementation of deterministic
+theorem harness naming and duplicate theorem-key rejection (Step 2.2.2 of the
+roadmap):
+
+- Harness naming helpers are added as additive public API in `theoremc::mangle`
+  via `theorem_key`, `theorem_slug`, `mangle_theorem_harness`, and the
+  `MangledHarness` result type.
+- To keep `src/mangle.rs` under the repository line-count limit, per-file
+  module naming and theorem harness naming are split into focused sibling files
+  `src/mangle_path.rs` and `src/mangle_harness.rs`, while `src/mangle.rs`
+  remains the public API surface and re-export point.
+- `theorem_slug` preserves identifiers already matching
+  `^[a-z_][a-z0-9_]*$` exactly. Non-snake identifiers are converted with an
+  explicit character-walk algorithm that handles acronym runs (`HNSWInvariant`
+  → `hnsw_invariant`) and numeric boundaries (`HTTP2StreamID` →
+  `http_2_stream_id`) without depending on a generic case-conversion crate.
+- Duplicate theorem-key checking is implemented inside
+  `load_theorem_docs_with_source`, after per-document conversion and validation
+  but before returning the final document vector. This keeps the check close to
+  the only current boundary that has both the caller-supplied `SourceId` and
+  the spanned raw theorem identifiers.
+- Duplicate theorem keys surface as a dedicated
+  `SchemaError::DuplicateTheoremKey` variant carrying the exact theorem key, a
+  structured list of deterministic collision diagnostics, and a
+  `schema.validation_failure` diagnostic anchored to the duplicate theorem
+  field.
+- Behavioural coverage uses a dedicated `tests/harness_naming_bdd.rs` suite
+  and `tests/features/harness_naming.feature` so harness naming and duplicate
+  theorem-key rejection stay explicit rather than being folded into unrelated
+  module-naming scenarios.
+
 ### 6.8 Localized diagnostics contract (ADR 002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:

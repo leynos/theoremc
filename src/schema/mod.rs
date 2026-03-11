@@ -21,6 +21,10 @@ mod types;
 mod validate;
 mod value;
 
+#[cfg(any(test, feature = "test-support"))]
+#[doc(hidden)]
+pub mod test_fixtures;
+
 pub use arg_value::{ArgDecodeError, ArgValue, LiteralValue};
 pub use diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, SourceLocation};
 pub use error::SchemaError;

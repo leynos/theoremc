@@ -2,8 +2,17 @@
 
 use super::diagnostic::SchemaDiagnostic;
 
+fn format_duplicate_theorem_key_collisions(collisions: &[SchemaDiagnostic]) -> String {
+    collisions
+        .iter()
+        .map(|collision| collision.message.as_str())
+        .collect::<Vec<_>>()
+        .join("; ")
+}
+
 /// Errors that can occur when loading or validating `.theorem` documents.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum SchemaError {
     /// YAML deserialization failed (malformed YAML or schema mismatch).
     #[error("YAML deserialization failed: {message}")]
@@ -51,6 +60,23 @@ pub enum SchemaError {
         /// canonical names per mangled identifier.
         message: String,
     },
+
+    /// Two or more theorem documents from the same source share one or more
+    /// theorem keys `{P}#{T}`.
+    #[error(
+        "duplicate theorem key '{theorem_key}': {}",
+        format_duplicate_theorem_key_collisions(.collisions)
+    )]
+    DuplicateTheoremKey {
+        /// The first colliding theorem key in deterministic theorem-key order.
+        theorem_key: String,
+        /// Structured diagnostics for all colliding theorem keys in
+        /// deterministic theorem-key order.
+        collisions: Vec<SchemaDiagnostic>,
+        /// Optional structured diagnostic payload for the duplicate site of the
+        /// first colliding theorem key.
+        diagnostic: Option<SchemaDiagnostic>,
+    },
 }
 
 impl SchemaError {
@@ -58,9 +84,9 @@ impl SchemaError {
     #[must_use]
     pub const fn diagnostic(&self) -> Option<&SchemaDiagnostic> {
         match self {
-            Self::Deserialize { diagnostic, .. } | Self::ValidationFailed { diagnostic, .. } => {
-                diagnostic.as_ref()
-            }
+            Self::Deserialize { diagnostic, .. }
+            | Self::ValidationFailed { diagnostic, .. }
+            | Self::DuplicateTheoremKey { diagnostic, .. } => diagnostic.as_ref(),
             Self::InvalidIdentifier { .. }
             | Self::InvalidActionName { .. }
             | Self::MangledIdentifierCollision { .. } => None,
