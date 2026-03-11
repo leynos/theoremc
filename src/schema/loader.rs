@@ -117,6 +117,7 @@ pub fn load_theorem_docs_with_source(
             diagnostic,
         }
     })?;
+    check_duplicate_theorem_keys(source, &raw_docs)?;
 
     let mut docs = Vec::with_capacity(raw_docs.len());
     for raw_doc in &raw_docs {
@@ -134,7 +135,6 @@ pub fn load_theorem_docs_with_source(
         docs.push(doc);
     }
 
-    check_duplicate_theorem_keys(source, &raw_docs)?;
     crate::collision::check_action_collisions(&docs)?;
 
     Ok(docs)
