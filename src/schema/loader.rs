@@ -143,8 +143,8 @@ pub fn load_theorem_docs_with_source(
 #[derive(Debug, Clone, Copy)]
 struct DuplicateTheoremLocation {
     location: serde_saphyr::Location,
-    first_line: usize,
-    first_column: usize,
+    line: usize,
+    column: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -207,8 +207,8 @@ fn check_duplicate_theorem_keys(
         let location = raw_doc.theorem_location();
         let duplicate = DuplicateTheoremLocation {
             location,
-            first_line: usize::try_from(location.line()).ok().unwrap_or(usize::MAX),
-            first_column: usize::try_from(location.column())
+            line: usize::try_from(location.line()).ok().unwrap_or(usize::MAX),
+            column: usize::try_from(location.column())
                 .ok()
                 .unwrap_or(usize::MAX),
         };
@@ -261,12 +261,7 @@ fn format_duplicate_theorem_key_summary(
 }
 
 fn render_duplicate_location(source: &SourceId, location: DuplicateTheoremLocation) -> String {
-    format!(
-        "{}:{}:{}",
-        source.as_str(),
-        location.first_line,
-        location.first_column,
-    )
+    format!("{}:{}:{}", source.as_str(), location.line, location.column,)
 }
 
 fn attach_validation_diagnostic(
