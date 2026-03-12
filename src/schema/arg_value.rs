@@ -221,8 +221,9 @@ fn decode_mapping(
 }
 
 /// Classifies a single-key map as a recognized sentinel wrapper, or
-/// returns `None` for maps that should pass through as struct literal
-/// candidates.
+/// returns `None` for maps that should pass through as `RawMap`
+/// struct-literal candidates — including single-key maps whose key is
+/// not a recognized sentinel (e.g. `{ frobnicate: "value" }`).
 fn classify_sentinel(map: &IndexMap<String, TheoremValue>) -> Option<SentinelKind> {
     if map.len() != 1 {
         return None;

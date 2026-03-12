@@ -236,10 +236,11 @@ Out of scope: implicit reference inference.
   variable references require `{ ref: name }`. Acceptance: tests prove adding a
   new binding cannot alter existing literal argument semantics. Signposts:
   `TFS-5`, `ADR-3`, `DES-5`.
-- [x] Implement optional `{ literal: "text" }` wrapper and reject ambiguous
-  wrapper maps containing unsupported sentinel keys. Acceptance: parser tests
-  cover valid wrapper use and deterministic rejection cases. Signposts:
-  `TFS-5`, `ADR-3`.
+- [x] Implement optional `{ literal: "text" }` wrapper and reject sentinel
+  wrappers with invalid value types (e.g. `{ literal: 42 }`). Single-key maps
+  whose key is not a recognized sentinel pass through as struct-literal
+  candidates per TFS-5 §5.3. Acceptance: parser tests cover valid wrapper use
+  and deterministic rejection cases. Signposts: `TFS-5`, `ADR-3`.
 - [ ] Implement struct-literal synthesis from YAML maps based on action
   parameter types, plus recursive list lowering to `vec![...]`. Acceptance:
   compile-fail tests show type mismatches are surfaced by Rust compilation.
