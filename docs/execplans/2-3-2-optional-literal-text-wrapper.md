@@ -239,8 +239,8 @@ starting at line 244. Line 298 lists `{ literal: "text" }` as "explicit string
 literal (future)".
 
 `docs/theoremc-design.md` contains section 6.7.6 "Implementation decisions
-(Step 2.3.1)" at line 857. The new section 6.7.8 for Step 2.3.2 will be
-inserted after the Step 2.2.1 section (6.7.7).
+(Step 2.3.1)" at line 857. The new section 6.7.9 for Step 2.3.2 will be
+inserted after the Step 2.2.2 section (6.7.8).
 
 `docs/roadmap.md` has the Step 2.3.2 checkbox at line 239.
 
@@ -509,7 +509,7 @@ In `docs/users-guide.md`:
 
 In `docs/theoremc-design.md`:
 
-- Insert a new subsection `### 6.7.8 Implementation decisions (Step 2.3.2)`
+- Insert a new subsection `### 6.7.9 Implementation decisions (Step 2.3.2)`
   before section 6.8 (line 891), documenting: the `NonStringLiteralValue`
   error variant, the unified `classify_sentinel` dispatch replacing
   `is_ref_wrapper`, empty string acceptance in `{ literal: "" }`, and
@@ -726,7 +726,7 @@ Files modified (9 total):
 7. `tests/fixtures/invalid_arg_literal_non_string.theorem` -- new fixture
    (create)
 8. `docs/users-guide.md` -- documentation updates
-9. `docs/theoremc-design.md` -- new section 6.7.8
+9. `docs/theoremc-design.md` -- new section 6.7.9
 10. `docs/roadmap.md` -- check Step 2.3.2 checkbox
 11. `docs/execplans/2-3-2-optional-literal-text-wrapper.md` -- this ExecPlan
     (create)
