@@ -167,6 +167,14 @@ Implementation completed successfully. All acceptance criteria met:
 - `docs/users-guide.md` upgraded `{ literal: "text" }` from "(future)" to
   documented behaviour.
 - Roadmap Step 2.3.2 checkbox marked as done.
+- The roadmap's original "reject ambiguous wrapper maps containing unsupported
+  sentinel keys" wording was clarified during review. The rejection criterion
+  applies to sentinel wrappers with invalid value types (e.g.
+  `{ literal: 42 }`), not to unrecognised single-key maps (e.g.
+  `{ frobnicate: "value" }`). Unrecognised single-key maps pass through as
+  `ArgValue::RawMap` — struct-literal candidates per TFS-5 §5.3. The roadmap
+  wording and `classify_sentinel` doc comment were updated to reflect this
+  design decision.
 
 Lesson learned: the `clippy::expect_used` deny policy requires using
 `let Some(...) = ... else { return ... }` instead of `.expect()` even in

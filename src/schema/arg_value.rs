@@ -210,7 +210,8 @@ fn decode_mapping(
     };
 
     // `classify_sentinel` confirmed exactly one key, so the iterator
-    // always yields a value.
+    // always yields a value. The `else` branch is unreachable but
+    // returns a safe fallback to satisfy the no-panic policy.
     let Some(value) = map.into_values().next() else {
         return Ok(ArgValue::RawMap(IndexMap::new()));
     };

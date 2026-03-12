@@ -279,6 +279,7 @@ args:
   enabled: true              # → ArgValue::Literal(Bool(true))
   graph_ref: { ref: graph }  # → ArgValue::Reference("graph")
   label: { literal: "graph" }  # → ArgValue::Literal(String("graph"))
+  opts: { timeout: 30 }     # → ArgValue::RawMap (future: struct literal)
 ```
 
 **Invalid reference targets** produce actionable error messages:
