@@ -968,7 +968,7 @@ roadmap):
 - The "reject ambiguous wrapper maps" acceptance criterion is satisfied by
   ensuring that `{ literal: <non-string> }` produces a deterministic error
   rather than silently passing through as a struct literal candidate.
-  Single-key maps with unrecognised keys (e.g. `{ frobnicate: "value" }`)
+  Single-key maps with unrecognized keys (e.g. `{ frobnicate: "value" }`)
   pass through as `ArgValue::RawMap` — these are struct-literal candidates
   per TFS-5 §5.3, not ambiguous wrappers.
 

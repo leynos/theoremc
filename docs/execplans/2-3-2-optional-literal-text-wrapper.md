@@ -170,8 +170,8 @@ Implementation completed successfully. All acceptance criteria met:
 - The roadmap's original "reject ambiguous wrapper maps containing unsupported
   sentinel keys" wording was clarified during review. The rejection criterion
   applies to sentinel wrappers with invalid value types (e.g.
-  `{ literal: 42 }`), not to unrecognised single-key maps (e.g.
-  `{ frobnicate: "value" }`). Unrecognised single-key maps pass through as
+  `{ literal: 42 }`), not to unrecognized single-key maps (e.g.
+  `{ frobnicate: "value" }`). Unrecognized single-key maps pass through as
   `ArgValue::RawMap` — struct-literal candidates per TFS-5 §5.3. The roadmap
   wording and `classify_sentinel` doc comment were updated to reflect this
   design decision.
@@ -723,7 +723,7 @@ fn is_ref_wrapper(map: &IndexMap<String, TheoremValue>) -> bool;
 This function is replaced by `classify_sentinel` which provides unified
 sentinel dispatch.
 
-Files modified (9 total):
+Files modified (11 total):
 
 1. `src/schema/arg_value.rs` -- core logic changes
 2. `src/schema/arg_value_tests.rs` -- new unit tests
