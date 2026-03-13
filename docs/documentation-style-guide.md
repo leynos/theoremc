@@ -1,7 +1,8 @@
 # Documentation style guide
 
-This guide outlines conventions for authoring documentation for Concordat.
-Apply these rules to keep the documentation clear and consistent for developers.
+This guide outlines conventions for authoring documentation for software
+created by df12 Productions. Apply these rules to keep documentation clear,
+consistent, and easy to maintain across projects.
 
 ## Spelling
 
@@ -26,8 +27,8 @@ Apply these rules to keep the documentation clear and consistent for developers.
 
 - Use the Oxford comma: "ships, planes, and hovercraft" where it aids
   comprehension.
-- Company names are treated as collective nouns: "Concordat Industries are
-  expanding".
+- Company names are treated as collective nouns: "df12 Productions are
+  releasing an update".
 - Avoid first and second person personal pronouns outside the `README.md`
   file.
 
@@ -69,11 +70,13 @@ Repositories that adopt this documentation style should keep a small set of
 high-value documents with clearly separated audiences and responsibilities.
 These document types are complementary: the contents file helps readers find
 material, the user's guide explains how to use the project, the developer's
-guide explains how the project is built and maintained, and the repository
-layout document explains where important things live. For discoverability, use
-canonical filenames unless a stronger repository-specific constraint applies:
-`docs/contents.md`, `docs/users-guide.md`, `docs/developers-guide.md`, and
-`docs/repository-layout.md`.
+guide explains how to work on the project, the design document explains why the
+system is shaped the way it is, and the repository layout document explains
+where important things live. For discoverability, use canonical filenames
+unless a stronger repository-specific constraint applies: `docs/contents.md`,
+`docs/users-guide.md`, `docs/developers-guide.md`, `docs/repository-layout.md`,
+and a primary design document with an explicit product or topic name such as
+`docs/theoremc-design.md` or `docs/query-planner-design.md`.
 
 ### Contents file
 
@@ -119,7 +122,7 @@ this means operators, end users, or integrators.
   schemas, or command usage.
 - Higher-level user workflows belong here, for example "load a document",
   "configure the service", or "interpret diagnostics".
-- Link to normative references or deeper design documents when detail would
+- Link to design documents or maintainer references when deeper rationale would
   otherwise overload the guide.
 - Exclude maintainer-only concerns such as internal layering debates, future
   refactor plans, or enforcement tooling unless they directly affect users.
@@ -127,32 +130,61 @@ this means operators, end users, or integrators.
 ### Developer's guide
 
 Use the developer's guide, canonically `docs/developers-guide.md`, for
-maintainers and contributors. This document may also be titled a design
-specification when it carries both implementation guidance and architecture
-rationale, but it should still serve as the primary maintainer-oriented manual.
+maintainers and contributors. Treat this as the operating manual for working on
+the existing system, not as the place for the project's primary design document.
 
-- State the status, scope, and intended audience near the top when that context
-  affects how the document should be interpreted.
-- Link early to accepted decision records and other normative references, and
-  explain which documents take precedence if wording diverges.
-- Start with the problem statement and constraints before describing the
-  implementation, so later choices remain grounded in the repository's goals.
-- Put maintainer-facing architecture material here, for example subsystem
-  boundaries, extension points, build/test/lint workflows, and contributor
-  expectations.
+- Open with one short paragraph that states the audience and the operational
+  scope of the guide.
+- Link early to the design document, accepted decision records, and other
+  normative references that explain architecture or rationale in depth.
+- Put maintainer-facing implementation guidance here, for example build, test,
+  lint, release, debugging, extension, and contribution workflows.
 - Use numbered sections for long-form technical documents to improve
   cross-referencing in reviews and follow-up discussions.
 - Separate normative rules from informative explanation. Mark source-of-truth
   sections clearly.
-- Include architecture diagrams, data-flow sketches, or interface maps where
-  they materially improve understanding.
-- Higher-level design rationale belongs here rather than in the user's guide,
-  for example why a parser is layered a certain way or how generated artefacts
-  fit into the build.
-- Record important risks, trade-offs, and future-extension points so the
-  document explains not only what exists, but why it exists in that form.
+- Include compact interface maps or workflow diagrams where they materially
+  improve implementation guidance.
+- Keep subsystem descriptions focused on current responsibilities,
+  integration points, and operational expectations. Put design rationale, major
+  trade-offs, and proposed architecture in design documents instead.
 - Keep the document synchronized with decision records, roadmap items, and the
   codebase. A stale developer's guide is worse than a shorter one.
+
+### Design document
+
+Use a dedicated design document, conventionally named
+`docs/<product-or-topic>-design.md`, when you need to explain the architecture,
+constraints, rationale, and intended evolution of a system or subsystem. This
+document is the right home for design intent; do not bury that material in the
+user's guide or developer's guide.
+
+- Start with a concise front matter section that states status, scope, primary
+  audience, and the decision records or other documents that take precedence.
+- Open the main body with the problem statement, product thesis, or design goal
+  before describing the solution. Readers should understand the problem the
+  design is solving before they inspect the structure.
+- State the non-negotiable constraints explicitly. These are the rules later
+  sections assume rather than re-justify.
+- Separate normative definitions from informative explanation. If another
+  document is the source of truth for a schema, protocol, or naming rule, say
+  so plainly and link to it.
+- Describe the high-level architecture before diving into file-level or
+  module-level details. A reader should understand the major subsystems,
+  boundaries, and data flow early.
+- Use numbered sections for substantial designs so review comments, follow-up
+  changes, and decision records can cite stable anchors.
+- Include diagrams, tables, or pipeline sketches when they materially improve
+  comprehension, especially for flows, layered boundaries, or generated
+  artefacts.
+- Record risks, trade-offs, rejected alternatives, and future extension points.
+  A design document should explain not only what the system looks like, but why
+  it takes that shape.
+- Keep examples concrete and representative. Prefer one realistic example that
+  exercises the important structure over several toy fragments.
+- Keep the design document synchronized with accepted decision records and the
+  implemented system. If the code or the governing decision changes, update the
+  design or mark the divergence explicitly.
 
 ### Repository layout document
 
