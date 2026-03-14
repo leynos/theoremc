@@ -615,7 +615,7 @@ a stage fails partway through, fix the issue and re-run the stage's validation
 commands. If the implementation is abandoned, `git checkout -- .` restores the
 working tree.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Expected error message for `{ literal: 42 }`:
 
