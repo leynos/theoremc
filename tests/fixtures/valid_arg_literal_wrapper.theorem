@@ -1,0 +1,18 @@
+Theorem: ArgLiteralWrapper
+About: Explicit literal wrapper is decoded as a string literal
+Let:
+  result:
+    call:
+      action: label.set
+      args:
+        label: { literal: "graph" }
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
