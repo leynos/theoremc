@@ -188,7 +188,8 @@ structures. Action calls within theorems have `args` maps where each value is
 decoded from raw YAML (`TheoremValue`) into a semantic `ArgValue`. The
 decoding logic lives in `src/schema/arg_value.rs`.
 
-Key files and their roles:
+Key files and their roles (pre-change baseline — see stages B–D for
+the changes introduced by this plan):
 
 `src/schema/arg_value.rs` (243 lines) is the core module. It contains:
 
