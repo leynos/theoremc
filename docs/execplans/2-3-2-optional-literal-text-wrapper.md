@@ -11,11 +11,11 @@ Status: COMPLETE
 
 After this change, theoremc recognizes `{ literal: "text" }` as a sentinel
 wrapper that forces string literal interpretation, parallel to the existing
-`{ ref: name }` wrapper that forces variable reference interpretation. A
+`{ ref: name }` wrapper that forces variable reference interpretation[^1]. A
 theorem author who writes `args: { label: { literal: "graph" } }` gets
 `ArgValue::Literal(LiteralValue::String("graph"))` -- exactly the same result
 as writing `label: "graph"` directly, but with explicit intent documented in
-the YAML source.
+the YAML source[^2].
 
 Invalid literal wrappers (where the value is not a string, such as
 `{ literal: 42 }` or `{ literal: true }`) are rejected with actionable error
@@ -23,7 +23,7 @@ messages at load time. The sentinel dispatch is unified: single-key maps whose
 key is `"ref"` or `"literal"` are intercepted as wrappers; all other maps
 (including multi-key maps that happen to contain `ref` or `literal` among
 their keys) pass through as `ArgValue::RawMap` for future struct-literal
-synthesis (Step 2.3.3).
+synthesis (Step 2.3.3)[^3].
 
 Observable success: loading a `.theorem` file containing
 `{ literal: "graph" }` produces
@@ -32,11 +32,6 @@ Observable success: loading a `.theorem` file containing
 be a string"`. Running `make check-fmt`, `make lint`, and `make test` all
 pass. The `docs/users-guide.md` reference to `{ literal: "text" }` is
 upgraded from "(future)" to documented behaviour.
-
-Signposts: `TFS-5` (theorem-file-specification.md sections 5.2 and 5.3),
-`ADR-3` (adr-001-theorem-symbol-stability-and-non-vacuity-policy.md
-decision 3 -- "Literal wrappers remain supported"), `DES-5`
-(theoremc-design.md section 5.5.1).
 
 ## Constraints
 
@@ -739,3 +734,8 @@ Files modified (11 total):
 10. `docs/roadmap.md` -- check Step 2.3.2 checkbox
 11. `docs/execplans/2-3-2-optional-literal-text-wrapper.md` -- this ExecPlan
     (create)
+
+[^1]: `TFS-5` (theorem-file-specification.md sections 5.2 and 5.3)
+[^2]: `ADR-3` (adr-001-theorem-symbol-stability-and-non-vacuity-policy.md
+    decision 3 -- "Literal wrappers remain supported")
+[^3]: `DES-5` (theoremc-design.md section 5.5.1)
