@@ -591,6 +591,41 @@ Similarly, lists become `vec![...]` recursively.
 This allows theorems to pass rich configuration data to actions without
 requiring inline Rust code blocks.
 
+For screen readers: this sequence diagram shows the argument-lowering flow from
+the theorem author's YAML input, through schema decoding and recursive list/map
+lowering, into generated Rust source, and finally to either a successful Rust
+build or a compile-fail type error reported back to the theorem author.
+
+```mermaid
+sequenceDiagram
+    actor TheoremAuthor
+    participant TheoremcSchema
+    participant ArgLoweringModule
+    participant Codegen
+    participant Rustc
+
+    TheoremAuthor->>TheoremcSchema: Provide_YAML_theorem_file
+    TheoremcSchema->>TheoremcSchema: decode_arg_value_to_ArgValue
+    TheoremcSchema-->>Codegen: ActionCall_with_ArgValue_args
+
+    Codegen->>ArgLoweringModule: lower_arg_to_expr(arg_value, expected_type, context)
+    ArgLoweringModule->>ArgLoweringModule: recurse_lists_and_maps
+    ArgLoweringModule-->>Codegen: Rust_expression_for_argument
+
+    Codegen->>Codegen: assemble_action_call_struct_literals
+    Codegen-->>Rustc: generated_Rust_source
+
+    Rustc->>Rustc: compile_source
+    alt types_match
+        Rustc-->>TheoremAuthor: successful_build
+    else type_mismatch
+        Rustc-->>TheoremAuthor: compile_fail_error_message
+    end
+```
+
+Figure: argument lowering and compile-time type-check feedback for
+struct-literal synthesis and recursive list lowering.
+
 #### 5.5.3 Borrowing and mutability
 
 The generator adapts argument passing based on parameter type:
