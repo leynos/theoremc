@@ -242,6 +242,44 @@ fn assert_is_string_literal(value: &ArgValue, expected: &str, context: &str) -> 
     Ok(())
 }
 
+// ── Scenario: Explicit literal wrapper is decoded as string literal ──
+
+#[given("a theorem file with an explicit literal wrapper")]
+fn given_theorem_with_literal_wrapper() {}
+
+#[then("loading succeeds and the argument is a string literal")]
+fn then_literal_wrapper_is_string_literal() -> Result<(), String> {
+    let docs = load_ok("valid_arg_literal_wrapper.theorem")?;
+    let args = first_let_args(&docs)?;
+    let label_arg = args.get("label").ok_or("missing 'label' arg")?;
+    if *label_arg != ArgValue::Literal(LiteralValue::String("graph".into())) {
+        return Err(format!(
+            "expected Literal(String(\"graph\")), got {label_arg:?}"
+        ));
+    }
+    Ok(())
+}
+
+// ── Scenario: Non-string literal wrapper value is rejected ───────────
+
+#[given("a theorem file with a non-string literal wrapper value")]
+fn given_theorem_with_non_string_literal() {}
+
+#[then("loading fails with a literal type error message")]
+fn then_literal_type_error() -> Result<(), String> {
+    let err = load_err("invalid_arg_literal_non_string.theorem")?;
+    if !err.contains("literal value must be a string") {
+        return Err(format!("expected literal type error, got: {err}"));
+    }
+    // Verify the error includes the specific argument name from the fixture.
+    if !err.contains("label") {
+        return Err(format!(
+            "expected error to reference argument 'label', got: {err}"
+        ));
+    }
+    Ok(())
+}
+
 // ── Scenario wiring ────────────────────────────────────────────────
 
 #[scenario(
@@ -273,3 +311,15 @@ fn invalid_ref_target_is_rejected() {}
     name = "Adding a binding cannot alter literal argument semantics"
 )]
 fn adding_a_binding_cannot_alter_literal_argument_semantics() {}
+
+#[scenario(
+    path = "tests/features/arg_decode.feature",
+    name = "Explicit literal wrapper is decoded as string literal"
+)]
+fn explicit_literal_wrapper_is_decoded_as_string_literal() {}
+
+#[scenario(
+    path = "tests/features/arg_decode.feature",
+    name = "Non-string literal wrapper value is rejected"
+)]
+fn non_string_literal_wrapper_value_is_rejected() {}

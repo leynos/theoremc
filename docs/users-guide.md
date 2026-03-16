@@ -261,8 +261,9 @@ and variable references require the explicit `{ ref: <name> }` wrapper.
   (`^[A-Za-z_][A-Za-z0-9_]*$`) and must not be a Rust reserved keyword.
 - `ArgValue::RawSequence(values)` — a YAML sequence (future: `vec![...]`
   synthesis).
-- `ArgValue::RawMap(map)` — a YAML map that is not a recognized wrapper (future:
-  struct-literal synthesis or `{ literal: ... }` wrapper).
+- `ArgValue::RawMap(map)` — any YAML map that is not a single-key sentinel
+  wrapper (future: struct-literal synthesis). Multi-key maps are never treated
+  as wrappers, even when one of their keys is `ref` or `literal`.
 
 **Semantic stability invariant:** adding a new `Let` binding can never silently
 change the meaning of an existing argument that was previously a plain string.
@@ -273,10 +274,12 @@ if a binding named `x` exists. To reference a binding, use `{ ref: x }`.
 
 ```yaml
 args:
-  name: "hello"           # → ArgValue::Literal(String("hello"))
-  count: 42               # → ArgValue::Literal(Integer(42))
-  enabled: true           # → ArgValue::Literal(Bool(true))
+  name: "hello"              # → ArgValue::Literal(String("hello"))
+  count: 42                  # → ArgValue::Literal(Integer(42))
+  enabled: true              # → ArgValue::Literal(Bool(true))
   graph_ref: { ref: graph }  # → ArgValue::Reference("graph")
+  label: { literal: "graph" }  # → ArgValue::Literal(String("graph"))
+  opts: { timeout: 30 }     # → ArgValue::RawMap (future: struct literal)
 ```
 
 **Invalid reference targets** produce actionable error messages:
@@ -286,6 +289,16 @@ args:
 - `{ ref: 123bad }` — "ref value '123bad' is not a valid identifier"
 - `{ ref: 42 }` — "ref value must be a string identifier, not an integer"
 
+**Explicit literal wrappers** produce string literals when the value is a
+string. Non-string values are rejected:
+
+- `{ literal: "graph" }` —
+  `ArgValue::Literal(LiteralValue::String("graph"))`.
+- `{ literal: "" }` — `ArgValue::Literal(LiteralValue::String(""))` (empty
+  string is valid).
+- `{ literal: 42 }` — "literal value must be a string, not an integer".
+- `{ literal: true }` — "literal value must be a string, not a boolean".
+
 **Supported YAML value forms** (summary):
 
 - YAML booleans → Rust boolean literals.
@@ -293,9 +306,11 @@ args:
 - YAML floats → Rust float literals.
 - YAML strings → Rust string literals (plain strings are always literals).
 - YAML lists → `vec![...]` (future lowering).
-- YAML maps → struct literals or explicit wrappers (future lowering).
-- `{ ref: name }` → variable reference (explicit).
-- `{ literal: "text" }` → explicit string literal (future).
+- YAML maps with exactly one recognized sentinel key are decoded as explicit
+  wrappers: `{ ref: name }` → `ArgValue::Reference`, `{ literal: "text" }` →
+  `ArgValue::Literal`. All other YAML maps (including multi-key maps such as
+  `{ literal: "x", other: 1 }`) pass through as `ArgValue::RawMap` (future:
+  struct-literal synthesis).
 
 ### Error handling
 

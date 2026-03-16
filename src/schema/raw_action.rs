@@ -191,5 +191,11 @@ fn remap_with_prefix(error: ArgDecodeError, prefix: &str) -> ArgDecodeError {
             param: format!("{prefix}: {param}"),
             kind,
         },
+        ArgDecodeError::NonStringLiteralValue { param, kind } => {
+            ArgDecodeError::NonStringLiteralValue {
+                param: format!("{prefix}: {param}"),
+                kind,
+            }
+        }
     }
 }
