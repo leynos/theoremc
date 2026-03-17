@@ -44,13 +44,23 @@ pub fn test_harness() {{
     )
 }
 
-/// Helper: lowers an [`ArgValue`] and asserts it compiles successfully.
-fn assert_lowers_and_compiles(arg: &ArgValue, param: &str, ty_str: &str) {
+/// Lowers `arg` for `param` against `ty_str`, assembles Rust code via
+/// `make_code(tokens_str, ty_str)`, compiles it, and returns `(success, stderr)`.
+fn lower_and_compile(
+    arg: &ArgValue,
+    param: &str,
+    ty_str: &str,
+    make_code: impl FnOnce(&str, &str) -> String,
+) -> (bool, String) {
     let ty = syn::parse_str(ty_str).unwrap_or_else(|e| panic!("parse failed: {e}"));
     let tokens = theoremc::arg_lowering::lower_arg_value(param, arg, &ty)
         .unwrap_or_else(|e| panic!("lowering failed: {e}"));
-    let code = wrap_in_harness(&tokens.to_string(), ty_str);
-    let (success, stderr) = compile_snippet(&code);
+    compile_snippet(&make_code(&tokens.to_string(), ty_str))
+}
+
+/// Helper: lowers an [`ArgValue`] and asserts it compiles successfully.
+fn assert_lowers_and_compiles(arg: &ArgValue, param: &str, ty_str: &str) {
+    let (success, stderr) = lower_and_compile(arg, param, ty_str, wrap_in_harness);
     assert!(
         success,
         "expected valid code to compile, but got errors:\n{stderr}"
@@ -64,19 +74,16 @@ fn assert_lowers_and_compiles_with_struct(
     ty_str: &str,
     struct_def: &str,
 ) {
-    let ty = syn::parse_str(ty_str).unwrap_or_else(|e| panic!("parse failed: {e}"));
-    let tokens = theoremc::arg_lowering::lower_arg_value(param, arg, &ty)
-        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
-    let code = format!(
-        "#![allow(unused)]\n{struct_def}\npub fn test_harness() {{\n    let _value: {ty_str} = {tokens};\n}}\n"
-    );
-    let (success, stderr) = compile_snippet(&code);
+    let (success, stderr) = lower_and_compile(arg, param, ty_str, |expr, ty| {
+        format!(
+            "#![allow(unused)]\n{struct_def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n"
+        )
+    });
     assert!(
         success,
         "expected valid struct literal to compile, but got errors:\n{stderr}"
     );
 }
-
 
 #[test]
 fn positive_control_scalar_compiles() {
@@ -94,18 +101,21 @@ fn compile_fail_wrong_scalar_type_in_struct_field() {
         "id".to_owned(),
         TheoremValue::String("not_an_int".to_owned()),
     );
-    let arg = ArgValue::RawMap(map);
-    let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("parse failed: {e}"));
-    let tokens = theoremc::arg_lowering::lower_arg_value("node", &arg, &ty)
-        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
-    let code = format!(
-        "#![allow(unused)]\nstruct Node {{ id: i32 }}\npub fn test_harness() {{\n    let _value: Node = {tokens};\n}}\n"
+    let (success, stderr) = lower_and_compile(
+        &ArgValue::RawMap(map),
+        "node",
+        "Node",
+        |expr, ty| {
+            format!(
+                "#![allow(unused)]\nstruct Node {{ id: i32 }}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n"
+            )
+        },
     );
-    let (success, stderr) = compile_snippet(&code);
-    assert!(!success, "expected compilation to fail for type mismatch");
+    assert!(!success, "expected compilation to fail");
+    let expected_fragments = ["mismatched types", "expected `i32`, found `&str`"];
     assert!(
-        stderr.contains("mismatched types") || stderr.contains("expected `i32`, found `&str`"),
-        "expected Rust type error, got:\n{stderr}"
+        expected_fragments.iter().any(|f| stderr.contains(f)),
+        "expected one of {expected_fragments:?} in stderr, got:\n{stderr}"
     );
 }
 
@@ -137,18 +147,21 @@ fn compile_fail_unknown_struct_field() {
     // YAML provides a field that doesn't exist in the struct.
     let mut map = IndexMap::new();
     map.insert("unknown_field".to_owned(), TheoremValue::Integer(42));
-    let arg = ArgValue::RawMap(map);
-    let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("parse failed: {e}"));
-    let tokens = theoremc::arg_lowering::lower_arg_value("node", &arg, &ty)
-        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
-    let code = format!(
-        "#![allow(unused)]\nstruct Node {{ id: i32 }}\npub fn test_harness() {{\n    let _value: Node = {tokens};\n}}\n"
+    let (success, stderr) = lower_and_compile(
+        &ArgValue::RawMap(map),
+        "node",
+        "Node",
+        |expr, ty| {
+            format!(
+                "#![allow(unused)]\nstruct Node {{ id: i32 }}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n"
+            )
+        },
     );
-    let (success, stderr) = compile_snippet(&code);
-    assert!(!success, "expected compilation to fail for unknown field");
+    assert!(!success, "expected compilation to fail");
+    let expected_fragments = ["has no field named `unknown_field`", "E0560"];
     assert!(
-        stderr.contains("has no field named `unknown_field`") || stderr.contains("E0560"),
-        "expected Rust unknown field error, got:\n{stderr}"
+        expected_fragments.iter().any(|f| stderr.contains(f)),
+        "expected one of {expected_fragments:?} in stderr, got:\n{stderr}"
     );
 }
 
