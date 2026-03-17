@@ -1,0 +1,208 @@
+//! Compile-fail tests for argument lowering.
+//!
+//! These tests verify that type mismatches in lowered expressions surface
+//! as Rust compilation errors, not theoremc validation errors.
+
+use std::fs;
+use std::process::Command;
+
+use indexmap::IndexMap;
+
+use theoremc::schema::TheoremValue;
+use theoremc::schema::arg_value::ArgValue;
+
+/// Compiles a Rust snippet and returns (success, stderr).
+fn compile_snippet(code: &str) -> (bool, String) {
+    let temp_dir = tempfile::tempdir().unwrap_or_else(|e| panic!("failed to create temp dir: {e}"));
+    let source_path = temp_dir.path().join("test.rs");
+    fs::write(&source_path, code).unwrap_or_else(|e| panic!("failed to write test file: {e}"));
+
+    let output = Command::new("rustc")
+        .arg(&source_path)
+        .arg("--crate-type=lib")
+        .arg("--edition=2021")
+        // Emit output inside the temp dir so artefacts don't pollute the
+        // project root.
+        .arg("--out-dir")
+        .arg(temp_dir.path())
+        .output()
+        .unwrap_or_else(|e| panic!("failed to run rustc: {e}"));
+
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    (output.status.success(), stderr)
+}
+
+/// Generates a simple test harness for a lowered expression.
+fn wrap_in_harness(expr: &str, expected_type: &str) -> String {
+    format!(
+        r"
+#![allow(unused)]
+pub fn test_harness() {{
+    let _value: {expected_type} = {expr};
+}}
+"
+    )
+}
+
+#[test]
+fn positive_control_scalar_compiles() {
+    // This test verifies our compile harness works by checking a valid case compiles.
+    let arg = ArgValue::Literal(theoremc::schema::arg_value::LiteralValue::Integer(42));
+    let ty = syn::parse_str("i32").unwrap_or_else(|e| panic!("parse failed: {e}"));
+    let tokens = theoremc::arg_lowering::lower_arg_value("x", &arg, &ty)
+        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let code = wrap_in_harness(&tokens.to_string(), "i32");
+
+    let (success, stderr) = compile_snippet(&code);
+    assert!(
+        success,
+        "expected valid code to compile, but got errors:\n{stderr}"
+    );
+}
+
+#[test]
+fn compile_fail_wrong_scalar_type_in_struct_field() {
+    // YAML provides an integer for a field that expects a string.
+    // The generated code should fail Rust compilation.
+    let mut map = IndexMap::new();
+    map.insert(
+        "id".to_owned(),
+        TheoremValue::String("not_an_int".to_owned()),
+    );
+    let arg = ArgValue::RawMap(map);
+    let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("parse failed: {e}"));
+    let tokens = theoremc::arg_lowering::lower_arg_value("node", &arg, &ty)
+        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
+
+    let code = format!(
+        r"
+#![allow(unused)]
+struct Node {{ id: i32 }}
+pub fn test_harness() {{
+    let _value: Node = {tokens};
+}}
+"
+    );
+
+    let (success, stderr) = compile_snippet(&code);
+    assert!(!success, "expected compilation to fail for type mismatch");
+    assert!(
+        stderr.contains("mismatched types") || stderr.contains("expected `i32`, found `&str`"),
+        "expected Rust type error, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn compile_fail_wrong_list_element_type() {
+    // YAML provides a list of strings where integers are expected.
+    let arg = ArgValue::RawSequence(vec![
+        TheoremValue::String("a".to_owned()),
+        TheoremValue::String("b".to_owned()),
+    ]);
+    let ty = syn::parse_str("Vec<i32>").unwrap_or_else(|e| panic!("parse failed: {e}"));
+    let tokens = theoremc::arg_lowering::lower_arg_value("nums", &arg, &ty)
+        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let code = wrap_in_harness(&tokens.to_string(), "Vec<i32>");
+
+    let (success, stderr) = compile_snippet(&code);
+    assert!(
+        !success,
+        "expected compilation to fail for element type mismatch"
+    );
+    assert!(
+        stderr.contains("mismatched types") || stderr.contains("expected integer"),
+        "expected Rust type error, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn compile_fail_unknown_struct_field() {
+    // YAML provides a field that doesn't exist in the struct.
+    let mut map = IndexMap::new();
+    map.insert("unknown_field".to_owned(), TheoremValue::Integer(42));
+    let arg = ArgValue::RawMap(map);
+    let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("parse failed: {e}"));
+    let tokens = theoremc::arg_lowering::lower_arg_value("node", &arg, &ty)
+        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
+
+    let code = format!(
+        r"
+#![allow(unused)]
+struct Node {{ id: i32 }}
+pub fn test_harness() {{
+    let _value: Node = {tokens};
+}}
+"
+    );
+
+    let (success, stderr) = compile_snippet(&code);
+    assert!(!success, "expected compilation to fail for unknown field");
+    assert!(
+        stderr.contains("has no field named `unknown_field`") || stderr.contains("E0560"),
+        "expected Rust unknown field error, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn compile_fail_nested_mismatch_in_list_of_structs() {
+    // List of structs where one field has wrong type.
+    let mut inner = IndexMap::new();
+    inner.insert("x".to_owned(), TheoremValue::String("wrong".to_owned()));
+    let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(inner)]);
+    let ty = syn::parse_str("Vec<Point>").unwrap_or_else(|e| panic!("parse failed: {e}"));
+
+    // This should fail during lowering because nested maps aren't supported yet
+    let result = theoremc::arg_lowering::lower_arg_value("points", &arg, &ty);
+    assert!(
+        result.is_err(),
+        "expected lowering to fail for nested map (not yet supported)"
+    );
+}
+
+#[test]
+fn positive_control_struct_compiles() {
+    // Valid struct literal should compile.
+    let mut map = IndexMap::new();
+    map.insert("id".to_owned(), TheoremValue::Integer(1));
+    map.insert("name".to_owned(), TheoremValue::String("test".to_owned()));
+    let arg = ArgValue::RawMap(map);
+    let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("parse failed: {e}"));
+    let tokens = theoremc::arg_lowering::lower_arg_value("node", &arg, &ty)
+        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
+
+    let code = format!(
+        r"
+#![allow(unused)]
+struct Node {{ id: i32, name: &'static str }}
+pub fn test_harness() {{
+    let _value: Node = {tokens};
+}}
+"
+    );
+
+    let (success, stderr) = compile_snippet(&code);
+    assert!(
+        success,
+        "expected valid struct literal to compile, but got errors:\n{stderr}"
+    );
+}
+
+#[test]
+fn positive_control_list_compiles() {
+    // Valid list should compile.
+    let arg = ArgValue::RawSequence(vec![
+        TheoremValue::Integer(1),
+        TheoremValue::Integer(2),
+        TheoremValue::Integer(3),
+    ]);
+    let ty = syn::parse_str("Vec<i32>").unwrap_or_else(|e| panic!("parse failed: {e}"));
+    let tokens = theoremc::arg_lowering::lower_arg_value("nums", &arg, &ty)
+        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let code = wrap_in_harness(&tokens.to_string(), "Vec<i32>");
+
+    let (success, stderr) = compile_snippet(&code);
+    assert!(
+        success,
+        "expected valid list to compile, but got errors:\n{stderr}"
+    );
+}

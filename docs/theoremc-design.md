@@ -1003,9 +1003,64 @@ roadmap):
 - The "reject ambiguous wrapper maps" acceptance criterion is satisfied by
   ensuring that `{ literal: <non-string> }` produces a deterministic error
   rather than silently passing through as a struct literal candidate.
-  Single-key maps with unrecognized keys (e.g. `{ frobnicate: "value" }`)
-  pass through as `ArgValue::RawMap` — these are struct-literal candidates
-  per TFS-5 §5.3, not ambiguous wrappers.
+  Single-key maps with unrecognized keys (e.g. `{ frobnicate: "value" }`) pass
+  through as `ArgValue::RawMap` — these are struct-literal candidates per TFS-5
+  §5.3, not ambiguous wrappers.
+
+### 6.7.10 Implementation decisions (Step 2.3.3)
+
+The following decisions were taken during implementation of struct literal
+synthesis from YAML maps and recursive list lowering (Step 2.3.3 of the
+roadmap):
+
+- A new internal `arg_lowering` module was added at the crate root (alongside
+  `schema`, `mangle`, and `collision`) to house argument-expression lowering
+  logic. This module is `#[doc(hidden)] pub` to support integration tests but
+  is not part of the stable public API. The lowering layer operates outside the
+  schema boundary per ADR-003: it consumes decoded `ArgValue` instances and
+  type information but does not participate in YAML deserialization or semantic
+  validation.
+- The lowering API is driven by explicit expected parameter types
+  (`syn::Type`) rather than full action-signature discovery. This keeps Step
+  2.3.3 bounded and reusable by Phase 3 proc-macro expansion and compile-time
+  type probes without coupling this step to source scanning prematurely.
+- Scalar literals (`LiteralValue`) are lowered to unsuffixed Rust literal
+  tokens (`42` not `42i64`, `99.5` not `99.5f64`) using
+  `proc_macro2::Literal::{i64,f64}_unsuffixed()` to produce clean,
+  type-inferred expressions.
+- References (`ArgValue::Reference`) are lowered to simple identifier path
+  expressions by parsing the validated identifier string into `syn::Ident`.
+- Sequences (`ArgValue::RawSequence`) are recursively lowered to `vec![...]`
+  macro expressions. Each element is lowered via `lower_theorem_value`, which
+  handles nested scalars, references, and sequences. Empty lists are supported
+  (`vec![]`).
+- Maps (`ArgValue::RawMap`) are lowered to struct literals using the type name
+  extracted from `expected_type`. Field names must be valid Rust identifiers;
+  field values are lowered recursively. No validation of field names or types
+  is performed by the lowerer — unknown fields, missing fields, and type
+  mismatches surface as Rust compilation errors per the roadmap acceptance
+  criterion.
+- Nested maps within composite values (maps within lists, or maps within map
+  field values) are **not supported** in this implementation because field type
+  information is unavailable without Phase 3 compile-time type probes. Attempts
+  to lower nested maps return `LoweringError::UnsupportedType` with a clear
+  error message directing users to use explicit let-bindings for nested struct
+  construction. This limitation is documented and will be resolved when Phase 3
+  adds field-type introspection.
+- The `extract_type_path` helper currently supports only simple type paths
+  (`MyStruct`, `module::Type`). Unsupported type shapes (references, tuples,
+  generics without concrete paths) return deterministic
+  `LoweringError::UnsupportedType` errors.
+- Compile-fail contract testing was implemented via a repository-owned test
+  harness in `tests/arg_lowering_compile_fail.rs`. This harness generates Rust
+  snippets, invokes `rustc`, and asserts stable error substrings (e.g.,
+  `"mismatched types"`, `"has no field named"`). Seven tests cover positive
+  controls (valid code compiles) and negative cases (type mismatches surface as
+  Rust errors).
+- BDD behavioural tests were deferred to Phase 3 because end-to-end
+  theorem-to-harness lowering requires proc-macro infrastructure not yet
+  implemented. The current lowering module is internal and will be consumed by
+  the Phase 3 `theorem_file!` macro.
 
 ### 6.8 Localized diagnostics contract (ADR 002)
 
