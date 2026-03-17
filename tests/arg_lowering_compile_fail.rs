@@ -44,20 +44,45 @@ pub fn test_harness() {{
     )
 }
 
-#[test]
-fn positive_control_scalar_compiles() {
-    // This test verifies our compile harness works by checking a valid case compiles.
-    let arg = ArgValue::Literal(theoremc::schema::arg_value::LiteralValue::Integer(42));
-    let ty = syn::parse_str("i32").unwrap_or_else(|e| panic!("parse failed: {e}"));
-    let tokens = theoremc::arg_lowering::lower_arg_value("x", &arg, &ty)
+/// Helper: lowers an [`ArgValue`] and asserts it compiles successfully.
+fn assert_lowers_and_compiles(arg: &ArgValue, param: &str, ty_str: &str) {
+    let ty = syn::parse_str(ty_str).unwrap_or_else(|e| panic!("parse failed: {e}"));
+    let tokens = theoremc::arg_lowering::lower_arg_value(param, arg, &ty)
         .unwrap_or_else(|e| panic!("lowering failed: {e}"));
-    let code = wrap_in_harness(&tokens.to_string(), "i32");
-
+    let code = wrap_in_harness(&tokens.to_string(), ty_str);
     let (success, stderr) = compile_snippet(&code);
     assert!(
         success,
         "expected valid code to compile, but got errors:\n{stderr}"
     );
+}
+
+/// Helper: lowers an [`ArgValue`] with a struct definition and asserts it compiles.
+fn assert_lowers_and_compiles_with_struct(
+    arg: &ArgValue,
+    param: &str,
+    ty_str: &str,
+    struct_def: &str,
+) {
+    let ty = syn::parse_str(ty_str).unwrap_or_else(|e| panic!("parse failed: {e}"));
+    let tokens = theoremc::arg_lowering::lower_arg_value(param, arg, &ty)
+        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let code = format!(
+        "#![allow(unused)]\n{struct_def}\npub fn test_harness() {{\n    let _value: {ty_str} = {tokens};\n}}\n"
+    );
+    let (success, stderr) = compile_snippet(&code);
+    assert!(
+        success,
+        "expected valid struct literal to compile, but got errors:\n{stderr}"
+    );
+}
+
+
+#[test]
+fn positive_control_scalar_compiles() {
+    // This test verifies our compile harness works by checking a valid case compiles.
+    let arg = ArgValue::Literal(theoremc::schema::arg_value::LiteralValue::Integer(42));
+    assert_lowers_and_compiles(&arg, "x", "i32");
 }
 
 #[test]
@@ -73,17 +98,9 @@ fn compile_fail_wrong_scalar_type_in_struct_field() {
     let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("parse failed: {e}"));
     let tokens = theoremc::arg_lowering::lower_arg_value("node", &arg, &ty)
         .unwrap_or_else(|e| panic!("lowering failed: {e}"));
-
     let code = format!(
-        r"
-#![allow(unused)]
-struct Node {{ id: i32 }}
-pub fn test_harness() {{
-    let _value: Node = {tokens};
-}}
-"
+        "#![allow(unused)]\nstruct Node {{ id: i32 }}\npub fn test_harness() {{\n    let _value: Node = {tokens};\n}}\n"
     );
-
     let (success, stderr) = compile_snippet(&code);
     assert!(!success, "expected compilation to fail for type mismatch");
     assert!(
@@ -124,17 +141,9 @@ fn compile_fail_unknown_struct_field() {
     let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("parse failed: {e}"));
     let tokens = theoremc::arg_lowering::lower_arg_value("node", &arg, &ty)
         .unwrap_or_else(|e| panic!("lowering failed: {e}"));
-
     let code = format!(
-        r"
-#![allow(unused)]
-struct Node {{ id: i32 }}
-pub fn test_harness() {{
-    let _value: Node = {tokens};
-}}
-"
+        "#![allow(unused)]\nstruct Node {{ id: i32 }}\npub fn test_harness() {{\n    let _value: Node = {tokens};\n}}\n"
     );
-
     let (success, stderr) = compile_snippet(&code);
     assert!(!success, "expected compilation to fail for unknown field");
     assert!(
@@ -166,24 +175,11 @@ fn positive_control_struct_compiles() {
     map.insert("id".to_owned(), TheoremValue::Integer(1));
     map.insert("name".to_owned(), TheoremValue::String("test".to_owned()));
     let arg = ArgValue::RawMap(map);
-    let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("parse failed: {e}"));
-    let tokens = theoremc::arg_lowering::lower_arg_value("node", &arg, &ty)
-        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
-
-    let code = format!(
-        r"
-#![allow(unused)]
-struct Node {{ id: i32, name: &'static str }}
-pub fn test_harness() {{
-    let _value: Node = {tokens};
-}}
-"
-    );
-
-    let (success, stderr) = compile_snippet(&code);
-    assert!(
-        success,
-        "expected valid struct literal to compile, but got errors:\n{stderr}"
+    assert_lowers_and_compiles_with_struct(
+        &arg,
+        "node",
+        "Node",
+        "struct Node { id: i32, name: &'static str }",
     );
 }
 
@@ -195,14 +191,5 @@ fn positive_control_list_compiles() {
         TheoremValue::Integer(2),
         TheoremValue::Integer(3),
     ]);
-    let ty = syn::parse_str("Vec<i32>").unwrap_or_else(|e| panic!("parse failed: {e}"));
-    let tokens = theoremc::arg_lowering::lower_arg_value("nums", &arg, &ty)
-        .unwrap_or_else(|e| panic!("lowering failed: {e}"));
-    let code = wrap_in_harness(&tokens.to_string(), "Vec<i32>");
-
-    let (success, stderr) = compile_snippet(&code);
-    assert!(
-        success,
-        "expected valid list to compile, but got errors:\n{stderr}"
-    );
+    assert_lowers_and_compiles(&arg, "nums", "Vec<i32>");
 }

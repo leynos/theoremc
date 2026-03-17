@@ -12,6 +12,13 @@ fn tokens_eq(left: &proc_macro2::TokenStream, right: &proc_macro2::TokenStream) 
     left.to_string() == right.to_string()
 }
 
+// Helper to lower an ArgValue with automatic error handling
+fn lower_ok(param: &str, arg: &ArgValue, ty_str: &str) -> proc_macro2::TokenStream {
+    let ty =
+        syn::parse_str(ty_str).unwrap_or_else(|e| panic!("failed to parse type `{ty_str}`: {e}"));
+    lower_arg_value(param, arg, &ty).unwrap_or_else(|e| panic!("lowering `{param}` failed: {e}"))
+}
+
 #[test]
 fn test_lower_literal_bool_true() {
     let value = LiteralValue::Bool(true);
@@ -97,36 +104,28 @@ fn test_lower_reference_with_digits() {
 #[test]
 fn test_lower_arg_value_literal_integer() {
     let arg = ArgValue::Literal(LiteralValue::Integer(42));
-    let ty = syn::parse_str("i32").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("count", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("count", &arg, "i32");
     assert!(tokens_eq(&result, &quote! { 42 }));
 }
 
 #[test]
 fn test_lower_arg_value_literal_string() {
     let arg = ArgValue::Literal(LiteralValue::String("test".to_owned()));
-    let ty = syn::parse_str("String").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("name", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("name", &arg, "String");
     assert!(tokens_eq(&result, &quote! { "test" }));
 }
 
 #[test]
 fn test_lower_arg_value_reference() {
     let arg = ArgValue::Reference("binding".to_owned());
-    let ty = syn::parse_str("Graph").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("graph", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("graph", &arg, "Graph");
     assert!(tokens_eq(&result, &quote! { binding }));
 }
 
 #[test]
 fn test_lower_arg_value_empty_sequence() {
     let arg = ArgValue::RawSequence(vec![]);
-    let ty = syn::parse_str("Vec<i32>").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("items", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("items", &arg, "Vec<i32>");
     assert!(tokens_eq(&result, &quote! { vec![] }));
 }
 
@@ -137,9 +136,7 @@ fn test_lower_arg_value_sequence_integers() {
         TheoremValue::Integer(2),
         TheoremValue::Integer(3),
     ]);
-    let ty = syn::parse_str("Vec<i32>").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("nums", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("nums", &arg, "Vec<i32>");
     assert!(tokens_eq(&result, &quote! { vec![1, 2, 3] }));
 }
 
@@ -149,18 +146,14 @@ fn test_lower_arg_value_sequence_strings() {
         TheoremValue::String("a".to_owned()),
         TheoremValue::String("b".to_owned()),
     ]);
-    let ty = syn::parse_str("Vec<String>").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("strs", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("strs", &arg, "Vec<String>");
     assert!(tokens_eq(&result, &quote! { vec!["a", "b"] }));
 }
 
 #[test]
 fn test_lower_arg_value_sequence_mixed_scalars() {
     let arg = ArgValue::RawSequence(vec![TheoremValue::Integer(1), TheoremValue::Bool(true)]);
-    let ty = syn::parse_str("Vec<Value>").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("mixed", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("mixed", &arg, "Vec<Value>");
     assert!(tokens_eq(&result, &quote! { vec![1, true] }));
 }
 
@@ -170,19 +163,14 @@ fn test_lower_arg_value_nested_sequence() {
         TheoremValue::Integer(1),
         TheoremValue::Integer(2),
     ])]);
-    let ty =
-        syn::parse_str("Vec<Vec<i32>>").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("nested", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("nested", &arg, "Vec<Vec<i32>>");
     assert!(tokens_eq(&result, &quote! { vec![vec![1, 2]] }));
 }
 
 #[test]
 fn test_lower_arg_value_empty_map() {
     let arg = ArgValue::RawMap(IndexMap::new());
-    let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("node", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("node", &arg, "Node");
     assert!(tokens_eq(&result, &quote! { Node {} }));
 }
 
@@ -191,9 +179,7 @@ fn test_lower_arg_value_map_single_field() {
     let mut map = IndexMap::new();
     map.insert("id".to_owned(), TheoremValue::Integer(42));
     let arg = ArgValue::RawMap(map);
-    let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("node", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("node", &arg, "Node");
     assert!(tokens_eq(&result, &quote! { Node { id: 42 } }));
 }
 
@@ -204,9 +190,7 @@ fn test_lower_arg_value_map_multiple_fields() {
     map.insert("name".to_owned(), TheoremValue::String("test".to_owned()));
     map.insert("active".to_owned(), TheoremValue::Bool(true));
     let arg = ArgValue::RawMap(map);
-    let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("node", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("node", &arg, "Node");
     assert!(tokens_eq(
         &result,
         &quote! { Node { id: 1, name: "test", active: true } }
@@ -225,9 +209,7 @@ fn test_lower_arg_value_map_with_list_field() {
         ]),
     );
     let arg = ArgValue::RawMap(map);
-    let ty = syn::parse_str("Node").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("node", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("node", &arg, "Node");
     assert!(tokens_eq(
         &result,
         &quote! { Node { id: 1, tags: vec!["a", "b"] } }
@@ -239,10 +221,7 @@ fn test_lower_arg_value_map_with_qualified_type() {
     let mut map = IndexMap::new();
     map.insert("x".to_owned(), TheoremValue::Integer(10));
     let arg = ArgValue::RawMap(map);
-    let ty =
-        syn::parse_str("module::Point").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let result =
-        lower_arg_value("point", &arg, &ty).unwrap_or_else(|e| panic!("lowering failed: {e}"));
+    let result = lower_ok("point", &arg, "module::Point");
     assert!(tokens_eq(&result, &quote! { module::Point { x: 10 } }));
 }
 
