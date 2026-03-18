@@ -102,6 +102,18 @@ fn test_lower_reference_with_digits() {
 }
 
 #[test]
+fn test_lower_reference_non_identifier_returns_error() {
+    let result = lower_reference("param", "foo::bar");
+    assert!(result.is_err());
+    if let Err(LoweringError::NestedDecodeError { param, detail }) = result {
+        assert_eq!(param, "param");
+        assert!(detail.contains("foo::bar"));
+    } else {
+        panic!("expected NestedDecodeError for non-identifier reference");
+    }
+}
+
+#[test]
 fn test_lower_arg_value_literal_integer() {
     let arg = ArgValue::Literal(LiteralValue::Integer(42));
     let result = lower_ok("count", &arg, "i32");
@@ -165,6 +177,54 @@ fn test_lower_arg_value_nested_sequence() {
     ])]);
     let result = lower_ok("nested", &arg, "Vec<Vec<i32>>");
     assert!(tokens_eq(&result, &quote! { vec![vec![1, 2]] }));
+}
+
+#[test]
+fn test_lower_arg_value_sequence_with_nested_ref() {
+    // A sequence containing { ref: graph } should decode the sentinel
+    // and lower to a reference identifier.
+    let mut sentinel = IndexMap::new();
+    sentinel.insert("ref".to_owned(), TheoremValue::String("graph".to_owned()));
+    let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(sentinel)]);
+    let result = lower_ok("items", &arg, "Vec<Graph>");
+    assert!(tokens_eq(&result, &quote! { vec![graph] }));
+}
+
+#[test]
+fn test_lower_arg_value_sequence_with_nested_literal() {
+    // A sequence containing { literal: "ref" } should decode the sentinel
+    // and lower to a string literal (not a reference).
+    let mut sentinel = IndexMap::new();
+    sentinel.insert("literal".to_owned(), TheoremValue::String("ref".to_owned()));
+    let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(sentinel)]);
+    let result = lower_ok("items", &arg, "Vec<String>");
+    assert!(tokens_eq(&result, &quote! { vec!["ref"] }));
+}
+
+#[test]
+fn test_lower_arg_value_map_field_with_nested_ref() {
+    // A struct field containing { ref: binding } should decode the sentinel
+    // and lower to a reference identifier in the field value position.
+    let mut sentinel = IndexMap::new();
+    sentinel.insert("ref".to_owned(), TheoremValue::String("binding".to_owned()));
+    let mut outer = IndexMap::new();
+    outer.insert("graph".to_owned(), TheoremValue::Mapping(sentinel));
+    let arg = ArgValue::RawMap(outer);
+    let result = lower_ok("cfg", &arg, "Config");
+    assert!(tokens_eq(&result, &quote! { Config { graph: binding } }));
+}
+
+#[test]
+fn test_lower_arg_value_map_field_with_nested_literal() {
+    // A struct field containing { literal: "ref" } should decode the sentinel
+    // and lower to a string literal (preserving the string "ref").
+    let mut sentinel = IndexMap::new();
+    sentinel.insert("literal".to_owned(), TheoremValue::String("ref".to_owned()));
+    let mut outer = IndexMap::new();
+    outer.insert("name".to_owned(), TheoremValue::Mapping(sentinel));
+    let arg = ArgValue::RawMap(outer);
+    let result = lower_ok("cfg", &arg, "Config");
+    assert!(tokens_eq(&result, &quote! { Config { name: "ref" } }));
 }
 
 #[test]
@@ -272,7 +332,7 @@ fn test_lower_arg_value_map_nested_map_fails() {
     assert!(result.is_err());
     if let Err(LoweringError::UnsupportedType { param, reason }) = result {
         assert_eq!(param, "nested");
-        assert!(reason.contains("nested maps require type information"));
+        assert!(reason.contains("nested map with keys"));
     } else {
         panic!("expected UnsupportedType error for nested maps");
     }

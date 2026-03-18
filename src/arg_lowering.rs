@@ -14,7 +14,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::schema::TheoremValue;
-use crate::schema::arg_value::{ArgValue, LiteralValue};
+use crate::schema::arg_value::{ArgValue, LiteralValue, decode_arg_value};
 
 /// Errors produced during argument lowering.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
@@ -152,8 +152,12 @@ fn lower_sequence(
 /// Lowers a raw [`TheoremValue`] (used for nested composite values).
 ///
 /// This helper recursively decodes and lowers nested values that appear
-/// inside sequences and maps. It mirrors the top-level `lower_arg_value`
-/// logic but operates on raw `TheoremValue` instead of decoded `ArgValue`.
+/// inside sequences and maps. Scalar values are lowered directly; maps
+/// are first decoded via [`decode_arg_value`] so that sentinel wrappers
+/// (`{ ref: <Ident> }`, `{ literal: "..." }`) are recognised and lowered
+/// to references or literals respectively. Only genuinely non-sentinel
+/// maps (decoded as `ArgValue::RawMap`) are rejected, since struct literal
+/// synthesis requires type information not available at this nesting depth.
 fn lower_theorem_value(
     param_name: &str,
     value: &TheoremValue,
@@ -165,21 +169,37 @@ fn lower_theorem_value(
         TheoremValue::Float(f) => Ok(lower_literal(&LiteralValue::Float(*f))),
         TheoremValue::String(s) => Ok(lower_literal(&LiteralValue::String(s.clone()))),
         TheoremValue::Sequence(elements) => lower_sequence(param_name, elements),
-        TheoremValue::Mapping(_fields) => {
-            // Nested maps within composite values don't have explicit type
-            // information in this implementation. Phase 3 compile-time type
-            // probes will enable field-type introspection. For now, this
-            // limitation means deeply nested struct literals must be
-            // expressed differently (e.g., via references to let-bindings).
-            Err(LoweringError::UnsupportedType {
-                param: param_name.to_owned(),
-                reason: concat!(
-                    "nested maps require type information that is not available ",
-                    "without compile-time field type probes (Phase 3); ",
-                    "use explicit let-bindings for nested struct construction"
-                )
-                .to_owned(),
-            })
+        TheoremValue::Mapping(fields) => {
+            // Attempt sentinel decoding first: maps like { ref: graph } or
+            // { literal: "x" } are valid nested values that decode into
+            // ArgValue::Reference or ArgValue::Literal respectively.
+            let decoded = decode_arg_value(param_name, value.clone()).map_err(|e| {
+                LoweringError::NestedDecodeError {
+                    param: param_name.to_owned(),
+                    detail: e.to_string(),
+                }
+            })?;
+            match decoded {
+                ArgValue::Literal(lit) => Ok(lower_literal(&lit)),
+                ArgValue::Reference(name) => lower_reference(param_name, &name),
+                // Non-sentinel maps lack the type information needed for
+                // struct literal synthesis at this nesting depth. Phase 3
+                // compile-time type probes will enable field-type
+                // introspection. For now, use explicit let-bindings.
+                ArgValue::RawMap(_) => Err(LoweringError::UnsupportedType {
+                    param: param_name.to_owned(),
+                    reason: format!(
+                        "nested map with keys {:?} requires type information that is not \
+                         available without compile-time field type probes (Phase 3); \
+                         use explicit let-bindings for nested struct construction",
+                        fields.keys().collect::<Vec<_>>()
+                    ),
+                }),
+                // Sequences inside a decoded mapping cannot occur (a
+                // sentinel map has exactly one scalar value), but handle
+                // the variant exhaustively.
+                ArgValue::RawSequence(elements) => lower_sequence(param_name, &elements),
+            }
         }
     }
 }
