@@ -254,35 +254,37 @@ fn extract_type_path(param_name: &str, ty: &syn::Type) -> Result<syn::Path, Lowe
         reason,
     };
 
-    match ty {
-        syn::Type::Path(type_path) => {
-            // Reject qualified-self paths (e.g., `<T as Trait>::Assoc`).
-            if type_path.qself.is_some() {
-                return Err(unsupported(format!(
-                    "qualified-self paths are not supported for struct \
-                     literal synthesis, found: {}",
-                    quote! { #ty }
-                )));
-            }
-
-            // Reject generic path segments (e.g., `Vec<i32>`, `Fn(i32)`).
-            for segment in &type_path.path.segments {
-                if !segment.arguments.is_none() {
-                    return Err(unsupported(format!(
-                        "generic type paths are not supported for struct \
-                         literal synthesis, found: {}",
-                        quote! { #ty }
-                    )));
-                }
-            }
-
-            Ok(type_path.path.clone())
-        }
-        _ => Err(unsupported(format!(
+    let syn::Type::Path(type_path) = ty else {
+        return Err(unsupported(format!(
             "expected a simple type path (e.g., MyStruct), found: {}",
             quote! { #ty }
-        ))),
+        )));
+    };
+
+    // Reject qualified-self paths (e.g., `<T as Trait>::Assoc`).
+    if type_path.qself.is_some() {
+        return Err(unsupported(format!(
+            "qualified-self paths are not supported for struct \
+             literal synthesis, found: {}",
+            quote! { #ty }
+        )));
     }
+
+    // Reject generic type paths (e.g., `Vec<i32>`, `Fn(i32)`).
+    if type_path
+        .path
+        .segments
+        .iter()
+        .any(|s| !s.arguments.is_none())
+    {
+        return Err(unsupported(format!(
+            "generic type paths are not supported for struct \
+             literal synthesis, found: {}",
+            quote! { #ty }
+        )));
+    }
+
+    Ok(type_path.path.clone())
 }
 
 #[cfg(test)]
