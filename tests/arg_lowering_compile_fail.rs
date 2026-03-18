@@ -85,6 +85,27 @@ fn assert_lowers_and_compiles_with_struct(
     );
 }
 
+/// Helper: lowers an [`ArgValue`] with a struct definition and asserts compilation fails,
+/// with at least one of the expected fragments present in stderr.
+fn assert_lowers_and_compile_fails_with_struct(
+    arg: &ArgValue,
+    param: &str,
+    ty_and_struct: (&str, &str),
+    expected_fragments: &[&str],
+) {
+    let (ty_str, struct_def) = ty_and_struct;
+    let (success, stderr) = lower_and_compile(arg, param, ty_str, |expr, ty| {
+        format!(
+            "#![allow(unused)]\n{struct_def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n"
+        )
+    });
+    assert!(!success, "expected compilation to fail");
+    assert!(
+        expected_fragments.iter().any(|f| stderr.contains(f)),
+        "expected one of {expected_fragments:?} in stderr, got:\n{stderr}"
+    );
+}
+
 #[test]
 fn positive_control_scalar_compiles() {
     // This test verifies our compile harness works by checking a valid case compiles.
@@ -101,21 +122,11 @@ fn compile_fail_wrong_scalar_type_in_struct_field() {
         "id".to_owned(),
         TheoremValue::String("not_an_int".to_owned()),
     );
-    let (success, stderr) = lower_and_compile(
+    assert_lowers_and_compile_fails_with_struct(
         &ArgValue::RawMap(map),
         "node",
-        "Node",
-        |expr, ty| {
-            format!(
-                "#![allow(unused)]\nstruct Node {{ id: i32 }}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n"
-            )
-        },
-    );
-    assert!(!success, "expected compilation to fail");
-    let expected_fragments = ["mismatched types", "expected `i32`, found `&str`"];
-    assert!(
-        expected_fragments.iter().any(|f| stderr.contains(f)),
-        "expected one of {expected_fragments:?} in stderr, got:\n{stderr}"
+        ("Node", "struct Node { id: i32 }"),
+        &["mismatched types", "expected `i32`, found `&str`"],
     );
 }
 
@@ -147,21 +158,11 @@ fn compile_fail_unknown_struct_field() {
     // YAML provides a field that doesn't exist in the struct.
     let mut map = IndexMap::new();
     map.insert("unknown_field".to_owned(), TheoremValue::Integer(42));
-    let (success, stderr) = lower_and_compile(
+    assert_lowers_and_compile_fails_with_struct(
         &ArgValue::RawMap(map),
         "node",
-        "Node",
-        |expr, ty| {
-            format!(
-                "#![allow(unused)]\nstruct Node {{ id: i32 }}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n"
-            )
-        },
-    );
-    assert!(!success, "expected compilation to fail");
-    let expected_fragments = ["has no field named `unknown_field`", "E0560"];
-    assert!(
-        expected_fragments.iter().any(|f| stderr.contains(f)),
-        "expected one of {expected_fragments:?} in stderr, got:\n{stderr}"
+        ("Node", "struct Node { id: i32 }"),
+        &["has no field named `unknown_field`", "E0560"],
     );
 }
 
