@@ -48,15 +48,16 @@ Observable success:
 5. `make check-fmt`, `make lint`, and `make test` pass before the work is
    declared complete.
 
-This plan covers the normative requirements in `TFS-5` and `DES-5`. It keeps
-implicit reference inference out of scope.
+This plan covers the normative requirements in the Theorem File Specification
+(TFS-5) and the Design Specification (DES-5). It keeps implicit reference
+inference out of scope.
 
 ## Constraints
 
-- Keep ADR-003 boundaries intact. `schema` remains responsible for YAML/domain
-  decoding. The new struct/list lowering must live outside the schema loading
-  pipeline so `schema::types` and `schema::arg_value` do not import emitter or
-  resolution logic.
+- Keep Architecture Decision Record 003 (ADR-003) boundaries intact. `schema`
+  remains responsible for YAML/domain decoding. The new struct/list lowering
+  must live outside the schema loading pipeline so `schema::types` and
+  `schema::arg_value` do not import emitter or resolution logic.
 - Preserve the Step 2.3.1 invariant: plain YAML strings are always string
   literals, and explicit references still require `{ ref: <Identifier> }`.
 - Do not implement implicit reference inference.
@@ -69,9 +70,9 @@ implicit reference inference out of scope.
   first or explicitly blocked.
 - Keep code files under 400 lines. Extract sibling files early if a lowering
   module or its tests grow too large.
-- Use `rstest` fixtures for shared unit-test setup and `rstest-bdd` v0.5.0 for
-  behavioural tests where the theorem-author workflow is the thing being
-  exercised.
+- Use `rstest` fixtures for shared unit-test setup and the `rstest-bdd`
+  (behaviour-driven development) crate v0.5.0 for behavioural tests where the
+  theorem-author workflow is the thing being exercised.
 - Avoid new external dependencies unless there is no credible in-repo
   alternative.
 - Update `docs/theoremc-design.md`, `docs/users-guide.md`, and

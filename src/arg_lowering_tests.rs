@@ -85,19 +85,19 @@ fn test_lower_literal_string_with_escapes() {
 
 #[test]
 fn test_lower_reference_simple() {
-    let result = lower_reference("graph");
+    let result = lower_reference("param", "graph").expect("valid identifier should lower");
     assert!(tokens_eq(&result, &quote! { graph }));
 }
 
 #[test]
 fn test_lower_reference_with_underscore() {
-    let result = lower_reference("my_var");
+    let result = lower_reference("param", "my_var").expect("valid identifier should lower");
     assert!(tokens_eq(&result, &quote! { my_var }));
 }
 
 #[test]
 fn test_lower_reference_with_digits() {
-    let result = lower_reference("var123");
+    let result = lower_reference("param", "var123").expect("valid identifier should lower");
     assert!(tokens_eq(&result, &quote! { var123 }));
 }
 

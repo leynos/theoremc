@@ -91,7 +91,7 @@ pub fn lower_arg_value(
 ) -> Result<TokenStream, LoweringError> {
     match value {
         ArgValue::Literal(lit) => Ok(lower_literal(lit)),
-        ArgValue::Reference(name) => Ok(lower_reference(name)),
+        ArgValue::Reference(name) => lower_reference(param_name, name),
         ArgValue::RawSequence(elements) => lower_sequence(param_name, elements),
         ArgValue::RawMap(fields) => lower_map(param_name, fields, expected_type),
     }
@@ -116,13 +116,21 @@ fn lower_literal(value: &LiteralValue) -> TokenStream {
 }
 
 /// Lowers a reference identifier to a path expression.
-fn lower_reference(name: &str) -> TokenStream {
+///
+/// # Errors
+///
+/// Returns [`LoweringError::NestedDecodeError`] if the identifier name
+/// cannot be parsed as a valid Rust identifier.
+fn lower_reference(param_name: &str, name: &str) -> Result<TokenStream, LoweringError> {
     // Parse the identifier and emit it as a path expression.
     // The identifier was already validated by schema::arg_value decoding,
-    // so we can safely parse it here.
-    let ident = syn::parse_str::<syn::Ident>(name)
-        .unwrap_or_else(|_| panic!("validated identifier failed to parse: {name}"));
-    quote! { #ident }
+    // but we handle parse errors gracefully rather than panicking.
+    let ident =
+        syn::parse_str::<syn::Ident>(name).map_err(|_| LoweringError::NestedDecodeError {
+            param: param_name.to_owned(),
+            detail: format!("reference name '{name}' is not a valid Rust identifier"),
+        })?;
+    Ok(quote! { #ident })
 }
 
 /// Lowers a sequence of [`TheoremValue`] to a `vec![...]` expression.
@@ -151,16 +159,11 @@ fn lower_theorem_value(
     value: &TheoremValue,
 ) -> Result<TokenStream, LoweringError> {
     match value {
-        TheoremValue::Bool(b) => Ok(quote! { #b }),
-        TheoremValue::Integer(n) => {
-            let lit = proc_macro2::Literal::i64_unsuffixed(*n);
-            Ok(quote! { #lit })
-        }
-        TheoremValue::Float(f) => {
-            let lit = proc_macro2::Literal::f64_unsuffixed(*f);
-            Ok(quote! { #lit })
-        }
-        TheoremValue::String(s) => Ok(quote! { #s }),
+        // Reuse lower_literal for scalar values to avoid duplication
+        TheoremValue::Bool(b) => Ok(lower_literal(&LiteralValue::Bool(*b))),
+        TheoremValue::Integer(n) => Ok(lower_literal(&LiteralValue::Integer(*n))),
+        TheoremValue::Float(f) => Ok(lower_literal(&LiteralValue::Float(*f))),
+        TheoremValue::String(s) => Ok(lower_literal(&LiteralValue::String(s.clone()))),
         TheoremValue::Sequence(elements) => lower_sequence(param_name, elements),
         TheoremValue::Mapping(_fields) => {
             // Nested maps within composite values don't have explicit type
