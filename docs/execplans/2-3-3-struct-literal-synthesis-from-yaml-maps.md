@@ -371,7 +371,7 @@ Keep the API internal for now. Step 3.x can consume it when proc-macro
 expansion and typed action probes arrive.
 
 Go/no-go check: there is one clear internal entry point for lowering a single
-argument value by expected type, and it is independent from schema loading.
+argument value by expected type, and it is independent of schema loading.
 
 ### Milestone 2: implement recursive list lowering
 
@@ -426,7 +426,7 @@ This milestone should stay narrow:
   plain expression,
 - no special-case struct field introspection through Rust reflection.
 
-If needed, add a small type-shape helper that recognises the specific
+If needed, add a small type-shape helper that recognizes the specific
 `syn::Type` forms this step supports cleanly. Unsupported expected-type shapes
 should fail deterministically and be recorded in the user/design docs.
 
