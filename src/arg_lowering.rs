@@ -244,18 +244,44 @@ fn lower_map(
 
 /// Extracts a type path from a [`syn::Type`] for struct literal synthesis.
 ///
-/// Currently supports simple path types like `MyStruct` or `module::Type`.
-/// Returns an error for unsupported type shapes (generics, references, etc.).
+/// Accepts only simple, non-generic path types like `MyStruct` or
+/// `module::Type`. Returns an error for generic paths (`Vec<i32>`),
+/// qualified-self paths (`<T as Trait>::Assoc`), references, tuples,
+/// and other unsupported type shapes.
 fn extract_type_path(param_name: &str, ty: &syn::Type) -> Result<syn::Path, LoweringError> {
+    let unsupported = |reason: String| LoweringError::UnsupportedType {
+        param: param_name.to_owned(),
+        reason,
+    };
+
     match ty {
-        syn::Type::Path(type_path) => Ok(type_path.path.clone()),
-        _ => Err(LoweringError::UnsupportedType {
-            param: param_name.to_owned(),
-            reason: format!(
-                "expected a simple type path (e.g., MyStruct), found: {}",
-                quote! { #ty }
-            ),
-        }),
+        syn::Type::Path(type_path) => {
+            // Reject qualified-self paths (e.g., `<T as Trait>::Assoc`).
+            if type_path.qself.is_some() {
+                return Err(unsupported(format!(
+                    "qualified-self paths are not supported for struct \
+                     literal synthesis, found: {}",
+                    quote! { #ty }
+                )));
+            }
+
+            // Reject generic path segments (e.g., `Vec<i32>`, `Fn(i32)`).
+            for segment in &type_path.path.segments {
+                if !segment.arguments.is_none() {
+                    return Err(unsupported(format!(
+                        "generic type paths are not supported for struct \
+                         literal synthesis, found: {}",
+                        quote! { #ty }
+                    )));
+                }
+            }
+
+            Ok(type_path.path.clone())
+        }
+        _ => Err(unsupported(format!(
+            "expected a simple type path (e.g., MyStruct), found: {}",
+            quote! { #ty }
+        ))),
     }
 }
 

@@ -2,56 +2,45 @@
 
 use indexmap::IndexMap;
 use quote::quote;
+use rstest::rstest;
 
 use super::{LoweringError, extract_type_path, lower_arg_value, lower_literal, lower_reference};
 use crate::schema::TheoremValue;
 use crate::schema::arg_value::{ArgValue, LiteralValue};
 
-// Helper to compare token streams by their string representation
+/// Helper: compare token streams by their string representation.
 fn tokens_eq(left: &proc_macro2::TokenStream, right: &proc_macro2::TokenStream) -> bool {
     left.to_string() == right.to_string()
 }
 
-// Helper to lower an ArgValue with automatic error handling
-fn lower_ok(param: &str, arg: &ArgValue, ty_str: &str) -> proc_macro2::TokenStream {
-    let ty =
-        syn::parse_str(ty_str).unwrap_or_else(|e| panic!("failed to parse type `{ty_str}`: {e}"));
-    lower_arg_value(param, arg, &ty).unwrap_or_else(|e| panic!("lowering `{param}` failed: {e}"))
+/// Helper: lower an [`ArgValue`] against `ty_str`, returning a `Result`.
+fn lower_ok(
+    param: &str,
+    arg: &ArgValue,
+    ty_str: &str,
+) -> Result<proc_macro2::TokenStream, Box<dyn std::error::Error>> {
+    let ty: syn::Type = syn::parse_str(ty_str)?;
+    Ok(lower_arg_value(param, arg, &ty)?)
 }
 
-#[test]
-fn test_lower_literal_bool_true() {
-    let value = LiteralValue::Bool(true);
+#[rstest]
+#[case::bool_true(LiteralValue::Bool(true), quote! { true })]
+#[case::bool_false(LiteralValue::Bool(false), quote! { false })]
+fn test_lower_literal_bool(
+    #[case] value: LiteralValue,
+    #[case] expected: proc_macro2::TokenStream,
+) {
     let result = lower_literal(&value);
-    assert!(tokens_eq(&result, &quote! { true }));
+    assert!(tokens_eq(&result, &expected));
 }
 
-#[test]
-fn test_lower_literal_bool_false() {
-    let value = LiteralValue::Bool(false);
-    let result = lower_literal(&value);
-    assert!(tokens_eq(&result, &quote! { false }));
-}
-
-#[test]
-fn test_lower_literal_integer_positive() {
-    let value = LiteralValue::Integer(42);
-    let result = lower_literal(&value);
-    assert!(tokens_eq(&result, &quote! { 42 }));
-}
-
-#[test]
-fn test_lower_literal_integer_negative() {
-    let value = LiteralValue::Integer(-99);
-    let result = lower_literal(&value);
-    assert!(tokens_eq(&result, &quote! { -99 }));
-}
-
-#[test]
-fn test_lower_literal_integer_zero() {
-    let value = LiteralValue::Integer(0);
-    let result = lower_literal(&value);
-    assert!(tokens_eq(&result, &quote! { 0 }));
+#[rstest]
+#[case::positive(42, "42")]
+#[case::negative(-99, "- 99")]
+#[case::zero(0, "0")]
+fn test_lower_literal_integer(#[case] n: i64, #[case] expected: &str) {
+    let result = lower_literal(&LiteralValue::Integer(n));
+    assert_eq!(result.to_string(), expected);
 }
 
 #[test]
@@ -83,22 +72,15 @@ fn test_lower_literal_string_with_escapes() {
     assert!(tokens_eq(&result, &quote! { "hello\nworld" }));
 }
 
-#[test]
-fn test_lower_reference_simple() {
-    let result = lower_reference("param", "graph").expect("valid identifier should lower");
-    assert!(tokens_eq(&result, &quote! { graph }));
-}
-
-#[test]
-fn test_lower_reference_with_underscore() {
-    let result = lower_reference("param", "my_var").expect("valid identifier should lower");
-    assert!(tokens_eq(&result, &quote! { my_var }));
-}
-
-#[test]
-fn test_lower_reference_with_digits() {
-    let result = lower_reference("param", "var123").expect("valid identifier should lower");
-    assert!(tokens_eq(&result, &quote! { var123 }));
+#[rstest]
+#[case::simple("graph")]
+#[case::with_underscore("my_var")]
+#[case::with_digits("var123")]
+fn test_lower_reference_valid(#[case] input: &str) {
+    let result = lower_reference("param", input).expect("valid identifier should lower");
+    let expected: proc_macro2::TokenStream =
+        syn::parse_str(input).expect("test input must parse as TokenStream");
+    assert!(tokens_eq(&result, &expected));
 }
 
 #[test]
@@ -116,28 +98,28 @@ fn test_lower_reference_non_identifier_returns_error() {
 #[test]
 fn test_lower_arg_value_literal_integer() {
     let arg = ArgValue::Literal(LiteralValue::Integer(42));
-    let result = lower_ok("count", &arg, "i32");
+    let result = lower_ok("count", &arg, "i32").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { 42 }));
 }
 
 #[test]
 fn test_lower_arg_value_literal_string() {
     let arg = ArgValue::Literal(LiteralValue::String("test".to_owned()));
-    let result = lower_ok("name", &arg, "String");
+    let result = lower_ok("name", &arg, "String").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { "test" }));
 }
 
 #[test]
 fn test_lower_arg_value_reference() {
     let arg = ArgValue::Reference("binding".to_owned());
-    let result = lower_ok("graph", &arg, "Graph");
+    let result = lower_ok("graph", &arg, "Graph").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { binding }));
 }
 
 #[test]
 fn test_lower_arg_value_empty_sequence() {
     let arg = ArgValue::RawSequence(vec![]);
-    let result = lower_ok("items", &arg, "Vec<i32>");
+    let result = lower_ok("items", &arg, "Vec<i32>").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { vec![] }));
 }
 
@@ -148,7 +130,7 @@ fn test_lower_arg_value_sequence_integers() {
         TheoremValue::Integer(2),
         TheoremValue::Integer(3),
     ]);
-    let result = lower_ok("nums", &arg, "Vec<i32>");
+    let result = lower_ok("nums", &arg, "Vec<i32>").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { vec![1, 2, 3] }));
 }
 
@@ -158,14 +140,14 @@ fn test_lower_arg_value_sequence_strings() {
         TheoremValue::String("a".to_owned()),
         TheoremValue::String("b".to_owned()),
     ]);
-    let result = lower_ok("strs", &arg, "Vec<String>");
+    let result = lower_ok("strs", &arg, "Vec<String>").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { vec!["a", "b"] }));
 }
 
 #[test]
 fn test_lower_arg_value_sequence_mixed_scalars() {
     let arg = ArgValue::RawSequence(vec![TheoremValue::Integer(1), TheoremValue::Bool(true)]);
-    let result = lower_ok("mixed", &arg, "Vec<Value>");
+    let result = lower_ok("mixed", &arg, "Vec<Value>").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { vec![1, true] }));
 }
 
@@ -175,7 +157,7 @@ fn test_lower_arg_value_nested_sequence() {
         TheoremValue::Integer(1),
         TheoremValue::Integer(2),
     ])]);
-    let result = lower_ok("nested", &arg, "Vec<Vec<i32>>");
+    let result = lower_ok("nested", &arg, "Vec<Vec<i32>>").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { vec![vec![1, 2]] }));
 }
 
@@ -186,7 +168,7 @@ fn test_lower_arg_value_sequence_with_nested_ref() {
     let mut sentinel = IndexMap::new();
     sentinel.insert("ref".to_owned(), TheoremValue::String("graph".to_owned()));
     let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(sentinel)]);
-    let result = lower_ok("items", &arg, "Vec<Graph>");
+    let result = lower_ok("items", &arg, "Vec<Graph>").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { vec![graph] }));
 }
 
@@ -197,7 +179,7 @@ fn test_lower_arg_value_sequence_with_nested_literal() {
     let mut sentinel = IndexMap::new();
     sentinel.insert("literal".to_owned(), TheoremValue::String("ref".to_owned()));
     let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(sentinel)]);
-    let result = lower_ok("items", &arg, "Vec<String>");
+    let result = lower_ok("items", &arg, "Vec<String>").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { vec!["ref"] }));
 }
 
@@ -210,7 +192,7 @@ fn test_lower_arg_value_map_field_with_nested_ref() {
     let mut outer = IndexMap::new();
     outer.insert("graph".to_owned(), TheoremValue::Mapping(sentinel));
     let arg = ArgValue::RawMap(outer);
-    let result = lower_ok("cfg", &arg, "Config");
+    let result = lower_ok("cfg", &arg, "Config").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { Config { graph: binding } }));
 }
 
@@ -223,14 +205,14 @@ fn test_lower_arg_value_map_field_with_nested_literal() {
     let mut outer = IndexMap::new();
     outer.insert("name".to_owned(), TheoremValue::Mapping(sentinel));
     let arg = ArgValue::RawMap(outer);
-    let result = lower_ok("cfg", &arg, "Config");
+    let result = lower_ok("cfg", &arg, "Config").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { Config { name: "ref" } }));
 }
 
 #[test]
 fn test_lower_arg_value_empty_map() {
     let arg = ArgValue::RawMap(IndexMap::new());
-    let result = lower_ok("node", &arg, "Node");
+    let result = lower_ok("node", &arg, "Node").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { Node {} }));
 }
 
@@ -239,7 +221,7 @@ fn test_lower_arg_value_map_single_field() {
     let mut map = IndexMap::new();
     map.insert("id".to_owned(), TheoremValue::Integer(42));
     let arg = ArgValue::RawMap(map);
-    let result = lower_ok("node", &arg, "Node");
+    let result = lower_ok("node", &arg, "Node").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { Node { id: 42 } }));
 }
 
@@ -250,7 +232,7 @@ fn test_lower_arg_value_map_multiple_fields() {
     map.insert("name".to_owned(), TheoremValue::String("test".to_owned()));
     map.insert("active".to_owned(), TheoremValue::Bool(true));
     let arg = ArgValue::RawMap(map);
-    let result = lower_ok("node", &arg, "Node");
+    let result = lower_ok("node", &arg, "Node").expect("lower_ok failed");
     assert!(tokens_eq(
         &result,
         &quote! { Node { id: 1, name: "test", active: true } }
@@ -269,7 +251,7 @@ fn test_lower_arg_value_map_with_list_field() {
         ]),
     );
     let arg = ArgValue::RawMap(map);
-    let result = lower_ok("node", &arg, "Node");
+    let result = lower_ok("node", &arg, "Node").expect("lower_ok failed");
     assert!(tokens_eq(
         &result,
         &quote! { Node { id: 1, tags: vec!["a", "b"] } }
@@ -281,28 +263,27 @@ fn test_lower_arg_value_map_with_qualified_type() {
     let mut map = IndexMap::new();
     map.insert("x".to_owned(), TheoremValue::Integer(10));
     let arg = ArgValue::RawMap(map);
-    let result = lower_ok("point", &arg, "module::Point");
+    let result = lower_ok("point", &arg, "module::Point").expect("lower_ok failed");
     assert!(tokens_eq(&result, &quote! { module::Point { x: 10 } }));
 }
 
 #[test]
 fn test_extract_type_path_simple() {
-    let ty = syn::parse_str("MyStruct").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let path = extract_type_path("param", &ty).unwrap_or_else(|e| panic!("extraction failed: {e}"));
+    let ty: syn::Type = syn::parse_str("MyStruct").expect("failed to parse type");
+    let path = extract_type_path("param", &ty).expect("extraction failed");
     assert_eq!(quote! { #path }.to_string(), "MyStruct");
 }
 
 #[test]
 fn test_extract_type_path_qualified() {
-    let ty = syn::parse_str("crate::module::Type")
-        .unwrap_or_else(|e| panic!("failed to parse type: {e}"));
-    let path = extract_type_path("param", &ty).unwrap_or_else(|e| panic!("extraction failed: {e}"));
+    let ty: syn::Type = syn::parse_str("crate::module::Type").expect("failed to parse type");
+    let path = extract_type_path("param", &ty).expect("extraction failed");
     assert_eq!(quote! { #path }.to_string(), "crate :: module :: Type");
 }
 
 #[test]
 fn test_extract_type_path_rejects_reference() {
-    let ty = syn::parse_str("&MyStruct").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
+    let ty: syn::Type = syn::parse_str("&MyStruct").expect("failed to parse type");
     let result = extract_type_path("param", &ty);
     assert!(result.is_err());
     if let Err(LoweringError::UnsupportedType { param, reason }) = result {
@@ -315,9 +296,35 @@ fn test_extract_type_path_rejects_reference() {
 
 #[test]
 fn test_extract_type_path_rejects_tuple() {
-    let ty = syn::parse_str("(i32, i32)").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
+    let ty: syn::Type = syn::parse_str("(i32, i32)").expect("failed to parse type");
     let result = extract_type_path("param", &ty);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_extract_type_path_rejects_generic() {
+    let ty: syn::Type = syn::parse_str("Vec<i32>").expect("failed to parse type");
+    let result = extract_type_path("param", &ty);
+    assert!(result.is_err());
+    if let Err(LoweringError::UnsupportedType { param, reason }) = result {
+        assert_eq!(param, "param");
+        assert!(reason.contains("generic type paths"));
+    } else {
+        panic!("expected UnsupportedType error for generic path");
+    }
+}
+
+#[test]
+fn test_extract_type_path_rejects_qself() {
+    let ty: syn::Type = syn::parse_str("<T as Trait>::Assoc").expect("failed to parse type");
+    let result = extract_type_path("param", &ty);
+    assert!(result.is_err());
+    if let Err(LoweringError::UnsupportedType { param, reason }) = result {
+        assert_eq!(param, "param");
+        assert!(reason.contains("qualified-self paths"));
+    } else {
+        panic!("expected UnsupportedType error for qself path");
+    }
 }
 
 #[test]
@@ -327,7 +334,7 @@ fn test_lower_arg_value_map_nested_map_fails() {
     let mut outer = IndexMap::new();
     outer.insert("inner".to_owned(), TheoremValue::Mapping(inner));
     let arg = ArgValue::RawMap(outer);
-    let ty = syn::parse_str("Outer").unwrap_or_else(|e| panic!("failed to parse type: {e}"));
+    let ty: syn::Type = syn::parse_str("Outer").expect("failed to parse type");
     let result = lower_arg_value("nested", &arg, &ty);
     assert!(result.is_err());
     if let Err(LoweringError::UnsupportedType { param, reason }) = result {
