@@ -51,25 +51,20 @@ fn test_lower_literal_float() {
     assert_eq!(result.to_string(), "99.5");
 }
 
-#[test]
-fn test_lower_literal_string_simple() {
-    let value = LiteralValue::String("hello".to_owned());
+#[rstest]
+#[case::simple(LiteralValue::String("hello".to_owned()), quote! { "hello" })]
+#[case::empty(LiteralValue::String(String::new()), quote! { "" })]
+#[case::with_escapes(
+    LiteralValue::String("hello\nworld".to_owned()),
+    quote! { "hello\nworld" }
+)]
+fn test_lower_literal_string_cases(
+    #[case] input: LiteralValue,
+    #[case] expected: proc_macro2::TokenStream,
+) {
+    let value = input;
     let result = lower_literal(&value);
-    assert!(tokens_eq(&result, &quote! { "hello" }));
-}
-
-#[test]
-fn test_lower_literal_string_empty() {
-    let value = LiteralValue::String(String::new());
-    let result = lower_literal(&value);
-    assert!(tokens_eq(&result, &quote! { "" }));
-}
-
-#[test]
-fn test_lower_literal_string_with_escapes() {
-    let value = LiteralValue::String("hello\nworld".to_owned());
-    let result = lower_literal(&value);
-    assert!(tokens_eq(&result, &quote! { "hello\nworld" }));
+    assert!(tokens_eq(&result, &expected));
 }
 
 #[rstest]

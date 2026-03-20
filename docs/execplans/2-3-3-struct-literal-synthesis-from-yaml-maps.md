@@ -144,12 +144,14 @@ inference out of scope.
   `SentinelKind` enum. Single-key YAML maps containing `literal` or `ref` are
   deterministically recognized as sentinels; multi-key maps pass through as
   `ArgValue::RawMap`.
-- [ ] Milestone 1: introduce the internal argument-lowering module and
-  supporting types/helpers.
-- [ ] Milestone 2: implement recursive list lowering to `vec![...]`.
-- [ ] Milestone 3: implement map-driven struct literal synthesis keyed by the
-  expected Rust parameter type.
-- [ ] Milestone 4: add unit coverage for recursive happy paths and edge cases.
+- [x] 2026-03-17: Milestone 1 complete. Added the internal
+  `arg_lowering` module plus the supporting lowering types and helpers.
+- [x] 2026-03-17: Milestone 2 complete. Recursive list lowering now emits
+  `vec![...]` expressions, including nested sequences and sentinel wrappers.
+- [x] 2026-03-17: Milestone 3 complete. YAML maps are lowered into struct
+  literal expressions keyed by the expected Rust parameter type.
+- [x] 2026-03-17: Milestone 4 complete. Unit coverage now exercises the
+  recursive happy paths and edge cases for scalar, list, and struct lowering.
 - [x] 2026-03-17: Milestone 5 complete. Added 7 compile-fail integration
   tests in `tests/arg_lowering_compile_fail.rs` that generate Rust snippets and
   verify type mismatches surface as Rust compilation errors (not theoremc
@@ -218,21 +220,21 @@ inference out of scope.
 
 ## Outcomes & Retrospective
 
-Implementation completed successfully on 2026-03-17. All milestones achieved.
+Implementation completed successfully on 2026-03-17. Milestones 1-5 and 7-8
+completed, and Milestone 6 was intentionally skipped as documented below.
 
 ### Final deliverables
 
 - **Source files added:**
-  - `src/arg_lowering.rs` (244 lines) — internal lowering module with core API
-  - `src/arg_lowering_tests.rs` (288 lines) — comprehensive unit tests (30+
-    tests)
-  - `tests/arg_lowering_compile_fail.rs` (201 lines) — compile-fail contract
-    tests (7 tests)
+  - `src/arg_lowering.rs` — internal lowering module with the core lowering API
+  - `src/arg_lowering_tests.rs` — unit coverage for scalar, list, and struct
+    lowering behaviour
+  - `tests/arg_lowering_compile_fail.rs` — compile-fail contract coverage for
+    Rust type mismatches surfaced by lowered expressions
 - **Dependencies added:**
-  - `quote = "1.0.37"` (production) — for TokenStream generation
-  - `proc-macro2 = "1.0.93"` (production) — for literal token construction
-  - `tempfile = "3.15.0"` (dev) — for compile-fail test harness
-  - `syn` features extended: `clone-impls`, `printing` (for ToTokens support)
+  - `quote`, `proc-macro2`, and `syn` printing support for expression
+    generation and literal construction
+  - `tempfile` for the repository-owned compile-fail harness
 - **Documentation updated:**
   - `docs/theoremc-design.md` — added §6.7.10 implementation decisions
   - `docs/users-guide.md` — documented lowering behaviour, limitations, and
