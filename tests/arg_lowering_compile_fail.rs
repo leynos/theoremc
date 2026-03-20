@@ -22,6 +22,14 @@ struct LoweringInput<'a> {
     ty_str: &'a str,
 }
 
+/// Bundles a Rust struct definition with the compiler diagnostic fragments
+/// expected when code generation produces an ill-typed struct literal.
+#[derive(Clone, Copy)]
+struct StructHarness<'a> {
+    def: &'a str,
+    expected_fragments: &'a [&'a str],
+}
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 /// Compiles a Rust snippet and returns `(success, stderr)`.
@@ -48,7 +56,6 @@ fn compile_snippet(code: &str) -> Result<(bool, String), Box<dyn std::error::Err
 fn wrap_in_harness(expr: &str, expected_type: &str) -> String {
     format!(
         r"
-#![allow(unused)]
 pub fn test_harness() {{
     let _value: {expected_type} = {expr};
 }}
@@ -86,11 +93,12 @@ fn assert_lowers_and_compiles(input: LoweringInput<'_>) -> TestResult {
 /// Helper: lowers an [`ArgValue`] with a struct definition and asserts it compiles.
 fn assert_lowers_and_compiles_with_struct(
     input: LoweringInput<'_>,
-    struct_def: &str,
+    harness: StructHarness<'_>,
 ) -> TestResult {
     let (success, stderr) = lower_and_compile(input, |expr, ty| {
         format!(
-            "#![allow(unused)]\n{struct_def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n"
+            "{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n",
+            def = harness.def
         )
     })?;
     if success {
@@ -104,30 +112,30 @@ fn assert_lowers_and_compiles_with_struct(
 
 /// Helper: lowers an [`ArgValue`] with a struct definition and asserts compilation fails,
 /// with at least one of the expected fragments present in stderr.
-fn assert_lowers_and_compile_fails_with_struct(
-    input: LoweringInput<'_>,
-    struct_def: &str,
-    expected_fragments: &[&str],
-) -> TestResult {
-    let (success, stderr) = lower_and_compile(input, |expr, ty| {
-        format!(
-            "#![allow(unused)]\n{struct_def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n"
-        )
-    })?;
+fn assert_compile_failed(success: bool, stderr: &str, expected_fragments: &[&str]) -> TestResult {
     if success {
         return Err(test_failure("expected compilation to fail"));
     }
-
-    if expected_fragments
-        .iter()
-        .any(|fragment| stderr.contains(fragment))
-    {
+    if expected_fragments.iter().any(|f| stderr.contains(f)) {
         Ok(())
     } else {
         Err(test_failure(format!(
             "expected one of {expected_fragments:?} in stderr, got:\n{stderr}"
         )))
     }
+}
+
+fn assert_lowers_and_compile_fails_with_struct(
+    input: LoweringInput<'_>,
+    harness: StructHarness<'_>,
+) -> TestResult {
+    let (success, stderr) = lower_and_compile(input, |expr, ty| {
+        format!(
+            "{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n",
+            def = harness.def
+        )
+    })?;
+    assert_compile_failed(success, &stderr, harness.expected_fragments)
 }
 
 /// Helper: lowers an [`ArgValue`] and asserts compilation fails, with at least
@@ -137,20 +145,7 @@ fn assert_lowers_and_compile_fails(
     expected_fragments: &[&str],
 ) -> TestResult {
     let (success, stderr) = lower_and_compile(input, wrap_in_harness)?;
-    if success {
-        return Err(test_failure("expected compilation to fail"));
-    }
-
-    if expected_fragments
-        .iter()
-        .any(|fragment| stderr.contains(fragment))
-    {
-        Ok(())
-    } else {
-        Err(test_failure(format!(
-            "expected one of {expected_fragments:?} in stderr, got:\n{stderr}"
-        )))
-    }
+    assert_compile_failed(success, &stderr, expected_fragments)
 }
 
 #[test]
@@ -179,8 +174,10 @@ fn compile_fail_wrong_scalar_type_in_struct_field() -> TestResult {
             param: "node",
             ty_str: "Node",
         },
-        "struct Node { id: i32 }",
-        &["mismatched types", "expected `i32`, found `&str`"],
+        StructHarness {
+            def: "struct Node { id: i32 }",
+            expected_fragments: &["mismatched types", "expected `i32`, found `&str`"],
+        },
     )
 }
 
@@ -212,8 +209,10 @@ fn compile_fail_unknown_struct_field() -> TestResult {
             param: "node",
             ty_str: "Node",
         },
-        "struct Node { id: i32 }",
-        &["has no field named `unknown_field`", "E0560"],
+        StructHarness {
+            def: "struct Node { id: i32 }",
+            expected_fragments: &["has no field named `unknown_field`", "E0560"],
+        },
     )
 }
 
@@ -249,7 +248,10 @@ fn positive_control_struct_compiles() -> TestResult {
             param: "node",
             ty_str: "Node",
         },
-        "struct Node { id: i32, name: &'static str }",
+        StructHarness {
+            def: "struct Node { id: i32, name: &'static str }",
+            expected_fragments: &[],
+        },
     )
 }
 

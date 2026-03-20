@@ -111,49 +111,45 @@ fn test_lower_arg_value_reference() {
     assert!(tokens_eq(&result, &quote! { binding }));
 }
 
-#[test]
-fn test_lower_arg_value_empty_sequence() {
-    let arg = ArgValue::RawSequence(vec![]);
-    let result = lower_ok("items", &arg, "Vec<i32>").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { vec![] }));
-}
-
-#[test]
-fn test_lower_arg_value_sequence_integers() {
-    let arg = ArgValue::RawSequence(vec![
+#[rstest]
+#[case::empty(ArgValue::RawSequence(vec![]), "Vec<i32>", quote! { vec![] })]
+#[case::integers(
+    ArgValue::RawSequence(vec![
         TheoremValue::Integer(1),
         TheoremValue::Integer(2),
         TheoremValue::Integer(3),
-    ]);
-    let result = lower_ok("nums", &arg, "Vec<i32>").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { vec![1, 2, 3] }));
-}
-
-#[test]
-fn test_lower_arg_value_sequence_strings() {
-    let arg = ArgValue::RawSequence(vec![
+    ]),
+    "Vec<i32>",
+    quote! { vec![1, 2, 3] }
+)]
+#[case::strings(
+    ArgValue::RawSequence(vec![
         TheoremValue::String("a".to_owned()),
         TheoremValue::String("b".to_owned()),
-    ]);
-    let result = lower_ok("strs", &arg, "Vec<String>").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { vec!["a", "b"] }));
-}
-
-#[test]
-fn test_lower_arg_value_sequence_mixed_scalars() {
-    let arg = ArgValue::RawSequence(vec![TheoremValue::Integer(1), TheoremValue::Bool(true)]);
-    let result = lower_ok("mixed", &arg, "Vec<Value>").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { vec![1, true] }));
-}
-
-#[test]
-fn test_lower_arg_value_nested_sequence() {
-    let arg = ArgValue::RawSequence(vec![TheoremValue::Sequence(vec![
+    ]),
+    "Vec<String>",
+    quote! { vec!["a", "b"] }
+)]
+#[case::mixed_scalars(
+    ArgValue::RawSequence(vec![TheoremValue::Integer(1), TheoremValue::Bool(true)]),
+    "Vec<Value>",
+    quote! { vec![1, true] }
+)]
+#[case::nested_sequence(
+    ArgValue::RawSequence(vec![TheoremValue::Sequence(vec![
         TheoremValue::Integer(1),
         TheoremValue::Integer(2),
-    ])]);
-    let result = lower_ok("nested", &arg, "Vec<Vec<i32>>").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { vec![vec![1, 2]] }));
+    ])]),
+    "Vec<Vec<i32>>",
+    quote! { vec![vec![1, 2]] }
+)]
+fn test_lower_arg_value_sequence_cases(
+    #[case] arg: ArgValue,
+    #[case] ty_str: &str,
+    #[case] expected: proc_macro2::TokenStream,
+) {
+    let result = lower_ok("name", &arg, ty_str).expect("lower_ok failed");
+    assert!(tokens_eq(&result, &expected));
 }
 
 #[test]
@@ -204,53 +200,43 @@ fn test_lower_arg_value_map_field_with_nested_literal() {
     assert!(tokens_eq(&result, &quote! { Config { name: "ref" } }));
 }
 
-#[test]
-fn test_lower_arg_value_empty_map() {
-    let arg = ArgValue::RawMap(IndexMap::new());
-    let result = lower_ok("node", &arg, "Node").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { Node {} }));
-}
-
-#[test]
-fn test_lower_arg_value_map_single_field() {
+#[rstest]
+#[case::empty(vec![], quote! { Node {} })]
+#[case::single_field(
+    vec![("id", TheoremValue::Integer(42))],
+    quote! { Node { id: 42 } }
+)]
+#[case::multiple_fields(
+    vec![
+        ("id", TheoremValue::Integer(1)),
+        ("name", TheoremValue::String("test".to_owned())),
+        ("active", TheoremValue::Bool(true)),
+    ],
+    quote! { Node { id: 1, name: "test", active: true } }
+)]
+#[case::list_field(
+    vec![
+        ("id", TheoremValue::Integer(1)),
+        (
+            "tags",
+            TheoremValue::Sequence(vec![
+                TheoremValue::String("a".to_owned()),
+                TheoremValue::String("b".to_owned()),
+            ]),
+        ),
+    ],
+    quote! { Node { id: 1, tags: vec!["a", "b"] } }
+)]
+fn test_lower_arg_value_map_cases(
+    #[case] entries: Vec<(&str, TheoremValue)>,
+    #[case] expected_tokens: proc_macro2::TokenStream,
+) {
     let mut map = IndexMap::new();
-    map.insert("id".to_owned(), TheoremValue::Integer(42));
-    let arg = ArgValue::RawMap(map);
-    let result = lower_ok("node", &arg, "Node").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { Node { id: 42 } }));
-}
-
-#[test]
-fn test_lower_arg_value_map_multiple_fields() {
-    let mut map = IndexMap::new();
-    map.insert("id".to_owned(), TheoremValue::Integer(1));
-    map.insert("name".to_owned(), TheoremValue::String("test".to_owned()));
-    map.insert("active".to_owned(), TheoremValue::Bool(true));
-    let arg = ArgValue::RawMap(map);
-    let result = lower_ok("node", &arg, "Node").expect("lower_ok failed");
-    assert!(tokens_eq(
-        &result,
-        &quote! { Node { id: 1, name: "test", active: true } }
-    ));
-}
-
-#[test]
-fn test_lower_arg_value_map_with_list_field() {
-    let mut map = IndexMap::new();
-    map.insert("id".to_owned(), TheoremValue::Integer(1));
-    map.insert(
-        "tags".to_owned(),
-        TheoremValue::Sequence(vec![
-            TheoremValue::String("a".to_owned()),
-            TheoremValue::String("b".to_owned()),
-        ]),
-    );
-    let arg = ArgValue::RawMap(map);
-    let result = lower_ok("node", &arg, "Node").expect("lower_ok failed");
-    assert!(tokens_eq(
-        &result,
-        &quote! { Node { id: 1, tags: vec!["a", "b"] } }
-    ));
+    for (name, value) in entries {
+        map.insert(name.to_owned(), value);
+    }
+    let result = lower_ok("node", &ArgValue::RawMap(map), "Node").expect("lower_ok failed");
+    assert!(tokens_eq(&result, &expected_tokens));
 }
 
 #[test]
@@ -276,16 +262,22 @@ fn test_extract_type_path_qualified() {
     assert_eq!(quote! { #path }.to_string(), "crate :: module :: Type");
 }
 
-#[test]
-fn test_extract_type_path_rejects_reference() {
-    let ty: syn::Type = syn::parse_str("&MyStruct").expect("failed to parse type");
+#[rstest]
+#[case::reference("&MyStruct", "simple type path")]
+#[case::generic("Vec<i32>", "generic type paths")]
+#[case::qself("<T as Trait>::Assoc", "qualified-self paths")]
+fn test_extract_type_path_rejects(#[case] ty_str: &str, #[case] expected_reason: &str) {
+    let ty: syn::Type = syn::parse_str(ty_str).expect("failed to parse type");
     let result = extract_type_path("param", &ty);
     assert!(result.is_err());
     if let Err(LoweringError::UnsupportedType { param, reason }) = result {
         assert_eq!(param, "param");
-        assert!(reason.contains("simple type path"));
+        assert!(
+            reason.contains(expected_reason),
+            "expected reason to contain {expected_reason:?}, got: {reason}"
+        );
     } else {
-        panic!("expected UnsupportedType error");
+        panic!("expected UnsupportedType error for type `{ty_str}`");
     }
 }
 
@@ -294,32 +286,6 @@ fn test_extract_type_path_rejects_tuple() {
     let ty: syn::Type = syn::parse_str("(i32, i32)").expect("failed to parse type");
     let result = extract_type_path("param", &ty);
     assert!(result.is_err());
-}
-
-#[test]
-fn test_extract_type_path_rejects_generic() {
-    let ty: syn::Type = syn::parse_str("Vec<i32>").expect("failed to parse type");
-    let result = extract_type_path("param", &ty);
-    assert!(result.is_err());
-    if let Err(LoweringError::UnsupportedType { param, reason }) = result {
-        assert_eq!(param, "param");
-        assert!(reason.contains("generic type paths"));
-    } else {
-        panic!("expected UnsupportedType error for generic path");
-    }
-}
-
-#[test]
-fn test_extract_type_path_rejects_qself() {
-    let ty: syn::Type = syn::parse_str("<T as Trait>::Assoc").expect("failed to parse type");
-    let result = extract_type_path("param", &ty);
-    assert!(result.is_err());
-    if let Err(LoweringError::UnsupportedType { param, reason }) = result {
-        assert_eq!(param, "param");
-        assert!(reason.contains("qualified-self paths"));
-    } else {
-        panic!("expected UnsupportedType error for qself path");
-    }
 }
 
 #[test]
