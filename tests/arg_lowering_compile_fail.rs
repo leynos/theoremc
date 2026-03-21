@@ -91,15 +91,16 @@ fn assert_lowers_and_compiles(input: LoweringInput<'_>) -> TestResult {
 }
 
 /// Helper: lowers an [`ArgValue`] with a struct definition and asserts it compiles.
+fn make_struct_harness_body(struct_def: &str, expr: &str, ty: &str) -> String {
+    format!("{struct_def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n")
+}
+
 fn assert_lowers_and_compiles_with_struct(
     input: LoweringInput<'_>,
     harness: StructHarness<'_>,
 ) -> TestResult {
     let (success, stderr) = lower_and_compile(input, |expr, ty| {
-        format!(
-            "{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n",
-            def = harness.def
-        )
+        make_struct_harness_body(harness.def, expr, ty)
     })?;
     if success {
         Ok(())
@@ -130,10 +131,7 @@ fn assert_lowers_and_compile_fails_with_struct(
     harness: StructHarness<'_>,
 ) -> TestResult {
     let (success, stderr) = lower_and_compile(input, |expr, ty| {
-        format!(
-            "{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n",
-            def = harness.def
-        )
+        make_struct_harness_body(harness.def, expr, ty)
     })?;
     assert_compile_failed(success, &stderr, harness.expected_fragments)
 }

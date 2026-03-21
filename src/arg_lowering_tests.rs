@@ -266,6 +266,7 @@ fn test_extract_type_path_qualified() {
 #[case::reference("&MyStruct", "simple type path")]
 #[case::generic("Vec<i32>", "generic type paths")]
 #[case::qself("<T as Trait>::Assoc", "qualified-self paths")]
+#[case::tuple("(i32, i32)", "simple type path")]
 fn test_extract_type_path_rejects(#[case] ty_str: &str, #[case] expected_reason: &str) {
     let ty: syn::Type = syn::parse_str(ty_str).expect("failed to parse type");
     let result = extract_type_path("param", &ty);
@@ -279,13 +280,6 @@ fn test_extract_type_path_rejects(#[case] ty_str: &str, #[case] expected_reason:
     } else {
         panic!("expected UnsupportedType error for type `{ty_str}`");
     }
-}
-
-#[test]
-fn test_extract_type_path_rejects_tuple() {
-    let ty: syn::Type = syn::parse_str("(i32, i32)").expect("failed to parse type");
-    let result = extract_type_path("param", &ty);
-    assert!(result.is_err());
 }
 
 #[test]
