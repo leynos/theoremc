@@ -159,52 +159,54 @@ fn test_lower_arg_value_sequence_cases(
     assert!(tokens_eq(&result, &expected));
 }
 
-#[test]
-fn test_lower_arg_value_sequence_with_nested_ref() {
-    // A sequence containing { ref: graph } should decode the sentinel
-    // and lower to a reference identifier.
+#[rstest]
+#[case::nested_ref("ref", "graph", "Vec<Graph>", quote! { vec![graph] })]
+#[case::nested_literal(
+    "literal",
+    "ref",
+    "Vec<String>",
+    quote! { vec!["ref"] }
+)]
+fn test_lower_arg_value_sequence_with_nested_sentinel(
+    #[case] sentinel_key: &str,
+    #[case] payload: &str,
+    #[case] target_type: &str,
+    #[case] expected: proc_macro2::TokenStream,
+) {
     let mut sentinel = IndexMap::new();
-    sentinel.insert("ref".to_owned(), TheoremValue::String("graph".to_owned()));
+    sentinel.insert(
+        sentinel_key.to_owned(),
+        TheoremValue::String(payload.to_owned()),
+    );
     let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(sentinel)]);
-    let result = lower_ok("items", &arg, "Vec<Graph>").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { vec![graph] }));
+    let result = lower_ok("items", &arg, target_type).expect("lower_ok failed");
+    assert!(tokens_eq(&result, &expected));
 }
 
-#[test]
-fn test_lower_arg_value_sequence_with_nested_literal() {
-    // A sequence containing { literal: "ref" } should decode the sentinel
-    // and lower to a string literal (not a reference).
+#[rstest]
+#[case::nested_ref("graph", "ref", "binding", quote! { Config { graph: binding } })]
+#[case::nested_literal(
+    "name",
+    "literal",
+    "ref",
+    quote! { Config { name: "ref" } }
+)]
+fn test_lower_arg_value_map_field_with_nested_sentinel(
+    #[case] field_name: &str,
+    #[case] sentinel_key: &str,
+    #[case] payload: &str,
+    #[case] expected: proc_macro2::TokenStream,
+) {
     let mut sentinel = IndexMap::new();
-    sentinel.insert("literal".to_owned(), TheoremValue::String("ref".to_owned()));
-    let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(sentinel)]);
-    let result = lower_ok("items", &arg, "Vec<String>").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { vec!["ref"] }));
-}
-
-#[test]
-fn test_lower_arg_value_map_field_with_nested_ref() {
-    // A struct field containing { ref: binding } should decode the sentinel
-    // and lower to a reference identifier in the field value position.
-    let mut sentinel = IndexMap::new();
-    sentinel.insert("ref".to_owned(), TheoremValue::String("binding".to_owned()));
+    sentinel.insert(
+        sentinel_key.to_owned(),
+        TheoremValue::String(payload.to_owned()),
+    );
     let mut outer = IndexMap::new();
-    outer.insert("graph".to_owned(), TheoremValue::Mapping(sentinel));
+    outer.insert(field_name.to_owned(), TheoremValue::Mapping(sentinel));
     let arg = ArgValue::RawMap(outer);
     let result = lower_ok("cfg", &arg, "Config").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { Config { graph: binding } }));
-}
-
-#[test]
-fn test_lower_arg_value_map_field_with_nested_literal() {
-    // A struct field containing { literal: "ref" } should decode the sentinel
-    // and lower to a string literal (preserving the string "ref").
-    let mut sentinel = IndexMap::new();
-    sentinel.insert("literal".to_owned(), TheoremValue::String("ref".to_owned()));
-    let mut outer = IndexMap::new();
-    outer.insert("name".to_owned(), TheoremValue::Mapping(sentinel));
-    let arg = ArgValue::RawMap(outer);
-    let result = lower_ok("cfg", &arg, "Config").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { Config { name: "ref" } }));
+    assert!(tokens_eq(&result, &expected));
 }
 
 #[rstest]
