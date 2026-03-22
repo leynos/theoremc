@@ -255,18 +255,13 @@ fn test_lower_arg_value_map_with_qualified_type() {
     assert!(tokens_eq(&result, &quote! { module::Point { x: 10 } }));
 }
 
-#[test]
-fn test_extract_type_path_simple() {
-    let ty: syn::Type = syn::parse_str("MyStruct").expect("failed to parse type");
+#[rstest]
+#[case::simple("MyStruct", "MyStruct")]
+#[case::qualified("crate::module::Type", "crate :: module :: Type")]
+fn test_extract_type_path_cases(#[case] input: &str, #[case] expected: &str) {
+    let ty: syn::Type = syn::parse_str(input).expect("failed to parse type");
     let path = extract_type_path("param", &ty).expect("extraction failed");
-    assert_eq!(quote! { #path }.to_string(), "MyStruct");
-}
-
-#[test]
-fn test_extract_type_path_qualified() {
-    let ty: syn::Type = syn::parse_str("crate::module::Type").expect("failed to parse type");
-    let path = extract_type_path("param", &ty).expect("extraction failed");
-    assert_eq!(quote! { #path }.to_string(), "crate :: module :: Type");
+    assert_eq!(quote! { #path }.to_string(), expected);
 }
 
 #[rstest]
