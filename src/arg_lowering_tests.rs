@@ -62,8 +62,7 @@ fn test_lower_literal_string_cases(
     #[case] input: LiteralValue,
     #[case] expected: proc_macro2::TokenStream,
 ) {
-    let value = input;
-    let result = lower_literal(&value);
+    let result = lower_literal(&input);
     assert!(tokens_eq(&result, &expected));
 }
 
@@ -90,25 +89,33 @@ fn test_lower_reference_non_identifier_returns_error() {
     }
 }
 
-#[test]
-fn test_lower_arg_value_literal_integer() {
-    let arg = ArgValue::Literal(LiteralValue::Integer(42));
-    let result = lower_ok("count", &arg, "i32").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { 42 }));
-}
-
-#[test]
-fn test_lower_arg_value_literal_string() {
-    let arg = ArgValue::Literal(LiteralValue::String("test".to_owned()));
-    let result = lower_ok("name", &arg, "String").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { "test" }));
-}
-
-#[test]
-fn test_lower_arg_value_reference() {
-    let arg = ArgValue::Reference("binding".to_owned());
-    let result = lower_ok("graph", &arg, "Graph").expect("lower_ok failed");
-    assert!(tokens_eq(&result, &quote! { binding }));
+#[rstest]
+#[case::literal_integer(
+    ArgValue::Literal(LiteralValue::Integer(42)),
+    "count",
+    "i32",
+    quote! { 42 }
+)]
+#[case::literal_string(
+    ArgValue::Literal(LiteralValue::String("test".to_owned())),
+    "name",
+    "String",
+    quote! { "test" }
+)]
+#[case::reference(
+    ArgValue::Reference("binding".to_owned()),
+    "graph",
+    "Graph",
+    quote! { binding }
+)]
+fn test_lower_arg_value_scalar_cases(
+    #[case] arg: ArgValue,
+    #[case] param: &str,
+    #[case] ty_str: &str,
+    #[case] expected: proc_macro2::TokenStream,
+) {
+    let result = lower_ok(param, &arg, ty_str).expect("lower_ok failed");
+    assert!(tokens_eq(&result, &expected));
 }
 
 #[rstest]

@@ -27,8 +27,13 @@ struct LoweringInput<'a> {
 #[derive(Clone, Copy)]
 struct StructHarness<'a> {
     def: &'a str,
-    expected_fragments: &'a [&'a str],
+    expected: DiagnosticMatch<'a>,
 }
+
+/// A set of compiler diagnostic substrings, at least one of which must
+/// appear in `rustc` stderr for a compile-fail assertion to pass.
+#[derive(Clone, Copy)]
+struct DiagnosticMatch<'a>(&'a [&'a str]);
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -113,15 +118,16 @@ fn assert_lowers_and_compiles_with_struct(
 
 /// Helper: lowers an [`ArgValue`] with a struct definition and asserts compilation fails,
 /// with at least one of the expected fragments present in stderr.
-fn assert_compile_failed(success: bool, stderr: &str, expected_fragments: &[&str]) -> TestResult {
+fn assert_compile_failed(success: bool, stderr: &str, expected: DiagnosticMatch<'_>) -> TestResult {
     if success {
         return Err(test_failure("expected compilation to fail"));
     }
-    if expected_fragments.iter().any(|f| stderr.contains(f)) {
+    if expected.0.iter().any(|f| stderr.contains(f)) {
         Ok(())
     } else {
         Err(test_failure(format!(
-            "expected one of {expected_fragments:?} in stderr, got:\n{stderr}"
+            "expected one of {:?} in stderr, got:\n{stderr}",
+            expected.0
         )))
     }
 }
@@ -133,17 +139,17 @@ fn assert_lowers_and_compile_fails_with_struct(
     let (success, stderr) = lower_and_compile(input, |expr, ty| {
         make_struct_harness_body(harness.def, expr, ty)
     })?;
-    assert_compile_failed(success, &stderr, harness.expected_fragments)
+    assert_compile_failed(success, &stderr, harness.expected)
 }
 
 /// Helper: lowers an [`ArgValue`] and asserts compilation fails, with at least
 /// one of `expected_fragments` present in stderr.
 fn assert_lowers_and_compile_fails(
     input: LoweringInput<'_>,
-    expected_fragments: &[&str],
+    expected: DiagnosticMatch<'_>,
 ) -> TestResult {
     let (success, stderr) = lower_and_compile(input, wrap_in_harness)?;
-    assert_compile_failed(success, &stderr, expected_fragments)
+    assert_compile_failed(success, &stderr, expected)
 }
 
 #[test]
@@ -174,7 +180,7 @@ fn compile_fail_wrong_scalar_type_in_struct_field() -> TestResult {
         },
         StructHarness {
             def: "struct Node { id: i32 }",
-            expected_fragments: &["mismatched types", "expected `i32`, found `&str`"],
+            expected: DiagnosticMatch(&["mismatched types", "expected `i32`, found `&str`"]),
         },
     )
 }
@@ -192,7 +198,7 @@ fn compile_fail_wrong_list_element_type() -> TestResult {
             param: "nums",
             ty_str: "Vec<i32>",
         },
-        &["mismatched types", "expected integer"],
+        DiagnosticMatch(&["mismatched types", "expected integer"]),
     )
 }
 
@@ -209,7 +215,7 @@ fn compile_fail_unknown_struct_field() -> TestResult {
         },
         StructHarness {
             def: "struct Node { id: i32 }",
-            expected_fragments: &["has no field named `unknown_field`", "E0560"],
+            expected: DiagnosticMatch(&["has no field named `unknown_field`", "E0560"]),
         },
     )
 }
@@ -248,7 +254,7 @@ fn positive_control_struct_compiles() -> TestResult {
         },
         StructHarness {
             def: "struct Node { id: i32, name: &'static str }",
-            expected_fragments: &[],
+            expected: DiagnosticMatch(&[]),
         },
     )
 }
