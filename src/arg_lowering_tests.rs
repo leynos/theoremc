@@ -2,7 +2,7 @@
 
 use indexmap::IndexMap;
 use quote::quote;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 
 use super::{LoweringError, extract_type_path, lower_arg_value, lower_literal, lower_reference};
 use crate::schema::TheoremValue;
@@ -21,6 +21,18 @@ fn lower_ok(
 ) -> Result<proc_macro2::TokenStream, Box<dyn std::error::Error>> {
     let ty: syn::Type = syn::parse_str(ty_str)?;
     Ok(lower_arg_value(param, arg, &ty)?)
+}
+
+#[fixture]
+fn sentinel_map() -> impl Fn(&str, &str) -> IndexMap<String, TheoremValue> {
+    |sentinel_key, payload| {
+        let mut sentinel = IndexMap::new();
+        sentinel.insert(
+            sentinel_key.to_owned(),
+            TheoremValue::String(payload.to_owned()),
+        );
+        sentinel
+    }
 }
 
 #[rstest]
@@ -173,37 +185,35 @@ fn test_lower_arg_value_sequence_with_nested_sentinel(
     #[case] target_type: &str,
     #[case] expected: proc_macro2::TokenStream,
 ) {
-    let mut sentinel = IndexMap::new();
-    sentinel.insert(
-        sentinel_key.to_owned(),
-        TheoremValue::String(payload.to_owned()),
-    );
-    let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(sentinel)]);
+    let nested_sentinel = sentinel_map()(sentinel_key, payload);
+    let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(nested_sentinel)]);
     let result = lower_ok("items", &arg, target_type).expect("lower_ok failed");
     assert!(tokens_eq(&result, &expected));
 }
 
 #[rstest]
-#[case::nested_ref("graph", "ref", "binding", quote! { Config { graph: binding } })]
+#[case::nested_ref(
+    "graph",
+    ("ref", "binding"),
+    quote! { Config { graph: binding } }
+)]
 #[case::nested_literal(
     "name",
-    "literal",
-    "ref",
+    ("literal", "ref"),
     quote! { Config { name: "ref" } }
 )]
 fn test_lower_arg_value_map_field_with_nested_sentinel(
     #[case] field_name: &str,
-    #[case] sentinel_key: &str,
-    #[case] payload: &str,
+    #[case] sentinel: (&str, &str),
+    sentinel_map: impl Fn(&str, &str) -> IndexMap<String, TheoremValue>,
     #[case] expected: proc_macro2::TokenStream,
 ) {
-    let mut sentinel = IndexMap::new();
-    sentinel.insert(
-        sentinel_key.to_owned(),
-        TheoremValue::String(payload.to_owned()),
-    );
+    let nested_sentinel = sentinel_map(sentinel.0, sentinel.1);
     let mut outer = IndexMap::new();
-    outer.insert(field_name.to_owned(), TheoremValue::Mapping(sentinel));
+    outer.insert(
+        field_name.to_owned(),
+        TheoremValue::Mapping(nested_sentinel),
+    );
     let arg = ArgValue::RawMap(outer);
     let result = lower_ok("cfg", &arg, "Config").expect("lower_ok failed");
     assert!(tokens_eq(&result, &expected));

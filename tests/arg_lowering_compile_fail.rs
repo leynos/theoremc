@@ -30,6 +30,17 @@ struct StructHarness<'a> {
     expected: DiagnosticMatch<'a>,
 }
 
+impl StructHarness<'_> {
+    /// Wraps a lowered expression in a struct-definition harness ready for
+    /// `rustc`.
+    fn make_code(self, expr: &str, ty: &str) -> String {
+        format!(
+            "{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n",
+            def = self.def
+        )
+    }
+}
+
 /// A set of compiler diagnostic substrings, at least one of which must
 /// appear in `rustc` stderr for a compile-fail assertion to pass.
 #[derive(Clone, Copy)]
@@ -95,18 +106,11 @@ fn assert_lowers_and_compiles(input: LoweringInput<'_>) -> TestResult {
     }
 }
 
-/// Helper: lowers an [`ArgValue`] with a struct definition and asserts it compiles.
-fn make_struct_harness_body(struct_def: &str, expr: &str, ty: &str) -> String {
-    format!("{struct_def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n")
-}
-
 fn assert_lowers_and_compiles_with_struct(
     input: LoweringInput<'_>,
     harness: StructHarness<'_>,
 ) -> TestResult {
-    let (success, stderr) = lower_and_compile(input, |expr, ty| {
-        make_struct_harness_body(harness.def, expr, ty)
-    })?;
+    let (success, stderr) = lower_and_compile(input, |expr, ty| harness.make_code(expr, ty))?;
     if success {
         Ok(())
     } else {
@@ -136,9 +140,7 @@ fn assert_lowers_and_compile_fails_with_struct(
     input: LoweringInput<'_>,
     harness: StructHarness<'_>,
 ) -> TestResult {
-    let (success, stderr) = lower_and_compile(input, |expr, ty| {
-        make_struct_harness_body(harness.def, expr, ty)
-    })?;
+    let (success, stderr) = lower_and_compile(input, |expr, ty| harness.make_code(expr, ty))?;
     assert_compile_failed(success, &stderr, harness.expected)
 }
 
