@@ -94,16 +94,24 @@ fn test_failure(message: impl Into<String>) -> Box<dyn Error> {
     Box::new(io::Error::other(message.into()))
 }
 
-/// Helper: lowers an [`ArgValue`] and asserts it compiles successfully.
-fn assert_lowers_and_compiles(input: LoweringInput<'_>) -> TestResult {
-    let (success, stderr) = lower_and_compile(input, wrap_in_harness)?;
+/// Asserts that a compile run succeeded, returning a descriptive error if it
+/// did not.
+fn assert_compile_succeeded(success: bool, stderr: &str, context: &str) -> TestResult {
     if success {
         Ok(())
     } else {
-        Err(test_failure(format!(
-            "expected valid code to compile, but got errors:\n{stderr}"
-        )))
+        Err(test_failure(format!("{context}:\n{stderr}")))
     }
+}
+
+/// Helper: lowers an [`ArgValue`] and asserts it compiles successfully.
+fn assert_lowers_and_compiles(input: LoweringInput<'_>) -> TestResult {
+    let (success, stderr) = lower_and_compile(input, wrap_in_harness)?;
+    assert_compile_succeeded(
+        success,
+        &stderr,
+        "expected valid code to compile, but got errors",
+    )
 }
 
 fn assert_lowers_and_compiles_with_struct(
@@ -111,13 +119,11 @@ fn assert_lowers_and_compiles_with_struct(
     harness: StructHarness<'_>,
 ) -> TestResult {
     let (success, stderr) = lower_and_compile(input, |expr, ty| harness.make_code(expr, ty))?;
-    if success {
-        Ok(())
-    } else {
-        Err(test_failure(format!(
-            "expected valid struct literal to compile, but got errors:\n{stderr}"
-        )))
-    }
+    assert_compile_succeeded(
+        success,
+        &stderr,
+        "expected valid struct literal to compile, but got errors",
+    )
 }
 
 /// Helper: lowers an [`ArgValue`] with a struct definition and asserts compilation fails,
