@@ -312,3 +312,20 @@ fn test_lower_arg_value_map_nested_map_fails() {
         panic!("expected UnsupportedType error for nested maps");
     }
 }
+
+#[test]
+fn test_lower_arg_value_sequence_nested_map_fails() {
+    // List of structs where each element is a map - nested maps aren't supported yet
+    let mut inner = IndexMap::new();
+    inner.insert("x".to_owned(), TheoremValue::String("wrong".to_owned()));
+    let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(inner)]);
+    let ty: syn::Type = syn::parse_str("Vec<Point>").expect("failed to parse type");
+    let result = lower_arg_value("points", &arg, &ty);
+    match result {
+        Err(LoweringError::UnsupportedType { reason, .. }) if reason.contains("nested map") => {
+            // Expected error
+        }
+        Err(err) => panic!("expected UnsupportedType for nested map, got: {err}"),
+        Ok(_) => panic!("expected lowering to fail for nested map (not yet supported)"),
+    }
+}

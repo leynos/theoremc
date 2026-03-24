@@ -23,6 +23,23 @@ struct LoweringInput<'a> {
     ty_str: &'a str,
 }
 
+/// Bundles a Rust struct definition for compile-success tests.
+#[derive(Clone, Copy)]
+struct StructDef<'a> {
+    def: &'a str,
+}
+
+impl StructDef<'_> {
+    /// Wraps a lowered expression in a struct-definition harness ready for
+    /// `rustc`.
+    fn make_code(self, expr: &str, ty: &str) -> String {
+        format!(
+            "{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n",
+            def = self.def
+        )
+    }
+}
+
 /// Bundles a Rust struct definition with the compiler diagnostic fragments
 /// expected when code generation produces an ill-typed struct literal.
 #[derive(Clone, Copy)]
@@ -127,9 +144,9 @@ fn assert_lowers_and_compiles(input: LoweringInput<'_>) -> TestResult {
 
 fn assert_lowers_and_compiles_with_struct(
     input: LoweringInput<'_>,
-    harness: StructHarness<'_>,
+    def: StructDef<'_>,
 ) -> TestResult {
-    let outcome = lower_and_compile(input, |expr, ty| harness.make_code(expr, ty))?;
+    let outcome = lower_and_compile(input, |expr, ty| def.make_code(expr, ty))?;
     assert_compile_succeeded(&outcome)
 }
 
@@ -236,31 +253,6 @@ fn compile_fail_unknown_struct_field() -> TestResult {
 }
 
 #[test]
-fn compile_fail_nested_mismatch_in_list_of_structs() -> TestResult {
-    // List of structs where one field has wrong type.
-    let mut inner = IndexMap::new();
-    inner.insert("x".to_owned(), TheoremValue::String("wrong".to_owned()));
-    let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(inner)]);
-    let ty: syn::Type = syn::parse_str("Vec<Point>")?;
-
-    // This should fail during lowering because nested maps aren't supported yet
-    let result = theoremc::arg_lowering::lower_arg_value("points", &arg, &ty);
-    match result {
-        Err(theoremc::arg_lowering::LoweringError::UnsupportedType { reason, .. })
-            if reason.contains("nested map") =>
-        {
-            Ok(())
-        }
-        Err(err) => Err(test_failure(format!(
-            "expected UnsupportedType for nested map, got: {err}"
-        ))),
-        Ok(_) => Err(test_failure(
-            "expected lowering to fail for nested map (not yet supported)",
-        )),
-    }
-}
-
-#[test]
 fn positive_control_struct_compiles() -> TestResult {
     let mut map = IndexMap::new();
     map.insert("id".to_owned(), TheoremValue::Integer(1));
@@ -272,9 +264,8 @@ fn positive_control_struct_compiles() -> TestResult {
             param: "node",
             ty_str: "Node",
         },
-        StructHarness {
+        StructDef {
             def: "struct Node { id: i32, name: &'static str }",
-            expected: DiagnosticMatch(&[]),
         },
     )
 }
