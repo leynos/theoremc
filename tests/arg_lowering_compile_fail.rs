@@ -47,6 +47,12 @@ impl StructHarness<'_> {
 #[derive(Clone, Copy)]
 struct DiagnosticMatch<'a>(&'a [&'a str]);
 
+/// The outcome of a `rustc` compilation: success flag and captured stderr.
+struct CompileOutcome {
+    success: bool,
+    stderr: String,
+}
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 /// Compiles a Rust snippet and returns `(success, stderr)`.
@@ -89,10 +95,11 @@ pub fn test_harness() {{
 fn lower_and_compile(
     input: LoweringInput<'_>,
     make_code: impl FnOnce(&str, &str) -> String,
-) -> Result<(bool, String), Box<dyn Error>> {
+) -> Result<CompileOutcome, Box<dyn Error>> {
     let ty: syn::Type = syn::parse_str(input.ty_str)?;
     let tokens = theoremc::arg_lowering::lower_arg_value(input.param, input.arg, &ty)?;
-    compile_snippet(&make_code(&tokens.to_string(), input.ty_str))
+    let (success, stderr) = compile_snippet(&make_code(&tokens.to_string(), input.ty_str))?;
+    Ok(CompileOutcome { success, stderr })
 }
 
 fn test_failure(message: impl Into<String>) -> Box<dyn Error> {
@@ -101,34 +108,43 @@ fn test_failure(message: impl Into<String>) -> Box<dyn Error> {
 
 /// Asserts that a compile run succeeded, returning a descriptive error if it
 /// did not.
-fn assert_compile_succeeded(success: bool, stderr: &str) -> TestResult {
-    if success {
+fn assert_compile_succeeded(outcome: &CompileOutcome) -> TestResult {
+    if outcome.success {
         Ok(())
     } else {
         Err(test_failure(format!(
-            "expected compilation to succeed, but got errors:\n{stderr}"
+            "expected compilation to succeed, but got errors:\n{}",
+            outcome.stderr
         )))
     }
 }
 
 /// Helper: lowers an [`ArgValue`] and asserts it compiles successfully.
 fn assert_lowers_and_compiles(input: LoweringInput<'_>) -> TestResult {
-    let (success, stderr) = lower_and_compile(input, wrap_in_harness)?;
-    assert_compile_succeeded(success, &stderr)
+    let outcome = lower_and_compile(input, wrap_in_harness)?;
+    assert_compile_succeeded(&outcome)
+}
+
+fn assert_lowers_and_compiles_with_struct(
+    input: LoweringInput<'_>,
+    harness: StructHarness<'_>,
+) -> TestResult {
+    let outcome = lower_and_compile(input, |expr, ty| harness.make_code(expr, ty))?;
+    assert_compile_succeeded(&outcome)
 }
 
 /// Helper: lowers an [`ArgValue`] with a struct definition and asserts compilation fails,
 /// with at least one of the expected fragments present in stderr.
-fn assert_compile_failed(success: bool, stderr: &str, expected: DiagnosticMatch<'_>) -> TestResult {
-    if success {
+fn assert_compile_failed(outcome: &CompileOutcome, expected: DiagnosticMatch<'_>) -> TestResult {
+    if outcome.success {
         return Err(test_failure("expected compilation to fail"));
     }
-    if expected.0.iter().any(|f| stderr.contains(f)) {
+    if expected.0.iter().any(|f| outcome.stderr.contains(f)) {
         Ok(())
     } else {
         Err(test_failure(format!(
-            "expected one of {:?} in stderr, got:\n{stderr}",
-            expected.0
+            "expected one of {:?} in stderr, got:\n{}",
+            expected.0, outcome.stderr
         )))
     }
 }
@@ -137,8 +153,8 @@ fn assert_lowers_and_compile_fails_with_struct(
     input: LoweringInput<'_>,
     harness: StructHarness<'_>,
 ) -> TestResult {
-    let (success, stderr) = lower_and_compile(input, |expr, ty| harness.make_code(expr, ty))?;
-    assert_compile_failed(success, &stderr, harness.expected)
+    let outcome = lower_and_compile(input, |expr, ty| harness.make_code(expr, ty))?;
+    assert_compile_failed(&outcome, harness.expected)
 }
 
 /// Helper: lowers an [`ArgValue`] and asserts compilation fails, with at least
@@ -147,8 +163,8 @@ fn assert_lowers_and_compile_fails(
     input: LoweringInput<'_>,
     expected: DiagnosticMatch<'_>,
 ) -> TestResult {
-    let (success, stderr) = lower_and_compile(input, wrap_in_harness)?;
-    assert_compile_failed(success, &stderr, expected)
+    let outcome = lower_and_compile(input, wrap_in_harness)?;
+    assert_compile_failed(&outcome, expected)
 }
 
 #[test]
@@ -246,21 +262,21 @@ fn compile_fail_nested_mismatch_in_list_of_structs() -> TestResult {
 
 #[test]
 fn positive_control_struct_compiles() -> TestResult {
-    // Valid struct literal should compile.
     let mut map = IndexMap::new();
     map.insert("id".to_owned(), TheoremValue::Integer(1));
     map.insert("name".to_owned(), TheoremValue::String("test".to_owned()));
     let arg = ArgValue::RawMap(map);
-    let def = "struct Node { id: i32, name: &'static str }";
-    let (success, stderr) = lower_and_compile(
+    assert_lowers_and_compiles_with_struct(
         LoweringInput {
             arg: &arg,
             param: "node",
             ty_str: "Node",
         },
-        |expr, ty| format!("{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n"),
-    )?;
-    assert_compile_succeeded(success, &stderr)
+        StructHarness {
+            def: "struct Node { id: i32, name: &'static str }",
+            expected: DiagnosticMatch(&[]),
+        },
+    )
 }
 
 #[test]
