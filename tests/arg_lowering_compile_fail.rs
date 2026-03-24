@@ -4,10 +4,11 @@
 //! as Rust compilation errors, not theoremc validation errors.
 
 use std::error::Error;
-use std::fs;
 use std::io;
 use std::process::Command;
 
+use camino::Utf8Path;
+use cap_std::{ambient_authority, fs_utf8::Dir};
 use indexmap::IndexMap;
 
 use theoremc::schema::TheoremValue;
@@ -51,17 +52,21 @@ type TestResult = Result<(), Box<dyn Error>>;
 /// Compiles a Rust snippet and returns `(success, stderr)`.
 fn compile_snippet(code: &str) -> Result<(bool, String), Box<dyn std::error::Error>> {
     let temp_dir = tempfile::tempdir()?;
-    let source_path = temp_dir.path().join("test.rs");
-    fs::write(&source_path, code)?;
+    let temp_dir_utf8 = Utf8Path::from_path(temp_dir.path())
+        .ok_or_else(|| io::Error::other("temp dir path is not valid UTF-8"))?;
+    let source_path = temp_dir_utf8.join("test.rs");
+
+    let dir = Dir::open_ambient_dir(temp_dir_utf8, ambient_authority())?;
+    dir.write("test.rs", code)?;
 
     let output = Command::new("rustc")
-        .arg(&source_path)
+        .arg(source_path.as_str())
         .arg("--crate-type=lib")
         .arg("--edition=2024")
         // Emit output inside the temp dir so artefacts don't pollute the
         // project root.
         .arg("--out-dir")
-        .arg(temp_dir.path())
+        .arg(temp_dir_utf8.as_str())
         .output()?;
 
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -224,12 +229,18 @@ fn compile_fail_nested_mismatch_in_list_of_structs() -> TestResult {
 
     // This should fail during lowering because nested maps aren't supported yet
     let result = theoremc::arg_lowering::lower_arg_value("points", &arg, &ty);
-    if result.is_err() {
-        Ok(())
-    } else {
-        Err(test_failure(
+    match result {
+        Err(theoremc::arg_lowering::LoweringError::UnsupportedType { reason, .. })
+            if reason.contains("nested map") =>
+        {
+            Ok(())
+        }
+        Err(err) => Err(test_failure(format!(
+            "expected UnsupportedType for nested map, got: {err}"
+        ))),
+        Ok(_) => Err(test_failure(
             "expected lowering to fail for nested map (not yet supported)",
-        ))
+        )),
     }
 }
 
