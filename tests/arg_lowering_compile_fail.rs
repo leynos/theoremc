@@ -112,14 +112,6 @@ fn assert_lowers_and_compiles(input: LoweringInput<'_>) -> TestResult {
     assert_compile_succeeded(success, &stderr)
 }
 
-fn assert_lowers_and_compiles_with_struct(
-    input: LoweringInput<'_>,
-    harness: StructHarness<'_>,
-) -> TestResult {
-    let (success, stderr) = lower_and_compile(input, |expr, ty| harness.make_code(expr, ty))?;
-    assert_compile_succeeded(success, &stderr)
-}
-
 /// Helper: lowers an [`ArgValue`] with a struct definition and asserts compilation fails,
 /// with at least one of the expected fragments present in stderr.
 fn assert_compile_failed(success: bool, stderr: &str, expected: DiagnosticMatch<'_>) -> TestResult {
@@ -248,17 +240,16 @@ fn positive_control_struct_compiles() -> TestResult {
     map.insert("id".to_owned(), TheoremValue::Integer(1));
     map.insert("name".to_owned(), TheoremValue::String("test".to_owned()));
     let arg = ArgValue::RawMap(map);
-    assert_lowers_and_compiles_with_struct(
+    let def = "struct Node { id: i32, name: &'static str }";
+    let (success, stderr) = lower_and_compile(
         LoweringInput {
             arg: &arg,
             param: "node",
             ty_str: "Node",
         },
-        StructHarness {
-            def: "struct Node { id: i32, name: &'static str }",
-            expected: DiagnosticMatch(&[]),
-        },
-    )
+        |expr, ty| format!("{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n"),
+    )?;
+    assert_compile_succeeded(success, &stderr)
 }
 
 #[test]

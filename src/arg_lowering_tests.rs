@@ -172,20 +172,19 @@ fn test_lower_arg_value_sequence_cases(
 }
 
 #[rstest]
-#[case::nested_ref("ref", "graph", "Vec<Graph>", quote! { vec![graph] })]
+#[case::nested_ref(("ref", "graph"), "Vec<Graph>", quote! { vec![graph] })]
 #[case::nested_literal(
-    "literal",
-    "ref",
+    ("literal", "ref"),
     "Vec<String>",
     quote! { vec!["ref"] }
 )]
 fn test_lower_arg_value_sequence_with_nested_sentinel(
-    #[case] sentinel_key: &str,
-    #[case] payload: &str,
+    #[case] sentinel: (&str, &str),
+    sentinel_map: impl Fn(&str, &str) -> IndexMap<String, TheoremValue>,
     #[case] target_type: &str,
     #[case] expected: proc_macro2::TokenStream,
 ) {
-    let nested_sentinel = sentinel_map()(sentinel_key, payload);
+    let nested_sentinel = sentinel_map(sentinel.0, sentinel.1);
     let arg = ArgValue::RawSequence(vec![TheoremValue::Mapping(nested_sentinel)]);
     let result = lower_ok("items", &arg, target_type).expect("lower_ok failed");
     assert!(tokens_eq(&result, &expected));
