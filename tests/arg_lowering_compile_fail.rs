@@ -23,11 +23,6 @@ struct LoweringInput<'a> {
     ty_str: &'a str,
 }
 
-/// Wraps a lowered expression in a struct-definition harness ready for `rustc`.
-fn make_struct_harness(def: &str, expr: &str, ty: &str) -> String {
-    format!("{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n")
-}
-
 /// Bundles a Rust struct definition for compile-success tests.
 #[derive(Clone, Copy)]
 struct StructDef<'a> {
@@ -38,7 +33,10 @@ impl StructDef<'_> {
     /// Wraps a lowered expression in a struct-definition harness ready for
     /// `rustc`.
     fn make_code(self, expr: &str, ty: &str) -> String {
-        make_struct_harness(self.def, expr, ty)
+        format!(
+            "{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n",
+            def = self.def
+        )
     }
 }
 
@@ -54,7 +52,10 @@ impl StructHarness<'_> {
     /// Wraps a lowered expression in a struct-definition harness ready for
     /// `rustc`.
     fn make_code(self, expr: &str, ty: &str) -> String {
-        make_struct_harness(self.def, expr, ty)
+        format!(
+            "{def}\npub fn test_harness() {{\n    let _value: {ty} = {expr};\n}}\n",
+            def = self.def
+        )
     }
 }
 
