@@ -196,7 +196,7 @@ fn positive_control_scalar_compiles() -> TestResult {
 
 #[test]
 fn compile_fail_wrong_scalar_type_in_struct_field() -> TestResult {
-    // YAML provides an integer for a field that expects a string.
+    // YAML provides a string for a field that expects an integer.
     // The generated code should fail Rust compilation.
     let mut map = IndexMap::new();
     map.insert(
