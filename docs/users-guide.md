@@ -259,11 +259,14 @@ and variable references require the explicit `{ ref: <name> }` wrapper.
 - `ArgValue::Reference(name)` — an explicit variable reference via
   `{ ref: <name> }`. The `name` must be a valid ASCII identifier
   (`^[A-Za-z_][A-Za-z0-9_]*$`) and must not be a Rust reserved keyword.
-- `ArgValue::RawSequence(values)` — a YAML sequence (future: `vec![...]`
-  synthesis).
+- `ArgValue::RawSequence(values)` — a YAML sequence. During proof harness
+  generation (Phase 3), sequences are recursively lowered to `vec![...]` macro
+  expressions. Nested sequences, scalars, and references are supported.
 - `ArgValue::RawMap(map)` — any YAML map that is not a single-key sentinel
-  wrapper (future: struct-literal synthesis). Multi-key maps are never treated
-  as wrappers, even when one of their keys is `ref` or `literal`.
+  wrapper. During proof harness generation (Phase 3), maps are lowered to
+  struct literals using the expected parameter type name. Field values are
+  lowered recursively. Multi-key maps are never treated as wrappers, even when
+  one of their keys is `ref` or `literal`.
 
 **Semantic stability invariant:** adding a new `Let` binding can never silently
 change the meaning of an existing argument that was previously a plain string.
@@ -299,18 +302,37 @@ string. Non-string values are rejected:
 - `{ literal: 42 }` — "literal value must be a string, not an integer".
 - `{ literal: true }` — "literal value must be a string, not a boolean".
 
+**Lowering limitations** (current implementation):
+
+- **Nested maps** within composite values (maps inside lists, or maps as field
+  values within other maps) are not yet supported because field type
+  information requires Phase 3 compile-time type probes. Attempts to lower
+  nested maps produce a clear error directing users to use explicit
+  let-bindings for nested struct construction. Top-level map arguments and
+  lists of scalars/references are fully supported.
+- **Type shape restrictions**: Only simple type paths (`MyStruct`,
+  `module::Type`) are supported as expected parameter types. Generic types,
+  references, and tuple types require explicit handling and may produce
+  unsupported type errors during lowering.
+
 **Supported YAML value forms** (summary):
 
-- YAML booleans → Rust boolean literals.
-- YAML integers → Rust integer literals.
-- YAML floats → Rust float literals.
-- YAML strings → Rust string literals (plain strings are always literals).
-- YAML lists → `vec![...]` (future lowering).
-- YAML maps with exactly one recognized sentinel key are decoded as explicit
-  wrappers: `{ ref: name }` → `ArgValue::Reference`, `{ literal: "text" }` →
-  `ArgValue::Literal`. All other YAML maps (including multi-key maps such as
-  `{ literal: "x", other: 1 }`) pass through as `ArgValue::RawMap` (future:
-  struct-literal synthesis).
+- YAML booleans → Rust boolean literals (`true`, `false`).
+- YAML integers → Rust unsuffixed integer literals (`42`, not `42i64`).
+- YAML floats → Rust unsuffixed float literals (`99.5`, not `99.5f64`).
+- YAML strings → Rust string literals (`"hello"`). Plain strings are always
+  literals.
+- YAML lists → `vec![...]` macro expressions (lowered recursively during Phase
+  3 harness generation). Nested lists, scalars, and references are supported.
+  Empty lists are allowed (`vec![]`).
+- YAML maps → Rust struct literals (lowered during Phase 3 harness generation
+  using the expected parameter type name). Field values are lowered
+  recursively. Unknown fields, missing fields, and type mismatches surface as
+  Rust compilation errors, not theoremc validation errors.
+- Single-key sentinel wrappers: `{ ref: name }` → `ArgValue::Reference`,
+  `{ literal: "text" }` → `ArgValue::Literal`. All other YAML maps (including
+  multi-key maps such as `{ literal: "x", other: 1 }`) pass through as
+  `ArgValue::RawMap` for struct-literal lowering.
 
 ### Error handling
 

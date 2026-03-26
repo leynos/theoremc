@@ -241,7 +241,7 @@ Out of scope: implicit reference inference.
   whose key is not a recognized sentinel pass through as struct-literal
   candidates per TFS-5 §5.3. Acceptance: parser tests cover valid wrapper use
   and deterministic rejection cases. Signposts: `TFS-5`, `ADR-3`.
-- [ ] Implement struct-literal synthesis from YAML maps based on action
+- [x] Implement struct-literal synthesis from YAML maps based on action
   parameter types, plus recursive list lowering to `vec![...]`. Acceptance:
   compile-fail tests show type mismatches are surfaced by Rust compilation.
   Signposts: `TFS-5`, `DES-5`.

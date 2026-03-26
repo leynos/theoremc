@@ -21,17 +21,16 @@ Invalid literal wrappers (where the value is not a string, such as
 `{ literal: 42 }` or `{ literal: true }`) are rejected with actionable error
 messages at load time. The sentinel dispatch is unified: single-key maps whose
 key is `"ref"` or `"literal"` are intercepted as wrappers; all other maps
-(including multi-key maps that happen to contain `ref` or `literal` among
-their keys) pass through as `ArgValue::RawMap` for future struct-literal
-synthesis (Step 2.3.3)[^3].
+(including multi-key maps that happen to contain `ref` or `literal` among their
+keys) pass through as `ArgValue::RawMap` for future struct-literal synthesis
+(Step 2.3.3)[^3].
 
-Observable success: loading a `.theorem` file containing
-`{ literal: "graph" }` produces
-`ArgValue::Literal(LiteralValue::String("graph"))`. Loading a file containing
-`{ literal: 42 }` fails with an error message containing `"literal value must
-be a string"`. Running `make check-fmt`, `make lint`, and `make test` all
-pass. The `docs/users-guide.md` reference to `{ literal: "text" }` is
-upgraded from "(future)" to documented behaviour.
+Observable success: loading a `.theorem` file containing `{ literal: "graph" }`
+produces `ArgValue::Literal(LiteralValue::String("graph"))`. Loading a file
+containing `{ literal: 42 }` fails with an error message containing
+`"literal value must be a string"`. Running `make check-fmt`, `make lint`, and
+`make test` all pass. The `docs/users-guide.md` reference to
+`{ literal: "text" }` is upgraded from "(future)" to documented behaviour.
 
 ## Constraints
 
@@ -72,20 +71,16 @@ upgraded from "(future)" to documented behaviour.
 
 - Risk: Adding the `NonStringLiteralValue` variant to `ArgDecodeError` is a
   public enum change. Any downstream consumer matching exhaustively will see a
-  compile error.
-  Severity: low.
-  Likelihood: low (the enum already had 4 variants added in Step 2.3.1;
-  consumers are expected to handle new variants).
-  Mitigation: this is an additive change, consistent with Step 2.3.1
-  precedent.
+  compile error. Severity: low. Likelihood: low (the enum already had 4
+  variants added in Step 2.3.1; consumers are expected to handle new variants).
+  Mitigation: this is an additive change, consistent with Step 2.3.1 precedent.
 
 - Risk: The unified `classify_sentinel` refactoring accidentally changes
-  behaviour for existing ref-wrapper edge cases.
-  Severity: medium.
-  Likelihood: low (the existing test suite has 16 unit tests and 5 BDD
-  scenarios covering ref behaviour).
-  Mitigation: all existing tests must pass before and after the refactoring.
-  The refactoring is a structural change to `decode_mapping` internals only.
+  behaviour for existing ref-wrapper edge cases. Severity: medium. Likelihood:
+  low (the existing test suite has 16 unit tests and 5 BDD scenarios covering
+  ref behaviour). Mitigation: all existing tests must pass before and after the
+  refactoring. The refactoring is a structural change to `decode_mapping`
+  internals only.
 
 ## Progress
 
@@ -105,47 +100,41 @@ upgraded from "(future)" to documented behaviour.
 ## Surprises & discoveries
 
 - Observation: Clippy rejects `.expect()` in production code due to the
-  project's `clippy::expect_used` deny policy.
-  Evidence: `make lint` failed on `map.into_values().next().expect(...)` in
-  `decode_mapping`.
-  Impact: used `let Some(value) = ... else { return ... }` pattern instead,
-  consistent with the original `decode_mapping` implementation.
+  project's `clippy::expect_used` deny policy. Evidence: `make lint` failed on
+  `map.into_values().next().expect(...)` in `decode_mapping`. Impact: used
+  `let Some(value) = ... else { return ... }` pattern instead, consistent with
+  the original `decode_mapping` implementation.
 
 ## Decision log
 
 - Decision: Use a `SentinelKind` enum and `classify_sentinel` helper instead
-  of adding a second `is_literal_wrapper` predicate alongside
-  `is_ref_wrapper`.
+  of adding a second `is_literal_wrapper` predicate alongside `is_ref_wrapper`.
   Rationale: a unified dispatch is cleaner, eliminates the chance of the two
   predicates falling out of sync, and makes it trivial to add future sentinel
   keys. The existing `is_ref_wrapper` function is private, so removing it has
-  no API impact.
-  Date/Author: 2026-03-05 / plan author.
+  no API impact. Date/Author: 2026-03-05 / plan author.
 
 - Decision: `{ literal: "" }` (empty string) is accepted as valid. Unlike
   `{ ref: "" }` which is rejected because empty is not a valid identifier, an
-  empty string is a legitimate string literal.
-  Rationale: the purpose of `{ literal: ... }` is to force string literal
-  interpretation. Rejecting empty strings would be surprising to users.
-  Date/Author: 2026-03-05 / plan author.
+  empty string is a legitimate string literal. Rationale: the purpose of
+  `{ literal: ... }` is to force string literal interpretation. Rejecting empty
+  strings would be surprising to users. Date/Author: 2026-03-05 / plan author.
 
 - Decision: Multi-key maps containing `literal` or `ref` as one of their keys
   pass through as `ArgValue::RawMap`, per TFS-5 section 5.3. The "reject
   ambiguous wrapper maps" acceptance criterion is satisfied by rejecting
   single-key `{ literal: <non-string> }` maps deterministically rather than
-  silently passing them through as `RawMap`.
-  Rationale: TFS-5 section 5.3 says only single-key sentinel maps are
-  intercepted. Multi-key maps are always struct literal candidates. A map like
-  `{ literal: 42 }` that looks like it intends to be a literal wrapper but has
-  the wrong value type must not silently become a struct literal candidate --
-  it must be an error.
+  silently passing them through as `RawMap`. Rationale: TFS-5 section 5.3 says
+  only single-key sentinel maps are intercepted. Multi-key maps are always
+  struct literal candidates. A map like `{ literal: 42 }` that looks like it
+  intends to be a literal wrapper but has the wrong value type must not
+  silently become a struct literal candidate -- it must be an error.
   Date/Author: 2026-03-05 / plan author.
 
 - Decision: Name the new error variant `NonStringLiteralValue` (not
-  `NonStringLiteralTarget`).
-  Rationale: semantic accuracy -- the `literal` wrapper carries a "value"
-  while the `ref` wrapper carries a "target" (an identifier name).
-  Date/Author: 2026-03-05 / plan author.
+  `NonStringLiteralTarget`). Rationale: semantic accuracy -- the `literal`
+  wrapper carries a "value" while the `ref` wrapper carries a "target" (an
+  identifier name). Date/Author: 2026-03-05 / plan author.
 
 ## Outcomes & retrospective
 
@@ -172,32 +161,32 @@ Implementation completed successfully. All acceptance criteria met:
   design decision.
 
 Lesson learned: the `clippy::expect_used` deny policy requires using
-`let Some(...) = ... else { return ... }` instead of `.expect()` even in
-cases where the precondition is provably satisfied. This is consistent with
-the project's zero-panic policy.
+`let Some(...) = ... else { return ... }` instead of `.expect()` even in cases
+where the precondition is provably satisfied. This is consistent with the
+project's zero-panic policy.
 
 ## Context and orientation
 
 The `theoremc` library parses `.theorem` files (YAML) into strongly-typed Rust
 structures. Action calls within theorems have `args` maps where each value is
-decoded from raw YAML (`TheoremValue`) into a semantic `ArgValue`. The
-decoding logic lives in `src/schema/arg_value.rs`.
+decoded from raw YAML (`TheoremValue`) into a semantic `ArgValue`. The decoding
+logic lives in `src/schema/arg_value.rs`.
 
-Key files and their roles (pre-change baseline — see stages B–D for
-the changes introduced by this plan):
+Key files and their roles (pre-change baseline — see stages B–D for the changes
+introduced by this plan):
 
 `src/schema/arg_value.rs` (243 lines) is the core module. It contains:
 
 - `ArgDecodeError` enum (4 variants: `EmptyRefTarget`, `InvalidIdentifier`,
-  `ReservedKeyword`, `NonStringRefTarget`). Each variant carries a `param:
-  String` field for diagnostic context.
+  `ReservedKeyword`, `NonStringRefTarget`). Each variant carries a
+  `param: String` field for diagnostic context.
 - `ArgValue` enum (4 variants: `Literal`, `Reference`, `RawSequence`,
   `RawMap`).
 - `LiteralValue` enum (4 variants: `Bool`, `Integer`, `Float`, `String`).
 - `decode_arg_value(param_name, TheoremValue) -> Result<ArgValue,
-  ArgDecodeError>` is the public entry point. It dispatches scalars to
-  `Literal`, sequences to `RawSequence`, and mappings to the private
-  `decode_mapping` function.
+  ArgDecodeError>` is the public entry point. It dispatches scalars to `Literal
+  `, sequences to `RawSequence`, and mappings to the private `decode_mapping
+  ` function.
 - `decode_mapping(param_name, map)` is private. It checks `is_ref_wrapper` and
   either validates the ref target or returns `ArgValue::RawMap`.
 - `is_ref_wrapper(map)` is a private predicate checking
@@ -209,18 +198,17 @@ the changes introduced by this plan):
   labels for error messages.
 - `const REF_KEY: &str = "ref"` is the existing sentinel key constant.
 
-`src/schema/arg_value_tests.rs` (166 lines) contains 16 unit tests included
-via the `#[path]` attribute. Tests cover scalar decoding, valid ref decoding,
+`src/schema/arg_value_tests.rs` (166 lines) contains 16 unit tests included via
+the `#[path]` attribute. Tests cover scalar decoding, valid ref decoding,
 invalid ref decoding (empty, keyword, invalid identifier, non-string), and
-pass-through forms (single-key non-ref map, multi-key map with ref, empty
-map, sequence).
+pass-through forms (single-key non-ref map, multi-key map with ref, empty map,
+sequence).
 
-`src/schema/raw_action.rs` (196 lines) contains raw serde types and
-conversion functions. The `remap_with_prefix` function (line 177) exhaustively
-matches all 4 `ArgDecodeError` variants to prepend breadcrumb context for
-nested `maybe.do` steps. Any new variant added to `ArgDecodeError` must be
-handled in this function, or Clippy's exhaustive-match lint will fail
-compilation.
+`src/schema/raw_action.rs` (196 lines) contains raw serde types and conversion
+functions. The `remap_with_prefix` function (line 177) exhaustively matches all
+4 `ArgDecodeError` variants to prepend breadcrumb context for nested `maybe.do`
+steps. Any new variant added to `ArgDecodeError` must be handled in this
+function, or Clippy's exhaustive-match lint will fail compilation.
 
 `src/schema/raw.rs` (391 lines) contains `RawDocDecodeError` which wraps
 `ArgDecodeError` as `#[source]`. This does not need modification because it
@@ -274,8 +262,8 @@ NonStringLiteralValue {
 },
 ```
 
-In `src/schema/raw_action.rs`, add a new match arm in `remap_with_prefix`
-after the `NonStringRefTarget` arm (after line 193):
+In `src/schema/raw_action.rs`, add a new match arm in `remap_with_prefix` after
+the `NonStringRefTarget` arm (after line 193):
 
 ```rust
 ArgDecodeError::NonStringLiteralValue { param, kind } => {
@@ -292,8 +280,7 @@ Validation: `make lint` and `make test` pass with no regressions.
 
 In `src/schema/arg_value.rs`, make the following changes:
 
-**Add the literal key constant** after the existing `REF_KEY` (after
-line 17):
+**Add the literal key constant** after the existing `REF_KEY` (after line 17):
 
 ```rust
 /// The sentinel YAML map key that identifies an explicit string literal.
@@ -313,8 +300,8 @@ enum SentinelKind {
 }
 ```
 
-**Replace `is_ref_wrapper`** (lines 191-193) with a unified
-`classify_sentinel` function:
+**Replace `is_ref_wrapper`** (lines 191-193) with a unified `classify_sentinel`
+function:
 
 ```rust
 /// Classifies a single-key map as a recognized sentinel wrapper, or
@@ -407,8 +394,8 @@ A `// -- Literal wrapper decoding` section with:
   asserts `ArgValue::Literal(LiteralValue::String(expected))`.
 
 - `literal_with_non_string_value_is_rejected` -- rstest parametric with cases:
-  `Integer(42)` / `"an integer"`, `Bool(true)` / `"a boolean"`,
-  `Float(1.0)` / `"a float"`, `Sequence(vec![...])` / `"a sequence"`,
+  `Integer(42)` / `"an integer"`, `Bool(true)` / `"a boolean"`, `Float(1.0)` /
+  `"a float"`, `Sequence(vec![...])` / `"a sequence"`,
   `Mapping(IndexMap::from([...]))` / `"a mapping"`. Each asserts
   `ArgDecodeError::NonStringLiteralValue`.
 
@@ -488,8 +475,8 @@ following the existing pattern: `#[given("...")]` no-op functions,
 `#[scenario(path = "...", name = "...")]` wiring functions.
 
 The "decoded as string literal" then-step loads
-`valid_arg_literal_wrapper.theorem`, extracts the `"label"` arg from the
-first Let binding, and asserts it equals
+`valid_arg_literal_wrapper.theorem`, extracts the `"label"` arg from the first
+Let binding, and asserts it equals
 `ArgValue::Literal(LiteralValue::String("graph".into()))`.
 
 The "rejected" then-step loads `invalid_arg_literal_non_string.theorem` and
@@ -514,10 +501,10 @@ In `docs/users-guide.md`:
 In `docs/theoremc-design.md`:
 
 - Insert a new subsection `### 6.7.9 Implementation decisions (Step 2.3.2)`
-  before section 6.8 (line 891), documenting: the `NonStringLiteralValue`
-  error variant, the unified `classify_sentinel` dispatch replacing
-  `is_ref_wrapper`, empty string acceptance in `{ literal: "" }`, and
-  multi-key map pass-through behaviour.
+  before section 6.8 (line 891), documenting: the `NonStringLiteralValue` error
+  variant, the unified `classify_sentinel` dispatch replacing `is_ref_wrapper`,
+  empty string acceptance in `{ literal: "" }`, and multi-key map pass-through
+  behaviour.
 
 In `docs/roadmap.md`:
 
@@ -605,8 +592,8 @@ set -o pipefail; make markdownlint 2>&1 | tee /tmp/gate-md.log
 ## Idempotence and recovery
 
 All stages are idempotent. The refactoring of `decode_mapping` replaces the
-existing function body entirely, so partial application is not a concern. If
-a stage fails partway through, fix the issue and re-run the stage's validation
+existing function body entirely, so partial application is not a concern. If a
+stage fails partway through, fix the issue and re-run the stage's validation
 commands. If the implementation is abandoned, `git checkout -- .` restores the
 working tree.
 
