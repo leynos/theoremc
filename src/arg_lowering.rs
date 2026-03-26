@@ -9,6 +9,11 @@
 //! consumes decoded argument values and type information, but does not
 //! participate in YAML deserialization or semantic validation.
 
+#![allow(
+    dead_code,
+    reason = "Internal API reserved for future code generator use"
+)]
+
 use indexmap::IndexMap;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -18,7 +23,7 @@ use crate::schema::arg_value::{ArgValue, LiteralValue, decode_arg_value};
 
 /// Errors produced during argument lowering.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
-pub enum LoweringError {
+pub(crate) enum LoweringError {
     /// The expected type shape is not supported for lowering.
     #[error("unsupported type shape for parameter '{param}': {reason}")]
     UnsupportedType {
@@ -84,7 +89,7 @@ pub enum LoweringError {
 /// let tokens = lower_arg_value("count", &value, &ty)?;
 /// // tokens represents: 42
 /// ```
-pub fn lower_arg_value(
+pub(crate) fn lower_arg_value(
     param_name: &str,
     value: &ArgValue,
     expected_type: &syn::Type,
@@ -290,3 +295,7 @@ fn extract_type_path(param_name: &str, ty: &syn::Type) -> Result<syn::Path, Lowe
 #[cfg(test)]
 #[path = "arg_lowering_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "arg_lowering_compile_fail_tests.rs"]
+mod compile_fail_tests;

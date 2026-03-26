@@ -15,4 +15,4 @@ pub mod schema;
 
 /// Argument-expression lowering for proof harness code generation.
 #[doc(hidden)]
-pub mod arg_lowering;
+pub(crate) mod arg_lowering;

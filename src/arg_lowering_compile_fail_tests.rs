@@ -11,8 +11,8 @@ use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use indexmap::IndexMap;
 
-use theoremc::schema::TheoremValue;
-use theoremc::schema::arg_value::ArgValue;
+use crate::schema::TheoremValue;
+use crate::schema::arg_value::ArgValue;
 
 /// Bundles the three inputs that every lowering call requires, reducing
 /// string-heavy argument lists.
@@ -114,7 +114,7 @@ fn lower_and_compile(
     make_code: impl FnOnce(&str, &str) -> String,
 ) -> Result<CompileOutcome, Box<dyn Error>> {
     let ty: syn::Type = syn::parse_str(input.ty_str)?;
-    let tokens = theoremc::arg_lowering::lower_arg_value(input.param, input.arg, &ty)?;
+    let tokens = super::lower_arg_value(input.param, input.arg, &ty)?;
     let (success, stderr) = compile_snippet(&make_code(&tokens.to_string(), input.ty_str))?;
     Ok(CompileOutcome { success, stderr })
 }
@@ -187,7 +187,7 @@ fn assert_lowers_and_compile_fails(
 #[test]
 fn positive_control_scalar_compiles() -> TestResult {
     // This test verifies our compile harness works by checking a valid case compiles.
-    let arg = ArgValue::Literal(theoremc::schema::arg_value::LiteralValue::Integer(42));
+    let arg = ArgValue::Literal(crate::schema::arg_value::LiteralValue::Integer(42));
     assert_lowers_and_compiles(LoweringInput {
         arg: &arg,
         param: "x",
