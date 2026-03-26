@@ -9,9 +9,11 @@
 //! consumes decoded argument values and type information, but does not
 //! participate in YAML deserialization or semantic validation.
 
+// Clippy wants #[expect] instead of #[allow], but #[expect] triggers warnings when
+// the code is actually used (which it is, by tests). Suppress the lint at module level.
 #![allow(
-    dead_code,
-    reason = "Internal API reserved for future code generator use"
+    clippy::allow_attributes,
+    reason = "Code is used by tests, so #[expect] would trigger unfulfilled warnings"
 )]
 
 use indexmap::IndexMap;
@@ -22,6 +24,7 @@ use crate::schema::TheoremValue;
 use crate::schema::arg_value::{ArgValue, LiteralValue, decode_arg_value};
 
 /// Errors produced during argument lowering.
+#[allow(dead_code, reason = "Reserved for future code generator use (Phase 2)")]
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
 pub(crate) enum LoweringError {
     /// The expected type shape is not supported for lowering.
@@ -89,13 +92,17 @@ pub(crate) enum LoweringError {
 /// let tokens = lower_arg_value("count", &value, &ty)?;
 /// // tokens represents: 42
 /// ```
+#[allow(
+    dead_code,
+    reason = "Primary lowering entry point reserved for code generator (Phase 2)"
+)]
 pub(crate) fn lower_arg_value(
     param_name: &str,
     value: &ArgValue,
     expected_type: &syn::Type,
 ) -> Result<TokenStream, LoweringError> {
     match value {
-        ArgValue::Literal(lit) => Ok(lower_literal(lit)),
+        ArgValue::Literal(lit) => lower_literal(param_name, lit),
         ArgValue::Reference(name) => lower_reference(param_name, name),
         ArgValue::RawSequence(elements) => lower_sequence(param_name, elements),
         ArgValue::RawMap(fields) => lower_map(param_name, fields, expected_type),
@@ -103,20 +110,39 @@ pub(crate) fn lower_arg_value(
 }
 
 /// Lowers a scalar [`LiteralValue`] to a Rust literal token.
-fn lower_literal(value: &LiteralValue) -> TokenStream {
+///
+/// # Errors
+///
+/// Returns [`LoweringError::UnsupportedType`] if the float value is non-finite
+/// (NaN or infinity), since `proc_macro2::Literal::f64_unsuffixed` panics on
+/// such values.
+#[allow(
+    dead_code,
+    reason = "Helper for lower_arg_value; used in Phase 2 code generation"
+)]
+fn lower_literal(param_name: &str, value: &LiteralValue) -> Result<TokenStream, LoweringError> {
     match value {
-        LiteralValue::Bool(b) => quote! { #b },
+        LiteralValue::Bool(b) => Ok(quote! { #b }),
         LiteralValue::Integer(n) => {
             // Use unsuffixed literal to avoid type suffix (42 not 42i64)
             let lit = proc_macro2::Literal::i64_unsuffixed(*n);
-            quote! { #lit }
+            Ok(quote! { #lit })
         }
         LiteralValue::Float(f) => {
+            // Reject non-finite floats before calling f64_unsuffixed to avoid panics
+            if !f.is_finite() {
+                return Err(LoweringError::UnsupportedType {
+                    param: param_name.to_owned(),
+                    reason: format!(
+                        "non-finite float value ({f}) is not supported in literal lowering"
+                    ),
+                });
+            }
             // Use a literal token for the float to preserve notation
             let lit = proc_macro2::Literal::f64_unsuffixed(*f);
-            quote! { #lit }
+            Ok(quote! { #lit })
         }
-        LiteralValue::String(s) => quote! { #s },
+        LiteralValue::String(s) => Ok(quote! { (#s).into() }),
     }
 }
 
@@ -126,6 +152,10 @@ fn lower_literal(value: &LiteralValue) -> TokenStream {
 ///
 /// Returns [`LoweringError::NestedDecodeError`] if the identifier name
 /// cannot be parsed as a valid Rust identifier.
+#[allow(
+    dead_code,
+    reason = "Helper for lower_arg_value; used in Phase 2 code generation"
+)]
 fn lower_reference(param_name: &str, name: &str) -> Result<TokenStream, LoweringError> {
     // Parse the identifier and emit it as a path expression.
     // The identifier was already validated by schema::arg_value decoding,
@@ -142,6 +172,10 @@ fn lower_reference(param_name: &str, name: &str) -> Result<TokenStream, Lowering
 ///
 /// Each element is recursively decoded and lowered. Nested sequences,
 /// maps, scalars, and references are all handled.
+#[allow(
+    dead_code,
+    reason = "Helper for lower_arg_value; used in Phase 2 code generation"
+)]
 fn lower_sequence(
     param_name: &str,
     elements: &[TheoremValue],
@@ -163,16 +197,20 @@ fn lower_sequence(
 /// to references or literals respectively. Only genuinely non-sentinel
 /// maps (decoded as `ArgValue::RawMap`) are rejected, since struct literal
 /// synthesis requires type information not available at this nesting depth.
+#[allow(
+    dead_code,
+    reason = "Helper for lower_sequence/lower_map; used in Phase 2 code generation"
+)]
 fn lower_theorem_value(
     param_name: &str,
     value: &TheoremValue,
 ) -> Result<TokenStream, LoweringError> {
     match value {
         // Reuse lower_literal for scalar values to avoid duplication
-        TheoremValue::Bool(b) => Ok(lower_literal(&LiteralValue::Bool(*b))),
-        TheoremValue::Integer(n) => Ok(lower_literal(&LiteralValue::Integer(*n))),
-        TheoremValue::Float(f) => Ok(lower_literal(&LiteralValue::Float(*f))),
-        TheoremValue::String(s) => Ok(lower_literal(&LiteralValue::String(s.clone()))),
+        TheoremValue::Bool(b) => lower_literal(param_name, &LiteralValue::Bool(*b)),
+        TheoremValue::Integer(n) => lower_literal(param_name, &LiteralValue::Integer(*n)),
+        TheoremValue::Float(f) => lower_literal(param_name, &LiteralValue::Float(*f)),
+        TheoremValue::String(s) => lower_literal(param_name, &LiteralValue::String(s.clone())),
         TheoremValue::Sequence(elements) => lower_sequence(param_name, elements),
         TheoremValue::Mapping(fields) => {
             // Attempt sentinel decoding first: maps like { ref: graph } or
@@ -185,7 +223,7 @@ fn lower_theorem_value(
                 }
             })?;
             match decoded {
-                ArgValue::Literal(lit) => Ok(lower_literal(&lit)),
+                ArgValue::Literal(lit) => lower_literal(param_name, &lit),
                 ArgValue::Reference(name) => lower_reference(param_name, &name),
                 // Non-sentinel maps lack the type information needed for
                 // struct literal synthesis at this nesting depth. Phase 3
@@ -214,6 +252,10 @@ fn lower_theorem_value(
 /// The struct type name is extracted from `expected_type`. Field values
 /// are lowered recursively. No validation of field names or types is
 /// performed here; mismatches will surface during Rust compilation.
+#[allow(
+    dead_code,
+    reason = "Helper for lower_arg_value; used in Phase 2 code generation"
+)]
 fn lower_map(
     param_name: &str,
     fields: &IndexMap<String, TheoremValue>,
@@ -253,6 +295,10 @@ fn lower_map(
 /// `module::Type`. Returns an error for generic paths (`Vec<i32>`),
 /// qualified-self paths (`<T as Trait>::Assoc`), references, tuples,
 /// and other unsupported type shapes.
+#[allow(
+    dead_code,
+    reason = "Helper for lower_map; used in Phase 2 code generation"
+)]
 fn extract_type_path(param_name: &str, ty: &syn::Type) -> Result<syn::Path, LoweringError> {
     let unsupported = |reason: String| LoweringError::UnsupportedType {
         param: param_name.to_owned(),

@@ -42,7 +42,7 @@ fn test_lower_literal_bool(
     #[case] value: LiteralValue,
     #[case] expected: proc_macro2::TokenStream,
 ) {
-    let result = lower_literal(&value);
+    let result = lower_literal("test_param", &value).expect("lowering should succeed");
     assert!(tokens_eq(&result, &expected));
 }
 
@@ -51,30 +51,45 @@ fn test_lower_literal_bool(
 #[case::negative(-99, "- 99")]
 #[case::zero(0, "0")]
 fn test_lower_literal_integer(#[case] n: i64, #[case] expected: &str) {
-    let result = lower_literal(&LiteralValue::Integer(n));
+    let result =
+        lower_literal("test_param", &LiteralValue::Integer(n)).expect("lowering should succeed");
     assert_eq!(result.to_string(), expected);
 }
 
 #[test]
 fn test_lower_literal_float() {
     let value = LiteralValue::Float(99.5);
-    let result = lower_literal(&value);
+    let result = lower_literal("test_param", &value).expect("lowering should succeed");
     // Compare string representation for floats
     assert_eq!(result.to_string(), "99.5");
 }
 
 #[rstest]
-#[case::simple(LiteralValue::String("hello".to_owned()), quote! { "hello" })]
-#[case::empty(LiteralValue::String(String::new()), quote! { "" })]
+#[case::nan(f64::NAN)]
+#[case::infinity(f64::INFINITY)]
+#[case::neg_infinity(f64::NEG_INFINITY)]
+fn test_lower_literal_float_non_finite_rejected(#[case] non_finite: f64) {
+    let value = LiteralValue::Float(non_finite);
+    let result = lower_literal("test_param", &value);
+    assert!(matches!(result, Err(LoweringError::UnsupportedType { .. })));
+    if let Err(LoweringError::UnsupportedType { param, reason }) = result {
+        assert_eq!(param, "test_param");
+        assert!(reason.contains("non-finite"));
+    }
+}
+
+#[rstest]
+#[case::simple(LiteralValue::String("hello".to_owned()), quote! { ("hello").into() })]
+#[case::empty(LiteralValue::String(String::new()), quote! { ("").into() })]
 #[case::with_escapes(
     LiteralValue::String("hello\nworld".to_owned()),
-    quote! { "hello\nworld" }
+    quote! { ("hello\nworld").into() }
 )]
 fn test_lower_literal_string_cases(
     #[case] input: LiteralValue,
     #[case] expected: proc_macro2::TokenStream,
 ) {
-    let result = lower_literal(&input);
+    let result = lower_literal("test_param", &input).expect("lowering should succeed");
     assert!(tokens_eq(&result, &expected));
 }
 
@@ -112,7 +127,7 @@ fn test_lower_reference_non_identifier_returns_error() {
     ArgValue::Literal(LiteralValue::String("test".to_owned())),
     "name",
     "String",
-    quote! { "test" }
+    quote! { ("test").into() }
 )]
 #[case::reference(
     ArgValue::Reference("binding".to_owned()),
@@ -147,7 +162,7 @@ fn test_lower_arg_value_scalar_cases(
         TheoremValue::String("b".to_owned()),
     ]),
     "Vec<String>",
-    quote! { vec!["a", "b"] }
+    quote! { vec![("a").into(), ("b").into()] }
 )]
 #[case::mixed_scalars(
     ArgValue::RawSequence(vec![TheoremValue::Integer(1), TheoremValue::Bool(true)]),
@@ -176,7 +191,7 @@ fn test_lower_arg_value_sequence_cases(
 #[case::nested_literal(
     ("literal", "ref"),
     "Vec<String>",
-    quote! { vec!["ref"] }
+    quote! { vec![("ref").into()] }
 )]
 fn test_lower_arg_value_sequence_with_nested_sentinel(
     #[case] sentinel: (&str, &str),
@@ -199,7 +214,7 @@ fn test_lower_arg_value_sequence_with_nested_sentinel(
 #[case::nested_literal(
     "name",
     ("literal", "ref"),
-    quote! { Config { name: "ref" } }
+    quote! { Config { name: ("ref").into() } }
 )]
 fn test_lower_arg_value_map_field_with_nested_sentinel(
     #[case] field_name: &str,
@@ -230,7 +245,7 @@ fn test_lower_arg_value_map_field_with_nested_sentinel(
         ("name", TheoremValue::String("test".to_owned())),
         ("active", TheoremValue::Bool(true)),
     ],
-    quote! { Node { id: 1, name: "test", active: true } }
+    quote! { Node { id: 1, name: ("test").into(), active: true } }
 )]
 #[case::list_field(
     vec![
@@ -243,7 +258,7 @@ fn test_lower_arg_value_map_field_with_nested_sentinel(
             ]),
         ),
     ],
-    quote! { Node { id: 1, tags: vec!["a", "b"] } }
+    quote! { Node { id: 1, tags: vec![("a").into(), ("b").into()] } }
 )]
 fn test_lower_arg_value_map_cases(
     #[case] entries: Vec<(&str, TheoremValue)>,

@@ -212,7 +212,10 @@ fn compile_fail_wrong_scalar_type_in_struct_field() -> TestResult {
         },
         StructHarness {
             def: "struct Node { id: i32 }",
-            expected: DiagnosticMatch(&["mismatched types", "expected `i32`, found `&str`"]),
+            expected: DiagnosticMatch(&[
+                "the trait bound `i32: From<&str>` is not satisfied",
+                "E0277",
+            ]),
         },
     )
 }
@@ -230,7 +233,10 @@ fn compile_fail_wrong_list_element_type() -> TestResult {
             param: "nums",
             ty_str: "Vec<i32>",
         },
-        DiagnosticMatch(&["mismatched types", "expected integer"]),
+        DiagnosticMatch(&[
+            "the trait bound `i32: From<&str>` is not satisfied",
+            "E0277",
+        ]),
     )
 }
 
@@ -265,7 +271,7 @@ fn positive_control_struct_compiles() -> TestResult {
             ty_str: "Node",
         },
         StructDef {
-            def: "struct Node { id: i32, name: &'static str }",
+            def: "struct Node { id: i32, name: String }",
         },
     )
 }
