@@ -19,7 +19,9 @@ files. Editing an existing theorem file must therefore cause Cargo to rerun the
 build script on the next build, without requiring `cargo clean` or manual
 touching of Rust source files. This work is intentionally limited to discovery
 and change tracking. Generating `OUT_DIR/theorem_suite.rs` and wiring
-`include!()` remain Step 3.1.2.
+`include!()` remain Step 3.1.2. That later step should be explicitly
+macro-centric: `build.rs` hands over an ordered per-file input list, and the
+proc macro owns as much per-file harness code generation as possible.
 
 Observable success:
 
@@ -52,9 +54,13 @@ inclusion.
 - Scope is limited to Roadmap Step `3.1.1`. Do not generate
   `OUT_DIR/theorem_suite.rs`, call `theorem_file!(...)`, or add `include!()`
   wiring in this change.
-- The implementation must keep theorem discovery reusable for Step `3.1.2`.
-  Discovery logic should therefore return a deterministic data structure that a
-  later suite-generation step can consume without rescanning the filesystem.
+- The implementation must keep theorem discovery reusable for Step `3.1.2`,
+  which should be explicitly macro-centric. Discovery logic should therefore
+  return only the narrow deterministic data needed by that later step, rather
+  than starting its own Rust code-generation pipeline.
+- The handoff from Step `3.1.1` to Step `3.1.2` should stay narrow:
+  `build.rs` produces an ordered crate-relative file list plus rerun metadata,
+  and the proc macro consumes file paths one file at a time.
 - The repository currently has no root-level `build.rs` and no committed
   `theorems/` directory. The new build integration must therefore not break
   builds for crates that have zero theorem files today.
@@ -98,6 +104,9 @@ inclusion.
 - Scope creep: if satisfying the acceptance criteria requires any proc-macro,
   harness-generation, or `include!()` work, stop and split that into the
   already-planned Step `3.1.2` change.
+- Interface drift: if the design starts requiring `build.rs` to know about
+  theorem AST lowering, harness layout, or backend-specific token generation,
+  stop and move that work to the Step `3.1.2` macro plan instead.
 - API churn: if a clean testable design seems to require exposing new public
   library APIs rather than keeping discovery internal to build support, stop
   and document the options before continuing.
@@ -191,6 +200,12 @@ inclusion.
   for `3-1-1-build-rs-scanning-of-theorems`, and splitting the work preserves
   atomic roadmap execution.
 
+- 2026-03-27: keep the architectural seam deliberately narrow between this step
+  and Step `3.1.2`. Rationale: `build.rs` should own crate-wide discovery and
+  Cargo invalidation, while the proc macro should own per-file code generation.
+  Mixing the two would make rebuild semantics and code-generation semantics
+  harder to test and reason about.
+
 - 2026-03-26: plan the implementation around a shared internal helper module
   compiled by both `build.rs` and tests, rather than burying all logic directly
   in the build script. Rationale: the acceptance criteria require unit tests
@@ -277,10 +292,15 @@ build.rs
   -> return BuildDiscovery { theorem_files, watched_directories }
   -> print root directory + watched directories + theorem files via
      cargo::rerun-if-changed=
+
+Step 3.1.2
+  -> consume the ordered theorem file list
+  -> invoke a proc macro one file at a time
+  -> let the macro own per-file Rust item and harness generation
 ```
 
 with the helper producing crate-relative forward-slash path strings in sorted
-order.
+order and nothing more elaborate than that.
 
 ## Plan of work
 
@@ -345,7 +365,9 @@ fn discover_theorem_inputs(manifest_dir: &Utf8Path)
 ```
 
 The error type does not need to be public API, but it must produce actionable
-messages when traversal fails.
+messages when traversal fails. Do not let this helper drift into token
+generation, theorem parsing, or macro-facing backend logic; its job is only to
+prepare a stable ordered file list plus watch metadata.
 
 Write direct tests against this helper covering:
 
@@ -370,7 +392,9 @@ Once the helper is green, add the actual root-level `build.rs`. Keep it small:
 
 Do not generate `OUT_DIR/theorem_suite.rs` in this step. If it helps future
 work, allow the helper to expose sorted theorem files now, but leave the
-generation callsite unused until Step `3.1.2`.
+generation callsite unused until Step `3.1.2`. In particular, do not start
+embedding Rust snippets, macro invocations, or backend-specific scaffolding in
+the build script.
 
 ### Stage D: add behavioural `rstest-bdd` coverage
 
@@ -415,7 +439,9 @@ Update the design and user-facing documentation in the same change:
    - how missing `theorems/` is handled,
    - why discovery normalises and sorts paths, and
    - why directory rerun lines include nested directories if that is the chosen
-     robustness strategy.
+     robustness strategy, and
+   - why Step `3.1.1` deliberately stops at ordered discovery while Step
+     `3.1.2` is reserved for macro-owned per-file code generation.
 2. `docs/users-guide.md`
    Document the new build-time behaviour that library consumers should know:
    - theorem files are auto-discovered from `theorems/**/*.theorem`,
