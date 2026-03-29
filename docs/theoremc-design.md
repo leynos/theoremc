@@ -1188,9 +1188,10 @@ build script:
 
 - scan `theorems/` for `*.theorem`,
 - emit `cargo::rerun-if-changed=<path>` for the directory and each file,
-- generate `OUT_DIR/theorem_suite.rs` containing one `theorem_file!(...)`
-  invocation per file,
-- compile it via `include!()`.
+- hand the ordered theorem path list to Step 3.1.2 so that later step can
+  generate `OUT_DIR/theorem_suite.rs` containing one `theorem_file!(...)`
+  invocation per file, and
+- compile that generated suite via `include!()`.
 
 Cargo documents that `cargo::rerun-if-changed=PATH` reruns the build script
 when the file changes, and if the path is a directory Cargo scans it for
@@ -1198,6 +1199,39 @@ modifications.[^6]
 
 Per-file rerun lines are also emitted for robustness across Cargo versions and
 edge cases.
+
+### 7.1.1 Implementation decisions (Step 3.1.1)
+
+Step 3.1.1 intentionally ships only discovery and Cargo invalidation. The
+generated suite file and `include!()` wiring remain Step 3.1.2 so the proc
+macro can stay the owner of per-file code generation.
+
+The build-discovery helper returns a deterministic crate-relative theorem file
+list plus the watched directories needed for Cargo invalidation. Both path sets
+are normalised to forward-slash form (`theorems/nested/example.theorem`) and
+sorted lexicographically before `build.rs` emits them. This keeps future
+suite-generation input stable across filesystem traversal differences and
+matches the path identity already assumed by the naming rules.
+
+The shipped invalidation contract is:
+
+- `build.rs` always emits `cargo::rerun-if-changed=theorems`, even when the
+  directory is absent.
+- when the directory exists, `build.rs` also emits nested theorem directories
+  plus every discovered `.theorem` file for robustness.
+- only files ending in `.theorem` are returned as theorem inputs; sibling files
+  such as `.txt` or `.yaml` are ignored by discovery.
+
+On the current supported toolchain, watching the missing root `theorems`
+directory is enough for Cargo to rerun the build script after the directory is
+created later. That lets theoremc support the repository's current default
+state, where no `theorems/` directory is committed yet.
+
+Because Cargo treats watched directories as change roots, edits elsewhere under
+the watched `theorems/` tree may still rerun the build script even when the
+edited file is not itself a discovered theorem input. The semantic guarantee of
+Step 3.1.1 is therefore about which files are discovered and emitted as theorem
+inputs, while tolerating conservative reruns from the directory watch.
 
 ### 7.2 The `theorem_file!()` proc macro
 

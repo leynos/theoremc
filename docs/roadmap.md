@@ -260,7 +260,7 @@ suite include wiring.
 
 Out of scope: theorem execution.
 
-- [ ] Implement `build.rs` scanning of `theorems/**/*.theorem` and emission of
+- [x] Implement `build.rs` scanning of `theorems/**/*.theorem` and emission of
   `cargo::rerun-if-changed` lines for directory and file paths. Acceptance:
   build integration tests confirm theorem edits trigger rebuilds reliably.
   Signposts: `DES-7`.
