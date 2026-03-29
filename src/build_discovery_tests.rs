@@ -68,14 +68,16 @@ fn rerun_paths(discovery: &BuildDiscovery) -> Vec<&str> {
     discovery.rerun_paths().map(Utf8Path::as_str).collect()
 }
 
+fn assert_root_watch_only(discovery: &BuildDiscovery) {
+    assert!(discovered_paths(discovery).is_empty());
+    assert_eq!(watched_directories(discovery), vec!["theorems"]);
+    assert_eq!(rerun_paths(discovery), vec!["theorems"]);
+}
+
 #[test]
 fn missing_theorems_directory_returns_root_watch_only() {
     let fixture = DiscoveryFixture::new().expect("temp fixture should be created");
-    let discovery = fixture.discover();
-
-    assert!(discovered_paths(&discovery).is_empty());
-    assert_eq!(watched_directories(&discovery), vec!["theorems"]);
-    assert_eq!(rerun_paths(&discovery), vec!["theorems"]);
+    assert_root_watch_only(&fixture.discover());
 }
 
 #[test]
@@ -84,12 +86,7 @@ fn empty_theorems_directory_returns_root_watch_only() {
     fixture
         .create_dir_all("theorems")
         .expect("theorem root should be created");
-
-    let discovery = fixture.discover();
-
-    assert!(discovered_paths(&discovery).is_empty());
-    assert_eq!(watched_directories(&discovery), vec!["theorems"]);
-    assert_eq!(rerun_paths(&discovery), vec!["theorems"]);
+    assert_root_watch_only(&fixture.discover());
 }
 
 #[test]

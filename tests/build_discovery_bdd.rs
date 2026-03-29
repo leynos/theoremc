@@ -55,16 +55,19 @@ impl FixtureCrate {
             dir,
         };
 
-        fixture.write("Cargo.toml", FIXTURE_CARGO_TOML)?;
-        fixture.write("build.rs", BUILD_SCRIPT_SOURCE)?;
-        fixture.write("src/lib.rs", FIXTURE_LIB_RS)?;
-        fixture.write("src/build_discovery.rs", BUILD_DISCOVERY_SOURCE)?;
+        fixture.write(Utf8Path::new("Cargo.toml"), FIXTURE_CARGO_TOML)?;
+        fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
+        fixture.write(Utf8Path::new("src/lib.rs"), FIXTURE_LIB_RS)?;
+        fixture.write(
+            Utf8Path::new("src/build_discovery.rs"),
+            BUILD_DISCOVERY_SOURCE,
+        )?;
 
         Ok(fixture)
     }
 
-    fn write(&self, path: &str, contents: &str) -> Result<(), String> {
-        if let Some(parent) = Utf8Path::new(path).parent() {
+    fn write(&self, path: &Utf8Path, contents: &str) -> Result<(), String> {
+        if let Some(parent) = path.parent() {
             if !parent.as_str().is_empty() {
                 self.dir
                     .create_dir_all(parent)
@@ -72,15 +75,15 @@ impl FixtureCrate {
             }
         }
         self.dir
-            .write(path, contents)
+            .write(path.as_str(), contents)
             .map_err(|error| error.to_string())
     }
 
-    fn overwrite_in_place(&self, path: &str, contents: &str) -> Result<(), String> {
+    fn overwrite_in_place(&self, path: &Utf8Path, contents: &str) -> Result<(), String> {
         std::fs::write(self.manifest_dir.join(path), contents).map_err(|error| error.to_string())
     }
 
-    fn build(&self) -> Result<String, String> {
+    fn build(&self) -> Result<BuildLog, String> {
         let output = Command::new("cargo")
             .current_dir(&self.manifest_dir)
             .args(["build", "-vv", "--color", "never"])
@@ -93,39 +96,49 @@ impl FixtureCrate {
         );
 
         if output.status.success() {
-            Ok(log)
+            Ok(BuildLog(log))
         } else {
             Err(log)
         }
     }
 }
 
+struct BuildLog(String);
+
+impl BuildLog {
+    fn ran(&self) -> bool {
+        self.0.contains("cargo::rerun-if-changed=theorems")
+    }
+
+    fn contains(&self, needle: &str) -> Result<(), String> {
+        if self.0.contains(needle) {
+            Ok(())
+        } else {
+            Err(format!(
+                "expected build log to contain '{needle}', got:\n{}",
+                self.0
+            ))
+        }
+    }
+
+    fn omits(&self, needle: &str) -> Result<(), String> {
+        if self.0.contains(needle) {
+            Err(format!(
+                "expected build log to omit '{needle}', got:\n{}",
+                self.0
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 fn pause_for_timestamp_tick() {
     thread::sleep(Duration::from_secs(1));
-}
-
-fn build_script_ran(log: &str) -> bool {
-    log.contains("cargo::rerun-if-changed=theorems")
-}
-
-fn log_contains(log: &str, needle: &str) -> Result<(), String> {
-    if log.contains(needle) {
-        Ok(())
-    } else {
-        Err(format!(
-            "expected build log to contain '{needle}', got:\n{log}"
-        ))
-    }
-}
-
-fn log_omits(log: &str, needle: &str) -> Result<(), String> {
-    if log.contains(needle) {
-        Err(format!(
-            "expected build log to omit '{needle}', got:\n{log}"
-        ))
-    } else {
-        Ok(())
-    }
 }
 
 #[given("a crate with nested theorem files")]
@@ -135,38 +148,41 @@ fn given_a_crate_with_nested_theorem_files() {}
 fn then_building_twice_stays_fresh_and_editing_a_theorem_reruns_the_build_script()
 -> Result<(), String> {
     let fixture = FixtureCrate::new()?;
-    fixture.write("theorems/root.theorem", TRIVIAL_THEOREM)?;
-    fixture.write("theorems/nested/alpha.theorem", TRIVIAL_THEOREM)?;
+    fixture.write(Utf8Path::new("theorems/root.theorem"), TRIVIAL_THEOREM)?;
+    fixture.write(
+        Utf8Path::new("theorems/nested/alpha.theorem"),
+        TRIVIAL_THEOREM,
+    )?;
 
     let first_build = fixture.build()?;
-    if !build_script_ran(&first_build) {
+    if !first_build.ran() {
         return Err(format!(
-            "first build should run the build script, got:\n{first_build}"
+            "first build should run the build script, got:\n{}",
+            first_build.as_str()
         ));
     }
-    log_contains(
-        &first_build,
-        "cargo::rerun-if-changed=theorems/nested/alpha.theorem",
-    )?;
-    log_contains(&first_build, "cargo::rerun-if-changed=theorems/nested")?;
+    first_build.contains("cargo::rerun-if-changed=theorems/nested/alpha.theorem")?;
+    first_build.contains("cargo::rerun-if-changed=theorems/nested")?;
 
     let second_build = fixture.build()?;
-    if build_script_ran(&second_build) {
+    if second_build.ran() {
         return Err(format!(
-            "second unchanged build should stay fresh, got:\n{second_build}"
+            "second unchanged build should stay fresh, got:\n{}",
+            second_build.as_str()
         ));
     }
 
     pause_for_timestamp_tick();
     fixture.overwrite_in_place(
-        "theorems/nested/alpha.theorem",
+        Utf8Path::new("theorems/nested/alpha.theorem"),
         &format!("{TRIVIAL_THEOREM}\n# edited\n"),
     )?;
 
     let third_build = fixture.build()?;
-    if !build_script_ran(&third_build) {
+    if !third_build.ran() {
         return Err(format!(
-            "editing a theorem file should rerun the build script, got:\n{third_build}"
+            "editing a theorem file should rerun the build script, got:\n{}",
+            third_build.as_str()
         ));
     }
     Ok(())
@@ -178,20 +194,18 @@ fn given_a_crate_with_ignored_non_theorem_files_under_theorems() {}
 #[then("the build script emits only theorem inputs")]
 fn then_the_build_script_emits_only_theorem_inputs() -> Result<(), String> {
     let fixture = FixtureCrate::new()?;
-    fixture.write("theorems/kept.theorem", TRIVIAL_THEOREM)?;
-    fixture.write("theorems/ignored.txt", "not a theorem")?;
+    fixture.write(Utf8Path::new("theorems/kept.theorem"), TRIVIAL_THEOREM)?;
+    fixture.write(Utf8Path::new("theorems/ignored.txt"), "not a theorem")?;
 
     let first_build = fixture.build()?;
-    if !build_script_ran(&first_build) {
+    if !first_build.ran() {
         return Err(format!(
-            "first build should run the build script, got:\n{first_build}"
+            "first build should run the build script, got:\n{}",
+            first_build.as_str()
         ));
     }
-    log_omits(&first_build, "cargo::rerun-if-changed=theorems/ignored.txt")?;
-    log_contains(
-        &first_build,
-        "cargo::rerun-if-changed=theorems/kept.theorem",
-    )?;
+    first_build.omits("cargo::rerun-if-changed=theorems/ignored.txt")?;
+    first_build.contains("cargo::rerun-if-changed=theorems/kept.theorem")?;
     Ok(())
 }
 
@@ -204,26 +218,25 @@ fn then_creating_theorems_later_reruns_the_build_script_without_manual_seeding()
     let fixture = FixtureCrate::new()?;
 
     let first_build = fixture.build()?;
-    if !build_script_ran(&first_build) {
+    if !first_build.ran() {
         return Err(format!(
-            "first build should run the build script, got:\n{first_build}"
+            "first build should run the build script, got:\n{}",
+            first_build.as_str()
         ));
     }
-    log_contains(&first_build, "cargo::rerun-if-changed=theorems")?;
+    first_build.contains("cargo::rerun-if-changed=theorems")?;
 
     pause_for_timestamp_tick();
-    fixture.write("theorems/first.theorem", TRIVIAL_THEOREM)?;
+    fixture.write(Utf8Path::new("theorems/first.theorem"), TRIVIAL_THEOREM)?;
 
     let second_build = fixture.build()?;
-    if !build_script_ran(&second_build) {
+    if !second_build.ran() {
         return Err(format!(
-            "creating theorems after the first build should rerun the build script, got:\n{second_build}"
+            "creating theorems after the first build should rerun the build script, got:\n{}",
+            second_build.as_str()
         ));
     }
-    log_contains(
-        &second_build,
-        "cargo::rerun-if-changed=theorems/first.theorem",
-    )?;
+    second_build.contains("cargo::rerun-if-changed=theorems/first.theorem")?;
     Ok(())
 }
 
