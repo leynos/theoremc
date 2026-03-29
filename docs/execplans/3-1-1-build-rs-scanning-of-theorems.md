@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -160,18 +160,34 @@ inclusion.
   `Cargo.toml` and existing BDD files under `tests/` provide the local style
   reference.
 - [x] 2026-03-26: drafted this ExecPlan.
-- [ ] Milestone 0: prototype missing-directory and edit-trigger behaviour in an
+- [x] 2026-03-29: prototyped missing-directory behaviour in an isolated Cargo
+  fixture and confirmed that `cargo::rerun-if-changed=theorems` reruns the
+  build script after the directory is created later on the current toolchain.
+- [x] 2026-03-29: added shared build discovery in `src/build_discovery.rs`
+  plus direct unit tests covering missing directories, nested trees, ignored
+  non-`.theorem` files, deterministic ordering, forward-slash normalisation,
+  and rerun path sets.
+- [x] 2026-03-29: added root-level `build.rs` that delegates to the shared
+  helper and emits rerun lines for the watched directories and theorem files.
+- [x] 2026-03-29: added `rstest-bdd` coverage in
+  `tests/build_discovery_bdd.rs` proving first-build execution, no-op rebuild,
+  theorem-edit reruns, missing-directory handling, and ignored-file exclusion
+  from emitted theorem inputs.
+- [x] 2026-03-29: ran `make fmt`, `make markdownlint`, `make nixie`,
+  `make check-fmt`, `make lint`, and `make test`, all through `tee`, and they
+  passed.
+- [x] Milestone 0: prototype missing-directory and edit-trigger behaviour in an
   isolated temporary Cargo fixture so the build contract is proven before the
   final implementation is locked in.
-- [ ] Milestone 1: add a shared discovery helper module and direct unit tests
+- [x] Milestone 1: add a shared discovery helper module and direct unit tests
   for recursion, filtering, sorting, and rerun-path derivation.
-- [ ] Milestone 2: add root-level `build.rs` that delegates to the shared
+- [x] Milestone 2: add root-level `build.rs` that delegates to the shared
   helper and emits `cargo::rerun-if-changed=` lines.
-- [ ] Milestone 3: add behavioural `rstest-bdd` coverage proving first build,
+- [x] Milestone 3: add behavioural `rstest-bdd` coverage proving first build,
   no-op rebuild, and edit-triggered rebuild behaviour.
-- [ ] Milestone 4: update `docs/theoremc-design.md`, `docs/users-guide.md`,
+- [x] Milestone 4: update `docs/theoremc-design.md`, `docs/users-guide.md`,
   and `docs/roadmap.md`.
-- [ ] Milestone 5: run `make fmt`, `make markdownlint`, `make nixie`,
+- [x] Milestone 5: run `make fmt`, `make markdownlint`, `make nixie`,
   `make check-fmt`, `make lint`, and `make test`, each through `tee` with
   `set -o pipefail`.
 
@@ -192,6 +208,14 @@ inclusion.
   `src/mangle_harness.rs` already assume stable crate-relative theorem path
   strings, which makes forward-slash normalisation in discovery important even
   before Step `3.1.2`.
+- 2026-03-29: the missing-directory prototype confirmed that the current Cargo
+  toolchain reruns the build script after `theorems/` is created later, so Step
+  `3.1.1` can support the repository's default no-directory state without
+  requiring a placeholder file.
+- 2026-03-29: watching the root `theorems` directory is conservative. Ignored
+  non-`.theorem` files are filtered out of discovery and are not emitted as
+  theorem inputs, but Cargo may still rerun the build script when that watched
+  directory tree changes.
 
 ## Decision Log
 
@@ -226,17 +250,45 @@ inclusion.
   decision rather than assuming Cargo behaviour. Rationale: the design note
   cites directory watching, but the current repository state makes this detail
   user-visible on day one.
+- 2026-03-29: ship Step `3.1.1` with a shared internal helper compiled by both
+  `build.rs` and unit tests via `#[path = ...]` inclusion. Rationale: this
+  keeps `build.rs` thin without exporting new public API surface just to make
+  discovery testable.
+- 2026-03-29: emit the root `theorems` watch unconditionally and emit nested
+  directories when present, even though that makes reruns conservative for the
+  whole watched tree. Rationale: this preserves missing-directory support and
+  robust nested discovery invalidation, while Step `3.1.1` only promises that
+  non-`.theorem` files are excluded from discovery output, not that they can
+  never provoke a rerun.
 
 ## Outcomes & Retrospective
 
-This section is intentionally incomplete because the plan has not yet been
-executed. Update it during implementation with:
-
-- the final build-discovery contract that shipped,
-- any deviations from the proposed milestones,
-- the exact test suites added,
-- the documentation sections updated, and
-- the final gate results.
+- Final build-discovery contract:
+  - `build.rs` scans only under crate-root `theorems/`.
+  - discovery returns sorted forward-slash crate-relative `.theorem` file paths
+    plus watched directories.
+  - `build.rs` always emits the root `theorems` watch and emits nested
+    directory and theorem-file rerun lines when present.
+  - missing `theorems/` directories are supported on the current toolchain.
+- Deviations from the proposed milestones:
+  - the behavioural coverage for ignored files was narrowed to proving they are
+    excluded from emitted theorem inputs, because the conservative root
+    directory watch means Cargo may still rerun when the watched tree changes.
+- Exact tests added:
+  - `src/build_discovery_tests.rs` direct unit tests.
+  - `tests/build_discovery_bdd.rs` plus
+    `tests/features/build_discovery.feature`.
+- Documentation updated:
+  - `docs/theoremc-design.md`
+  - `docs/users-guide.md`
+  - `docs/roadmap.md`
+- Final gate results:
+  - passed `make fmt`
+  - passed `make markdownlint`
+  - passed `make nixie`
+  - passed `make check-fmt`
+  - passed `make lint`
+  - passed `make test`
 
 ## Context and orientation
 

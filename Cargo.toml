@@ -17,9 +17,14 @@ quote = "1.0.45"
 proc-macro2 = "1.0.106"
 blake3 = "1.8.3"
 camino = "1.2.2"
+cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+
+[build-dependencies]
+camino = "1.2.2"
+cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+thiserror = "2.0.18"
 
 [dev-dependencies]
-cap-std = { version = "4.0.2", features = ["fs_utf8"] }
 rstest = "0.26.1"
 rstest-bdd = "0.5.0"
 rstest-bdd-macros = "0.5.0"
@@ -36,6 +41,9 @@ required-features = ["test-support"]
 [[test]]
 name = "harness_naming_bdd"
 required-features = ["test-support"]
+
+[[test]]
+name = "build_discovery_bdd"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
