@@ -110,26 +110,25 @@ impl BuildLog {
         self.0.contains("cargo::rerun-if-changed=theorems")
     }
 
-    fn contains(&self, needle: &str) -> Result<(), String> {
-        if self.0.contains(needle) {
+    fn check(&self, expect_present: bool, needle: &str) -> Result<(), String> {
+        let found = self.0.contains(needle);
+        if found == expect_present {
             Ok(())
         } else {
+            let verb = if expect_present { "contain" } else { "omit" };
             Err(format!(
-                "expected build log to contain '{needle}', got:\n{}",
+                "expected build log to {verb} '{needle}', got:\n{}",
                 self.0
             ))
         }
     }
 
+    fn contains(&self, needle: &str) -> Result<(), String> {
+        self.check(true, needle)
+    }
+
     fn omits(&self, needle: &str) -> Result<(), String> {
-        if self.0.contains(needle) {
-            Err(format!(
-                "expected build log to omit '{needle}', got:\n{}",
-                self.0
-            ))
-        } else {
-            Ok(())
-        }
+        self.check(false, needle)
     }
 
     fn as_str(&self) -> &str {
