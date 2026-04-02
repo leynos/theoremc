@@ -5,7 +5,7 @@ use std::io;
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 
-use super::{BuildDiscovery, discover_theorem_inputs};
+use super::{BuildDiscovery, BuildDiscoveryError, discover_theorem_inputs};
 
 struct DiscoveryFixture {
     _temp_dir: tempfile::TempDir,
@@ -49,18 +49,13 @@ impl DiscoveryFixture {
 }
 
 fn discovered_paths(discovery: &BuildDiscovery) -> Vec<&str> {
-    discovery
-        .theorem_files
-        .iter()
-        .map(|path| path.as_str())
-        .collect()
+    discovery.theorem_files().map(Utf8Path::as_str).collect()
 }
 
 fn watched_directories(discovery: &BuildDiscovery) -> Vec<&str> {
     discovery
-        .watched_directories
-        .iter()
-        .map(|path| path.as_str())
+        .watched_directories()
+        .map(Utf8Path::as_str)
         .collect()
 }
 
@@ -87,6 +82,32 @@ fn empty_theorems_directory_returns_root_watch_only() {
         .create_dir_all("theorems")
         .expect("theorem root should be created");
     assert_root_watch_only(&fixture.discover());
+}
+
+#[test]
+fn theorem_root_file_returns_not_directory_error() {
+    let fixture = DiscoveryFixture::new().expect("temp fixture should be created");
+    fixture
+        .write("theorems")
+        .expect("theorem root file should be written");
+
+    let error = discover_theorem_inputs(&fixture.manifest_dir)
+        .expect_err("file theorem root should fail discovery");
+    let message = error.to_string();
+
+    match &error {
+        BuildDiscoveryError::TheoremRootNotDirectory { path } => {
+            assert_eq!(path.as_str(), "theorems");
+        }
+        other @ BuildDiscoveryError::Io { .. } => {
+            panic!("expected TheoremRootNotDirectory error, got {other:?}");
+        }
+    }
+
+    assert_eq!(
+        message,
+        "theorem root 'theorems' exists but is not a directory"
+    );
 }
 
 #[test]

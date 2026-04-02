@@ -80,7 +80,7 @@ inclusion.
   suite generation. Normalise discovered path strings to forward-slash form
   (`theorems/nested/example.theorem`) rather than platform-specific separator
   forms.
-- Keep `build.rs` thin. Put traversal, path normalisation, filtering, and
+- Keep `build.rs` thin. Put traversal, path normalization, filtering, and
   rerun-path derivation in a small helper module so the logic is directly
   testable without spawning Cargo for every case.
 - Follow repository filesystem guidance: prefer `cap_std` and `camino` over
@@ -129,7 +129,7 @@ inclusion.
 
 - Risk: raw filesystem traversal order is not stable across platforms or
   filesystems. Mitigation: collect crate-relative theorem paths into a vector,
-  normalise them, and sort before deriving rerun paths or future suite inputs.
+  normalize them, and sort before deriving rerun paths or future suite inputs.
 
 - Risk: testing `build.rs` behaviour inside the live repository can recurse
   into Cargo building the package under test. Mitigation: use temporary fixture
@@ -138,14 +138,14 @@ inclusion.
 
 - Risk: Windows path separators can drift from the forward-slash theorem path
   strings already used by the mangling rules. Mitigation: keep discovery and
-  future suite inputs in normalised forward-slash crate-relative form even when
+  future suite inputs in normalized forward-slash crate-relative form even when
   scanning host-native paths.
 
 - Risk: a monolithic build-discovery function can quickly become a "bumpy road"
   mixture of traversal, filtering, formatting, and emission. Mitigation:
   separate the work into small helper functions such as
   `discover_theorem_files`, `collect_watched_directories`,
-  `normalise_relative_path`, and `emit_rerun_if_changed_lines`.
+  `normalize_relative_path`, and `emit_rerun_if_changed_lines`.
 
 ## Progress
 
@@ -241,10 +241,10 @@ inclusion.
   inside its own integration tests is needlessly fragile and can couple test
   outcomes to workspace state.
 
-- 2026-03-26: plan to sort and normalise theorem paths now, even though Step
+- 2026-03-26: plan to sort and normalize theorem paths now, even though Step
   `3.1.1` only emits rerun lines. Rationale: Step `3.1.2` will need stable
   theorem path ordering to generate deterministic suite files, and doing the
-  normalisation in discovery avoids reinterpreting path identity later.
+  normalization in discovery avoids reinterpreting path identity later.
 
 - 2026-03-26: keep the missing-directory contract as an explicit prototype
   decision rather than assuming Cargo behaviour. Rationale: the design note
@@ -399,7 +399,7 @@ Its responsibilities should be:
 3. include only `.theorem` files;
 4. compute the set of watched directories needed for reliable change
    detection;
-5. normalise discovered theorem file paths into crate-relative forward-slash
+5. normalize discovered theorem file paths into crate-relative forward-slash
    strings; and
 6. sort the final vectors deterministically.
 
@@ -428,7 +428,7 @@ Write direct tests against this helper covering:
 3. nested directories containing `.theorem` files;
 4. ignored sibling files such as `.txt`, `.yaml`, or editor temp files;
 5. deterministic ordering regardless of creation order; and
-6. forward-slash normalisation of returned theorem paths.
+6. forward-slash normalization of returned theorem paths.
 
 ### Stage C: add the thin `build.rs` entrypoint
 
@@ -455,12 +455,12 @@ the user perspective. Prefer three scenarios:
 
 1. `Existing theorem files are discovered recursively`
    - Given a crate with nested theorem files,
-   - when I build twice and then edit one theorem file,
+   - when a build runs twice and then one theorem file is edited,
    - then the second unchanged build stays fresh and the edited build reruns
      the build script.
 2. `Non-theorem files do not participate in discovery`
    - Given sibling files under `theorems/` that do not end in `.theorem`,
-   - when I build and then edit only the ignored file,
+   - when a build runs and then only the ignored file is edited,
    - then Cargo does not rerun the build script because the watched theorem
      inputs are unchanged.
 3. `Missing theorem directory is handled explicitly`
@@ -489,7 +489,7 @@ Update the design and user-facing documentation in the same change:
 1. `docs/theoremc-design.md`
    Add a short implementation-decision subsection under §7.1 describing:
    - how missing `theorems/` is handled,
-   - why discovery normalises and sorts paths, and
+   - why discovery normalizes and sorts paths, and
    - why directory rerun lines include nested directories if that is the chosen
      robustness strategy, and
    - why Step `3.1.1` deliberately stops at ordered discovery while Step

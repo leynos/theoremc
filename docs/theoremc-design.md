@@ -1188,7 +1188,7 @@ build script:
 
 - scan `theorems/` for `*.theorem`,
 - emit `cargo::rerun-if-changed=<path>` for the directory and each file,
-- hand the ordered theorem path list to Step 3.1.2 so that later step can
+- hand the ordered theorem path list to Step 3.1.2 so that a later step can
   generate `OUT_DIR/theorem_suite.rs` containing one `theorem_file!(...)`
   invocation per file, and
 - compile that generated suite via `include!()`.
@@ -1203,12 +1203,12 @@ edge cases.
 ### 7.1.1 Implementation decisions (Step 3.1.1)
 
 Step 3.1.1 intentionally ships only discovery and Cargo invalidation. The
-generated suite file and `include!()` wiring remain Step 3.1.2 so the proc
+generated suite file and `include!()` wiring remain for Step 3.1.2 so the proc
 macro can stay the owner of per-file code generation.
 
 The build-discovery helper returns a deterministic crate-relative theorem file
 list plus the watched directories needed for Cargo invalidation. Both path sets
-are normalised to forward-slash form (`theorems/nested/example.theorem`) and
+are normalized to forward-slash form (`theorems/nested/example.theorem`) and
 sorted lexicographically before `build.rs` emits them. This keeps future
 suite-generation input stable across filesystem traversal differences and
 matches the path identity already assumed by the naming rules.

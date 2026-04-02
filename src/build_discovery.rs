@@ -37,12 +37,19 @@ impl BuildDiscovery {
         self.watched_directories.dedup();
     }
 
+    /// Returns the discovered theorem files in deterministic order.
+    pub(crate) fn theorem_files(&self) -> impl Iterator<Item = &Utf8Path> {
+        self.theorem_files.iter().map(Utf8PathBuf::as_path)
+    }
+
+    /// Returns the watched directories in deterministic order.
+    pub(crate) fn watched_directories(&self) -> impl Iterator<Item = &Utf8Path> {
+        self.watched_directories.iter().map(Utf8PathBuf::as_path)
+    }
+
     /// Returns the exact rerun path order emitted by `build.rs`.
     pub(crate) fn rerun_paths(&self) -> impl Iterator<Item = &Utf8Path> {
-        self.watched_directories
-            .iter()
-            .map(Utf8PathBuf::as_path)
-            .chain(self.theorem_files.iter().map(Utf8PathBuf::as_path))
+        self.watched_directories().chain(self.theorem_files())
     }
 }
 
@@ -74,43 +81,12 @@ pub(crate) enum BuildDiscoveryError {
 pub(crate) fn discover_theorem_inputs(
     manifest_dir: &Utf8Path,
 ) -> Result<BuildDiscovery, BuildDiscoveryError> {
-    let crate_root =
-        Dir::open_ambient_dir(manifest_dir, ambient_authority()).map_err(|source| {
-            BuildDiscoveryError::Io {
-                operation: "open crate root",
-                path: manifest_dir.to_path_buf(),
-                source,
-            }
-        })?;
+    let crate_root = Dir::open_ambient_dir(manifest_dir, ambient_authority())
+        .map_err(|source| io_err("open crate root", manifest_dir, source))?;
     let theorem_root = Utf8Path::new(THEOREMS_DIR);
-
-    match crate_root.metadata(theorem_root) {
-        Ok(metadata) if metadata.is_dir() => {}
-        Ok(_) => {
-            return Err(BuildDiscoveryError::TheoremRootNotDirectory {
-                path: theorem_root.to_path_buf(),
-            });
-        }
-        Err(source) if source.kind() == io::ErrorKind::NotFound => {
-            return Ok(BuildDiscovery::root_only());
-        }
-        Err(source) => {
-            return Err(BuildDiscoveryError::Io {
-                operation: "inspect theorem root",
-                path: theorem_root.to_path_buf(),
-                source,
-            });
-        }
-    }
-
-    let theorem_dir =
-        crate_root
-            .open_dir(theorem_root)
-            .map_err(|source| BuildDiscoveryError::Io {
-                operation: "open theorem directory",
-                path: theorem_root.to_path_buf(),
-                source,
-            })?;
+    let Some(theorem_dir) = open_theorem_root(&crate_root, theorem_root)? else {
+        return Ok(BuildDiscovery::root_only());
+    };
     let mut discovery = BuildDiscovery {
         theorem_files: Vec::new(),
         watched_directories: Vec::new(),
@@ -128,22 +104,15 @@ fn collect_theorem_inputs(
 ) -> Result<(), BuildDiscoveryError> {
     discovery
         .watched_directories
-        .push(normalise_relative_path(relative_dir));
+        .push(relative_dir.to_path_buf());
 
     let entries = directory
         .entries()
-        .map_err(|source| BuildDiscoveryError::Io {
-            operation: "read theorem directory",
-            path: relative_dir.to_path_buf(),
-            source,
-        })?;
+        .map_err(|source| io_err("read theorem directory", relative_dir, source))?;
 
     for entry_result in entries {
-        let entry = entry_result.map_err(|source| BuildDiscoveryError::Io {
-            operation: "read theorem directory entry",
-            path: relative_dir.to_path_buf(),
-            source,
-        })?;
+        let entry = entry_result
+            .map_err(|source| io_err("read theorem directory entry", relative_dir, source))?;
         collect_entry(&entry, relative_dir, discovery)?;
     }
 
@@ -157,36 +126,46 @@ fn collect_entry(
 ) -> Result<(), BuildDiscoveryError> {
     let file_name = entry
         .file_name()
-        .map_err(|source| BuildDiscoveryError::Io {
-            operation: "read theorem entry name",
-            path: relative_dir.to_path_buf(),
-            source,
-        })?;
+        .map_err(|source| io_err("read theorem entry name", relative_dir, source))?;
     let relative_path = relative_dir.join(&file_name);
     let file_type = entry
         .file_type()
-        .map_err(|source| BuildDiscoveryError::Io {
-            operation: "inspect theorem entry",
-            path: relative_path.clone(),
-            source,
-        })?;
+        .map_err(|source| io_err("inspect theorem entry", &relative_path, source))?;
 
     if file_type.is_dir() {
-        let child_dir = entry.open_dir().map_err(|source| BuildDiscoveryError::Io {
-            operation: "open theorem directory",
-            path: relative_path.clone(),
-            source,
-        })?;
+        let child_dir = entry
+            .open_dir()
+            .map_err(|source| io_err("open theorem directory", &relative_path, source))?;
         return collect_theorem_inputs(&child_dir, &relative_path, discovery);
     }
 
     if file_type.is_file() && is_theorem_path(&relative_path) {
-        discovery
-            .theorem_files
-            .push(normalise_relative_path(&relative_path));
+        discovery.theorem_files.push(relative_path);
     }
 
     Ok(())
+}
+
+fn open_theorem_root(
+    crate_root: &Dir,
+    theorem_root: &Utf8Path,
+) -> Result<Option<Dir>, BuildDiscoveryError> {
+    let metadata = match crate_root.metadata(theorem_root) {
+        Ok(metadata) => metadata,
+        Err(source) if source.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => return Err(io_err("inspect theorem root", theorem_root, source)),
+    };
+
+    if !metadata.is_dir() {
+        return Err(BuildDiscoveryError::TheoremRootNotDirectory {
+            path: theorem_root.to_path_buf(),
+        });
+    }
+
+    crate_root
+        .open_dir(theorem_root)
+        .map(Some)
+        .map_err(|source| io_err("open theorem directory", theorem_root, source))
 }
 
 fn is_theorem_path(path: &Utf8Path) -> bool {
@@ -194,13 +173,12 @@ fn is_theorem_path(path: &Utf8Path) -> bool {
         .is_some_and(|extension| extension == "theorem")
 }
 
-fn normalise_relative_path(path: &Utf8Path) -> Utf8PathBuf {
-    Utf8PathBuf::from(
-        path.components()
-            .map(|component| component.as_str())
-            .collect::<Vec<_>>()
-            .join("/"),
-    )
+fn io_err(operation: &'static str, path: &Utf8Path, source: io::Error) -> BuildDiscoveryError {
+    BuildDiscoveryError::Io {
+        operation,
+        path: path.to_path_buf(),
+        source,
+    }
 }
 
 #[cfg(test)]

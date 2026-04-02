@@ -12,7 +12,7 @@ The build-time contract is:
 
 - theorem files are discovered recursively from the crate-root `theorems/`
   directory,
-- discovered theorem paths are normalised to forward-slash crate-relative form
+- discovered theorem paths are normalized to forward-slash crate-relative form
   and sorted deterministically, and
 - editing a discovered `.theorem` file causes Cargo to rerun the build script
   on the next build.

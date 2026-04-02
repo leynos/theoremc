@@ -9,16 +9,7 @@ use rstest_bdd_macros::{given, scenario, then};
 
 const BUILD_SCRIPT_SOURCE: &str = include_str!("../build.rs");
 const BUILD_DISCOVERY_SOURCE: &str = include_str!("../src/build_discovery.rs");
-const FIXTURE_CARGO_TOML: &str = r#"[package]
-name = "build_discovery_fixture"
-version = "0.1.0"
-edition = "2024"
-
-[build-dependencies]
-camino = "1.2.2"
-cap-std = { version = "4.0.2", features = ["fs_utf8"] }
-thiserror = "2.0.18"
-"#;
+const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
 const FIXTURE_LIB_RS: &str = "//! Fixture crate for build discovery behavioural tests.\n";
 const TRIVIAL_THEOREM: &str = concat!(
     "Theorem: Smoke\n",
@@ -55,7 +46,7 @@ impl FixtureCrate {
             dir,
         };
 
-        fixture.write(Utf8Path::new("Cargo.toml"), FIXTURE_CARGO_TOML)?;
+        fixture.write(Utf8Path::new("Cargo.toml"), &fixture_cargo_toml()?)?;
         fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
         fixture.write(Utf8Path::new("src/lib.rs"), FIXTURE_LIB_RS)?;
         fixture.write(
@@ -103,6 +94,44 @@ impl FixtureCrate {
     }
 }
 
+fn fixture_cargo_toml() -> Result<String, String> {
+    let build_dependencies = toml_section(ROOT_CARGO_TOML, "build-dependencies")
+        .ok_or_else(|| "root Cargo.toml is missing [build-dependencies]".to_owned())?;
+
+    Ok(format!(
+        concat!(
+            "[package]\n",
+            "name = \"build_discovery_fixture\"\n",
+            "version = \"0.1.0\"\n",
+            "edition = \"2024\"\n\n",
+            "[build-dependencies]\n",
+            "{build_dependencies}",
+        ),
+        build_dependencies = build_dependencies
+    ))
+}
+
+fn toml_section(document: &str, section_name: &str) -> Option<String> {
+    let header_line = format!("[{section_name}]");
+    let mut in_section = false;
+    let mut body_lines = Vec::new();
+
+    for line in document.lines() {
+        if !in_section {
+            in_section = line == header_line;
+            continue;
+        }
+
+        if line.starts_with('[') {
+            break;
+        }
+
+        body_lines.push(line);
+    }
+
+    in_section.then(|| format!("{}\n", body_lines.join("\n")))
+}
+
 struct BuildLog(String);
 
 impl BuildLog {
@@ -137,7 +166,16 @@ impl BuildLog {
 }
 
 fn pause_for_timestamp_tick() {
-    thread::sleep(Duration::from_secs(1));
+    use std::time::Instant;
+
+    let tick = Duration::from_secs(1);
+    let start = Instant::now();
+
+    while start.elapsed() <= tick {
+        let remaining = tick.saturating_sub(start.elapsed());
+        let sleep_for = remaining.min(Duration::from_millis(50));
+        thread::sleep(sleep_for);
+    }
 }
 
 #[given("a crate with nested theorem files")]
