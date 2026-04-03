@@ -1,7 +1,29 @@
 # Developer's guide
 
-Status: living document. Audience: maintainers and contributors to the theoremc
-crate.
+**Status:** living document **Audience:** maintainers and contributors to the
+theoremc crate
+
+## Problem statement
+
+This guide exists to help contributors understand theoremc's internal
+architecture and maintain its design constraints. The crate follows layered
+boundaries and capability-oriented patterns to keep test generation predictable
+and maintainable. Without clear architectural guidance, incremental changes can
+erode these boundaries and make the codebase harder to reason about.
+
+## Key architecture decision records (ADRs)
+
+- [ADR-001: Theorem symbol stability and non-vacuity
+  policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md) — governs
+  theorem naming and vacuity defaults
+- [ADR-002: Library-first internationalization and localization with
+  Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+   — establishes i18n strategy
+- [ADR-003: Architectural boundary
+  enforcement](adr-003-architectural-boundary-enforcement.md) — enforces
+  layered schema boundaries and anti-corruption constraints
+
+## Scope
 
 This guide covers the build system, internal architecture, contributor
 workflows, and extension points for the theoremc crate. For user-facing
@@ -16,6 +38,8 @@ design specification take precedence if wording diverges.
 
 The root-level `build.rs` script runs during `cargo build` and depends on three
 crates declared under `[build-dependencies]` in `Cargo.toml`:
+
+**Table:** Build dependencies
 
 | Crate       | Purpose                                           |
 | ----------- | ------------------------------------------------- |
@@ -83,6 +107,8 @@ at a time.
 The crate follows the layer boundaries enforced by Architecture Decision Record
 (ADR) [ADR-003](adr-003-architectural-boundary-enforcement.md):
 
+**Table:** Module layers and responsibilities
+
 | Layer         | Modules                          | Responsibility                                    |
 | ------------- | -------------------------------- | ------------------------------------------------- |
 | Schema        | `schema/`                        | YAML deserialization and semantic validation      |
@@ -125,6 +151,8 @@ Accessors return iterators over `&Utf8Path`:
 
 Before committing any change, run the following gates. The Makefile wraps each
 underlying command:
+
+**Table:** Quality gates and their Makefile commands
 
 | Gate             | Command             | What it checks                         |
 | ---------------- | ------------------- | -------------------------------------- |
