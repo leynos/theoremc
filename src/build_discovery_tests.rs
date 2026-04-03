@@ -218,3 +218,161 @@ fn returned_paths_use_forward_slashes() {
         vec!["theorems", "theorems/windows"]
     );
 }
+
+// --- IO error path tests ---
+
+#[test]
+fn nonexistent_manifest_dir_returns_io_error() {
+    let result = discover_theorem_inputs(Utf8Path::new("/nonexistent/manifest/dir"));
+    let error = result.expect_err("nonexistent manifest dir should fail");
+
+    match &error {
+        BuildDiscoveryError::Io {
+            operation, path, ..
+        } => {
+            assert_eq!(*operation, "open crate root");
+            assert_eq!(path.as_str(), "/nonexistent/manifest/dir");
+        }
+        other @ BuildDiscoveryError::TheoremRootNotDirectory { .. } => {
+            panic!("expected Io error, got {other:?}");
+        }
+    }
+
+    assert!(
+        error.to_string().contains("open crate root"),
+        "Display should include the operation"
+    );
+}
+
+#[test]
+fn io_error_read_theorem_directory_display() {
+    let source = io::Error::new(io::ErrorKind::PermissionDenied, "permission denied");
+    let error = BuildDiscoveryError::Io {
+        operation: "read theorem directory",
+        path: Utf8PathBuf::from("theorems"),
+        source,
+    };
+
+    let display = error.to_string();
+    assert!(
+        display.contains("read theorem directory"),
+        "should include operation"
+    );
+    assert!(display.contains("theorems"), "should include path");
+}
+
+#[test]
+fn io_error_open_theorem_directory_display() {
+    let source = io::Error::new(io::ErrorKind::PermissionDenied, "permission denied");
+    let error = BuildDiscoveryError::Io {
+        operation: "open theorem directory",
+        path: Utf8PathBuf::from("theorems/nested"),
+        source,
+    };
+
+    let display = error.to_string();
+    assert!(
+        display.contains("open theorem directory"),
+        "should include operation"
+    );
+    assert!(display.contains("theorems/nested"), "should include path");
+}
+
+#[test]
+fn io_error_read_theorem_directory_entry_display() {
+    let source = io::Error::other("entry iteration failed");
+    let error = BuildDiscoveryError::Io {
+        operation: "read theorem directory entry",
+        path: Utf8PathBuf::from("theorems"),
+        source,
+    };
+
+    let display = error.to_string();
+    assert!(
+        display.contains("read theorem directory entry"),
+        "should include operation"
+    );
+}
+
+#[test]
+fn io_error_read_theorem_entry_name_display() {
+    let source = io::Error::other("name retrieval failed");
+    let error = BuildDiscoveryError::Io {
+        operation: "read theorem entry name",
+        path: Utf8PathBuf::from("theorems"),
+        source,
+    };
+
+    let display = error.to_string();
+    assert!(
+        display.contains("read theorem entry name"),
+        "should include operation"
+    );
+}
+
+#[test]
+fn io_error_inspect_theorem_entry_display() {
+    let source = io::Error::other("file type inspection failed");
+    let error = BuildDiscoveryError::Io {
+        operation: "inspect theorem entry",
+        path: Utf8PathBuf::from("theorems/example.theorem"),
+        source,
+    };
+
+    let display = error.to_string();
+    assert!(
+        display.contains("inspect theorem entry"),
+        "should include operation"
+    );
+    assert!(
+        display.contains("theorems/example.theorem"),
+        "should include path"
+    );
+}
+
+#[test]
+fn io_error_inspect_theorem_root_display() {
+    let source = io::Error::new(io::ErrorKind::PermissionDenied, "permission denied");
+    let error = BuildDiscoveryError::Io {
+        operation: "inspect theorem root",
+        path: Utf8PathBuf::from("theorems"),
+        source,
+    };
+
+    let display = error.to_string();
+    assert!(
+        display.contains("inspect theorem root"),
+        "should include operation"
+    );
+}
+
+#[test]
+fn io_error_source_chain_is_accessible() {
+    let inner = io::Error::new(io::ErrorKind::NotFound, "not found");
+    let error = BuildDiscoveryError::Io {
+        operation: "inspect theorem root",
+        path: Utf8PathBuf::from("theorems"),
+        source: inner,
+    };
+
+    let source = std::error::Error::source(&error).expect("Io variant should expose source");
+    assert!(
+        source.to_string().contains("not found"),
+        "source chain should include the original IO error"
+    );
+}
+
+#[test]
+fn not_directory_error_display() {
+    let error = BuildDiscoveryError::TheoremRootNotDirectory {
+        path: Utf8PathBuf::from("theorems"),
+    };
+    assert_eq!(
+        error.to_string(),
+        "theorem root 'theorems' exists but is not a directory"
+    );
+    assert!(
+        std::error::Error::source(&error).is_none(),
+        "TheoremRootNotDirectory has no source"
+    );
+}

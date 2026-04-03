@@ -23,6 +23,8 @@ pub(crate) struct BuildDiscovery {
 }
 
 impl BuildDiscovery {
+    /// Returns a discovery result that watches only the root `theorems`
+    /// directory, with no discovered theorem files.
     fn root_only() -> Self {
         Self {
             theorem_files: Vec::new(),
@@ -30,6 +32,8 @@ impl BuildDiscovery {
         }
     }
 
+    /// Sorts both path vectors lexicographically and removes duplicates so
+    /// emitted rerun lines and future suite inputs are deterministic.
     fn sort_and_dedup(&mut self) {
         self.theorem_files.sort();
         self.theorem_files.dedup();
@@ -97,6 +101,8 @@ pub(crate) fn discover_theorem_inputs(
     Ok(discovery)
 }
 
+/// Recursively collects theorem files and watched directories from a single
+/// directory level, appending results to `discovery`.
 fn collect_theorem_inputs(
     directory: &Dir,
     relative_dir: &Utf8Path,
@@ -119,6 +125,8 @@ fn collect_theorem_inputs(
     Ok(())
 }
 
+/// Classifies a single directory entry: recurses into subdirectories and
+/// appends `.theorem` files to the discovery result.
 fn collect_entry(
     entry: &DirEntry,
     relative_dir: &Utf8Path,
@@ -146,6 +154,8 @@ fn collect_entry(
     Ok(())
 }
 
+/// Opens the `theorems` directory if it exists and is a directory, returning
+/// `None` for a missing directory and an error for a non-directory path.
 fn open_theorem_root(
     crate_root: &Dir,
     theorem_root: &Utf8Path,
@@ -168,11 +178,14 @@ fn open_theorem_root(
         .map_err(|source| io_err("open theorem directory", theorem_root, source))
 }
 
+/// Returns `true` when the path has a `.theorem` file extension.
 fn is_theorem_path(path: &Utf8Path) -> bool {
     path.extension()
         .is_some_and(|extension| extension == "theorem")
 }
 
+/// Constructs a [`BuildDiscoveryError::Io`] with the given operation label,
+/// path, and underlying IO error.
 fn io_err(operation: &'static str, path: &Utf8Path, source: io::Error) -> BuildDiscoveryError {
     BuildDiscoveryError::Io {
         operation,
