@@ -68,17 +68,20 @@ set so Cargo can detect when the directory is created later.
 
 #### Architectural separation from Step 3.1.2
 
-Step 3.1.1 owns only discovery and Cargo invalidation. It does not generate
+Step 3.1.1 (see
+[`execplans/3-1-1-build-rs-scanning-of-theorems.md`](execplans/3-1-1-build-rs-scanning-of-theorems.md))
+ owns only discovery and Cargo invalidation. It does not generate
 `OUT_DIR/theorem_suite.rs`, invoke `theorem_file!()`, or emit any Rust code.
-Step 3.1.2 will consume the ordered theorem file list and own per-file code
-generation through the proc macro. The handoff is deliberately narrow:
-`build.rs` produces an ordered crate-relative file list plus rerun metadata,
-and the proc macro will consume file paths one at a time.
+Step 3.1.2 (future work: per-file code generation) will consume the ordered
+theorem file list and own per-file code generation through the proc macro. The
+handoff is deliberately narrow: `build.rs` produces an ordered crate-relative
+file list plus rerun metadata, and the proc macro will consume file paths one
+at a time.
 
 ## 2. Module architecture
 
-The crate follows the layer boundaries enforced by
-[ADR-003](adr-003-architectural-boundary-enforcement.md):
+The crate follows the layer boundaries enforced by Architecture Decision Record
+(ADR) [ADR-003](adr-003-architectural-boundary-enforcement.md):
 
 | Layer         | Modules                          | Responsibility                                    |
 | ------------- | -------------------------------- | ------------------------------------------------- |

@@ -4,6 +4,7 @@ use std::io;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
+use rstest::rstest;
 
 use super::{BuildDiscovery, BuildDiscoveryError, discover_theorem_inputs};
 
@@ -76,6 +77,9 @@ fn check_io_error_display(operation: &'static str, path: &str, source: io::Error
         source,
     };
     let display = error.to_string();
+    let source_display = std::error::Error::source(&error)
+        .expect("Io variant should have source")
+        .to_string();
     assert!(
         display.contains(operation),
         "display should include operation '{operation}'"
@@ -83,6 +87,10 @@ fn check_io_error_display(operation: &'static str, path: &str, source: io::Error
     assert!(
         display.contains(path),
         "display should include path '{path}'"
+    );
+    assert!(
+        display.contains(&source_display),
+        "display should include underlying IO error '{source_display}'"
     );
 }
 
@@ -240,7 +248,13 @@ fn returned_paths_use_forward_slashes() {
 
 #[test]
 fn nonexistent_manifest_dir_returns_io_error() {
-    let result = discover_theorem_inputs(Utf8Path::new("/nonexistent/manifest/dir"));
+    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+    let nonexistent_path = Utf8Path::from_path(temp_dir.path())
+        .expect("temp dir path should be valid UTF-8")
+        .join("nonexistent");
+    drop(temp_dir);
+
+    let result = discover_theorem_inputs(&nonexistent_path);
     let error = result.expect_err("nonexistent manifest dir should fail");
 
     match &error {
@@ -248,7 +262,7 @@ fn nonexistent_manifest_dir_returns_io_error() {
             operation, path, ..
         } => {
             assert_eq!(*operation, "open crate root");
-            assert_eq!(path.as_str(), "/nonexistent/manifest/dir");
+            assert_eq!(path, &nonexistent_path);
         }
         other @ BuildDiscoveryError::TheoremRootNotDirectory { .. } => {
             panic!("expected Io error, got {other:?}");
@@ -261,58 +275,43 @@ fn nonexistent_manifest_dir_returns_io_error() {
     );
 }
 
-#[test]
-fn io_error_read_theorem_directory_display() {
-    check_io_error_display(
-        "read theorem directory",
-        "theorems",
-        io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"),
-    );
-}
-
-#[test]
-fn io_error_open_theorem_directory_display() {
-    check_io_error_display(
-        "open theorem directory",
-        "theorems/nested",
-        io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"),
-    );
-}
-
-#[test]
-fn io_error_read_theorem_directory_entry_display() {
-    check_io_error_display(
-        "read theorem directory entry",
-        "theorems",
-        io::Error::other("entry iteration failed"),
-    );
-}
-
-#[test]
-fn io_error_read_theorem_entry_name_display() {
-    check_io_error_display(
-        "read theorem entry name",
-        "theorems",
-        io::Error::other("name retrieval failed"),
-    );
-}
-
-#[test]
-fn io_error_inspect_theorem_entry_display() {
-    check_io_error_display(
-        "inspect theorem entry",
-        "theorems/example.theorem",
-        io::Error::other("file type inspection failed"),
-    );
-}
-
-#[test]
-fn io_error_inspect_theorem_root_display() {
-    check_io_error_display(
-        "inspect theorem root",
-        "theorems",
-        io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"),
-    );
+#[rstest]
+#[case(
+    "read theorem directory",
+    "theorems",
+    io::Error::new(io::ErrorKind::PermissionDenied, "permission denied")
+)]
+#[case(
+    "open theorem directory",
+    "theorems/nested",
+    io::Error::new(io::ErrorKind::PermissionDenied, "permission denied")
+)]
+#[case(
+    "read theorem directory entry",
+    "theorems",
+    io::Error::other("entry iteration failed")
+)]
+#[case(
+    "read theorem entry name",
+    "theorems",
+    io::Error::other("name retrieval failed")
+)]
+#[case(
+    "inspect theorem entry",
+    "theorems/example.theorem",
+    io::Error::other("file type inspection failed")
+)]
+#[case(
+    "inspect theorem root",
+    "theorems",
+    io::Error::new(io::ErrorKind::PermissionDenied, "permission denied")
+)]
+fn io_error_display_includes_operation_path_and_source(
+    #[case] operation: &'static str,
+    #[case] path: &str,
+    #[case] source: io::Error,
+) {
+    check_io_error_display(operation, path, source);
 }
 
 #[test]
