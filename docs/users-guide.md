@@ -3,6 +3,31 @@
 This guide covers the behaviour and application programming interface (API) of
 the `theoremc` library from the perspective of a library consumer.
 
+## Build discovery
+
+`theoremc` now uses a root-level `build.rs` script to discover theorem files
+under `theorems/**/*.theorem`.
+
+The build-time contract is:
+
+- theorem files are discovered recursively from the crate-root `theorems/`
+  directory,
+- discovered theorem paths are normalized to forward-slash crate-relative form
+  and sorted deterministically, and
+- editing a discovered `.theorem` file causes Cargo to rerun the build script
+  on the next build.
+
+The repository does not need a pre-seeded `theorems/` directory. On the
+supported toolchain, theoremc watches the root `theorems` path even when it is
+absent, so creating the directory and adding the first theorem later still
+causes the next build to rerun the build script.
+
+Only files ending in `.theorem` are treated as theorem inputs. However, the
+root `theorems/` directory is watched so Cargo can notice newly created theorem
+trees. As a result, changes elsewhere under that watched directory may still
+rerun the build script even though non-`.theorem` files are not parsed or fed
+into later theorem compilation steps.
+
 ## Theorem document schema
 
 A `.theorem` file is a UTF-8 text file containing one or more YAML (YAML Ain't

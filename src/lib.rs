@@ -16,3 +16,8 @@ pub mod schema;
 /// Argument-expression lowering for proof harness code generation.
 #[doc(hidden)]
 pub(crate) mod arg_lowering;
+
+/// Build-time theorem discovery shared with the Cargo build script.
+#[cfg(test)]
+#[doc(hidden)]
+pub(crate) mod build_discovery;
