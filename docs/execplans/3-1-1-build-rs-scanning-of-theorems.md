@@ -77,7 +77,7 @@ inclusion.
   paths lexicographically before returning or emitting them so future generated
   suite files are stable under filesystem traversal differences.
 - Preserve crate-relative theorem path strings suitable for later mangling and
-  suite generation. Normalise discovered path strings to forward-slash form
+  suite generation. Normalize discovered path strings to forward-slash form
   (`theorems/nested/example.theorem`) rather than platform-specific separator
   forms.
 - Keep `build.rs` thin. Put traversal, path normalization, filtering, and
@@ -125,7 +125,7 @@ inclusion.
 - Risk: Cargo directory-watch semantics for an absent `theorems/` directory may
   differ from the behaviour assumed by the design note. Mitigation: start with
   a prototype milestone that proves the behaviour on the current toolchain
-  before finalising the missing-directory contract.
+  before finalizing the missing-directory contract.
 
 - Risk: raw filesystem traversal order is not stable across platforms or
   filesystems. Mitigation: collect crate-relative theorem paths into a vector,
@@ -165,7 +165,7 @@ inclusion.
   build script after the directory is created later on the current toolchain.
 - [x] 2026-03-29: added shared build discovery in `src/build_discovery.rs`
   plus direct unit tests covering missing directories, nested trees, ignored
-  non-`.theorem` files, deterministic ordering, forward-slash normalisation,
+  non-`.theorem` files, deterministic ordering, forward-slash normalization,
   and rerun path sets.
 - [x] 2026-03-29: added root-level `build.rs` that delegates to the shared
   helper and emits rerun lines for the watched directories and theorem files.
@@ -206,7 +206,7 @@ inclusion.
   `Cargo.toml` are the available local style reference.
 - 2026-03-26: existing naming helpers in `src/mangle_path.rs` and
   `src/mangle_harness.rs` already assume stable crate-relative theorem path
-  strings, which makes forward-slash normalisation in discovery important even
+  strings, which makes forward-slash normalization in discovery important even
   before Step `3.1.2`.
 - 2026-03-29: the missing-directory prototype confirmed that the current Cargo
   toolchain reruns the build script after `theorems/` is created later, so Step

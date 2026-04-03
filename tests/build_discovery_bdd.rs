@@ -165,6 +165,9 @@ impl BuildLog {
     }
 }
 
+/// Pauses until at least one full second has elapsed, ensuring filesystem
+/// modification times (mtime) advance enough for Cargo to detect file changes
+/// between successive builds in tests that rely on mtime comparisons.
 fn pause_for_timestamp_tick() {
     use std::time::Instant;
 
@@ -178,6 +181,7 @@ fn pause_for_timestamp_tick() {
     }
 }
 
+/// Precondition stub; the nested theorem fixture is created in the `then` step.
 #[given("a crate with nested theorem files")]
 fn given_a_crate_with_nested_theorem_files() {}
 
@@ -225,6 +229,7 @@ fn then_building_twice_stays_fresh_and_editing_a_theorem_reruns_the_build_script
     Ok(())
 }
 
+/// Precondition stub; the non-theorem fixture is created in the `then` step.
 #[given("a crate with ignored non-theorem files under theorems")]
 fn given_a_crate_with_ignored_non_theorem_files_under_theorems() {}
 
@@ -246,6 +251,7 @@ fn then_the_build_script_emits_only_theorem_inputs() -> Result<(), String> {
     Ok(())
 }
 
+/// Precondition stub; the missing-directory precondition is verified in the `then` step.
 #[given("a crate without a theorems directory")]
 fn given_a_crate_without_a_theorems_directory() {}
 
