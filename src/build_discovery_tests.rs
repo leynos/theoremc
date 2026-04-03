@@ -69,6 +69,23 @@ fn assert_root_watch_only(discovery: &BuildDiscovery) {
     assert_eq!(rerun_paths(discovery), vec!["theorems"]);
 }
 
+fn check_io_error_display(operation: &'static str, path: &str, source: io::Error) {
+    let error = BuildDiscoveryError::Io {
+        operation,
+        path: Utf8PathBuf::from(path),
+        source,
+    };
+    let display = error.to_string();
+    assert!(
+        display.contains(operation),
+        "display should include operation '{operation}'"
+    );
+    assert!(
+        display.contains(path),
+        "display should include path '{path}'"
+    );
+}
+
 #[test]
 fn missing_theorems_directory_returns_root_watch_only() {
     let fixture = DiscoveryFixture::new().expect("temp fixture should be created");
@@ -246,103 +263,55 @@ fn nonexistent_manifest_dir_returns_io_error() {
 
 #[test]
 fn io_error_read_theorem_directory_display() {
-    let source = io::Error::new(io::ErrorKind::PermissionDenied, "permission denied");
-    let error = BuildDiscoveryError::Io {
-        operation: "read theorem directory",
-        path: Utf8PathBuf::from("theorems"),
-        source,
-    };
-
-    let display = error.to_string();
-    assert!(
-        display.contains("read theorem directory"),
-        "should include operation"
+    check_io_error_display(
+        "read theorem directory",
+        "theorems",
+        io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"),
     );
-    assert!(display.contains("theorems"), "should include path");
 }
 
 #[test]
 fn io_error_open_theorem_directory_display() {
-    let source = io::Error::new(io::ErrorKind::PermissionDenied, "permission denied");
-    let error = BuildDiscoveryError::Io {
-        operation: "open theorem directory",
-        path: Utf8PathBuf::from("theorems/nested"),
-        source,
-    };
-
-    let display = error.to_string();
-    assert!(
-        display.contains("open theorem directory"),
-        "should include operation"
+    check_io_error_display(
+        "open theorem directory",
+        "theorems/nested",
+        io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"),
     );
-    assert!(display.contains("theorems/nested"), "should include path");
 }
 
 #[test]
 fn io_error_read_theorem_directory_entry_display() {
-    let source = io::Error::other("entry iteration failed");
-    let error = BuildDiscoveryError::Io {
-        operation: "read theorem directory entry",
-        path: Utf8PathBuf::from("theorems"),
-        source,
-    };
-
-    let display = error.to_string();
-    assert!(
-        display.contains("read theorem directory entry"),
-        "should include operation"
+    check_io_error_display(
+        "read theorem directory entry",
+        "theorems",
+        io::Error::other("entry iteration failed"),
     );
 }
 
 #[test]
 fn io_error_read_theorem_entry_name_display() {
-    let source = io::Error::other("name retrieval failed");
-    let error = BuildDiscoveryError::Io {
-        operation: "read theorem entry name",
-        path: Utf8PathBuf::from("theorems"),
-        source,
-    };
-
-    let display = error.to_string();
-    assert!(
-        display.contains("read theorem entry name"),
-        "should include operation"
+    check_io_error_display(
+        "read theorem entry name",
+        "theorems",
+        io::Error::other("name retrieval failed"),
     );
 }
 
 #[test]
 fn io_error_inspect_theorem_entry_display() {
-    let source = io::Error::other("file type inspection failed");
-    let error = BuildDiscoveryError::Io {
-        operation: "inspect theorem entry",
-        path: Utf8PathBuf::from("theorems/example.theorem"),
-        source,
-    };
-
-    let display = error.to_string();
-    assert!(
-        display.contains("inspect theorem entry"),
-        "should include operation"
-    );
-    assert!(
-        display.contains("theorems/example.theorem"),
-        "should include path"
+    check_io_error_display(
+        "inspect theorem entry",
+        "theorems/example.theorem",
+        io::Error::other("file type inspection failed"),
     );
 }
 
 #[test]
 fn io_error_inspect_theorem_root_display() {
-    let source = io::Error::new(io::ErrorKind::PermissionDenied, "permission denied");
-    let error = BuildDiscoveryError::Io {
-        operation: "inspect theorem root",
-        path: Utf8PathBuf::from("theorems"),
-        source,
-    };
-
-    let display = error.to_string();
-    assert!(
-        display.contains("inspect theorem root"),
-        "should include operation"
+    check_io_error_display(
+        "inspect theorem root",
+        "theorems",
+        io::Error::new(io::ErrorKind::PermissionDenied, "permission denied"),
     );
 }
 
