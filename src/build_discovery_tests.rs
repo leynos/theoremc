@@ -4,6 +4,7 @@ use std::io;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
+use rstest::rstest;
 
 use super::{BuildDiscovery, BuildDiscoveryError, discover_theorem_inputs};
 
@@ -67,6 +68,30 @@ fn assert_root_watch_only(discovery: &BuildDiscovery) {
     assert!(discovered_paths(discovery).is_empty());
     assert_eq!(watched_directories(discovery), vec!["theorems"]);
     assert_eq!(rerun_paths(discovery), vec!["theorems"]);
+}
+
+fn check_io_error_display(operation: &'static str, path: &str, source: io::Error) {
+    let error = BuildDiscoveryError::Io {
+        operation,
+        path: Utf8PathBuf::from(path),
+        source,
+    };
+    let display = error.to_string();
+    let source_display = std::error::Error::source(&error)
+        .expect("Io variant should have source")
+        .to_string();
+    assert!(
+        display.contains(operation),
+        "display should include operation '{operation}'"
+    );
+    assert!(
+        display.contains(path),
+        "display should include path '{path}'"
+    );
+    assert!(
+        display.contains(&source_display),
+        "display should include underlying IO error '{source_display}'"
+    );
 }
 
 #[test]
@@ -216,5 +241,106 @@ fn returned_paths_use_forward_slashes() {
     assert_eq!(
         watched_directories(&discovery),
         vec!["theorems", "theorems/windows"]
+    );
+}
+
+// --- IO error path tests ---
+
+#[test]
+fn nonexistent_manifest_dir_returns_io_error() {
+    let temp_dir = tempfile::tempdir().expect("temp dir should be created");
+    let nonexistent_path = Utf8Path::from_path(temp_dir.path())
+        .expect("temp dir path should be valid UTF-8")
+        .join("nonexistent");
+    drop(temp_dir);
+
+    let result = discover_theorem_inputs(&nonexistent_path);
+    let error = result.expect_err("nonexistent manifest dir should fail");
+
+    match &error {
+        BuildDiscoveryError::Io {
+            operation, path, ..
+        } => {
+            assert_eq!(*operation, "open crate root");
+            assert_eq!(path, &nonexistent_path);
+        }
+        other @ BuildDiscoveryError::TheoremRootNotDirectory { .. } => {
+            panic!("expected Io error, got {other:?}");
+        }
+    }
+
+    assert!(
+        error.to_string().contains("open crate root"),
+        "Display should include the operation"
+    );
+}
+
+#[rstest]
+#[case(
+    "read theorem directory",
+    "theorems",
+    io::Error::new(io::ErrorKind::PermissionDenied, "permission denied")
+)]
+#[case(
+    "open theorem directory",
+    "theorems/nested",
+    io::Error::new(io::ErrorKind::PermissionDenied, "permission denied")
+)]
+#[case(
+    "read theorem directory entry",
+    "theorems",
+    io::Error::other("entry iteration failed")
+)]
+#[case(
+    "read theorem entry name",
+    "theorems",
+    io::Error::other("name retrieval failed")
+)]
+#[case(
+    "inspect theorem entry",
+    "theorems/example.theorem",
+    io::Error::other("file type inspection failed")
+)]
+#[case(
+    "inspect theorem root",
+    "theorems",
+    io::Error::new(io::ErrorKind::PermissionDenied, "permission denied")
+)]
+fn io_error_display_includes_operation_path_and_source(
+    #[case] operation: &'static str,
+    #[case] path: &str,
+    #[case] source: io::Error,
+) {
+    check_io_error_display(operation, path, source);
+}
+
+#[test]
+fn io_error_source_chain_is_accessible() {
+    let inner = io::Error::new(io::ErrorKind::NotFound, "not found");
+    let error = BuildDiscoveryError::Io {
+        operation: "inspect theorem root",
+        path: Utf8PathBuf::from("theorems"),
+        source: inner,
+    };
+
+    let source = std::error::Error::source(&error).expect("Io variant should expose source");
+    assert!(
+        source.to_string().contains("not found"),
+        "source chain should include the original IO error"
+    );
+}
+
+#[test]
+fn not_directory_error_display() {
+    let error = BuildDiscoveryError::TheoremRootNotDirectory {
+        path: Utf8PathBuf::from("theorems"),
+    };
+    assert_eq!(
+        error.to_string(),
+        "theorem root 'theorems' exists but is not a directory"
+    );
+    assert!(
+        std::error::Error::source(&error).is_none(),
+        "TheoremRootNotDirectory has no source"
     );
 }

@@ -5,6 +5,8 @@ mod build_discovery;
 
 use camino::Utf8PathBuf;
 
+/// Scans `CARGO_MANIFEST_DIR/theorems` and emits `cargo::rerun-if-changed`
+/// lines for discovered theorem files and watched directories.
 fn main() {
     let manifest_dir = Utf8PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR")

@@ -14,6 +14,9 @@
 - [Navigating code complexity: a guide for implementers and maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring
   strategies for long-lived codebases.
+- [Developer's guide](developers-guide.md) - Maintainer-oriented manual
+  covering the build system, internal architecture, contributor workflows, and
+  extension points.
 - [Documentation style guide](documentation-style-guide.md) - Authoring rules
   for spelling, formatting, Markdown structure, diagrams, and documentation
   consistency.
