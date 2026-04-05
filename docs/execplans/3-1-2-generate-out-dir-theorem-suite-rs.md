@@ -190,7 +190,7 @@ Observable success:
 
 ## Outcomes & Retrospective
 
-This section will be completed during implementation. At minimum it must record
+This section will be completed during implementation. At minimum, it must record
 the final generated-suite contract, the exact tests added, the exact
 documentation files updated, and the final gate results.
 
@@ -207,7 +207,7 @@ current files are:
   Already exposes `discover_theorem_inputs(manifest_dir)` and returns sorted,
   forward-slash theorem paths via `BuildDiscovery::theorem_files()`.
 - `src/lib.rs`
-  Currently exposes library modules only. There is no generated-suite include
+  Currently, exposes library modules only. There is no generated-suite include
   site and no `theorem_file!` macro.
 - `tests/build_discovery_bdd.rs`
   Provides a working fixture-crate pattern for Cargo behavioural testing. This
