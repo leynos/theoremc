@@ -76,10 +76,11 @@ fn paths_with_special_characters_render_escaped() {
     let paths = theorem_paths(&["theorems/file_with_\"quotes\".theorem"]);
     let rendered = render_theorem_suite(paths.iter().map(Utf8PathBuf::as_path));
 
-    // The path should be escaped for Rust string literal
-    assert!(
-        rendered.contains("\\\""),
-        "quotes in path should be escaped"
+    // Assert the full rendered line, not just that it contains escaped quotes
+    let expected = "theorem_file!(\"theorems/file_with_\\\"quotes\\\".theorem\");\n";
+    assert_eq!(
+        rendered, expected,
+        "quotes in path should be properly escaped"
     );
 }
 
@@ -89,9 +90,10 @@ fn backslashes_in_paths_are_escaped() {
     let paths = theorem_paths(&["theorems/dir\\file.theorem"]);
     let rendered = render_theorem_suite(paths.iter().map(Utf8PathBuf::as_path));
 
-    // Backslashes should be doubled for Rust string literal
-    assert!(
-        rendered.contains("dir\\\\file"),
-        "backslashes in path should be escaped"
+    // Assert the full rendered line, not just that it contains escaped backslashes
+    let expected = "theorem_file!(\"theorems/dir\\\\file.theorem\");\n";
+    assert_eq!(
+        rendered, expected,
+        "backslashes in path should be properly escaped"
     );
 }

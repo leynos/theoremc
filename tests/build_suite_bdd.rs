@@ -92,21 +92,21 @@ impl FixtureCrate {
             .map_err(|error| error.to_string())
     }
 
-    fn build(&self) -> Result<BuildLog, String> {
+    fn build(&self) -> Result<(), String> {
         let output = Command::new("cargo")
             .current_dir(&self.manifest_dir)
             .args(["build", "-vv", "--color", "never"])
             .output()
             .map_err(|error| error.to_string())?;
-        let log = format!(
-            "{}{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr),
-        );
 
         if output.status.success() {
-            Ok(BuildLog(log))
+            Ok(())
         } else {
+            let log = format!(
+                "{}{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr),
+            );
             Err(log)
         }
     }
@@ -150,14 +150,6 @@ fn toml_section(document: &str, section_name: &str) -> Option<String> {
     in_section.then(|| format!("{}\n", body_lines.join("\n")))
 }
 
-struct BuildLog(String);
-
-impl BuildLog {
-    fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
 /// Precondition stub; the empty crate scenario is created in the `then` step.
 #[given("a crate without a theorems directory")]
 fn given_a_crate_without_a_theorems_directory() {}
@@ -166,14 +158,8 @@ fn given_a_crate_without_a_theorems_directory() {}
 fn then_the_crate_compiles_successfully_with_the_generated_suite() -> Result<(), String> {
     let fixture = FixtureCrate::new()?;
     // No theorems directory created - testing empty suite case
-
-    let build = fixture.build()?;
-    if !build.as_str().contains("Finished") {
-        return Err(format!(
-            "expected successful build, got:\n{}",
-            build.as_str()
-        ));
-    }
+    // build() returns Ok only if the build succeeded
+    fixture.build()?;
     Ok(())
 }
 
@@ -187,13 +173,8 @@ fn then_the_single_theorem_is_included_automatically_and_the_crate_compiles() ->
     let fixture = FixtureCrate::new()?;
     fixture.write(Utf8Path::new("theorems/single.theorem"), TRIVIAL_THEOREM)?;
 
-    let build = fixture.build()?;
-    if !build.as_str().contains("Finished") {
-        return Err(format!(
-            "expected successful build with single theorem, got:\n{}",
-            build.as_str()
-        ));
-    }
+    // build() returns Ok only if the build succeeded
+    fixture.build()?;
     Ok(())
 }
 
@@ -209,13 +190,8 @@ fn then_all_theorems_compile_in_deterministic_suite_order() -> Result<(), String
     fixture.write(Utf8Path::new("theorems/a.theorem"), TRIVIAL_THEOREM)?;
     fixture.write(Utf8Path::new("theorems/m.theorem"), TRIVIAL_THEOREM)?;
 
-    let build = fixture.build()?;
-    if !build.as_str().contains("Finished") {
-        return Err(format!(
-            "expected successful build with multiple theorems, got:\n{}",
-            build.as_str()
-        ));
-    }
+    // build() returns Ok only if the build succeeded
+    fixture.build()?;
     Ok(())
 }
 

@@ -48,19 +48,9 @@ mod __theoremc_generated_suite {
     // This macro is used by the generated suite file when theorems exist.
     // When no theorems exist, the generated file is empty and this macro
     // is unused - this is expected behaviour.
-    #[cfg_attr(
-        not(any()),
-        expect(
-            unused_macros,
-            reason = "macro is used by generated suite when theorems exist"
-        )
-    )]
-    #[cfg_attr(
-        any(),
-        allow(
-            unused_macros,
-            reason = "macro is used by generated suite when theorems exist"
-        )
+    #[expect(
+        unused_macros,
+        reason = "macro is used by generated suite when theorems exist"
     )]
     macro_rules! theorem_file {
         ($path:literal) => {

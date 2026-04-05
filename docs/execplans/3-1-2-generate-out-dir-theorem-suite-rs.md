@@ -157,8 +157,9 @@ Observable success:
   existing `BuildDiscovery` API returns exactly the sorted theorem path list
   that Step `3.1.2` needs, so no discovery redesign should be necessary.
 - 2026-04-05: the prompt references `docs/rstest-bdd-users-guide.md`, but that
-  file is not present in this checkout. Existing local BDD suites and
-  `Cargo.toml` are the available style references.
+  file is not present in this checkout. Existing local BDD
+  (behaviour-driven development) suites and `Cargo.toml` are the available
+  style references.
 - 2026-04-05: there is no current `theorem_file!` implementation anywhere in
   the repository, which makes the callsite-versus-expansion boundary the key
   design decision for this step.
