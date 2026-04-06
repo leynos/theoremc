@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: SHIPPED
 
 ## Purpose / big picture
 
@@ -135,21 +135,21 @@ Observable success:
   `theorem_file!` implementation in this checkout, so this step needs a narrow
   compile-time bridge.
 - [x] 2026-04-05: drafted this ExecPlan.
-- [ ] Milestone 0: add failing tests that describe exact suite rendering and
-  empty/single/multi-file compile behaviour.
-- [ ] Milestone 1: add a shared generated-suite helper that renders deterministic
-  `theorem_file!(...)` lines and writes `OUT_DIR/theorem_suite.rs`.
-- [ ] Milestone 2: extend `build.rs` to call the new helper after theorem
+- [x] Milestone 0 (2026-04-05): add failing tests that describe exact suite rendering
+  and empty/single/multi-file compile behaviour.
+- [x] Milestone 1 (2026-04-05): add a shared generated-suite helper that renders
+  deterministic `theorem_file!(...)` lines and writes `OUT_DIR/theorem_suite.rs`.
+- [x] Milestone 2 (2026-04-05): extend `build.rs` to call the new helper after theorem
   discovery.
-- [ ] Milestone 3: add hidden crate-side include wiring with a temporary
+- [x] Milestone 3 (2026-04-05): add hidden crate-side include wiring with a temporary
   internal `theorem_file!` bridge macro.
-- [ ] Milestone 4: add `rstest-bdd` behavioural coverage for empty, single, and
-  multi-file suites.
-- [ ] Milestone 5: update `docs/theoremc-design.md`, `docs/users-guide.md`,
+- [x] Milestone 4 (2026-04-05): add `rstest-bdd` behavioural coverage for empty,
+  single, and multi-file suites.
+- [x] Milestone 5 (2026-04-05): update `docs/theoremc-design.md`, `docs/users-guide.md`,
   and `docs/roadmap.md`.
-- [ ] Milestone 6: run `make fmt`, `make markdownlint`, `make nixie`,
-  `make check-fmt`, `make lint`, and `make test`, sequentially, with captured
-  logs.
+- [x] Milestone 6 (2026-04-05): run `make fmt`, `make markdownlint`,
+  `make nixie`, `make check-fmt`, `make lint`, and `make test`, sequentially,
+  with captured logs.
 
 ## Surprises & Discoveries
 
@@ -190,9 +190,63 @@ Observable success:
 
 ## Outcomes & Retrospective
 
-This section will be completed during implementation. At minimum, it must record
-the final generated-suite contract, the exact tests added, the exact
-documentation files updated, and the final gate results.
+### Final Generated-Suite Contract
+
+The generated `OUT_DIR/theorem_suite.rs` file contains one line per discovered
+theorem file in the format:
+
+```rust
+theorem_file!("path/to/file.theorem");
+```
+
+Paths are sorted lexicographically, escaped for Rust string literals
+(backslashes and quotes doubled), and the file always ends with a trailing
+newline. The `theorem_file!` macro is defined in `src/lib.rs` within the hidden
+`__theoremc_generated_suite` module and expands to a compile-time `include_str!`
+verification.
+
+### Tests Added
+
+- **Unit tests** (`src/build_suite_tests.rs`): 6 test cases covering empty
+  suite, single theorem, multiple theorems, nested paths, special characters
+  (quotes), and backslash escaping.
+- **Behavioural tests** (`tests/build_suite_bdd.rs`): 3 BDD scenarios using
+  `rstest-bdd` proving empty, single-file, and multi-file theorem suites
+  compile successfully via Cargo fixture crates.
+
+### Documentation Files Updated
+
+- `docs/theoremc-design.md` §7.1.2: Added implementation decisions for the
+  generated suite seam.
+- `docs/users-guide.md`: Documented always-included build behaviour.
+- `docs/roadmap.md`: Marked Step 3.1 suite-generation as complete.
+
+### Gate Results
+
+All validation gates passed on 2026-04-05:
+
+- `make check-fmt`: passed
+- `make lint`: passed (clippy -D warnings)
+- `make test`: passed (full test suite)
+- `make markdownlint`: passed
+- `make nixie`: passed (Mermaid diagrams valid)
+
+### Lessons Learned
+
+1. The narrow bridge pattern (temporary `macro_rules!` expanding to
+   `include_str!`) successfully defers proc-macro work to Step 3.2 while
+   delivering compile-time path validation now.
+2. Write-if-changed semantics prevent unnecessary rebuilds when theorem
+   inputs are unchanged.
+3. Fixture-crate BDD tests are effective for proving Cargo integration but
+   should be kept minimal; exact text assertions belong in unit tests.
+
+### Follow-ups
+
+- Step 3.2 will replace the bridge macro with real proc-macro-based per-file
+  expansion while keeping the same generated callsite.
+- Consider extending the escape logic if theorem paths with Unicode control
+  characters become a concern.
 
 ## Context and orientation
 

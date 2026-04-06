@@ -4,96 +4,62 @@
 //! and multi-file inputs, including deterministic ordering and newline policy.
 
 use camino::Utf8PathBuf;
+use rstest::rstest;
 
 use super::render_theorem_suite;
 
-/// Helper to create a collection of theorem file paths for testing.
-fn theorem_paths(paths: &[&str]) -> Vec<Utf8PathBuf> {
-    paths.iter().map(|p| Utf8PathBuf::from(*p)).collect()
+/// Test case for theorem suite rendering.
+struct RenderCase {
+    paths: Vec<&'static str>,
+    expected: &'static str,
+    description: &'static str,
 }
 
-#[test]
-fn empty_theorem_list_renders_empty_suite_with_trailing_newline() {
-    let paths: Vec<Utf8PathBuf> = vec![];
-    let rendered = render_theorem_suite(paths.iter().map(Utf8PathBuf::as_path));
-
-    assert_eq!(
-        rendered, "\n",
-        "empty suite should contain only a trailing newline"
-    );
-}
-
-#[test]
-fn single_theorem_renders_one_theorem_file_invocation() {
-    let paths = theorem_paths(&["theorems/example.theorem"]);
-    let rendered = render_theorem_suite(paths.iter().map(Utf8PathBuf::as_path));
-
-    assert_eq!(
-        rendered, "theorem_file!(\"theorems/example.theorem\");\n",
-        "single theorem should render one invocation with trailing newline"
-    );
-}
-
-#[test]
-fn multiple_theorems_render_in_supplied_order() {
-    // Note: These are supplied out of lexical order to prove the renderer
-    // respects the order given (which should already be sorted by BuildDiscovery)
-    let paths = theorem_paths(&[
+#[rstest]
+#[case::empty_suite(RenderCase {
+    paths: vec![],
+    expected: "\n",
+    description: "empty suite should contain only a trailing newline",
+})]
+#[case::single_theorem(RenderCase {
+    paths: vec!["theorems/example.theorem"],
+    expected: "theorem_file!(\"theorems/example.theorem\");\n",
+    description: "single theorem should render one invocation with trailing newline",
+})]
+#[case::multiple_theorems(RenderCase {
+    paths: vec![
         "theorems/z.theorem",
         "theorems/a.theorem",
         "theorems/nested/b.theorem",
-    ]);
-    let rendered = render_theorem_suite(paths.iter().map(Utf8PathBuf::as_path));
-
-    let expected = concat!(
+    ],
+    expected: concat!(
         "theorem_file!(\"theorems/z.theorem\");\n",
         "theorem_file!(\"theorems/a.theorem\");\n",
         "theorem_file!(\"theorems/nested/b.theorem\");\n",
-    );
-
-    assert_eq!(
-        rendered, expected,
-        "multiple theorems should render in supplied order"
-    );
-}
-
-#[test]
-fn nested_paths_render_correctly() {
-    let paths = theorem_paths(&["theorems/nested/deep/file.theorem", "theorems/root.theorem"]);
-    let rendered = render_theorem_suite(paths.iter().map(Utf8PathBuf::as_path));
-
-    let expected = concat!(
+    ),
+    description: "multiple theorems should render in supplied order",
+})]
+#[case::nested_paths(RenderCase {
+    paths: vec!["theorems/nested/deep/file.theorem", "theorems/root.theorem"],
+    expected: concat!(
         "theorem_file!(\"theorems/nested/deep/file.theorem\");\n",
         "theorem_file!(\"theorems/root.theorem\");\n",
-    );
-
-    assert_eq!(rendered, expected);
-}
-
-#[test]
-fn paths_with_special_characters_render_escaped() {
-    // Paths with quotes or backslashes should be properly escaped
-    let paths = theorem_paths(&["theorems/file_with_\"quotes\".theorem"]);
+    ),
+    description: "nested paths should render correctly",
+})]
+#[case::paths_with_quotes(RenderCase {
+    paths: vec!["theorems/file_with_\"quotes\".theorem"],
+    expected: "theorem_file!(\"theorems/file_with_\\\"quotes\\\".theorem\");\n",
+    description: "quotes in path should be properly escaped",
+})]
+#[case::paths_with_backslashes(RenderCase {
+    paths: vec!["theorems/dir\\file.theorem"],
+    expected: "theorem_file!(\"theorems/dir\\\\file.theorem\");\n",
+    description: "backslashes in path should be properly escaped",
+})]
+fn render_theorem_suite_produces_expected_output(#[case] case: RenderCase) {
+    let paths: Vec<Utf8PathBuf> = case.paths.iter().map(|p| Utf8PathBuf::from(*p)).collect();
     let rendered = render_theorem_suite(paths.iter().map(Utf8PathBuf::as_path));
 
-    // Assert the full rendered line, not just that it contains escaped quotes
-    let expected = "theorem_file!(\"theorems/file_with_\\\"quotes\\\".theorem\");\n";
-    assert_eq!(
-        rendered, expected,
-        "quotes in path should be properly escaped"
-    );
-}
-
-#[test]
-fn backslashes_in_paths_are_escaped() {
-    // Windows-style paths with backslashes should be escaped
-    let paths = theorem_paths(&["theorems/dir\\file.theorem"]);
-    let rendered = render_theorem_suite(paths.iter().map(Utf8PathBuf::as_path));
-
-    // Assert the full rendered line, not just that it contains escaped backslashes
-    let expected = "theorem_file!(\"theorems/dir\\\\file.theorem\");\n";
-    assert_eq!(
-        rendered, expected,
-        "backslashes in path should be properly escaped"
-    );
+    assert_eq!(rendered, case.expected, "{}", case.description);
 }

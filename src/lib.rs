@@ -45,18 +45,15 @@ mod __theoremc_generated_suite {
     /// `CARGO_MANIFEST_DIR`, proving that the theorem file path is a valid
     /// crate-relative input. In Step 3.2, this will be replaced with real
     /// proc-macro-based per-file expansion.
-    // This macro is used by the generated suite file when theorems exist.
-    // When no theorems exist, the generated file is empty and this macro
-    // is unused - this is expected behaviour.
-    #[expect(
-        unused_macros,
-        reason = "macro is used by generated suite when theorems exist"
-    )]
     macro_rules! theorem_file {
+        (@__used_marker) => {};
         ($path:literal) => {
             const _: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", $path));
         };
     }
+
+    // Invoke the marker arm so the macro is always referenced at compile time.
+    theorem_file!(@__used_marker);
 
     // Include the generated suite file from OUT_DIR.
     // This file contains one `theorem_file!(...)` invocation per discovered

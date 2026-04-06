@@ -2,7 +2,7 @@
 //!
 //! Step 3.1.2 generates `OUT_DIR/theorem_suite.rs` with one `theorem_file!(...)`
 //! invocation per discovered theorem path. This module provides deterministic
-//! rendering and write-if-changed semantics to minimise build churn.
+//! rendering and write-if-changed semantics to minimize build churn.
 
 use camino::Utf8Path;
 
@@ -17,11 +17,9 @@ pub(crate) fn render_theorem_suite<'a>(
 
     for path in theorem_files {
         let escaped = escape_rust_string(path.as_str());
-        #[expect(
-            clippy::format_push_string,
-            reason = "write! is fallible; push_str+format is infallible and clearer here"
-        )]
-        output.push_str(&format!("theorem_file!(\"{escaped}\");\n"));
+        output.push_str("theorem_file!(\"");
+        output.push_str(&escaped);
+        output.push_str("\");\n");
     }
 
     if output.is_empty() {
@@ -32,14 +30,14 @@ pub(crate) fn render_theorem_suite<'a>(
 }
 
 fn escape_rust_string(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
+    s.chars().map(|c| c.escape_default().to_string()).collect()
 }
 
 #[cfg(not(test))]
 mod build_only {
     use std::io;
 
-    use camino::Utf8Path;
+    use cap_std::fs_utf8::Dir as Utf8Dir;
     use thiserror::Error;
 
     use super::render_theorem_suite;
@@ -54,19 +52,23 @@ mod build_only {
     }
 
     pub(crate) fn write_theorem_suite(
-        out_dir: &Utf8Path,
+        out_dir: &Utf8Dir,
         discovery: &BuildDiscovery,
     ) -> Result<(), BuildSuiteError> {
         let rendered = render_theorem_suite(discovery.theorem_files());
-        let suite_path = out_dir.join(SUITE_FILENAME);
+        let suite_path = camino::Utf8PathBuf::from(SUITE_FILENAME);
 
-        if let Ok(existing) = std::fs::read_to_string(&suite_path) {
-            if existing == rendered {
-                return Ok(());
+        match out_dir.read_to_string(&suite_path) {
+            Ok(existing) if existing == rendered => return Ok(()),
+            Ok(_) => {}
+            Err(e) => {
+                if e.kind() != std::io::ErrorKind::NotFound {
+                    return Err(BuildSuiteError::Io(e));
+                }
             }
         }
 
-        std::fs::write(&suite_path, rendered)?;
+        out_dir.write(&suite_path, rendered)?;
         Ok(())
     }
 }

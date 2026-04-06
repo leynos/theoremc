@@ -1247,7 +1247,7 @@ even for the empty case. Paths are escaped for Rust string literals (backslashes
 and quotes are doubled). The output follows the sorted order established by
 `BuildDiscovery` to ensure deterministic generation across builds.
 
-Write-if-changed semantics are implemented to minimise build churn: the suite
+Write-if-changed semantics are implemented to minimize build churn: the suite
 is rendered in memory, compared against any existing file, and only rewritten
 when bytes differ. This prevents unnecessary rebuilds when theorem inputs are
 unchanged.
