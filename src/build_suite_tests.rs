@@ -57,6 +57,26 @@ struct RenderCase {
     expected: "theorem_file!(\"theorems/dir\\\\file.theorem\");\n",
     description: "backslashes in path should be properly escaped",
 })]
+#[case::path_with_newline(RenderCase {
+    paths: vec!["theorems/file\nname.theorem"],
+    expected: "theorem_file!(\"theorems/file\\nname.theorem\");\n",
+    description: "newline in path should be escaped to \\n",
+})]
+#[case::path_with_tab(RenderCase {
+    paths: vec!["theorems/file\tname.theorem"],
+    expected: "theorem_file!(\"theorems/file\\tname.theorem\");\n",
+    description: "tab in path should be escaped to \\t",
+})]
+#[case::path_with_nul(RenderCase {
+    paths: vec!["theorems/file\x00name.theorem"],
+    expected: "theorem_file!(\"theorems/file\\x{00}name.theorem\");\n",
+    description: "NUL byte in path should be escaped to \\x{00}",
+})]
+#[case::path_with_unit_separator(RenderCase {
+    paths: vec!["theorems/file\x1fname.theorem"],
+    expected: "theorem_file!(\"theorems/file\\x{1F}name.theorem\");\n",
+    description: "unit separator in path should be escaped to \\x{1F}",
+})]
 fn render_theorem_suite_produces_expected_output(#[case] case: RenderCase) {
     let paths: Vec<Utf8PathBuf> = case.paths.iter().map(|p| Utf8PathBuf::from(*p)).collect();
     let rendered = render_theorem_suite(paths.iter().map(Utf8PathBuf::as_path));

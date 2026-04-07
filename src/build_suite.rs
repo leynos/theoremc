@@ -30,7 +30,17 @@ pub(crate) fn render_theorem_suite<'a>(
 }
 
 fn escape_rust_string(s: &str) -> String {
-    s.chars().map(|c| c.escape_default().to_string()).collect()
+    s.chars()
+        .map(|ch| match ch {
+            '\\' => "\\\\".to_owned(),
+            '"' => "\\\"".to_owned(),
+            '\n' => "\\n".to_owned(),
+            '\r' => "\\r".to_owned(),
+            '\t' => "\\t".to_owned(),
+            c if c.is_ascii_control() => format!("\\x{{{:02X}}}", c as u8),
+            c => c.to_string(),
+        })
+        .collect()
 }
 
 #[cfg(not(test))]

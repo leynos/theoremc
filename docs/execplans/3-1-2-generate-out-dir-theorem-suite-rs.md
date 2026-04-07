@@ -157,9 +157,8 @@ Observable success:
   existing `BuildDiscovery` API returns exactly the sorted theorem path list
   that Step `3.1.2` needs, so no discovery redesign should be necessary.
 - 2026-04-05: the prompt references `docs/rstest-bdd-users-guide.md`, but that
-  file is not present in this checkout. Existing local BDD
-  (behaviour-driven development) suites and `Cargo.toml` are the available
-  style references.
+  file is not present in this checkout. Existing local behaviour-driven
+  development (BDD) suites and `Cargo.toml` are the available style references.
 - 2026-04-05: there is no current `theorem_file!` implementation anywhere in
   the repository, which makes the callsite-versus-expansion boundary the key
   design decision for this step.
@@ -261,7 +260,7 @@ current files are:
   Already exposes `discover_theorem_inputs(manifest_dir)` and returns sorted,
   forward-slash theorem paths via `BuildDiscovery::theorem_files()`.
 - `src/lib.rs`
-  Currently, exposes library modules only. There is no generated-suite include
+  Currently it exposes library modules only. There is no generated-suite include
   site and no `theorem_file!` macro.
 - `tests/build_discovery_bdd.rs`
   Provides a working fixture-crate pattern for Cargo behavioural testing. This
