@@ -27,18 +27,19 @@ pub(crate) mod build_discovery;
 #[doc(hidden)]
 pub(crate) mod build_suite;
 
-/// Generated theorem suite integration.
-///
-/// This hidden module provides the bridge between the generated
-/// `OUT_DIR/theorem_suite.rs` and the crate's compilation. It defines a
-/// temporary `theorem_file!` macro that expands to a compile-time
-/// `include_str!` check, proving that discovered theorem paths are valid
-/// crate-relative inputs.
-///
-/// Step 3.2 will replace this bridge with the real proc-macro-based
-/// per-file expansion while keeping the same generated callsite.
 #[doc(hidden)]
 mod __theoremc_generated_suite {
+    //! Generated theorem suite integration.
+    //!
+    //! This hidden module provides the bridge between the generated
+    //! `OUT_DIR/theorem_suite.rs` and the crate's compilation. It defines a
+    //! temporary `theorem_file!` macro that expands to a compile-time
+    //! `include_str!` check, proving that discovered theorem paths are valid
+    //! crate-relative inputs.
+    //!
+    //! Step 3.2 will replace this bridge with the real proc-macro-based
+    //! per-file expansion while keeping the same generated callsite.
+
     /// Temporary bridge macro for Step 3.1.2.
     ///
     /// This macro expands to a compile-time `include_str!` anchored at
