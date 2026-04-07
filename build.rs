@@ -13,6 +13,8 @@ use cap_std::fs_utf8::Dir as Utf8Dir;
 /// and emits `cargo::rerun-if-changed` lines for discovered theorem files
 /// and watched directories.
 fn main() {
+    // Inform Cargo about the cfg flags we may emit.
+    println!("cargo::rustc-check-cfg=cfg(theoremc_has_theorems)");
     let manifest_dir = Utf8PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR")
             .unwrap_or_else(|error| panic!("CARGO_MANIFEST_DIR is not set: {error}")),
@@ -29,6 +31,11 @@ fn main() {
         .unwrap_or_else(|error| panic!("failed to open OUT_DIR: {error}"));
     build_suite::write_theorem_suite(&out_dir, &discovery)
         .unwrap_or_else(|error| panic!("failed to write theorem suite: {error}"));
+
+    // Emit cfg flag when theorems exist (used for conditional lint expectations)
+    if discovery.theorem_files().next().is_some() {
+        println!("cargo::rustc-cfg=theoremc_has_theorems");
+    }
 
     // Emit rerun-if-changed lines for Cargo
     for path in discovery.rerun_paths() {
