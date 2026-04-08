@@ -109,13 +109,13 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 
 **Table:** Module layers and responsibilities
 
-| Layer         | Modules                          | Responsibility                                    |
-| ------------- | -------------------------------- | ------------------------------------------------- |
-| Schema        | `schema/`                        | YAML deserialization and semantic validation      |
-| Mangle        | `mangle*.rs`                     | Deterministic identifier generation               |
-| Cross-cutting | `collision.rs`                   | Collision detection across schema and mangle      |
-| Lowering      | `arg_lowering.rs`                | Conversion of semantic values to Rust token trees |
-| Build         | `build_discovery.rs`, `build.rs` | Theorem file discovery and Cargo change tracking  |
+| Layer         | Modules                                            | Responsibility                                                      |
+| ------------- | -------------------------------------------------- | ------------------------------------------------------------------- |
+| Schema        | `schema/`                                          | YAML deserialization and semantic validation                        |
+| Mangle        | `mangle*.rs`                                       | Deterministic identifier generation                                 |
+| Cross-cutting | `collision.rs`                                     | Collision detection across schema and mangle                        |
+| Lowering      | `arg_lowering.rs`                                  | Conversion of semantic values to Rust token trees                   |
+| Build         | `build_discovery.rs`, `build_suite.rs`, `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking |
 
 The schema layer must not import from `mangle`, and vice versa. The `collision`
 module exists as a separate top-level module specifically to orchestrate both
@@ -136,6 +136,10 @@ pub(crate) struct BuildDiscovery {
 pub(crate) fn discover_theorem_inputs(
     manifest_dir: &Utf8Path,
 ) -> Result<BuildDiscovery, BuildDiscoveryError>;
+
+pub(crate) fn render_theorem_suite<'a>(
+    theorem_files: impl IntoIterator<Item = &'a Utf8Path>,
+) -> String;
 ```
 
 Accessors return iterators over `&Utf8Path`:
@@ -205,8 +209,12 @@ To add new build-time discovery or generation:
    the feature interacts with Cargo's build-script protocol.
 5. Update `docs/theoremc-design.md` §7 and this guide.
 
-Step 3.1.2 will extend this pattern by adding suite generation to the build
-script while keeping per-file code generation in the proc macro.
+Step 3.1.2 extends this pattern by adding suite generation (`build_suite.rs`)
+to the build script. The `__theoremc_generated_suite` bridge module in
+`src/lib.rs` defines a temporary `theorem_file!` macro that validates theorem
+paths at compile time via `include_str!`. This bridge will be replaced with
+real proc-macro-based per-file expansion in Step 3.2 while keeping the same
+generated `theorem_file!(...)` callsite.
 
 ## 4. Filesystem and path conventions
 

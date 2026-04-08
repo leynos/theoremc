@@ -37,7 +37,7 @@ fn escape_rust_string(s: &str) -> String {
             '\n' => "\\n".to_owned(),
             '\r' => "\\r".to_owned(),
             '\t' => "\\t".to_owned(),
-            c if c.is_ascii_control() => format!("\\x{{{:02X}}}", c as u8),
+            c if c.is_ascii_control() => format!("\\x{:02X}", c as u8),
             c => c.to_string(),
         })
         .collect()
