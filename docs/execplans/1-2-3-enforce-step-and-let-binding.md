@@ -50,7 +50,7 @@ it correctly rejects the input; improving that message is a Step 1.3 concern
 - All code must pass `make check-fmt`, `make lint`, and `make test`.
 - Clippy lints are aggressive (see `Cargo.toml` `[lints.clippy]`): no
   `unwrap`, no `expect`, no indexing, no panics in result functions, no missing
-  docs, cognitive complexity <= 9.
+  docs, cognitive complexity \<= 9.
 - No `unsafe` code.
 - No file longer than 400 lines.
 - Module-level (`//!`) doc comments on every module.
@@ -240,25 +240,27 @@ shapes.
 
 Public functions:
 
-    /// Validates that an action call's `action` field is non-empty after
-    /// trimming.
-    pub(crate) fn validate_action_call(
-        action_call: &ActionCall,
-    ) -> Result<(), String>
+```
+/// Validates that an action call's `action` field is non-empty after
+/// trimming.
+pub(crate) fn validate_action_call(
+    action_call: &ActionCall,
+) -> Result<(), String>
 
-    /// Validates a single step's structural constraints.
-    pub(crate) fn validate_step(
-        step: &Step,
-        path: &str,
-        pos: usize,
-    ) -> Result<(), String>
+/// Validates a single step's structural constraints.
+pub(crate) fn validate_step(
+    step: &Step,
+    path: &str,
+    pos: usize,
+) -> Result<(), String>
 
-    /// Validates a list of steps, used for both top-level `Do` and
-    /// nested `maybe.do` sequences.
-    pub(crate) fn validate_step_list(
-        steps: &[Step],
-        path: &str,
-    ) -> Result<(), String>
+/// Validates a list of steps, used for both top-level `Do` and
+/// nested `maybe.do` sequences.
+pub(crate) fn validate_step_list(
+    steps: &[Step],
+    path: &str,
+) -> Result<(), String>
+```
 
 The `path` parameter provides context for error messages (e.g., "Do step", "Do
 step 2: maybe.do step"). The `pos` parameter provides 1-based position within
@@ -268,7 +270,7 @@ Implementation of `validate_action_call`:
 
 1. If `action_call.action.trim().is_empty()`, return
    `Err("action must be non-empty after trimming".to_owned())`.
-2. Otherwise, return `Ok(())`.
+1. Otherwise, return `Ok(())`.
 
 Implementation of `validate_step`:
 
@@ -279,19 +281,16 @@ Implementation of `validate_step`:
      with `format!("{path} {pos}: {reason}")`.
    - `Step::Maybe(m)` → validate the MaybeBlock:
      a. If `m.maybe.because.trim().is_empty()`, return
-        `Err(format!("{path} {pos}: maybe.because must be non-empty after
-        trimming"))`.
+     `Err(format!("{path} {pos}: maybe.because must be non-empty after    trimming"))`.
      b. If `m.maybe.do_steps.is_empty()`, return
-        `Err(format!("{path} {pos}: maybe.do must contain at least one
-        step"))`.
-     c. Call `validate_step_list(&m.maybe.do_steps, &format!("{path} {pos}:
-        maybe.do step"))` to recurse into nested steps.
+     `Err(format!("{path} {pos}: maybe.do must contain at least one    step"))`.
+     c. Call `validate_step_list(&m.maybe.do_steps, &format!("{path} {pos}:    maybe.do step"))` to recurse into nested steps.
 
 Implementation of `validate_step_list`:
 
 1. For each `(i, step)` in `steps.iter().enumerate()`, call
    `validate_step(step, path, i + 1)?`.
-2. Return `Ok(())`.
+1. Return `Ok(())`.
 
 Add `mod step;` to `src/schema/mod.rs`. Nothing is `pub use`-exported — the
 module is `pub(crate)` only.
@@ -333,14 +332,18 @@ Add `use super::step;` to `validate.rs`.
 
 Add two thin wrapper functions:
 
-    fn validate_let_bindings(doc: &TheoremDoc) -> Result<(), SchemaError>
+```
+fn validate_let_bindings(doc: &TheoremDoc) -> Result<(), SchemaError>
+```
 
 Iterates `doc.let_bindings`. For each `(name, binding)`, extracts the
 `ActionCall` (from `LetBinding::Call` or `LetBinding::Must`) and calls
 `step::validate_action_call(action_call)`. Maps errors as
 `fail(doc, format!("Let binding '{name}': {reason}"))`.
 
-    fn validate_do_steps(doc: &TheoremDoc) -> Result<(), SchemaError>
+```
+fn validate_do_steps(doc: &TheoremDoc) -> Result<(), SchemaError>
+```
 
 Calls `step::validate_step_list(&doc.do_steps, "Do step")`. Maps errors as
 `fail(doc, reason)` (the reason string already contains the full path context
@@ -349,8 +352,10 @@ from `step.rs`).
 Insert both calls into `validate_theorem_doc` after
 `validate_expressions(doc)?;` and before `validate_evidence(doc)?;`:
 
-    validate_let_bindings(doc)?;
-    validate_do_steps(doc)?;
+```
+validate_let_bindings(doc)?;
+validate_do_steps(doc)?;
+```
 
 Update the doc comment on `validate_theorem_doc` to include step/let-binding
 validation in the list of applied checks.
@@ -364,50 +369,52 @@ Create 5 new fixture files in `tests/fixtures/`:
 1. `invalid_maybe_empty_because.theorem` — `maybe` block with empty `because`
    field. Template: valid_full.theorem with `because: ""` on the maybe block.
 
-2. `invalid_maybe_empty_do.theorem` — `maybe` block with empty `do` list.
+1. `invalid_maybe_empty_do.theorem` — `maybe` block with empty `do` list.
    Template: valid_full.theorem with `do: []` on the maybe block.
 
-3. `invalid_let_empty_action.theorem` — Let binding with blank action name.
+1. `invalid_let_empty_action.theorem` — Let binding with blank action name.
    Template: valid_full.theorem with `action: ""` on a Let must binding.
 
-4. `invalid_step_empty_action.theorem` — Do step with blank action name.
+1. `invalid_step_empty_action.theorem` — Do step with blank action name.
    Template: valid_full.theorem with `action: ""` on a Do must step.
 
-5. `invalid_nested_maybe_empty_because.theorem` — nested maybe with blank
+1. `invalid_nested_maybe_empty_because.theorem` — nested maybe with blank
    `because`. Template: valid_full.theorem with a nested maybe inside the
    existing maybe, with `because: ""`.
 
 Add a new BDD test group in `tests/schema_bdd.rs`:
 
-    // -- Given invalid Step or LetBinding shapes, validation fails -----
+```
+// -- Given invalid Step or LetBinding shapes, validation fails -----
 
-    #[rstest]
-    #[case::maybe_empty_because(
-        "invalid_maybe_empty_because.theorem",
-        "maybe.because must be non-empty"
-    )]
-    #[case::maybe_empty_do(
-        "invalid_maybe_empty_do.theorem",
-        "maybe.do must contain at least one step"
-    )]
-    #[case::let_empty_action(
-        "invalid_let_empty_action.theorem",
-        "action must be non-empty"
-    )]
-    #[case::step_empty_action(
-        "invalid_step_empty_action.theorem",
-        "action must be non-empty"
-    )]
-    #[case::nested_maybe_empty_because(
-        "invalid_nested_maybe_empty_because.theorem",
-        "maybe.because must be non-empty"
-    )]
-    fn given_invalid_step_or_let_shape_when_loaded_then_validation_fails(
-        #[case] fixture: &str,
-        #[case] expected_fragment: &str,
-    ) {
-        assert_fixture_err_contains(fixture, expected_fragment);
-    }
+#[rstest]
+#[case::maybe_empty_because(
+    "invalid_maybe_empty_because.theorem",
+    "maybe.because must be non-empty"
+)]
+#[case::maybe_empty_do(
+    "invalid_maybe_empty_do.theorem",
+    "maybe.do must contain at least one step"
+)]
+#[case::let_empty_action(
+    "invalid_let_empty_action.theorem",
+    "action must be non-empty"
+)]
+#[case::step_empty_action(
+    "invalid_step_empty_action.theorem",
+    "action must be non-empty"
+)]
+#[case::nested_maybe_empty_because(
+    "invalid_nested_maybe_empty_because.theorem",
+    "maybe.because must be non-empty"
+)]
+fn given_invalid_step_or_let_shape_when_loaded_then_validation_fails(
+    #[case] fixture: &str,
+    #[case] expected_fragment: &str,
+) {
+    assert_fixture_err_contains(fixture, expected_fragment);
+}
+```
 
 Gate: `make check-fmt && make lint && make test`.
 
@@ -416,16 +423,16 @@ Gate: `make check-fmt && make lint && make test`.
 1. `docs/roadmap.md`: change `- [ ]` to `- [x]` for step 1.2.3 ("Enforce
    `Step` and `LetBinding` shape rules").
 
-2. `docs/contents.md`: add entry for the new execplan under the "Execution
+1. `docs/contents.md`: add entry for the new execplan under the "Execution
    plans" section.
 
-3. `docs/theoremc-design.md`: add section recording Step 1.2.3 implementation
+1. `docs/theoremc-design.md`: add section recording Step 1.2.3 implementation
    decisions. Insert as a new §6.7 after the existing §6.6 ("Implementation
    decisions (Step 1.1)") and renumber the subsequent sections (current §6.7
    "Localized diagnostics contract" becomes §6.8, etc.). Update the `DES-6.5`
    anchor link in `docs/roadmap.md` to point to the correct new anchor.
 
-4. `docs/users-guide.md`: add a "Step and Let binding validation" subsection
+1. `docs/users-guide.md`: add a "Step and Let binding validation" subsection
    after the "Expression syntax validation" section. Document the new
    validation rules: ActionCall.action non-empty, MaybeBlock.because non-empty,
    MaybeBlock.do non-empty, recursive validation of nested steps.
@@ -434,10 +441,12 @@ Gate: `make check-fmt` (for any Markdown formatting).
 
 ### Milestone 5: final quality gates
 
-    set -o pipefail
-    make check-fmt 2>&1 | tee /tmp/check-fmt.log
-    make lint 2>&1 | tee /tmp/lint.log
-    make test 2>&1 | tee /tmp/test.log
+```
+set -o pipefail
+make check-fmt 2>&1 | tee /tmp/check-fmt.log
+make lint 2>&1 | tee /tmp/lint.log
+make test 2>&1 | tee /tmp/test.log
+```
 
 All three must exit 0. Test count should increase from 204.
 
@@ -453,27 +462,27 @@ Milestones 1+2 (combined to avoid dead-code lint):
 
 1. Create `src/schema/step.rs` with module doc comment, validation functions,
    and unit tests.
-2. Add `mod step;` to `src/schema/mod.rs`.
-3. Add `use super::step;` and thin wrapper functions to
+1. Add `mod step;` to `src/schema/mod.rs`.
+1. Add `use super::step;` and thin wrapper functions to
    `src/schema/validate.rs`.
-4. Insert `validate_let_bindings(doc)?;` and `validate_do_steps(doc)?;` into
+1. Insert `validate_let_bindings(doc)?;` and `validate_do_steps(doc)?;` into
    `validate_theorem_doc`.
-5. Update the doc comment on `validate_theorem_doc`.
-6. Run `make fmt && make check-fmt && make lint && make test`.
+1. Update the doc comment on `validate_theorem_doc`.
+1. Run `make fmt && make check-fmt && make lint && make test`.
 
 Milestone 3:
 
 1. Create 5 new fixture files in `tests/fixtures/`.
-2. Add BDD test group to `tests/schema_bdd.rs`.
-3. Run `make fmt && make check-fmt && make lint && make test`.
+1. Add BDD test group to `tests/schema_bdd.rs`.
+1. Run `make fmt && make check-fmt && make lint && make test`.
 
 Milestone 4:
 
 1. Update `docs/roadmap.md` checkbox.
-2. Update `docs/contents.md` index.
-3. Add implementation decisions section to `docs/theoremc-design.md`.
-4. Update `docs/users-guide.md` with step/let-binding validation section.
-5. Run `make check-fmt` (markdown validation).
+1. Update `docs/contents.md` index.
+1. Add implementation decisions section to `docs/theoremc-design.md`.
+1. Update `docs/users-guide.md` with step/let-binding validation section.
+1. Run `make check-fmt` (markdown validation).
 
 Milestone 5: final quality gates.
 
@@ -492,10 +501,12 @@ Quality criteria:
 
 Quality method:
 
-    set -o pipefail
-    make check-fmt 2>&1 | tee /tmp/check-fmt.log
-    make lint 2>&1 | tee /tmp/lint.log
-    make test 2>&1 | tee /tmp/test.log
+```
+set -o pipefail
+make check-fmt 2>&1 | tee /tmp/check-fmt.log
+make lint 2>&1 | tee /tmp/lint.log
+make test 2>&1 | tee /tmp/test.log
+```
 
 Expected: all three commands exit 0. Test count increases from 204.
 
@@ -531,24 +542,26 @@ No new external dependencies.
 
 Internal interface added in `src/schema/step.rs`:
 
-    /// Validates that an action call's `action` field is non-empty after
-    /// trimming.
-    pub(crate) fn validate_action_call(
-        action_call: &ActionCall,
-    ) -> Result<(), String>
+```
+/// Validates that an action call's `action` field is non-empty after
+/// trimming.
+pub(crate) fn validate_action_call(
+    action_call: &ActionCall,
+) -> Result<(), String>
 
-    /// Validates a single step's structural constraints.
-    pub(crate) fn validate_step(
-        step: &Step,
-        path: &str,
-        pos: usize,
-    ) -> Result<(), String>
+/// Validates a single step's structural constraints.
+pub(crate) fn validate_step(
+    step: &Step,
+    path: &str,
+    pos: usize,
+) -> Result<(), String>
 
-    /// Validates a list of steps (top-level Do or nested maybe.do).
-    pub(crate) fn validate_step_list(
-        steps: &[Step],
-        path: &str,
-    ) -> Result<(), String>
+/// Validates a list of steps (top-level Do or nested maybe.do).
+pub(crate) fn validate_step_list(
+    steps: &[Step],
+    path: &str,
+) -> Result<(), String>
+```
 
 Called from `validate_let_bindings` and `validate_do_steps` in
 `src/schema/validate.rs`, which are called from `validate_theorem_doc` after

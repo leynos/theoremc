@@ -61,9 +61,9 @@ out of scope until the later reporting work.
 - Non-snake theorem names must be converted using the deterministic rule from
   `docs/name-mangling-rules.md` and `docs/theorem-file-specification.md`:
   1. insert `_` between a lower-case letter or digit and an upper-case letter,
-  2. split acronym runs before the last capital when followed by lower-case
+  1. split acronym runs before the last capital when followed by lower-case
      text,
-  3. lowercase the final result.
+  1. lowercase the final result.
 - Duplicate theorem-key checking must use the literal file path string supplied
   by the caller plus the theorem identifier exactly as loaded, joined by `#`.
 - Error reporting for duplicate theorem keys must be deterministic and include
@@ -259,8 +259,8 @@ Inspect how theorem file path information reaches the loader today. Confirm
 whether duplicate theorem-key checking can run:
 
 1. in the loader using the existing `SourceId` plus theorem names,
-2. in a new cross-cutting module analogous to `src/collision.rs`, or
-3. in a future build-generation layer only if neither of the first two can
+1. in a new cross-cutting module analogous to `src/collision.rs`, or
+1. in a future build-generation layer only if neither of the first two can
    preserve source diagnostics.
 
 Before implementation, add failing tests that lock the intended public contract:
@@ -283,10 +283,9 @@ Extend `src/mangle.rs` with additive theorem naming support. The likely helper
 set is:
 
 1. `pub fn theorem_key(path: impl AsRef<str>, theorem: impl AsRef<str>) -> String`
-2. `pub fn theorem_slug(theorem: impl AsRef<str>) -> String`
-3. `pub struct MangledHarness { slug, theorem_key, hash, identifier }`
-4. `pub fn mangle_theorem_harness(path: impl AsRef<str>, theorem:
-   impl AsRef<str>) -> MangledHarness`
+1. `pub fn theorem_slug(theorem: impl AsRef<str>) -> String`
+1. `pub struct MangledHarness { slug, theorem_key, hash, identifier }`
+1. `pub fn mangle_theorem_harness(path: impl AsRef<str>, theorem: impl AsRef<str>) -> MangledHarness`
 
 The exact names may change if a better additive API emerges, but the final API
 must let callers inspect the readable slug, the hash, the theorem key, and the
@@ -346,9 +345,9 @@ behaviour.
 Required scenarios:
 
 1. happy path: representative theorem IDs produce the expected harness names;
-2. happy path: already-snake theorem IDs are preserved exactly in the slug;
-3. unhappy path: duplicate theorem keys are rejected before code generation;
-4. edge case: theorem IDs with acronym runs and numeric boundaries produce the
+1. happy path: already-snake theorem IDs are preserved exactly in the slug;
+1. unhappy path: duplicate theorem keys are rejected before code generation;
+1. edge case: theorem IDs with acronym runs and numeric boundaries produce the
    documented slug.
 
 BDD implementation guidance:
@@ -424,14 +423,14 @@ The implementation is complete only when all of the following are true:
 
 1. A public caller can derive the deterministic harness identifier for a theorem
    using additive helpers in `theoremc::mangle`.
-2. Unit tests cover acronym runs, numeric boundaries, and already-snake theorem
+1. Unit tests cover acronym runs, numeric boundaries, and already-snake theorem
    identifiers.
-3. Behavioural tests cover both successful harness naming and duplicate
+1. Behavioural tests cover both successful harness naming and duplicate
    theorem-key rejection.
-4. Duplicate theorem keys fail before code generation with actionable,
+1. Duplicate theorem keys fail before code generation with actionable,
    deterministic errors.
-5. `docs/theoremc-design.md` and `docs/users-guide.md` reflect the shipped
+1. `docs/theoremc-design.md` and `docs/users-guide.md` reflect the shipped
    behaviour.
-6. `docs/roadmap.md` is updated only for the work actually completed.
-7. `make check-fmt`, `make lint`, and `make test` succeed, with documentation
+1. `docs/roadmap.md` is updated only for the work actually completed.
+1. `make check-fmt`, `make lint`, and `make test` succeed, with documentation
    validation also passing because this task changes Markdown files.

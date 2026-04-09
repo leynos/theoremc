@@ -30,14 +30,14 @@ Definitions:
 
 - `segment_escape(segment)`:
   1. Replace `_` with `_u`.
-  2. Leave ASCII letters and digits unchanged.
+  1. Leave ASCII letters and digits unchanged.
 - `action_slug(canonical_name)`:
   1. Split `canonical_name` on `.`.
-  2. Apply `segment_escape` to each segment.
-  3. Join escaped segments with `__`.
+  1. Apply `segment_escape` to each segment.
+  1. Join escaped segments with `__`.
 - `hash12(value)`:
   1. Compute `blake3(value.as_bytes())`.
-  2. Take the first 12 lowercase hex characters.
+  1. Take the first 12 lowercase hex characters.
 
 Examples:
 
@@ -81,10 +81,10 @@ Definitions:
 - `path_stem(P)`: `P` with a trailing `.theorem` removed, if present
 - `path_mangle(S)`:
   1. Replace `/` and `\` with `__`.
-  2. Replace any character not in `[A-Za-z0-9_]` with `_`.
-  3. Collapse consecutive `_` to a single `_`.
-  4. Lowercase the result.
-  5. If the result starts with a digit, prefix `_`.
+  1. Replace any character not in `[A-Za-z0-9_]` with `_`.
+  1. Collapse consecutive `_` to a single `_`.
+  1. Lowercase the result.
+  1. If the result starts with a digit, prefix `_`.
 - `hash12(P)`: `blake3(P.as_bytes())`, taking the first 12 lowercase hex
   characters of the digest
 
@@ -117,9 +117,9 @@ Definitions:
   - Otherwise, convert UpperCamelCase to `snake_case` deterministically:
     1. Insert `_` between a lower-case letter or digit and an upper-case
        letter.
-    2. Split acronym runs before the last capital when followed by lower-case
+    1. Split acronym runs before the last capital when followed by lower-case
        text.
-    3. Lowercase the final result.
+    1. Lowercase the final result.
 
 Examples:
 
@@ -159,8 +159,8 @@ symbol names.
 - Canonical form: `{normalized_path(P)}#{T}`
 - `normalized_path(P)` rules:
   1. Use `/` as the separator.
-  2. Remove any leading `./`.
-  3. Preserve case.
+  1. Remove any leading `./`.
+  1. Preserve case.
 
 Example:
 

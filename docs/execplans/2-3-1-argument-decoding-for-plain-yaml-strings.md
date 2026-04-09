@@ -192,14 +192,14 @@ proof harnesses. The current loading pipeline is:
 1. `load_theorem_docs(yaml)` in `src/schema/loader.rs` calls
    `serde_saphyr::from_multiple(input)` to deserialize YAML into
    `Vec<RawTheoremDoc>`.
-2. Each `RawTheoremDoc` is converted to a `TheoremDoc` via
+1. Each `RawTheoremDoc` is converted to a `TheoremDoc` via
    `raw_doc.to_theorem_doc()` in `src/schema/raw.rs`.
-3. `validate_theorem_doc(&doc)` in `src/schema/validate.rs` validates each
+1. `validate_theorem_doc(&doc)` in `src/schema/validate.rs` validates each
    document (fields, expressions, action name grammar).
-4. `load_theorem_docs_with_source(...)` runs duplicate-theorem-key checks
+1. `load_theorem_docs_with_source(...)` runs duplicate-theorem-key checks
    across the loaded source after per-document validation and before returning
    the accumulated documents.
-5. `check_action_collisions(&docs)` in `src/collision.rs` detects mangled
+1. `check_action_collisions(&docs)` in `src/collision.rs` detects mangled
    identifier collisions.
 
 Action arguments currently live in `ActionCall.args` as
@@ -210,8 +210,7 @@ semantic interpretation — a string `"x"` and a map `{ ref: x }` are both just
 
 Key files and their approximate line counts:
 
-- `src/lib.rs` (15 lines) — crate root, declares `pub mod schema`, `pub mod
-  mangle`, `pub mod collision`.
+- `src/lib.rs` (15 lines) — crate root, declares `pub mod schema`, `pub mod mangle`, `pub mod collision`.
 - `src/schema/mod.rs` (33 lines) — module root with public re-exports.
 - `src/schema/types.rs` (312 lines) — `TheoremDoc`, `ActionCall`, `Step`,
   `LetBinding`, and related types. `ActionCall` is at line 241.
@@ -356,7 +355,7 @@ Update the import in `types.rs` to bring in `ArgValue` from `super::arg_value`.
 In `src/schema/raw.rs`, `RawTheoremDoc` currently imports and uses the public
 `LetBinding`, `Step`, and related types directly (line 12):
 `use super::types::{Evidence, KaniEvidence, KaniExpectation, LetBinding, Step, TheoremDoc};`.
- Since `ActionCall.args` changes from `TheoremValue` to `ArgValue`, serde can
+Since `ActionCall.args` changes from `TheoremValue` to `ArgValue`, serde can
 no longer deserialize YAML directly into the public `ActionCall` (the YAML
 contains raw `TheoremValue`-shaped data). Raw versions of all types that
 contain `ActionCall` are therefore required.
@@ -452,22 +451,22 @@ or, if the file would exceed 400 lines, in a separate
 Test cases:
 
 1. Plain string → `Literal(String(...))`.
-2. Boolean true → `Literal(Bool(true))`.
-3. Boolean false → `Literal(Bool(false))`.
-4. Integer → `Literal(Integer(...))`.
-5. Float → `Literal(Float(...))`.
-6. `{ ref: valid_name }` → `Reference("valid_name")`.
-7. `{ ref: _underscore }` → `Reference("_underscore")`.
-8. `{ ref: "" }` → error (empty identifier).
-9. `{ ref: "fn" }` → error (Rust keyword).
-10. `{ ref: "123bad" }` → error (invalid identifier pattern).
-11. `{ ref: 42 }` (non-string value) → error.
-12. `{ ref: true }` (boolean value) → error.
-13. `{ other_key: value }` → `RawMap(...)`.
-14. `{ ref: name, extra: value }` → `RawMap(...)` (two keys, not a ref
-    wrapper).
-15. YAML sequence → `RawSequence(...)`.
-16. Empty map `{}` → `RawMap(...)`.
+1. Boolean true → `Literal(Bool(true))`.
+1. Boolean false → `Literal(Bool(false))`.
+1. Integer → `Literal(Integer(...))`.
+1. Float → `Literal(Float(...))`.
+1. `{ ref: valid_name }` → `Reference("valid_name")`.
+1. `{ ref: _underscore }` → `Reference("_underscore")`.
+1. `{ ref: "" }` → error (empty identifier).
+1. `{ ref: "fn" }` → error (Rust keyword).
+1. `{ ref: "123bad" }` → error (invalid identifier pattern).
+1. `{ ref: 42 }` (non-string value) → error.
+1. `{ ref: true }` (boolean value) → error.
+1. `{ other_key: value }` → `RawMap(...)`.
+1. `{ ref: name, extra: value }` → `RawMap(...)` (two keys, not a ref
+   wrapper).
+1. YAML sequence → `RawSequence(...)`.
+1. Empty map `{}` → `RawMap(...)`.
 
 Go/no-go check: `cargo test -- arg_value` passes.
 
@@ -520,12 +519,12 @@ Create a test (in the BDD suite or as a dedicated unit test) that:
 
 1. Defines a theorem YAML with `Let: { x: { call: { action: a.b, args: {} } } }`
    and a Do step with `args: { param: "x" }` (plain string "x").
-2. Loads the theorem and verifies `param` is `ArgValue::Literal(String("x"))`.
-3. Defines a second theorem YAML identical except `Let` also binds `param`
+1. Loads the theorem and verifies `param` is `ArgValue::Literal(String("x"))`.
+1. Defines a second theorem YAML identical except `Let` also binds `param`
    (i.e., a binding with the same name as the string argument).
-4. Loads the second theorem and verifies `param` is still
+1. Loads the second theorem and verifies `param` is still
    `ArgValue::Literal(String("x"))` — NOT a reference.
-5. Defines a third YAML where `param` uses `{ ref: x }` and verifies it
+1. Defines a third YAML where `param` uses `{ ref: x }` and verifies it
    decodes as `ArgValue::Reference("x")`.
 
 This directly demonstrates the invariant from ADR-3: "adding a new binding
@@ -567,13 +566,13 @@ Run from the repository root.
 
    Expected signal: existing suite passes.
 
-2. After code and test edits, run formatting:
+1. After code and test edits, run formatting:
 
    ```shell
    make fmt
    ```
 
-3. Run formatting gate:
+1. Run formatting gate:
 
    ```shell
    set -o pipefail
@@ -582,7 +581,7 @@ Run from the repository root.
 
    Expected signal: formatter check exits 0.
 
-4. Run lint gate:
+1. Run lint gate:
 
    ```shell
    set -o pipefail
@@ -591,7 +590,7 @@ Run from the repository root.
 
    Expected signal: rustdoc + clippy exit 0 with no denied warnings.
 
-5. Run full tests:
+1. Run full tests:
 
    ```shell
    set -o pipefail
@@ -745,5 +744,5 @@ No new external dependencies. Uses existing:
 
 - `indexmap` (already in `Cargo.toml`)
 - `super::identifier::{is_valid_ascii_identifier_pattern, is_rust_reserved_keyword}`
-   (existing)
+  (existing)
 - `super::value::TheoremValue` (existing)

@@ -26,21 +26,21 @@ Observable success:
 
 1. `build.rs` writes `OUT_DIR/theorem_suite.rs` from the already-sorted theorem
    file list returned by `src/build_discovery.rs`.
-2. `src/lib.rs` includes that generated suite on every build through a hidden
+1. `src/lib.rs` includes that generated suite on every build through a hidden
    internal integration point, so empty, single-file, and multi-file theorem
    trees all compile.
-3. Unit tests prove exact generated suite contents for empty, single-file, and
+1. Unit tests prove exact generated suite contents for empty, single-file, and
    multi-file inputs, including deterministic ordering and newline policy.
-4. Behavioural tests using `rstest-bdd` v0.5.0 prove the real Cargo workflow
+1. Behavioural tests using `rstest-bdd` v0.5.0 prove the real Cargo workflow
    for:
    - no theorem files,
    - one discovered theorem file, and
    - multiple discovered theorem files created in non-sorted order.
-5. `docs/theoremc-design.md` records the design decisions for the generated
+1. `docs/theoremc-design.md` records the design decisions for the generated
    suite seam, `docs/users-guide.md` explains the new always-included build
    behaviour, and `docs/roadmap.md` marks the Step 3.1 suite-generation entry
    done after all gates pass.
-6. `make check-fmt`, `make lint`, and `make test` pass. Because documentation
+1. `make check-fmt`, `make lint`, and `make test` pass. Because documentation
    changes are also in scope, `make fmt`, `make markdownlint`, and
    `make nixie` must pass before implementation is considered complete.
 
@@ -235,9 +235,9 @@ All validation gates passed on 2026-04-05:
 1. The narrow bridge pattern (temporary `macro_rules!` expanding to
    `include_str!`) successfully defers proc-macro work to Step 3.2 while
    delivering compile-time path validation now.
-2. Write-if-changed semantics prevent unnecessary rebuilds when theorem
+1. Write-if-changed semantics prevent unnecessary rebuilds when theorem
    inputs are unchanged.
-3. Fixture-crate BDD tests are effective for proving Cargo integration but
+1. Fixture-crate BDD tests are effective for proving Cargo integration but
    should be kept minimal; exact text assertions belong in unit tests.
 
 ### Follow-ups
@@ -280,16 +280,16 @@ Suggested implementation file layout:
 
 1. `src/build_suite.rs`
    Shared helper for rendering and writing `OUT_DIR/theorem_suite.rs`.
-2. `src/build_suite_tests.rs`
+1. `src/build_suite_tests.rs`
    Direct unit tests for exact suite contents and write-if-changed behaviour.
-3. `build.rs`
+1. `build.rs`
    Extended to call the shared suite helper after discovery.
-4. `src/lib.rs`
+1. `src/lib.rs`
    Hidden generated-suite include site plus the temporary internal
    `theorem_file!` bridge macro.
-5. `tests/build_suite_bdd.rs`
+1. `tests/build_suite_bdd.rs`
    Behavioural Cargo tests for empty, single, and multi-file suites.
-6. `tests/features/build_suite.feature`
+1. `tests/features/build_suite.feature`
    `rstest-bdd` feature file for the behavioural scenarios.
 
 The intended seam is:
@@ -322,8 +322,8 @@ Add direct unit tests for a new shared suite helper. These tests should assert
 the exact generated file contents for:
 
 1. an empty theorem list;
-2. a single theorem path; and
-3. multiple theorem paths supplied out of lexical order.
+1. a single theorem path; and
+1. multiple theorem paths supplied out of lexical order.
 
 The multi-file test should prove that the rendered output follows the sorted
 crate-relative path order already established by `BuildDiscovery`.
@@ -337,8 +337,8 @@ Add failing behavioural tests using the existing fixture-crate pattern. The
 three required scenarios are:
 
 1. an empty fixture crate with no `theorems/` directory compiles;
-2. a fixture crate with one theorem file compiles; and
-3. a fixture crate with several theorem files created in non-sorted order also
+1. a fixture crate with one theorem file compiles; and
+1. a fixture crate with several theorem files created in non-sorted order also
    compiles.
 
 These fixture crates should include a copy of the Step `3.1.2` bridge wiring in
@@ -352,7 +352,7 @@ Create a small helper module, likely `src/build_suite.rs`, with two focused
 responsibilities:
 
 1. render deterministic suite contents from a theorem path iterator; and
-2. write `OUT_DIR/theorem_suite.rs` only when the contents have changed.
+1. write `OUT_DIR/theorem_suite.rs` only when the contents have changed.
 
 The rendering contract should be intentionally small and stable. A suitable
 shape is:
@@ -383,9 +383,9 @@ Once the helper is green, extend `build.rs` so it does three things in order:
 
 1. discover theorem inputs with the existing `discover_theorem_inputs()`
    helper;
-2. write `OUT_DIR/theorem_suite.rs` using the new suite helper and the ordered
+1. write `OUT_DIR/theorem_suite.rs` using the new suite helper and the ordered
    theorem list; and
-3. emit the existing `cargo::rerun-if-changed=` lines.
+1. emit the existing `cargo::rerun-if-changed=` lines.
 
 Keep `build.rs` thin. It should remain a coordination entrypoint, not the home
 for rendering logic.
@@ -406,7 +406,7 @@ theorem path to participate in Rust compilation by expanding to a compile-time
 `include_str!` anchored at `CARGO_MANIFEST_DIR`. This proves that:
 
 1. the generated theorem paths are valid crate-relative inputs; and
-2. empty, single-file, and multi-file suites compile without any additional
+1. empty, single-file, and multi-file suites compile without any additional
    manual wiring.
 
 Do not generate per-file modules, theorem parsing, or harness code in this
@@ -419,15 +419,15 @@ Create `tests/build_suite_bdd.rs` plus a matching
 `tests/build_discovery_bdd.rs`, but extend the fixture crate to include:
 
 1. the root `build.rs`;
-2. `src/build_discovery.rs`;
-3. the new `src/build_suite.rs`; and
-4. a fixture `src/lib.rs` that mirrors the hidden bridge wiring.
+1. `src/build_discovery.rs`;
+1. the new `src/build_suite.rs`; and
+1. a fixture `src/lib.rs` that mirrors the hidden bridge wiring.
 
 The scenarios should be phrased in theorem-author workflow terms:
 
 1. `An empty crate still compiles with generated suite wiring`
-2. `A single theorem file is included automatically`
-3. `Multiple theorem files compile in deterministic suite order`
+1. `A single theorem file is included automatically`
+1. `Multiple theorem files compile in deterministic suite order`
 
 The behavioural assertions should focus on successful Cargo builds and on the
 presence or absence of stable build-log markers. Exact suite text belongs in
@@ -445,13 +445,13 @@ Update the requested documentation in the same implementation change:
    - why the bridge uses `include_str!(concat!(env!("CARGO_MANIFEST_DIR"), ...))`,
      and
    - how this preserves a clean handoff to Step `3.2`.
-2. `docs/users-guide.md`
+1. `docs/users-guide.md`
    Document the user-visible behaviour:
    - theorem discovery now results in an always-included generated suite,
    - empty theorem trees still compile,
    - discovered theorem files become compile inputs automatically, and
    - no extra crate-side include wiring is required from the user.
-3. `docs/roadmap.md`
+1. `docs/roadmap.md`
    Mark the Step `3.1` generated-suite checkbox done only after all tests and
    gates pass.
 
@@ -475,11 +475,11 @@ set -o pipefail; make test | tee /tmp/make-test.log
 Success means:
 
 1. direct suite-rendering tests pass;
-2. behavioural Cargo workflow tests pass for empty, single, and multi-file
+1. behavioural Cargo workflow tests pass for empty, single, and multi-file
    suites;
-3. `make check-fmt`, `make lint`, and `make test` pass;
-4. documentation validation passes; and
-5. `docs/roadmap.md` shows the generated-suite checkbox done.
+1. `make check-fmt`, `make lint`, and `make test` pass;
+1. documentation validation passes; and
+1. `docs/roadmap.md` shows the generated-suite checkbox done.
 
 ## Concrete steps
 

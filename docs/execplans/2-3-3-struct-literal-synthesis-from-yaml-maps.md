@@ -36,16 +36,16 @@ Observable success:
 
 1. Recursive lowering succeeds for nested scalar, reference, list, and
    struct-shaped arguments when the expected Rust parameter types match.
-2. Type mismatches are not hidden behind theoremc-specific validation; the
+1. Type mismatches are not hidden behind theoremc-specific validation; the
    generated Rust fails in ordinary Rust compilation with actionable type
    errors.
-3. Unit tests, behavioural tests using `rstest-bdd` v0.5.0 where they add
+1. Unit tests, behavioural tests using `rstest-bdd` v0.5.0 where they add
    value, and compile-fail tests cover happy paths, unhappy paths, and edge
    cases.
-4. `docs/theoremc-design.md` records the implementation decisions,
+1. `docs/theoremc-design.md` records the implementation decisions,
    `docs/users-guide.md` documents the new behaviour that library consumers
    must know, and `docs/roadmap.md` marks the Step 2.3.3 item done.
-5. `make check-fmt`, `make lint`, and `make test` pass before the work is
+1. `make check-fmt`, `make lint`, and `make test` pass before the work is
    declared complete.
 
 This plan covers the normative requirements in the Theorem File Specification
@@ -212,6 +212,7 @@ inference out of scope.
   ignored detail. Rationale: `{ literal: ... }` and struct synthesis both
   interpret YAML maps, so the sentinel semantics must be reserved before
   ordinary map-to-struct lowering is considered settled.
+
 - 2026-03-17: Milestone 0 resolution: Step 2.3.2 is complete and landed on
   main. The `classify_sentinel` function in `src/schema/arg_value.rs` now
   deterministically identifies single-key `{ ref: ... }` and `{ literal: ... }`
@@ -250,7 +251,7 @@ completed, and Milestone 6 was intentionally skipped as documented below.
    infrastructure not yet implemented. The lowering module is internal and will
    be consumed by the `theorem_file!` macro. This decision was documented in
    the plan and is sound given the current architecture.
-2. **Nested map limitation:** Nested maps within composite values (maps inside
+1. **Nested map limitation:** Nested maps within composite values (maps inside
    lists, or maps as field values) are not supported in this implementation
    because field type information requires Phase 3 compile-time type probes.
    This limitation was identified during implementation and is clearly
@@ -327,9 +328,9 @@ Definitions used in this plan:
 The gap from the current state to Step 2.3.3 is therefore:
 
 1. keep schema decoding as-is,
-2. add a bounded internal lowering layer that understands `ArgValue` plus
+1. add a bounded internal lowering layer that understands `ArgValue` plus
    nested `TheoremValue`,
-3. prove that correct shapes compile and wrong shapes fail in Rust itself.
+1. prove that correct shapes compile and wrong shapes fail in Rust itself.
 
 ## Plan of work
 
@@ -339,9 +340,9 @@ Inspect the current Step 2.3.2 state. If `{ literal: ... }` support is still
 absent, decide one of these paths before implementation continues:
 
 1. fold the minimal sentinel reservation into this branch, or
-2. block `literal` sentinel maps in the lowerer with a deterministic error
+1. block `literal` sentinel maps in the lowerer with a deterministic error
    until Step 2.3.2 lands, or
-3. stop and make Step 2.3.2 a hard prerequisite.
+1. stop and make Step 2.3.2 a hard prerequisite.
 
 Do not proceed with ordinary map-to-struct lowering while this ambiguity is
 undefined. Record the chosen path in `docs/theoremc-design.md` and in this
@@ -365,8 +366,8 @@ let any one file grow past 400 lines.
 The core API should accept:
 
 1. a decoded argument value (`ArgValue`),
-2. the expected Rust type (`syn::Type` or an equivalent internal shape), and
-3. enough context to produce deterministic diagnostics for theorem authors and
+1. the expected Rust type (`syn::Type` or an equivalent internal shape), and
+1. enough context to produce deterministic diagnostics for theorem authors and
    stable assertions in tests.
 
 Keep the API internal for now. Step 3.x can consume it when proc-macro
@@ -381,7 +382,7 @@ Teach the lowerer to transform `ArgValue::RawSequence` into `vec![...]`,
 recursing into each nested element. This recursion must work both for:
 
 1. top-level list arguments, and
-2. lists nested inside struct fields or other lists.
+1. lists nested inside struct fields or other lists.
 
 Keep the semantics simple:
 
@@ -396,10 +397,10 @@ compatible with the resulting `vec![...]`, Rust compilation should fail later.
 Unit tests for this milestone should cover:
 
 1. top-level integer list,
-2. nested list inside a struct field,
-3. list containing references,
-4. empty list,
-5. mixed-shape list that should compile only when the expected element type
+1. nested list inside a struct field,
+1. list containing references,
+1. empty list,
+1. mixed-shape list that should compile only when the expected element type
    permits it.
 
 Go/no-go check: the lowerer can build nested `vec![...]` expressions without
@@ -413,11 +414,11 @@ when the expected parameter type is a concrete struct type.
 Required behaviour:
 
 1. The expected Rust type provides the outer type name for the emitted literal.
-2. YAML map keys become Rust field names in the same deterministic order they
+1. YAML map keys become Rust field names in the same deterministic order they
    were authored.
-3. Field values lower recursively using the same scalar/reference/list/map
+1. Field values lower recursively using the same scalar/reference/list/map
    rules.
-4. The lowerer does not try to validate the field set against Rust itself. If
+1. The lowerer does not try to validate the field set against Rust itself. If
    the YAML names a non-existent field or provides the wrong nested type, the
    generated code must fail in Rust compilation.
 
@@ -444,13 +445,13 @@ explicit so failures identify the exact lowering rule that regressed.
 Minimum unit coverage:
 
 1. scalar literal lowering by scalar expected types,
-2. reference lowering to identifier expressions,
-3. top-level `vec![...]` lowering,
-4. nested struct literal synthesis,
-5. list-inside-struct recursion,
-6. struct-inside-list recursion,
-7. empty map/list edge cases,
-8. unsupported or ambiguous sentinel map handling from Milestone 0.
+1. reference lowering to identifier expressions,
+1. top-level `vec![...]` lowering,
+1. nested struct literal synthesis,
+1. list-inside-struct recursion,
+1. struct-inside-list recursion,
+1. empty map/list edge cases,
+1. unsupported or ambiguous sentinel map handling from Milestone 0.
 
 Prefer token-string or pretty-printed expression assertions only where the
 format is stable enough to be maintainable. When possible, assert on parsed
@@ -472,10 +473,10 @@ messages.
 Minimum compile-fail cases:
 
 1. wrong scalar type inside a struct field,
-2. wrong list element type,
-3. unknown struct field,
-4. nested mismatch inside a list of structs,
-5. a positive control showing the matching case compiles.
+1. wrong list element type,
+1. unknown struct field,
+1. nested mismatch inside a list of structs,
+1. a positive control showing the matching case compiles.
 
 Keep the fixtures tiny. Each case should isolate one mismatch so the Rust error
 is easy to interpret.
@@ -492,11 +493,11 @@ theorem author's perspective.
 Recommended behavioural scenarios:
 
 1. a theorem with nested list arguments lowers and compiles successfully,
-2. a theorem with a nested struct-shaped argument lowers and compiles
+1. a theorem with a nested struct-shaped argument lowers and compiles
    successfully,
-3. a theorem with a nested type mismatch fails compilation and surfaces the
+1. a theorem with a nested type mismatch fails compilation and surfaces the
    Rust error path,
-4. the explicit-reference invariant still holds inside nested lists/maps.
+1. the explicit-reference invariant still holds inside nested lists/maps.
 
 The BDD layer should focus on author-visible behaviour, not duplicate every
 unit test. Reuse existing fixture patterns from `tests/arg_decode_bdd.rs` and
@@ -543,14 +544,14 @@ set -o pipefail; make test | tee /tmp/theoremc-make-test.log
 Capture the final results in `Outcomes & Retrospective`, including:
 
 1. which compile-fail cases were added,
-2. which BDD scenarios were added,
-3. the chosen `{ literal: ... }` prerequisite resolution,
-4. any implementation deviations from this draft.
+1. which BDD scenarios were added,
+1. the chosen `{ literal: ... }` prerequisite resolution,
+1. any implementation deviations from this draft.
 
 Completion criteria:
 
 1. happy-path lowering works for recursive lists and struct-shaped maps,
-2. compile-fail tests prove mismatches are surfaced by Rust compilation,
-3. docs are updated,
-4. roadmap entry is marked done,
-5. all gates pass.
+1. compile-fail tests prove mismatches are surfaced by Rust compilation,
+1. docs are updated,
+1. roadmap entry is marked done,
+1. all gates pass.

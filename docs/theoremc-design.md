@@ -66,15 +66,15 @@ ______________________________________________________________________
    They contain narrative text, variable declarations, assumptions, calls to
    named actions, and assertions-with-reasons.
 
-2. **No inline Rust blocks inside `.theorem`.**
+1. **No inline Rust blocks inside `.theorem`.**
    Any non-trivial logic must live in `.rs` action code so it is linted,
    typechecked, refactorable, and reviewable.
 
-3. **Per-build connectedness (rstest-bdd-style “always connected”).**
+1. **Per-build connectedness (rstest-bdd-style “always connected”).**
    `.theorem` ↔ actions ↔ generated harnesses must stay correlated through
    compilation (not a one-shot CLI scaffold).
 
-4. **YAML parsing uses `serde-saphyr`.**
+1. **YAML parsing uses `serde-saphyr`.**
    `serde-saphyr` is a strongly typed YAML deserializer built on a pure-Rust
    YAML parser (“saphyr”), designed to be panic-free on malformed input and
    avoid unsafe code in the library layer.[^1]
@@ -155,19 +155,19 @@ domain types.
 
 Normative boundary rules live in
 [ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
- and
+and
 [ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
- This section is intentionally informative and maps current module placement.
+This section is intentionally informative and maps current module placement.
 
 Table 1: Current schema layer to module mapping (informative).
 
-| Layer                       | Current primary modules                                                          |
+| Layer | Current primary modules |
 | --------------------------- | -------------------------------------------------------------------------------- |
-| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier`       |
+| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier` |
 | Raw anti-corruption adapter | `schema::raw` (planned extraction from current loader-side deserialization path) |
-| Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                               |
-| Loader orchestration        | `schema::loader`                                                                 |
-| Diagnostic infrastructure   | `schema::diagnostic` (currently `schema::error`)                                 |
+| Validator (domain rules) | `schema::validate`, `schema::expr`, `schema::step` |
+| Loader orchestration | `schema::loader` |
+| Diagnostic infrastructure | `schema::diagnostic` (currently `schema::error`) |
 
 ______________________________________________________________________
 
@@ -321,8 +321,8 @@ Each theorem document supports the following sections:
 A *step* is one of:
 
 1. `call` — invoke an action
-2. `must` — invoke an action and prove it cannot fail
-3. `maybe` — symbolic branch containing nested steps
+1. `must` — invoke an action and prove it cannot fail
+1. `maybe` — symbolic branch containing nested steps
 
 #### 4.4.1 `call`
 
@@ -364,9 +364,11 @@ Concretely:
   - `assert!(result.is_ok(), "...")`,
   - unwrap,
   - bind `T` if needed.
+
 - If the action returns `Option<T>`, similarly:
 
   - `assert!(opt.is_some(), "...")`, then unwrap.
+
 - If the action is infallible (returns `T` or `()`), `must` is allowed but adds
   no new obligation (it acts as documentary intent).
 
@@ -525,8 +527,10 @@ To keep generation predictable and avoid implicit cloning/magic:
 
 - Parameters must be simple patterns: identifiers only (`graph: &mut Graph`,
   not destructuring).
+
 - Parameter identifiers must be unique; they become the keys used in `.theorem`
   `args: { ... }`.
+
 - Return types may be:
 
   - `()`
@@ -630,9 +634,9 @@ struct-literal synthesis and recursive list lowering.
 
 The generator adapts argument passing based on parameter type:
 
-- parameter `&mut T`  → pass `&mut var`
-- parameter `&T`      → pass `&var`
-- parameter `T`       → pass `var` (move)
+- parameter `&mut T` → pass `&mut var`
+- parameter `&T` → pass `&var`
+- parameter `T` → pass `var` (move)
 
 If a variable is ever passed as `&mut`, the generator declares it
 `let mut var = ...;`.
@@ -666,9 +670,9 @@ Validation happens in three layers:
 
 1. **Structural:** required fields exist (`Theorem`, `About`, `Prove`,
    `Evidence.kani.unwind` etc).
-2. **Expression syntax:** `Assume.expr` and `Prove.assert` parse as `syn::Expr`
+1. **Expression syntax:** `Assume.expr` and `Prove.assert` parse as `syn::Expr`
    (syntax only).
-3. **Semantic:** step shapes make sense (`maybe` contains `do`, `call` on
+1. **Semantic:** step shapes make sense (`maybe` contains `do`, `call` on
    fallible action requires `as` or `must`, `because` required for
    assumptions/asserts).
 
@@ -1313,17 +1317,22 @@ For each theorem:
 
 1. Create a parameterless proof harness function (the Kani unit of
    verification).[^2]
-2. For `Forall` variables:
+
+1. For `Forall` variables:
 
    - emit `let x: Ty = kani::any();` (symbolic input).[^2]
-3. Emit all `Assume` expressions as `kani::assume(<expr>);`.
-4. Emit `Let` bindings (in order).
-5. Execute `Do` steps:
+
+1. Emit all `Assume` expressions as `kani::assume(<expr>);`.
+
+1. Emit `Let` bindings (in order).
+
+1. Execute `Do` steps:
 
    - `call` → invoke action
    - `must` → invoke + assert success + unwrap
    - `maybe` → symbolic boolean guard around nested steps
-6. Emit `Prove` assertions using `assert!(expr, because)`.
+
+1. Emit `Prove` assertions using `assert!(expr, because)`.
 
 ### 8.2 Must/maybe codegen rules (precise)
 
@@ -1412,19 +1421,19 @@ inside the schema subsystem. The boundary policy is defined by ADR 003.
 
 The normative boundary rules are defined in
 [ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
- and
+and
 [ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
- This section focuses on enforcement tooling and rollout.
+This section focuses on enforcement tooling and rollout.
 
 ### 10.2 Enforcement stack and priority
 
-| Tool                                     | Purpose                                                                     | Priority |
+| Tool | Purpose | Priority |
 | ---------------------------------------- | --------------------------------------------------------------------------- | -------- |
-| Module visibility and curated re-exports | Prevent accidental public exposure of internal adapter/diagnostic internals | High     |
-| `cargo modules graph --acyclic --lib`    | Detect cycles in module dependencies                                        | High     |
-| Clippy with wildcard-import deny         | Keep dependency edges explicit and reviewable                               | High     |
-| Dylint custom lints                      | Catch forbidden layer-edge imports that visibility alone cannot express     | Medium   |
-| `cargo-deny` policy checks               | Enforce architecture-sensitive dependency policy                            | Low      |
+| Module visibility and curated re-exports | Prevent accidental public exposure of internal adapter/diagnostic internals | High |
+| `cargo modules graph --acyclic --lib` | Detect cycles in module dependencies | High |
+| Clippy with wildcard-import deny | Keep dependency edges explicit and reviewable | High |
+| Dylint custom lints | Catch forbidden layer-edge imports that visibility alone cannot express | Medium |
+| `cargo-deny` policy checks | Enforce architecture-sensitive dependency policy | Low |
 
 `theoremc-dylint` provides lints using Dylint, which runs Rust lints from
 dynamic libraries.[^10]
@@ -1606,22 +1615,15 @@ the next most valuable addition would be a complete, concrete YAML schema
 reference (field-by-field) and the precise mangling rules for action names and
 harness names. The remaining work is mostly engineering.
 
-[^1]: <https://docs.rs/crate/serde-saphyr/latest?utm_source=chatgpt.com>
-      "serde-saphyr 0.0.7"
-[^2]: <https://model-checking.github.io/kani/reference/attributes.html?utm_source=chatgpt.com>
-       "Attributes - The Kani Rust Verifier"
-[^3]: <https://docs.rs/serde-saphyr?utm_source=chatgpt.com> "serde_saphyr -
-      Rust"
-[^4]: <https://model-checking.github.io/kani/verification-results.html?utm_source=chatgpt.com>
-       "Verification results - The Kani Rust Verifier"
-[^5]: <https://docs.rs/inventory> "<https://docs.rs/inventory>"
-[^6]: <https://doc.rust-lang.org/cargo/reference/build-scripts.html>
-      "<https://doc.rust-lang.org/cargo/reference/build-scripts.html>"
-[^7]: <https://doc.rust-lang.org/std/macro.include_str.html?utm_source=chatgpt.com>
-       "include_str in std"
-[^8]: <https://model-checking.github.io/kani/usage.html?utm_source=chatgpt.com>
-      "Using Kani - The Kani Rust Verifier"
-[^9]: <https://arxiv.org/html/2510.01072v1?utm_source=chatgpt.com> "Lessons
-      Learned So Far From Verifying the Rust Standard …"
-[^10]: <https://github.com/trailofbits/dylint>
-       "<https://github.com/trailofbits/dylint>"
+[^1]: https://docs.rs/crate/serde-saphyr/latest?utm_source=chatgpt.com "serde-saphyr 0.0.7"
+[^10]: https://github.com/trailofbits/dylint "<https://github.com/trailofbits/dylint>"
+[^2]: https://model-checking.github.io/kani/reference/attributes.html?utm_source=chatgpt.com "Attributes - The Kani Rust Verifier"
+[^3]: https://docs.rs/serde-saphyr?utm_source=chatgpt.com "serde_saphyr -
+Rust"
+[^4]: https://model-checking.github.io/kani/verification-results.html?utm_source=chatgpt.com "Verification results - The Kani Rust Verifier"
+[^5]: https://docs.rs/inventory "<https://docs.rs/inventory>"
+[^6]: https://doc.rust-lang.org/cargo/reference/build-scripts.html "<https://doc.rust-lang.org/cargo/reference/build-scripts.html>"
+[^7]: https://doc.rust-lang.org/std/macro.include_str.html?utm_source=chatgpt.com "include_str in std"
+[^8]: https://model-checking.github.io/kani/usage.html?utm_source=chatgpt.com "Using Kani - The Kani Rust Verifier"
+[^9]: https://arxiv.org/html/2510.01072v1?utm_source=chatgpt.com "Lessons
+Learned So Far From Verifying the Rust Standard …"

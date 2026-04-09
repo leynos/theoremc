@@ -183,10 +183,7 @@ introduced by this plan):
 - `ArgValue` enum (4 variants: `Literal`, `Reference`, `RawSequence`,
   `RawMap`).
 - `LiteralValue` enum (4 variants: `Bool`, `Integer`, `Float`, `String`).
-- `decode_arg_value(param_name, TheoremValue) -> Result<ArgValue,
-  ArgDecodeError>` is the public entry point. It dispatches scalars to `Literal
-  `, sequences to `RawSequence`, and mappings to the private `decode_mapping
-  ` function.
+- `decode_arg_value(param_name, TheoremValue) -> Result<ArgValue, ArgDecodeError>` is the public entry point. It dispatches scalars to `Literal `, sequences to `RawSequence`, and mappings to the private `decode_mapping ` function.
 - `decode_mapping(param_name, map)` is private. It checks `is_ref_wrapper` and
   either validates the ref target or returns `ArgValue::RawMap`.
 - `is_ref_wrapper(map)` is a private predicate checking
@@ -709,20 +706,20 @@ sentinel dispatch.
 Files modified (11 total):
 
 1. `src/schema/arg_value.rs` -- core logic changes
-2. `src/schema/arg_value_tests.rs` -- new unit tests
-3. `src/schema/raw_action.rs` -- new `remap_with_prefix` match arm
-4. `tests/arg_decode_bdd.rs` -- new BDD scenarios
-5. `tests/features/arg_decode.feature` -- new Gherkin scenarios
-6. `tests/fixtures/valid_arg_literal_wrapper.theorem` -- new fixture (create)
-7. `tests/fixtures/invalid_arg_literal_non_string.theorem` -- new fixture
+1. `src/schema/arg_value_tests.rs` -- new unit tests
+1. `src/schema/raw_action.rs` -- new `remap_with_prefix` match arm
+1. `tests/arg_decode_bdd.rs` -- new BDD scenarios
+1. `tests/features/arg_decode.feature` -- new Gherkin scenarios
+1. `tests/fixtures/valid_arg_literal_wrapper.theorem` -- new fixture (create)
+1. `tests/fixtures/invalid_arg_literal_non_string.theorem` -- new fixture
    (create)
-8. `docs/users-guide.md` -- documentation updates
-9. `docs/theoremc-design.md` -- new section 6.7.9
-10. `docs/roadmap.md` -- check Step 2.3.2 checkbox
-11. `docs/execplans/2-3-2-optional-literal-text-wrapper.md` -- this ExecPlan
-    (create)
+1. `docs/users-guide.md` -- documentation updates
+1. `docs/theoremc-design.md` -- new section 6.7.9
+1. `docs/roadmap.md` -- check Step 2.3.2 checkbox
+1. `docs/execplans/2-3-2-optional-literal-text-wrapper.md` -- this ExecPlan
+   (create)
 
-[^1]: `TFS-5` (theorem-file-specification.md sections 5.2 and 5.3)
-[^2]: `ADR-3` (adr-001-theorem-symbol-stability-and-non-vacuity-policy.md
-    decision 3 -- "Literal wrappers remain supported")
-[^3]: `DES-5` (theoremc-design.md section 5.5.1)
+[^1]: %60TFS-5%60 "theorem-file-specification.md sections 5.2 and 5.3"
+[^2]: %60ADR-3%60 "adr-001-theorem-symbol-stability-and-non-vacuity-policy.md
+decision 3 -- \"Literal wrappers remain supported\""
+[^3]: %60DES-5%60 "theoremc-design.md section 5.5.1"

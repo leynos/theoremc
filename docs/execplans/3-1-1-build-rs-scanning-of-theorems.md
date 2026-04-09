@@ -27,19 +27,19 @@ Observable success:
 
 1. A thin root-level `build.rs` exists and successfully scans
    `theorems/**/*.theorem` from `CARGO_MANIFEST_DIR`.
-2. Direct unit tests cover missing directories, nested theorem trees, ignored
+1. Direct unit tests cover missing directories, nested theorem trees, ignored
    non-`.theorem` files, deterministic ordering, and emitted rerun path sets.
-3. Behavioural tests using `rstest-bdd` v0.5.0 prove build behaviour in an
+1. Behavioural tests using `rstest-bdd` v0.5.0 prove build behaviour in an
    isolated temporary fixture crate:
    - a first build runs the build script,
    - a second build without theorem changes does not rerun it, and
    - editing a discovered `.theorem` file causes the next build to rerun the
      build script.
-4. `docs/theoremc-design.md` records the implementation decisions,
+1. `docs/theoremc-design.md` records the implementation decisions,
    `docs/users-guide.md` explains the new build-time behaviour that consumers
    must know, and `docs/roadmap.md` marks only the Step 3.1.1 checkbox done
    once the implementation and gates pass.
-5. `make check-fmt`, `make lint`, and `make test` pass. Because documentation
+1. `make check-fmt`, `make lint`, and `make test` pass. Because documentation
    changes are part of the scope, `make fmt`, `make markdownlint`, and
    `make nixie` must also pass before the change is considered complete.
 
@@ -99,7 +99,7 @@ inclusion.
   of these explicit follow-ups before proceeding:
   1. commit an empty `theorems/.gitkeep`-style placeholder so the watched
      directory always exists, or
-  2. document the directory-existence requirement and confirm that product
+  1. document the directory-existence requirement and confirm that product
      behaviour is acceptable.
 - Scope creep: if satisfying the acceptance criteria requires any proc-macro,
   harness-generation, or `include!()` work, stop and split that into the
@@ -250,10 +250,12 @@ inclusion.
   decision rather than assuming Cargo behaviour. Rationale: the design note
   cites directory watching, but the current repository state makes this detail
   user-visible on day one.
+
 - 2026-03-29: ship Step `3.1.1` with a shared internal helper compiled by both
   `build.rs` and unit tests via `#[path = ...]` inclusion. Rationale: this
   keeps `build.rs` thin without exporting new public API surface just to make
   discovery testable.
+
 - 2026-03-29: emit the root `theorems` watch unconditionally and emit nested
   directories when present, even though that makes reruns conservative for the
   whole watched tree. Rationale: this preserves missing-directory support and
@@ -325,15 +327,15 @@ Suggested implementation file layout:
 1. `build.rs`
    Thin build-script entrypoint that loads `CARGO_MANIFEST_DIR`, delegates to
    the helper, and prints `cargo::rerun-if-changed=` lines.
-2. `src/build_discovery.rs` or `build_support.rs`
+1. `src/build_discovery.rs` or `build_support.rs`
    Shared discovery logic. Pick one location and keep it free of application
    runtime concerns so both `build.rs` and tests can compile it.
-3. `src/build_discovery_tests.rs` or a focused sibling test file
+1. `src/build_discovery_tests.rs` or a focused sibling test file
    Direct unit coverage for discovery semantics if the helper lives under
    `src/`.
-4. `tests/build_discovery_bdd.rs`
+1. `tests/build_discovery_bdd.rs`
    Behavioural build-integration scenarios using temporary fixture crates.
-5. `tests/features/build_discovery.feature`
+1. `tests/features/build_discovery.feature`
    Feature text for the BDD scenarios.
 
 The strongest candidate design is:
@@ -367,24 +369,24 @@ than guessing. Build a small test helper that can:
    - copies of the repository's current `build.rs` and shared build-discovery
      helper under test, and
    - an optional `theorems/` tree populated per scenario;
-2. run `cargo build -vv --color never` inside that fixture; and
-3. capture stdout and stderr for assertions.
+1. run `cargo build -vv --color never` inside that fixture; and
+1. capture stdout and stderr for assertions.
 
 Before implementing the production code, add failing tests that express the
 required behaviour:
 
 1. a direct unit test for recursive discovery and sorted relative paths;
-2. a behavioural test that runs `cargo build` twice with no theorem changes and
+1. a behavioural test that runs `cargo build` twice with no theorem changes and
    expects the second build not to rerun the build script; and
-3. a behavioural test that edits a discovered theorem file and expects the next
+1. a behavioural test that edits a discovered theorem file and expects the next
    `cargo build` to rerun the build script.
 
 If the missing-directory case is intended to be supported, include a failing
 prototype test for:
 
 1. building successfully when `theorems/` is absent; then
-2. creating `theorems/first.theorem`; then
-3. observing whether the next `cargo build` reruns the build script.
+1. creating `theorems/first.theorem`; then
+1. observing whether the next `cargo build` reruns the build script.
 
 Use that prototype to settle the contract recorded in `Decision Log` and
 `docs/theoremc-design.md`.
@@ -395,13 +397,13 @@ Create a small helper module that owns filesystem traversal and path shaping.
 Its responsibilities should be:
 
 1. resolve the crate-root theorem directory from `CARGO_MANIFEST_DIR`;
-2. recurse into nested directories when the root exists;
-3. include only `.theorem` files;
-4. compute the set of watched directories needed for reliable change
+1. recurse into nested directories when the root exists;
+1. include only `.theorem` files;
+1. compute the set of watched directories needed for reliable change
    detection;
-5. normalize discovered theorem file paths into crate-relative forward-slash
+1. normalize discovered theorem file paths into crate-relative forward-slash
    strings; and
-6. sort the final vectors deterministically.
+1. sort the final vectors deterministically.
 
 Keep the helper API additive and future-proof. A shape like the following is
 appropriate:
@@ -424,22 +426,22 @@ prepare a stable ordered file list plus watch metadata.
 Write direct tests against this helper covering:
 
 1. no `theorems/` directory;
-2. an empty `theorems/` directory;
-3. nested directories containing `.theorem` files;
-4. ignored sibling files such as `.txt`, `.yaml`, or editor temp files;
-5. deterministic ordering regardless of creation order; and
-6. forward-slash normalization of returned theorem paths.
+1. an empty `theorems/` directory;
+1. nested directories containing `.theorem` files;
+1. ignored sibling files such as `.txt`, `.yaml`, or editor temp files;
+1. deterministic ordering regardless of creation order; and
+1. forward-slash normalization of returned theorem paths.
 
 ### Stage C: add the thin `build.rs` entrypoint
 
 Once the helper is green, add the actual root-level `build.rs`. Keep it small:
 
 1. read `CARGO_MANIFEST_DIR`;
-2. call the helper;
-3. print `cargo::rerun-if-changed=theorems` unconditionally;
-4. print additional `cargo::rerun-if-changed=` lines for discovered watched
+1. call the helper;
+1. print `cargo::rerun-if-changed=theorems` unconditionally;
+1. print additional `cargo::rerun-if-changed=` lines for discovered watched
    directories and theorem files; and
-5. fail the build with a clear panic message only for genuine traversal errors,
+1. fail the build with a clear panic message only for genuine traversal errors,
    not for the ordinary "directory absent" case.
 
 Do not generate `OUT_DIR/theorem_suite.rs` in this step. If it helps future
@@ -458,12 +460,12 @@ the user perspective. Prefer three scenarios:
    - when a build runs twice and then one theorem file is edited,
    - then the second unchanged build stays fresh and the edited build reruns
      the build script.
-2. `Non-theorem files do not participate in discovery`
+1. `Non-theorem files do not participate in discovery`
    - Given sibling files under `theorems/` that do not end in `.theorem`,
    - when a build runs and then only the ignored file is edited,
    - then Cargo does not rerun the build script because the watched theorem
      inputs are unchanged.
-3. `Missing theorem directory is handled explicitly`
+1. `Missing theorem directory is handled explicitly`
    - If the prototype proves absent-directory watching works, the scenario
      should assert that the first later theorem addition reruns the build.
    - If the prototype disproves it, replace this with a scenario asserting the
@@ -494,12 +496,12 @@ Update the design and user-facing documentation in the same change:
      robustness strategy, and
    - why Step `3.1.1` deliberately stops at ordered discovery while Step
      `3.1.2` is reserved for macro-owned per-file code generation.
-2. `docs/users-guide.md`
+1. `docs/users-guide.md`
    Document the new build-time behaviour that library consumers should know:
    - theorem files are auto-discovered from `theorems/**/*.theorem`,
    - edits trigger Cargo rebuilds through the build script, and
    - any requirement about creating or seeding the `theorems/` directory.
-3. `docs/roadmap.md`
+1. `docs/roadmap.md`
    Mark only the first checkbox under Step 3.1 as done after all gates pass.
 
 ### Stage F: validate end to end
@@ -529,9 +531,9 @@ set -o pipefail; make test | tee /tmp/make-test.log
 Success criteria:
 
 1. the new unit and behavioural tests pass;
-2. `make check-fmt`, `make lint`, and `make test` pass as required by the
+1. `make check-fmt`, `make lint`, and `make test` pass as required by the
    roadmap task;
-3. `make fmt`, `make markdownlint`, and `make nixie` pass because documentation
+1. `make fmt`, `make markdownlint`, and `make nixie` pass because documentation
    changed; and
-4. `docs/roadmap.md` shows the Step `3.1.1` checkbox marked done while the
+1. `docs/roadmap.md` shows the Step `3.1.1` checkbox marked done while the
    Step `3.1.2` checkbox remains open.

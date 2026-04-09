@@ -4,16 +4,16 @@
   this directory.
 - [Architecture Decision Record (ADR) 001: theorem symbol stability and non-vacuity policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
   - Decision record for injective symbol mangling, explicit reference
-  semantics, non-vacuity requirements, and theorem ID migration.
+    semantics, non-vacuity requirements, and theorem ID migration.
 - [Architecture Decision Record (ADR) 002: library-first internationalization and localization with Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
   - Decision record for Fluent-based, library-safe localization via injected
-  localizers, structured diagnostic codes, and deterministic fallback policy.
+    localizers, structured diagnostic codes, and deterministic fallback policy.
 - [Architecture Decision Record (ADR) 003: architectural boundary enforcement for schema layers](adr-003-architectural-boundary-enforcement.md)
   - Decision record for schema layering constraints, module boundary policy,
-  and an incremental architecture-enforcement stack.
+    and an incremental architecture-enforcement stack.
 - [Navigating code complexity: a guide for implementers and maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring
-  strategies for long-lived codebases.
+    strategies for long-lived codebases.
 - [Developer's guide](developers-guide.md) - Maintainer-oriented manual
   covering the build system, internal architecture, contributor workflows, and
   extension points.
@@ -25,13 +25,13 @@
   identifiers.
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)
   - Patterns for testable Rust design using dependency injection to avoid
-  global-state coupling.
+    global-state coupling.
 - [A systematic guide to effective, ergonomic, and "don't repeat yourself" (DRY) doctests in Rust](rust-doctest-dry-guide.md)
   - Detailed reference for writing maintainable Rust doctests with minimal
-  duplication.
+    duplication.
 - [Mastering test fixtures in Rust with `rstest`](rust-testing-with-rstest-fixtures.md)
   - Comprehensive reference for fixture design, parametrization, and best
-  practices with `rstest`.
+    practices with `rstest`.
 - [Scripting standards](scripting-standards.md) - Standards for project
   scripts, covering toolchain choices, structure, and operational expectations.
 - [Theorem file format](theorem-file-specification.md) - Schema and behavioural
@@ -51,7 +51,7 @@
     - ExecPlan for post-deserialization semantic validation rules.
   - [Step 1.2.2: Parse expression fields as `syn::Expr`](execplans/1-2-2-parse-assume-prove-and-witness-expressions.md)
     - ExecPlan for expression syntax validation and statement block
-    rejection.
+      rejection.
   - [Step 1.2.3: Enforce `Step` and `LetBinding` shape rules](execplans/1-2-3-enforce-step-and-let-binding.md)
     - ExecPlan for step and let-binding structural validation.
   - [Step 1.2.4: Enforce non-vacuity defaults](execplans/1-2-4-enforce-non-vacuity-defaults.md)

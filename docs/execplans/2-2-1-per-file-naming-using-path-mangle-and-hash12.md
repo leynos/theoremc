@@ -58,10 +58,10 @@ follow-up steps (roadmap items 2.2.2 and 2.2.3).
 - The `path_mangle` algorithm must follow the specification in
   `docs/name-mangling-rules.md` §1 exactly:
   1. Replace `/` and `\` with `__`.
-  2. Replace any character not in `[A-Za-z0-9_]` with `_`.
-  3. Collapse consecutive `_` to a single `_`.
-  4. Lowercase the result.
-  5. If the result starts with a digit, prefix `_`.
+  1. Replace any character not in `[A-Za-z0-9_]` with `_`.
+  1. Collapse consecutive `_` to a single `_`.
+  1. Lowercase the result.
+  1. If the result starts with a digit, prefix `_`.
 - `path_stem(P)` removes a trailing `.theorem` extension if present;
   otherwise returns `P` unchanged.
 - The existing `hash12` function (blake3, 12 lowercase hex chars) is reused
@@ -239,11 +239,11 @@ New types and functions:
 
 1. `path_stem(path: impl AsRef<Utf8Path>) -> PathStem` — removes trailing
    `.theorem` if present.
-2. `path_mangle(stem: &PathStem) -> String` — applies the 5-step
+1. `path_mangle(stem: &PathStem) -> String` — applies the 5-step
    sanitization.
-3. `MangledModule` — struct holding `stem`, `mangled_stem`, `hash`, and
+1. `MangledModule` — struct holding `stem`, `mangled_stem`, `hash`, and
    `module_name`.
-4. `mangle_module_path(path: impl AsRef<Utf8Path>) -> MangledModule` —
+1. `mangle_module_path(path: impl AsRef<Utf8Path>) -> MangledModule` —
    composite entry point.
 
 Unit tests cover:
@@ -267,8 +267,8 @@ Go/no-go: `cargo test --lib -- mangle` passes all new and existing tests.
 Create `tests/features/module_naming.feature` with scenarios:
 
 1. Simple paths produce deterministic module names.
-2. Mixed separators produce stable, human-recognizable names.
-3. Punctuation-heavy paths are disambiguated by hash.
+1. Mixed separators produce stable, human-recognizable names.
+1. Punctuation-heavy paths are disambiguated by hash.
 
 Create `tests/module_naming_bdd.rs` following the established pattern from
 `tests/collision_bdd.rs`.
@@ -303,7 +303,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: existing suite passes (327+ tests, 0 failures).
 
-2. Compute golden hash values for representative paths. Run a temporary test
+1. Compute golden hash values for representative paths. Run a temporary test
    or use `blake3` in a Rust playground to hash each path string. Record the
    12-character hex prefixes. Representative paths:
 
@@ -316,12 +316,12 @@ Run from repository root: `/home/user/project`.
    - `"no_extension"`
    - `"theorems/UPPER-case.theorem"`
 
-3. Implement `path_stem`, `path_mangle`, `MangledModule`, and
+1. Implement `path_stem`, `path_mangle`, `MangledModule`, and
    `mangle_module_path` in `src/mangle.rs`. Add unit tests below the existing
    `#[cfg(test)]` section (or extract tests to a sibling file if the 400-line
    limit would be exceeded).
 
-4. Run module-level tests:
+1. Run module-level tests:
 
    ```shell
    set -o pipefail
@@ -330,10 +330,10 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: all mangle tests pass.
 
-5. Create BDD feature file `tests/features/module_naming.feature` and
+1. Create BDD feature file `tests/features/module_naming.feature` and
    BDD test runner `tests/module_naming_bdd.rs`.
 
-6. Run BDD tests:
+1. Run BDD tests:
 
    ```shell
    set -o pipefail
@@ -342,9 +342,9 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: all BDD scenarios pass.
 
-7. Update documentation files.
+1. Update documentation files.
 
-8. Run formatting gate:
+1. Run formatting gate:
 
    ```shell
    set -o pipefail
@@ -353,7 +353,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: formatter check exits 0.
 
-9. Run lint gate:
+1. Run lint gate:
 
    ```shell
    set -o pipefail
@@ -362,22 +362,22 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: Clippy + rustdoc exit 0 with no denied warnings.
 
-10. Run full test suite:
+1. Run full test suite:
 
-    ```shell
-    set -o pipefail
-    make test 2>&1 | tee /tmp/2-2-1-test.log
-    ```
+   ```shell
+   set -o pipefail
+   make test 2>&1 | tee /tmp/2-2-1-test.log
+   ```
 
-    Expected signal: all tests pass (existing + new).
+   Expected signal: all tests pass (existing + new).
 
-11. Review logs for failure markers:
+1. Review logs for failure markers:
 
-    ```shell
-    grep -E "error:|FAILED|failures:" /tmp/2-2-1-*.log
-    ```
+   ```shell
+   grep -E "error:|FAILED|failures:" /tmp/2-2-1-*.log
+   ```
 
-    Expected signal: no failure markers found.
+   Expected signal: no failure markers found.
 
 ## Validation and acceptance
 
@@ -386,7 +386,7 @@ Acceptance behaviours:
 - `mangle_module_path("theorems/bidirectional.theorem")` returns a
   `MangledModule` whose `module_name()` matches
   `__theoremc__file__theorems_bidirectional__{hash12("theorems/bidirectional.theorem")}`.
-   (The exact hash is determined in Milestone 1.)
+  (The exact hash is determined in Milestone 1.)
 
 - `mangle_module_path("theorems/my-file.theorem")` and
   `mangle_module_path("theorems/my_file.theorem")` produce different
