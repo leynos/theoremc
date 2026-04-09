@@ -45,7 +45,7 @@ crates declared under `[build-dependencies]` in `Cargo.toml`:
 | ----------- | ------------------------------------------------- |
 | `camino` | UTF-8 path types for cross-platform path handling |
 | `cap-std` | Capability-oriented filesystem access |
-| `thiserror` | Derive macro for `BuildDiscoveryError` |
+| `thiserror` | Derive macros for `BuildDiscoveryError` and `BuildSuiteError` |
 
 These are separate from the library's `[dependencies]` and the test-only
 `[dev-dependencies]`. Cargo compiles them for the host toolchain, not the
@@ -57,15 +57,15 @@ The build script performs discovery and suite generation:
 
 1. reads `CARGO_MANIFEST_DIR` from the environment (set by Cargo),
 2. delegates to `build_discovery::discover_theorem_inputs()`,
-3. prints `cargo::rerun-if-changed=` lines for each watched directory and
-   discovered theorem file, and
-4. writes `OUT_DIR/theorem_suite.rs` via `build_suite::write_theorem_suite()`,
+3. writes `OUT_DIR/theorem_suite.rs` via `build_suite::write_theorem_suite()`,
    containing `theorem_file!("path/to/file.theorem");` invocations for each
-   discovered theorem.
+   discovered theorem, and
+4. prints `cargo::rerun-if-changed=` lines for each watched directory and
+   discovered theorem file.
 
 The discovery and suite modules are shared between `build.rs` and the library's
 test suite via `#[path = "src/build_*.rs"]` inclusion. This keeps the build
-script small without exporting new public API surface.
+script small without exporting a new public API surface.
 
 ### 1.3 Build discovery module (`src/build_discovery.rs`)
 
