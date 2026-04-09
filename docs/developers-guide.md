@@ -130,7 +130,7 @@ module exists as a separate top-level module specifically to orchestrate both
 without violating this boundary. The `mangle_validate` module duplicates
 action-name validation rules to preserve independence from the schema layer.
 
-### 2.1 `BuildDiscovery` API
+### 2.1 Build system API
 
 Contributors extending the build system should note the following internal API
 surface:
