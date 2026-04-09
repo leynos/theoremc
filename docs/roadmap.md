@@ -264,7 +264,7 @@ Out of scope: theorem execution.
   `cargo::rerun-if-changed` lines for directory and file paths. Acceptance:
   build integration tests confirm theorem edits trigger rebuilds reliably.
   Signposts: `DES-7`.
-- [ ] Generate `OUT_DIR/theorem_suite.rs` with one `theorem_file!(...)`
+- [x] Generate `OUT_DIR/theorem_suite.rs` with one `theorem_file!(...)`
   invocation per discovered path, then include it from crate code. Acceptance:
   empty, single-file, and multi-file suites compile deterministically.
   Signposts: `DES-7`.
