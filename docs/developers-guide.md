@@ -45,7 +45,7 @@ crates declared under `[build-dependencies]` in `Cargo.toml`:
 | ----------- | ------------------------------------------------- |
 | `camino` | UTF-8 path types for cross-platform path handling |
 | `cap-std` | Capability-oriented filesystem access |
-| `thiserror` | Derive macros for `BuildDiscoveryError` and `BuildSuiteError` |
+| `thiserror` | Derive macro for `BuildDiscoveryError` and `BuildSuiteError` |
 
 These are separate from the library's `[dependencies]` and the test-only
 `[dev-dependencies]`. Cargo compiles them for the host toolchain, not the
@@ -59,8 +59,11 @@ The build script performs discovery and suite generation:
 2. delegates to `build_discovery::discover_theorem_inputs()`,
 3. writes `OUT_DIR/theorem_suite.rs` via `build_suite::write_theorem_suite()`,
    containing `theorem_file!("path/to/file.theorem");` invocations for each
-   discovered theorem, and
-4. prints `cargo::rerun-if-changed=` lines for each watched directory and
+   discovered theorem,
+4. emits `cargo::rustc-cfg=theoremc_has_theorems` when any theorems are
+   discovered (used by conditional lint expectations in the generated suite
+   bridge), and
+5. prints `cargo::rerun-if-changed=` lines for each watched directory and
    discovered theorem file.
 
 The discovery and suite modules are shared between `build.rs` and the library's
