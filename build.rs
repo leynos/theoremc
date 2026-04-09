@@ -1,21 +1,45 @@
-//! Cargo build-script entrypoint for theorem file discovery.
+//! Cargo build-script entrypoint for theorem file discovery and suite generation.
 
 #[path = "src/build_discovery.rs"]
 mod build_discovery;
 
-use camino::Utf8PathBuf;
+#[path = "src/build_suite.rs"]
+mod build_suite;
 
-/// Scans `CARGO_MANIFEST_DIR/theorems` and emits `cargo::rerun-if-changed`
-/// lines for discovered theorem files and watched directories.
-fn main() {
+use camino::Utf8PathBuf;
+use cap_std::fs_utf8::Dir as Utf8Dir;
+
+/// Scans `CARGO_MANIFEST_DIR/theorems`, generates `OUT_DIR/theorem_suite.rs`,
+/// and emits `cargo::rerun-if-changed` lines for discovered theorem files
+/// and watched directories.
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Inform Cargo about the cfg flags we may emit.
+    println!("cargo::rustc-check-cfg=cfg(theoremc_has_theorems)");
+
     let manifest_dir = Utf8PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR")
-            .unwrap_or_else(|error| panic!("CARGO_MANIFEST_DIR is not set: {error}")),
+            .map_err(|e| format!("CARGO_MANIFEST_DIR is not set: {e}"))?,
     );
-    let discovery = build_discovery::discover_theorem_inputs(&manifest_dir)
-        .unwrap_or_else(|error| panic!("failed to discover theorem build inputs: {error}"));
+    let out_dir_path = Utf8PathBuf::from(
+        std::env::var("OUT_DIR").map_err(|e| format!("OUT_DIR is not set: {e}"))?,
+    );
 
+    let discovery = build_discovery::discover_theorem_inputs(&manifest_dir)?;
+
+    // Generate OUT_DIR/theorem_suite.rs
+    let out_dir = Utf8Dir::open_ambient_dir(&out_dir_path, cap_std::ambient_authority())
+        .map_err(|e| format!("failed to open OUT_DIR: {e}"))?;
+    build_suite::write_theorem_suite(&out_dir, &discovery)?;
+
+    // Emit cfg flag when theorems exist (used for conditional lint expectations)
+    if discovery.theorem_files().next().is_some() {
+        println!("cargo::rustc-cfg=theoremc_has_theorems");
+    }
+
+    // Emit rerun-if-changed lines for Cargo
     for path in discovery.rerun_paths() {
         println!("cargo::rerun-if-changed={}", path.as_str());
     }
+
+    Ok(())
 }

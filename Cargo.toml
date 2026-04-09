@@ -45,6 +45,9 @@ required-features = ["test-support"]
 [[test]]
 name = "build_discovery_bdd"
 
+[[test]]
+name = "build_suite_bdd"
+
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 

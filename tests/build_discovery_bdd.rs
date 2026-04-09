@@ -9,6 +9,7 @@ use rstest_bdd_macros::{given, scenario, then};
 
 const BUILD_SCRIPT_SOURCE: &str = include_str!("../build.rs");
 const BUILD_DISCOVERY_SOURCE: &str = include_str!("../src/build_discovery.rs");
+const BUILD_SUITE_SOURCE: &str = include_str!("../src/build_suite.rs");
 const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
 const FIXTURE_LIB_RS: &str = "//! Fixture crate for build discovery behavioural tests.\n";
 const TRIVIAL_THEOREM: &str = concat!(
@@ -53,6 +54,7 @@ impl FixtureCrate {
             Utf8Path::new("src/build_discovery.rs"),
             BUILD_DISCOVERY_SOURCE,
         )?;
+        fixture.write(Utf8Path::new("src/build_suite.rs"), BUILD_SUITE_SOURCE)?;
 
         Ok(fixture)
     }
