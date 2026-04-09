@@ -78,7 +78,7 @@ classes are detected. `make check-fmt`, `make lint`, and `make test` pass.
 - [x] (2026-02-27 00:05Z) Milestone 0: baseline verification (all existing
   tests pass).
 - [x] (2026-02-27 00:10Z) Milestone 1: add `MangledIdentifierCollision` variant
-  to
+      to
   `SchemaError` and create `src/collision.rs` module scaffold.
 - [x] (2026-02-27 00:15Z) Milestone 2: implement action-name collection
   (traversal of `TheoremDoc`).
@@ -100,7 +100,7 @@ classes are detected. `make check-fmt`, `make lint`, and `make test` pass.
   `collect_all_occurrences<'a>(docs: &'a [TheoremDoc])`. Evidence: `make lint`
   failed with this warning denied. Impact: replaced with elided lifetime
   `fn collect_all_occurrences(docs: &[TheoremDoc]) -> Vec<ActionOccurrence<'_>>`
-  per Clippy's suggestion. Minimal impact.
+   per Clippy's suggestion. Minimal impact.
 
 - Observation: `TheoremName::new` takes `String` not `&str`. Evidence: compile
   error when constructing `TheoremDoc` in unit tests. Impact: used
@@ -201,9 +201,9 @@ proof harnesses. The current pipeline is:
 
 1. `load_theorem_docs(yaml)` in `src/schema/loader.rs` deserializes YAML into
    `Vec<TheoremDoc>`.
-1. `validate_theorem_doc(doc)` in `src/schema/validate.rs` validates each
+2. `validate_theorem_doc(doc)` in `src/schema/validate.rs` validates each
    document (fields, expressions, action name grammar).
-1. `mangle_action_name(canonical_name)` in `src/mangle.rs` transforms a
+3. `mangle_action_name(canonical_name)` in `src/mangle.rs` transforms a
    canonical dot-separated name into a `MangledAction` struct containing slug,
    hash, identifier, and resolution path.
 
@@ -312,12 +312,12 @@ Go/no-go check: existing tests still pass.
 Add `#[cfg(test)] mod tests` to `src/collision.rs` with unit tests covering:
 
 1. Let binding traversal.
-1. Do step traversal.
-1. Nested maybe block traversal.
-1. Distinct canonical names pass.
-1. Mangled collision detection (using the internal helper directly with crafted
+2. Do step traversal.
+3. Nested maybe block traversal.
+4. Distinct canonical names pass.
+5. Mangled collision detection (using the internal helper directly with crafted
    data).
-1. Error message formatting.
+6. Error message formatting.
 
 Go/no-go check: `cargo test -- collision` passes.
 
@@ -330,8 +330,8 @@ names.
 Create `tests/features/collision.feature` with BDD scenarios:
 
 1. Distinct action names across theorems are accepted.
-1. Same action name reused within one theorem is accepted.
-1. Mangled identifier collision is detected.
+2. Same action name reused within one theorem is accepted.
+3. Mangled identifier collision is detected.
 
 Create `tests/collision_bdd.rs` following the pattern in
 `tests/schema_action_name_bdd.rs`.
@@ -368,7 +368,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: existing suite passes.
 
-1. After code and test edits, run formatting gate:
+2. After code and test edits, run formatting gate:
 
    ```shell
    set -o pipefail
@@ -377,7 +377,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: formatter check exits 0.
 
-1. Run lint gate:
+3. Run lint gate:
 
    ```shell
    set -o pipefail
@@ -386,7 +386,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: rustdoc + clippy exit 0 with no denied warnings.
 
-1. Run full tests:
+4. Run full tests:
 
    ```shell
    set -o pipefail

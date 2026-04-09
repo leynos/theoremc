@@ -36,7 +36,7 @@ with clear error messages. Existing tests remain green (no regressions).
 - All code must pass `make check-fmt`, `make lint`, and `make test`.
 - Clippy lints are aggressive (see `Cargo.toml` `[lints.clippy]`): no
   `unwrap`, no `expect`, no indexing, no panics in result functions, no missing
-  docs, cognitive complexity \<= 9.
+  docs, cognitive complexity <= 9.
 - No `unsafe` code.
 - No file longer than 400 lines.
 - Module-level (`//!`) doc comments on every module.
@@ -274,10 +274,10 @@ Implementation:
 
 1. Call `syn::parse_str::<syn::Expr>(input)`. On parse failure, return
    `Err(format!("is not a valid Rust expression: {err}"))`.
-1. On success, check the parsed `Expr` against the denylist using
+2. On success, check the parsed `Expr` against the denylist using
    `is_statement_like()`. If it matches, return
    `Err("must be a single expression, not a statement or block".to_owned())`.
-1. Otherwise, return `Ok(())`.
+3. Otherwise, return `Ok(())`.
 
 Private predicate:
 
@@ -290,23 +290,23 @@ helper `is_compound_assignment` that detects compound assignment operators
 (`+=`, `-=`, etc.) which `syn` 2.x represents as `Expr::Binary` with
 `BinOp::*Assign` variants:
 
-| Variant | Why rejected |
+| Variant                   | Why rejected                                         |
 | ------------------------- | ---------------------------------------------------- |
-| `Expr::Assign` | Assignment is a side effect, not a value expression. |
-| `Expr::Async` | `async { ... }` block. Spec: "no statement blocks". |
-| `Expr::Block` | Explicit `{ ... }` block with statements. |
-| `Expr::Break` | Flow control, not a value-producing expression. |
-| `Expr::Const` | `const { ... }` block. Analogous to async/unsafe. |
-| `Expr::Continue` | Flow control. |
-| `Expr::ForLoop` | `for` loop. Spec: "no `for`". |
-| `Expr::Let` | `let` guard/binding. Spec: "no `let`". |
-| `Expr::Loop` | Unconditional `loop { ... }`. |
-| `Expr::Return` | Flow control. |
-| `Expr::TryBlock` | `try { ... }` block. |
-| `Expr::Unsafe` | `unsafe { ... }` block. Spec: "no statement blocks". |
-| `Expr::While` | `while` loop. Analogous to `for`. |
-| `Expr::Yield` | `yield` expression. Only meaningful in generators. |
-| `Expr::Binary` (compound) | `+=`, `-=`, `*=`, etc. Mutating side effect. |
+| `Expr::Assign`            | Assignment is a side effect, not a value expression. |
+| `Expr::Async`             | `async { ... }` block. Spec: "no statement blocks".  |
+| `Expr::Block`             | Explicit `{ ... }` block with statements.            |
+| `Expr::Break`             | Flow control, not a value-producing expression.      |
+| `Expr::Const`             | `const { ... }` block. Analogous to async/unsafe.    |
+| `Expr::Continue`          | Flow control.                                        |
+| `Expr::ForLoop`           | `for` loop. Spec: "no `for`".                        |
+| `Expr::Let`               | `let` guard/binding. Spec: "no `let`".               |
+| `Expr::Loop`              | Unconditional `loop { ... }`.                        |
+| `Expr::Return`            | Flow control.                                        |
+| `Expr::TryBlock`          | `try { ... }` block.                                 |
+| `Expr::Unsafe`            | `unsafe { ... }` block. Spec: "no statement blocks". |
+| `Expr::While`             | `while` loop. Analogous to `for`.                    |
+| `Expr::Yield`             | `yield` expression. Only meaningful in generators.   |
+| `Expr::Binary` (compound) | `+=`, `-=`, `*=`, etc. Mutating side effect.         |
 
 Allowed forms include: `if`, `match`, closures, method calls, function calls,
 binary/unary operations, literals, paths, field access, indexing, casts,
@@ -413,11 +413,11 @@ Gate: `make check-fmt && make lint && make test`.
 Create 6 new fixture files in `tests/fixtures/`:
 
 1. `invalid_block_assume_expr.theorem` -- `expr: "{ let x = 1; x }"`
-1. `invalid_for_loop_assert.theorem` -- `assert: "for i in 0..10 { }"`
-1. `invalid_while_witness_cover.theorem` -- `cover: "while true { }"`
-1. `invalid_syntax_assume_expr.theorem` -- `expr: "not valid %%"`
-1. `invalid_syntax_assert.theorem` -- `assert: "not valid %%"`
-1. `invalid_syntax_witness_cover.theorem` -- `cover: "not valid %%"`
+2. `invalid_for_loop_assert.theorem` -- `assert: "for i in 0..10 { }"`
+3. `invalid_while_witness_cover.theorem` -- `cover: "while true { }"`
+4. `invalid_syntax_assume_expr.theorem` -- `expr: "not valid %%"`
+5. `invalid_syntax_assert.theorem` -- `assert: "not valid %%"`
+6. `invalid_syntax_witness_cover.theorem` -- `cover: "not valid %%"`
 
 Add a new BDD test group in `tests/schema_bdd.rs` with 6 cases covering all
 three expression fields (block rejection and syntax rejection).
@@ -427,11 +427,11 @@ Gate: `make check-fmt && make lint && make test`.
 ### Milestone 5: documentation updates
 
 1. `docs/roadmap.md`: change `- [ ]` to `- [x]` for step 1.2.2.
-1. `docs/contents.md`: add entry for the new execplan.
-1. `docs/theoremc-design.md`: add section 6.5 recording implementation
+2. `docs/contents.md`: add entry for the new execplan.
+3. `docs/theoremc-design.md`: add section 6.5 recording implementation
    decisions.
-1. `docs/users-guide.md`: add "Expression syntax validation" subsection.
-1. Create this ExecPlan document.
+4. `docs/users-guide.md`: add "Expression syntax validation" subsection.
+5. Create this ExecPlan document.
 
 ### Milestone 6: final quality gates
 

@@ -280,8 +280,8 @@ Go/no-go check: `cargo test --lib -- mangle` passes all unit tests.
 Create `tests/features/action_mangle.feature` with scenarios:
 
 1. Simple action names produce correct mangled identifiers.
-1. Underscore escaping preserves injectivity.
-1. Mangled identifiers resolve to `crate::theorem_actions`.
+2. Underscore escaping preserves injectivity.
+3. Mangled identifiers resolve to `crate::theorem_actions`.
 
 Create `tests/action_mangle_bdd.rs` following the existing BDD patterns.
 
@@ -318,7 +318,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: existing suite passes.
 
-1. After code and test edits, run formatting gate:
+2. After code and test edits, run formatting gate:
 
    ```shell
    set -o pipefail
@@ -327,7 +327,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: formatter check exits 0.
 
-1. Run lint gate:
+3. Run lint gate:
 
    ```shell
    set -o pipefail
@@ -336,7 +336,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: rustdoc + clippy exit 0 with no denied warnings.
 
-1. Run full tests:
+4. Run full tests:
 
    ```shell
    set -o pipefail
@@ -346,7 +346,7 @@ Run from repository root: `/home/user/project`.
    Expected signal: all tests pass, including 33 new mangle unit tests and 3
    new BDD scenarios.
 
-1. Review logs:
+5. Review logs:
 
    ```shell
    grep -E "error:|FAILED|failures:" /tmp/2-1-2-*.log

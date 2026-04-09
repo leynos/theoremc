@@ -290,44 +290,44 @@ Run all commands from repository root.
 
 1. Baseline tests before code edits.
 
-   ```sh
-   set -o pipefail
-   make test | tee /tmp/step-1-3-baseline-test.log
-   ```
+    ```sh
+    set -o pipefail
+    make test | tee /tmp/step-1-3-baseline-test.log
+    ```
 
-1. Implement milestones 1-6.
+2. Implement milestones 1-6.
 
-1. Format sources and documentation.
+3. Format sources and documentation.
 
-   ```sh
-   set -o pipefail
-   make fmt | tee /tmp/step-1-3-fmt.log
-   ```
+    ```sh
+    set -o pipefail
+    make fmt | tee /tmp/step-1-3-fmt.log
+    ```
 
-1. Validate Markdown and Mermaid diagrams (docs are modified in this step).
+4. Validate Markdown and Mermaid diagrams (docs are modified in this step).
 
-   ```sh
-   set -o pipefail
-   make markdownlint | tee /tmp/step-1-3-markdownlint.log
+    ```sh
+    set -o pipefail
+    make markdownlint | tee /tmp/step-1-3-markdownlint.log
 
-   set -o pipefail
-   make nixie | tee /tmp/step-1-3-nixie.log
-   ```
+    set -o pipefail
+    make nixie | tee /tmp/step-1-3-nixie.log
+    ```
 
-1. Run required commit gates.
+5. Run required commit gates.
 
-   ```sh
-   set -o pipefail
-   make check-fmt | tee /tmp/step-1-3-check-fmt.log
+    ```sh
+    set -o pipefail
+    make check-fmt | tee /tmp/step-1-3-check-fmt.log
 
-   set -o pipefail
-   make lint | tee /tmp/step-1-3-lint.log
+    set -o pipefail
+    make lint | tee /tmp/step-1-3-lint.log
 
-   set -o pipefail
-   make test | tee /tmp/step-1-3-test.log
-   ```
+    set -o pipefail
+    make test | tee /tmp/step-1-3-test.log
+    ```
 
-1. Verify all acceptance criteria and mark roadmap Step 1.3 done.
+6. Verify all acceptance criteria and mark roadmap Step 1.3 done.
 
 ## Validation and acceptance
 

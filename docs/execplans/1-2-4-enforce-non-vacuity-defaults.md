@@ -251,44 +251,44 @@ Run from the repository root. Keep command logs for review.
 
 1. Baseline audit and targeted test loop.
 
-   ```sh
-   set -o pipefail
-   make test | tee /tmp/step-1-2-4-baseline.log
-   ```
+    ```sh
+    set -o pipefail
+    make test | tee /tmp/step-1-2-4-baseline.log
+    ```
 
-1. Implement code/test/doc changes from milestones 1-4.
+2. Implement code/test/doc changes from milestones 1-4.
 
-1. Format Markdown and Rust.
+3. Format Markdown and Rust.
 
-   ```sh
-   set -o pipefail
-   make fmt | tee /tmp/step-1-2-4-fmt.log
-   ```
+    ```sh
+    set -o pipefail
+    make fmt | tee /tmp/step-1-2-4-fmt.log
+    ```
 
-1. Validate docs and diagrams.
+4. Validate docs and diagrams.
 
-   ```sh
-   set -o pipefail
-   make markdownlint | tee /tmp/step-1-2-4-markdownlint.log
+    ```sh
+    set -o pipefail
+    make markdownlint | tee /tmp/step-1-2-4-markdownlint.log
 
-   set -o pipefail
-   make nixie | tee /tmp/step-1-2-4-nixie.log
-   ```
+    set -o pipefail
+    make nixie | tee /tmp/step-1-2-4-nixie.log
+    ```
 
-1. Run required commit gates.
+5. Run required commit gates.
 
-   ```sh
-   set -o pipefail
-   make check-fmt | tee /tmp/step-1-2-4-check-fmt.log
+    ```sh
+    set -o pipefail
+    make check-fmt | tee /tmp/step-1-2-4-check-fmt.log
 
-   set -o pipefail
-   make lint | tee /tmp/step-1-2-4-lint.log
+    set -o pipefail
+    make lint | tee /tmp/step-1-2-4-lint.log
 
-   set -o pipefail
-   make test | tee /tmp/step-1-2-4-test.log
-   ```
+    set -o pipefail
+    make test | tee /tmp/step-1-2-4-test.log
+    ```
 
-1. Confirm roadmap checkbox updated and all logs show success.
+6. Confirm roadmap checkbox updated and all logs show success.
 
 ## Validation and acceptance
 

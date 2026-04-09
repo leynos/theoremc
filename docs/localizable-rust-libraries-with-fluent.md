@@ -21,14 +21,14 @@ libraries in Rust using the Fluent ecosystem.
 1. **The application is the authority:** The application is solely responsible
    for detecting the locale, creating and configuring a single authoritative
    `LanguageLoader`, and managing the overall localization state.
-1. **Libraries provide resources:** The library's role is to embed its `.ftl`
+2. **Libraries provide resources:** The library's role is to embed its `.ftl`
    translation files as assets and expose public functions that require a
    `LanguageLoader` to produce a translated string. The library defines _what_
    can be translated.
-1. **Localization via dependency injection:** The application injects its
+3. **Localization via dependency injection:** The application injects its
    configured `LanguageLoader` into the library's functions when a localized
    message is needed. The library never creates its own loader.
-1. **Composability:** This pattern is highly composable. An application can
+4. **Composability:** This pattern is highly composable. An application can
    aggregate translation assets from multiple independent libraries into one
    unified localization context, ensuring consistency across the entire program.
 
@@ -211,8 +211,8 @@ architecture for internationalization in a modular Rust ecosystem.[^1]
 By following this separation of concerns, the Rust ecosystem can provide
 composable internationalized libraries that work together seamlessly.
 
-\[^1\]: i18n_embed - Rust - [Docs.rs](https://docs.rs/i18n-embed), accessed on
-August 18, 2025.
-\[^2\]: i18n_embed - Rust -
-[Docs.rs](https://docs.rs/i18n-embed/0.14.1/i18n_embed/),
-accessed on August 18, 2025.
+[^1]: i18n_embed - Rust - [Docs.rs](https://docs.rs/i18n-embed), accessed on
+      August 18, 2025.
+[^2]: i18n_embed - Rust -
+      [Docs.rs](https://docs.rs/i18n-embed/0.14.1/i18n_embed/),
+      accessed on August 18, 2025.

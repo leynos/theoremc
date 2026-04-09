@@ -1233,43 +1233,6 @@ edited file is not itself a discovered theorem input. The semantic guarantee of
 Step 3.1.1 is therefore about which files are discovered and emitted as theorem
 inputs, while tolerating conservative reruns from the directory watch.
 
-### 7.1.2 Implementation decisions (Step 3.1.2)
-
-Step 3.1.2 generates `OUT_DIR/theorem_suite.rs` with one `theorem_file!(...)`
-invocation per discovered theorem path, then includes that generated file from
-the crate via a hidden internal module. This establishes the compile-time suite
-seam that Step 3.2 will later replace with real proc-macro-based per-file
-expansion.
-
-The generated suite format is intentionally minimal: one line per theorem file
-containing `theorem_file!("path/to/file.theorem");`, with a trailing newline
-even for the empty case. Paths are escaped for Rust string literals (backslashes
-and quotes are doubled). The output follows the sorted order established by
-`BuildDiscovery` to ensure deterministic generation across builds.
-
-Write-if-changed semantics are implemented to minimize build churn: the suite
-is rendered in memory, compared against any existing file, and only rewritten
-when bytes differ. This prevents unnecessary rebuilds when theorem inputs are
-unchanged.
-
-The crate-side bridge is a hidden internal module (`__theoremc_generated_suite`)
-that defines a temporary `macro_rules! theorem_file` macro before including the
-generated suite. The bridge macro expands to a compile-time `include_str!`
-anchored at `CARGO_MANIFEST_DIR`:
-
-```rust
-macro_rules! theorem_file {
-    ($path:literal) => {
-        const _: &str =
-            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", $path));
-    };
-}
-```
-
-This proves that generated paths are valid crate-relative inputs without
-prematurely building the full proc-macro crate. Step 3.2 will keep the same
-generated callsite while replacing the macro body with real per-file expansion.
-
 ### 7.2 The `theorem_file!()` proc macro
 
 For each `.theorem` file, the macro expands to:

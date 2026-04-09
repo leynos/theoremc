@@ -338,7 +338,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: existing suite passes before changes.
 
-1. After code + test edits, run formatting gate:
+2. After code + test edits, run formatting gate:
 
    ```shell
    set -o pipefail
@@ -347,7 +347,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: formatter check exits 0.
 
-1. Run lint gate:
+3. Run lint gate:
 
    ```shell
    set -o pipefail
@@ -356,7 +356,7 @@ Run from repository root: `/home/user/project`.
 
    Expected signal: rustdoc + clippy exit 0 with no denied warnings.
 
-1. Run full tests:
+4. Run full tests:
 
    ```shell
    set -o pipefail
@@ -366,7 +366,7 @@ Run from repository root: `/home/user/project`.
    Expected signal: all tests pass, including new action-name unit and
    behavioural tests.
 
-1. Review logs for deterministic proof of success:
+5. Review logs for deterministic proof of success:
 
    ```shell
    rg -n "error:|FAILED|failures:" /tmp/2-1-1-*.log
