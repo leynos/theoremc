@@ -18,7 +18,7 @@ erode these boundaries and make the codebase harder to reason about.
   theorem naming and vacuity defaults
 - [ADR-002: Library-first internationalization and localization with
   Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
-  — establishes i18n strategy
+  — establishes internationalisation (i18n) strategy
 - [ADR-003: Architectural boundary
   enforcement](adr-003-architectural-boundary-enforcement.md) — enforces
   layered schema boundaries and anti-corruption constraints
@@ -64,8 +64,11 @@ The build script performs discovery and suite generation:
    discovered theorem file.
 
 The discovery and suite modules are shared between `build.rs` and the library's
-test suite via `#[path = "src/build_*.rs"]` inclusion. This keeps the build
-script small without exporting a new public API surface.
+test suite via separate `#[path = "..."]` attributes for each module
+(`#[path = "src/build_discovery.rs"]` for discovery and
+`#[path = "src/build_suite.rs"]` for suite generation). Rust does not support
+wildcards in `#[path]`, so multiple attributes must be listed. This keeps the
+build script small without exporting a new public API surface.
 
 ### 1.3 Build discovery module (`src/build_discovery.rs`)
 
@@ -145,6 +148,11 @@ pub(crate) fn discover_theorem_inputs(
 pub(crate) fn render_theorem_suite<'a>(
     theorem_files: impl IntoIterator<Item = &'a Utf8Path>,
 ) -> String;
+
+pub(crate) fn write_theorem_suite(
+    out_dir: &Utf8Dir,
+    discovery: &BuildDiscovery,
+) -> Result<(), BuildSuiteError>;
 ```
 
 Accessors return iterators over `&Utf8Path`:
