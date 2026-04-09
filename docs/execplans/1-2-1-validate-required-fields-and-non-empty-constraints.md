@@ -191,7 +191,8 @@ prevents false regressions.
 
 Create `src/schema/validate.rs` with:
 
-- `pub(crate) fn validate_theorem_doc(doc: &TheoremDoc) -> Result<(), SchemaError>` as the entry point.
+- `pub(crate) fn validate_theorem_doc(doc: &TheoremDoc) -> Result<(),
+  SchemaError>` as the entry point.
 - Private helpers: `is_blank(s: &str) -> bool` and
   `fail(doc: &TheoremDoc, reason: String) -> SchemaError`.
 - Move existing validation logic from `loader.rs` (lines 55-96: the
@@ -211,17 +212,17 @@ Add private validation helpers in `validate.rs`:
 
 *Table 1: validation rules added in Milestone 2.*
 
-| Rule | Field | Check | Error reason |
+| Rule | Field                          | Check                       | Error reason                                                      |
 | ---- | ------------------------------ | --------------------------- | ----------------------------------------------------------------- |
-| 1 | `About` | `is_blank(&doc.about)` | `About must be non-empty after trimming` |
-| 2 | `Assertion.assert_expr` | `is_blank(...)` | `Prove assertion {i}: assert must be non-empty after trimming` |
-| 3 | `Assertion.because` | `is_blank(...)` | `Prove assertion {i}: because must be non-empty after trimming` |
-| 4 | `Assumption.expr` | `is_blank(...)` | `Assume constraint {i}: expr must be non-empty after trimming` |
-| 5 | `Assumption.because` | `is_blank(...)` | `Assume constraint {i}: because must be non-empty after trimming` |
-| 6 | `WitnessCheck.cover` | `is_blank(...)` | `Witness {i}: cover must be non-empty after trimming` |
-| 7 | `WitnessCheck.because` | `is_blank(...)` | `Witness {i}: because must be non-empty after trimming` |
-| 8 | `KaniEvidence.unwind` | `unwind == 0` | `Evidence.kani.unwind must be a positive integer (> 0)` |
-| 9 | `KaniEvidence.vacuity_because` | present but `is_blank(...)` | `Evidence.kani.vacuity_because must be non-empty after trimming` |
+| 1    | `About`                        | `is_blank(&doc.about)`      | `About must be non-empty after trimming`                          |
+| 2    | `Assertion.assert_expr`        | `is_blank(...)`             | `Prove assertion {i}: assert must be non-empty after trimming`    |
+| 3    | `Assertion.because`            | `is_blank(...)`             | `Prove assertion {i}: because must be non-empty after trimming`   |
+| 4    | `Assumption.expr`              | `is_blank(...)`             | `Assume constraint {i}: expr must be non-empty after trimming`    |
+| 5    | `Assumption.because`           | `is_blank(...)`             | `Assume constraint {i}: because must be non-empty after trimming` |
+| 6    | `WitnessCheck.cover`           | `is_blank(...)`             | `Witness {i}: cover must be non-empty after trimming`             |
+| 7    | `WitnessCheck.because`         | `is_blank(...)`             | `Witness {i}: because must be non-empty after trimming`           |
+| 8    | `KaniEvidence.unwind`          | `unwind == 0`               | `Evidence.kani.unwind must be a positive integer (> 0)`           |
+| 9    | `KaniEvidence.vacuity_because` | present but `is_blank(...)` | `Evidence.kani.vacuity_because must be non-empty after trimming`  |
 
 Gate: `make check-fmt && make lint && make test` — existing tests still pass
 (all existing fixtures have non-empty fields, confirmed by Milestone 0 audit).
@@ -231,16 +232,16 @@ Gate: `make check-fmt && make lint && make test` — existing tests still pass
 Create 10 new fixture files in `tests/fixtures/`:
 
 1. `invalid_empty_about.theorem` — `About: ""`
-1. `invalid_whitespace_about.theorem` — `About: "   "`
-1. `invalid_empty_assert.theorem` — `Prove[0].assert: ""`
-1. `invalid_empty_prove_because.theorem` — `Prove[0].because: ""`
-1. `invalid_empty_assume_expr.theorem` — `Assume[0].expr: ""`
-1. `invalid_empty_assume_because.theorem` — `Assume[0].because: ""`
-1. `invalid_empty_witness_cover.theorem` — `Witness[0].cover: ""`
-1. `invalid_empty_witness_because.theorem` — `Witness[0].because: ""`
-1. `invalid_zero_unwind.theorem` — `unwind: 0`
-1. `invalid_empty_vacuity_because.theorem` — `allow_vacuous: true` with
-   `vacuity_because: ""`
+2. `invalid_whitespace_about.theorem` — `About: "   "`
+3. `invalid_empty_assert.theorem` — `Prove[0].assert: ""`
+4. `invalid_empty_prove_because.theorem` — `Prove[0].because: ""`
+5. `invalid_empty_assume_expr.theorem` — `Assume[0].expr: ""`
+6. `invalid_empty_assume_because.theorem` — `Assume[0].because: ""`
+7. `invalid_empty_witness_cover.theorem` — `Witness[0].cover: ""`
+8. `invalid_empty_witness_because.theorem` — `Witness[0].because: ""`
+9. `invalid_zero_unwind.theorem` — `unwind: 0`
+10. `invalid_empty_vacuity_because.theorem` — `allow_vacuous: true` with
+    `vacuity_because: ""`
 
 Add BDD tests in `tests/schema_bdd.rs`:
 

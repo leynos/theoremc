@@ -217,17 +217,15 @@ confirm the scaffold is clean.
 
 Dependencies to add:
 
-```
-[dependencies]
-serde = { version = "1", features = ["derive"] }
-serde-saphyr = "0.0.17"
-indexmap = { version = "2", features = ["serde"] }
-thiserror = "2"
+    [dependencies]
+    serde = { version = "1", features = ["derive"] }
+    serde-saphyr = "0.0.17"
+    indexmap = { version = "2", features = ["serde"] }
+    thiserror = "2"
 
-[dev-dependencies]
-rstest = "0.26"
-rstest-bdd = "0.5.0"
-```
+    [dev-dependencies]
+    rstest = "0.26"
+    rstest-bdd = "0.5.0"
 
 ### Milestone 1: core schema types
 
@@ -235,29 +233,25 @@ Create the `src/schema/` module tree:
 
 `src/schema/error.rs` — define `SchemaError` using `thiserror::Error`:
 
-```
-#[derive(Debug, thiserror::Error)]
-pub enum SchemaError {
-    #[error("YAML deserialization failed: {0}")]
-    Deserialize(String),
-    #[error("invalid identifier '{identifier}': {reason}")]
-    InvalidIdentifier { identifier: String, reason: String },
-}
-```
+    #[derive(Debug, thiserror::Error)]
+    pub enum SchemaError {
+        #[error("YAML deserialization failed: {0}")]
+        Deserialize(String),
+        #[error("invalid identifier '{identifier}': {reason}")]
+        InvalidIdentifier { identifier: String, reason: String },
+    }
 
 `src/schema/value.rs` — define `TheoremValue`:
 
-```
-#[derive(Debug, Clone, PartialEq)]
-pub enum TheoremValue {
-    Bool(bool),
-    Integer(i64),
-    Float(f64),
-    String(String),
-    Sequence(Vec<TheoremValue>),
-    Mapping(IndexMap<String, TheoremValue>),
-}
-```
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum TheoremValue {
+        Bool(bool),
+        Integer(i64),
+        Float(f64),
+        String(String),
+        Sequence(Vec<TheoremValue>),
+        Mapping(IndexMap<String, TheoremValue>),
+    }
 
 With a hand-written `impl<'de> serde::Deserialize<'de> for TheoremValue` that
 walks the YAML value types and rejects null.
@@ -305,11 +299,9 @@ map keys are validated after deserialization.
 
 `src/schema/loader.rs` — define:
 
-```
-pub fn load_theorem_docs(
-    input: &str,
-) -> Result<Vec<TheoremDoc>, SchemaError>
-```
+    pub fn load_theorem_docs(
+        input: &str,
+    ) -> Result<Vec<TheoremDoc>, SchemaError>
 
 Uses `serde_saphyr::from_multiple::<TheoremDoc>(input)` (or equivalent) to
 handle `---`-separated documents. After deserialization, runs identifier
@@ -380,53 +372,41 @@ All commands run from `/home/user/project`.
 
 Milestone 0:
 
-```
-mkdir -p docs/execplans
-# Write ExecPlan file (this document)
-# Edit Cargo.toml to add dependencies
-# Create src/lib.rs
-make check-fmt && make lint && make test
-```
+    mkdir -p docs/execplans
+    # Write ExecPlan file (this document)
+    # Edit Cargo.toml to add dependencies
+    # Create src/lib.rs
+    make check-fmt && make lint && make test
 
 Milestone 1:
 
-```
-mkdir -p src/schema
-# Create error.rs, value.rs, types.rs, mod.rs
-# Update lib.rs
-make check-fmt && make lint && make test
-```
+    mkdir -p src/schema
+    # Create error.rs, value.rs, types.rs, mod.rs
+    # Update lib.rs
+    make check-fmt && make lint && make test
 
 Milestone 2:
 
-```
-# Create identifier.rs
-# Wire validation into loader
-make check-fmt && make lint && make test
-```
+    # Create identifier.rs
+    # Wire validation into loader
+    make check-fmt && make lint && make test
 
 Milestone 3:
 
-```
-# Create loader.rs
-make check-fmt && make lint && make test
-```
+    # Create loader.rs
+    make check-fmt && make lint && make test
 
 Milestone 4:
 
-```
-mkdir -p tests/fixtures
-# Create fixture .theorem files
-# Create test files
-make check-fmt && make lint && make test
-```
+    mkdir -p tests/fixtures
+    # Create fixture .theorem files
+    # Create test files
+    make check-fmt && make lint && make test
 
 Milestone 5:
 
-```
-# Create/update documentation files
-make check-fmt && make lint && make test
-```
+    # Create/update documentation files
+    make check-fmt && make lint && make test
 
 ## Validation and acceptance
 
@@ -442,12 +422,10 @@ Quality criteria:
 
 Quality method:
 
-```
-set -o pipefail
-make check-fmt 2>&1 | tee /tmp/check-fmt.log
-make lint 2>&1 | tee /tmp/lint.log
-make test 2>&1 | tee /tmp/test.log
-```
+    set -o pipefail
+    make check-fmt 2>&1 | tee /tmp/check-fmt.log
+    make lint 2>&1 | tee /tmp/lint.log
+    make test 2>&1 | tee /tmp/test.log
 
 Expected: all three commands exit 0.
 
@@ -491,38 +469,36 @@ Dev dependencies:
 
 Public API surface (in `theoremc::schema`):
 
-```
-pub fn load_theorem_docs(input: &str)
-    -> Result<Vec<TheoremDoc>, SchemaError>;
+    pub fn load_theorem_docs(input: &str)
+        -> Result<Vec<TheoremDoc>, SchemaError>;
 
-pub struct TheoremDoc { /* TitleCase fields, see types.rs */ }
-pub struct Assumption { pub expr: String, pub because: String }
-pub struct Assertion { pub assert_expr: String, pub because: String }
-pub struct WitnessCheck { pub cover: String, pub because: String }
-pub enum LetBinding { Call { call: ActionCall },
-                      Must { must: ActionCall } }
-pub enum Step { Call { call: ActionCall },
-                Must { must: ActionCall },
-                Maybe { maybe: MaybeBlock } }
-pub struct MaybeBlock { pub because: String,
-                        pub do_steps: Vec<Step> }
-pub struct ActionCall { pub action: String,
-                        pub args: IndexMap<String, TheoremValue>,
-                        pub as_binding: Option<String> }
-pub struct Evidence { pub kani: Option<KaniEvidence>,
-                      pub verus: Option<TheoremValue>,
-                      pub stateright: Option<TheoremValue> }
-pub struct KaniEvidence { pub unwind: u32,
-                          pub expect: KaniExpectation,
-                          pub allow_vacuous: bool,
-                          pub vacuity_because: Option<String> }
-pub enum KaniExpectation { Success, Failure, Unreachable, Undetermined }
-pub enum TheoremValue { Bool(bool), Integer(i64), Float(f64),
-                        String(String), Sequence(Vec<TheoremValue>),
-                        Mapping(IndexMap<String, TheoremValue>) }
-pub enum SchemaError { Deserialize(String),
-                       InvalidIdentifier { identifier, reason },
-                       ValidationFailed { theorem, reason } }
+    pub struct TheoremDoc { /* TitleCase fields, see types.rs */ }
+    pub struct Assumption { pub expr: String, pub because: String }
+    pub struct Assertion { pub assert_expr: String, pub because: String }
+    pub struct WitnessCheck { pub cover: String, pub because: String }
+    pub enum LetBinding { Call { call: ActionCall },
+                          Must { must: ActionCall } }
+    pub enum Step { Call { call: ActionCall },
+                    Must { must: ActionCall },
+                    Maybe { maybe: MaybeBlock } }
+    pub struct MaybeBlock { pub because: String,
+                            pub do_steps: Vec<Step> }
+    pub struct ActionCall { pub action: String,
+                            pub args: IndexMap<String, TheoremValue>,
+                            pub as_binding: Option<String> }
+    pub struct Evidence { pub kani: Option<KaniEvidence>,
+                          pub verus: Option<TheoremValue>,
+                          pub stateright: Option<TheoremValue> }
+    pub struct KaniEvidence { pub unwind: u32,
+                              pub expect: KaniExpectation,
+                              pub allow_vacuous: bool,
+                              pub vacuity_because: Option<String> }
+    pub enum KaniExpectation { Success, Failure, Unreachable, Undetermined }
+    pub enum TheoremValue { Bool(bool), Integer(i64), Float(f64),
+                            String(String), Sequence(Vec<TheoremValue>),
+                            Mapping(IndexMap<String, TheoremValue>) }
+    pub enum SchemaError { Deserialize(String),
+                           InvalidIdentifier { identifier, reason },
+                           ValidationFailed { theorem, reason } }
 
-pub fn validate_identifier(s: &str) -> Result<(), SchemaError>;
-```
+    pub fn validate_identifier(s: &str) -> Result<(), SchemaError>;

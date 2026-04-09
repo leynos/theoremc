@@ -22,18 +22,14 @@ avoid `unsafe` in library code).[^1]
 These rules are *normative* for v1:
 
 - Unknown top-level keys: **MUST error** (`deny_unknown_fields` behaviour).
-
 - Required keys missing: **MUST error**.
-
 - Scalar types wrong (e.g., `Tags: foo` instead of `Tags: [foo]`): **MUST
   error**.
-
 - `Assume.expr` and `Prove.assert`:
 
   - **MUST parse as Rust expressions** (syntactic validation using `syn`).
   - **MUST be single expressions** (no statement blocks, no `let`, no `for`,
     etc.).
-
 - Theorem names:
 
   - **MUST be unique per crate** (within the theorem suite included in that
@@ -303,13 +299,11 @@ Binding rules:
 - In `Do:`:
 
   - If `as` exists, the call’s return value is bound to that name.
-
   - If `as` is absent:
 
     - Allowed only if the return type is `()` (infallible, no value).
     - Otherwise, **error** (prevents accidentally discarding important results
       or failures).
-
 - In `Let:`:
 
   - The `Let` key is the binding name; `as` is ignored (and should error if
@@ -344,11 +338,9 @@ More precisely:
 
   - `must` generates an obligation `assert!(res.is_ok(), "...")` then unwraps
     to `T`.
-
 - If the action returns `Option<T>`:
 
   - `must` generates `assert!(opt.is_some(), "...")` then unwraps to `T`.
-
 - If the action returns `T` or `()`:
 
   - `must` simply calls it; no additional obligation is created.
@@ -396,10 +388,10 @@ preserve friendliness while staying typecheckable.
 A `Value` is one of:
 
 1. YAML integer → Rust integer literal (`0`, `1`, `32`, …)
-1. YAML boolean → Rust boolean literal (`true`/`false`)
-1. YAML string → Rust string literal
-1. YAML list → Rust `vec![...]`
-1. YAML map → either a struct literal or an explicit wrapper form
+2. YAML boolean → Rust boolean literal (`true`/`false`)
+3. YAML string → Rust string literal
+4. YAML list → Rust `vec![...]`
+5. YAML map → either a struct literal or an explicit wrapper form
 
 ### 5.2 Explicit variable references and string literals
 
@@ -526,14 +518,14 @@ Definitions:
 
 - `segment_escape(segment)`:
   1. Replace `_` with `_u`.
-  1. Leave ASCII letters and digits unchanged.
+  2. Leave ASCII letters and digits unchanged.
 - `action_slug(canonical_name)`:
   1. Split `canonical_name` on `.`.
-  1. Apply `segment_escape` to each segment.
-  1. Join escaped segments with `__`.
+  2. Apply `segment_escape` to each segment.
+  3. Join escaped segments with `__`.
 - `hash12(value)`:
   1. Compute `blake3(value.as_bytes())`.
-  1. Take the first 12 lowercase hex characters.
+  2. Take the first 12 lowercase hex characters.
 
 So:
 
@@ -578,10 +570,10 @@ Define:
 - `path_mangle(P)`:
 
   1. Replace `/` and `\` with `__`
-  1. Replace any character not in `[A-Za-z0-9_]` with `_`
-  1. Collapse consecutive `_` into a single `_`
-  1. Lowercase
-  1. If it starts with a digit, prefix `_`
+  2. Replace any character not in `[A-Za-z0-9_]` with `_`
+  3. Collapse consecutive `_` into a single `_`
+  4. Lowercase
+  5. If it starts with a digit, prefix `_`
 
 - `hash12(P)`: compute `blake3(P.as_bytes())`, take the first 12 hex chars of
   the digest.
@@ -622,13 +614,11 @@ This should be exploited while also keeping the simple name unique so
 Define:
 
 - `theorem_id` = the `Theorem` field (an `Identifier`).
-
 - `theorem_key` = `{P}#{theorem_id}`.
 
 - `theorem_snake(theorem_id)`:
 
   - If `theorem_id` already matches `^[a-z_][a-z0-9_]*$`, keep it.
-
   - Else convert UpperCamelCase → snake_case with this deterministic rule:
 
     - Insert `_` between a lower/digit and an upper (e.g. `Path3` → `path_3`)
@@ -683,8 +673,8 @@ Reporting uses a stable external theorem ID independent of Rust symbols:
 - Canonical ID: `{normalized_path(P)}#{theorem_id}`
 - `normalized_path(P)`:
   1. Use `/` as separator.
-  1. Remove leading `./`.
-  1. Preserve case.
+  2. Remove leading `./`.
+  3. Preserve case.
 
 When files or theorem names move, maintain aliases in
 `theorems/theorem-id-aliases.yaml`:
@@ -830,7 +820,9 @@ pub struct KaniEvidence {
 `Value` enum can enforce “no nulls”, implement `{ref:}` and `{literal:}`
 wrappers, and support typed struct-literal emission cleanly.)
 
-[^1]: https://docs.rs/serde-saphyr?utm_source=chatgpt.com "serde_saphyr -
-Rust"
-[^2]: https://model-checking.github.io/kani/reference/attributes.html?utm_source=chatgpt.com "Attributes - The Kani Rust Verifier"
-[^3]: https://model-checking.github.io/verify-rust-std/tools/kani.html?utm_source=chatgpt.com "Kani - Verify Rust Std Lib"
+[^1]: <https://docs.rs/serde-saphyr?utm_source=chatgpt.com> "serde_saphyr -
+      Rust"
+[^2]: <https://model-checking.github.io/kani/reference/attributes.html?utm_source=chatgpt.com>
+       "Attributes - The Kani Rust Verifier"
+[^3]: <https://model-checking.github.io/verify-rust-std/tools/kani.html?utm_source=chatgpt.com>
+       "Kani - Verify Rust Std Lib"

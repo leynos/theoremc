@@ -82,20 +82,20 @@ Every theorem document is a YAML mapping with the following fields. Keys use
 `TitleCase` canonically, but lowercase aliases are also accepted (e.g.,
 `Theorem` or `theorem`).
 
-| Field | Type | Required | Default | Notes |
+| Field      | Type                              | Required | Default              | Notes                                                                   |
 | ---------- | --------------------------------- | -------- | -------------------- | ----------------------------------------------------------------------- |
-| `Schema` | integer | no | `None` (unspecified) | Forwards compatibility. |
-| `Theorem` | string | **yes** | — | Must be a valid identifier (see below). |
-| `About` | string | **yes** | — | Human-readable description of intent. Must be non-empty after trimming. |
-| `Tags` | list of strings | no | `[]` | Metadata for filtering and reporting. |
-| `Given` | list of strings | no | `[]` | Narrative context (no codegen impact). |
-| `Forall` | map (identifier → type) | no | `{}` | Symbolic quantified variables. |
-| `Assume` | list of `Assumption` | no | `[]` | Constraints on symbolic inputs. |
-| `Witness` | list of `WitnessCheck` | no | `[]` | Non-vacuity witnesses. |
-| `Let` | map (identifier → `LetBinding`) | no | `{}` | Named fixtures. |
-| `Do` | list of `Step` | no | `[]` | Theorem step sequence. |
-| `Prove` | list of `Assertion` | **yes** | — | Proof obligations. |
-| `Evidence` | `Evidence` | **yes** | — | Backend configuration. |
+| `Schema`   | integer                           | no       | `None` (unspecified) | Forwards compatibility.                                                 |
+| `Theorem`  | string                            | **yes**  | —                    | Must be a valid identifier (see below).                                 |
+| `About`    | string                            | **yes**  | —                    | Human-readable description of intent. Must be non-empty after trimming. |
+| `Tags`     | list of strings                   | no       | `[]`                 | Metadata for filtering and reporting.                                   |
+| `Given`    | list of strings                   | no       | `[]`                 | Narrative context (no codegen impact).                                  |
+| `Forall`   | map (identifier → type)           | no       | `{}`                 | Symbolic quantified variables.                                          |
+| `Assume`   | list of `Assumption`              | no       | `[]`                 | Constraints on symbolic inputs.                                         |
+| `Witness`  | list of `WitnessCheck`            | no       | `[]`                 | Non-vacuity witnesses.                                                  |
+| `Let`      | map (identifier → `LetBinding`)   | no       | `{}`                 | Named fixtures.                                                         |
+| `Do`       | list of `Step`                    | no       | `[]`                 | Theorem step sequence.                                                  |
+| `Prove`    | list of `Assertion`               | **yes**  | —                    | Proof obligations.                                                      |
+| `Evidence` | `Evidence`                        | **yes**  | —                    | Backend configuration.                                                  |
 
 ### Identifier rules
 
@@ -458,12 +458,12 @@ The algorithm follows `docs/name-mangling-rules.md`:
 
 1. **Segment escape**: replace each `_` in a segment with `_u`. ASCII letters
    and digits are unchanged.
-1. **Action slug**: split the canonical name on `.`, escape each segment, and
+2. **Action slug**: split the canonical name on `.`, escape each segment, and
    join the escaped segments with `__`.
-1. **Hash suffix**: compute `blake3(canonical_name.as_bytes())` and take the
+3. **Hash suffix**: compute `blake3(canonical_name.as_bytes())` and take the
    first 12 lowercase hex characters.
-1. **Mangled identifier**: `{slug}__h{hash12}`.
-1. **Resolution path**: `crate::theorem_actions::{identifier}`.
+4. **Mangled identifier**: `{slug}__h{hash12}`.
+5. **Resolution path**: `crate::theorem_actions::{identifier}`.
 
 ### Building-block functions
 
@@ -534,10 +534,10 @@ __theoremc__file__{path_mangle(path_stem(P))}__{hash12(P)}
 - `path_mangle(&PathStem)` — sanitizes a path stem into a Rust-identifier-safe
   fragment using the five-step algorithm from `docs/name-mangling-rules.md` §1:
   1. Replace `/` and `\` with `__`.
-  1. Replace any character not in `[A-Za-z0-9_]` with `_`.
-  1. Collapse consecutive `_` to a single `_`.
-  1. Lowercase the result.
-  1. If the result starts with a digit, prefix `_`.
+  2. Replace any character not in `[A-Za-z0-9_]` with `_`.
+  3. Collapse consecutive `_` to a single `_`.
+  4. Lowercase the result.
+  5. If the result starts with a digit, prefix `_`.
 - `hash12(path)` — computes the first 12 lowercase hex characters of the blake3
   digest of the **original** path string (not the mangled stem).
 
