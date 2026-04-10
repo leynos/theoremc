@@ -20,7 +20,7 @@ use super::types::{ActionCall, Step};
 ///
 /// # Examples
 ///
-///     use theoremc::schema::ActionCall;
+///     use theoremc_core::schema::ActionCall;
 ///     use indexmap::IndexMap;
 ///
 ///     let good = ActionCall {

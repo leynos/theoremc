@@ -1,0 +1,23 @@
+[package]
+name = "theoremc-macros"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+camino = "1.2.2"
+cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+proc-macro2 = "1.0.106"
+quote = "1.0.45"
+syn = { version = "2.0.117", default-features = false, features = ["parsing", "full", "clone-impls", "printing", "proc-macro"] }
+theoremc-core = { path = "../theoremc-core" }
+thiserror = "2.0.18"
+
+[dev-dependencies]
+tempfile = "3.15.0"
+
+[lints]
+workspace = true

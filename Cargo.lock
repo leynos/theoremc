@@ -1725,7 +1725,6 @@ dependencies = [
 name = "theoremc"
 version = "0.1.0"
 dependencies = [
- "blake3",
  "camino",
  "cap-std 4.0.2",
  "indexmap",
@@ -1734,10 +1733,40 @@ dependencies = [
  "rstest",
  "rstest-bdd",
  "rstest-bdd-macros",
+ "syn 2.0.117",
+ "tempfile",
+ "theoremc-core",
+ "theoremc-macros",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "theoremc-core"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "camino",
+ "indexmap",
+ "proc-macro2",
+ "quote",
+ "rstest",
  "serde",
  "serde-saphyr",
  "syn 2.0.117",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "theoremc-macros"
+version = "0.1.0"
+dependencies = [
+ "camino",
+ "cap-std 4.0.2",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.117",
  "tempfile",
+ "theoremc-core",
  "thiserror 2.0.18",
 ]
 

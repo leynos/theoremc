@@ -5,10 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
-
-This plan is for review only. It must be explicitly approved before any
-implementation work begins.
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -167,16 +164,16 @@ Observable success:
   `docs/rstest-bdd-users-guide.md`, but that file is not present in this
   checkout. Existing local `rstest-bdd` suites are the style reference.
 - [x] 2026-04-10: drafted this ExecPlan.
-- [ ] Milestone 0: prove the minimal architecture seam that breaks the
+- [x] Milestone 0: prove the minimal architecture seam that breaks the
   proc-macro dependency cycle without changing the public crate name.
-- [ ] Milestone 1: add failing unit and snapshot tests for stable per-file
+- [x] Milestone 1: add failing unit and snapshot tests for stable per-file
   expansion and failing behavioural tests for macro-driven compile success and
   compile failure.
-- [ ] Milestone 2: introduce the proc-macro crate and the shared support crate
+- [x] Milestone 2: introduce the proc-macro crate and the shared support crate
   boundary needed by the macro.
-- [ ] Milestone 3: replace the temporary hidden bridge with the imported proc
+- [x] Milestone 3: replace the temporary hidden bridge with the imported proc
   macro while preserving the generated suite callsite.
-- [ ] Milestone 4: update `docs/theoremc-design.md`,
+- [x] Milestone 4: update `docs/theoremc-design.md`,
   `docs/users-guide.md`, `docs/developers-guide.md`, and `docs/roadmap.md`.
 - [ ] Milestone 5: run the full validation sequence with captured logs.
 
@@ -225,14 +222,22 @@ Observable success:
 
 ## Outcomes & Retrospective
 
-This section is intentionally incomplete while the plan remains in draft. When
-implementation is finished, replace this placeholder with:
-
-- what shipped,
-- what changed from the draft,
-- which risks materialized,
-- final gate results, and
-- any follow-up work left for Step `3.2.2`.
+- Implemented the minimal workspace split described in the plan:
+  `crates/theoremc-core` now owns shared theorem semantics,
+  `crates/theoremc-macros` owns the real `theorem_file!` proc macro, and the
+  root `theoremc` crate remains the public facade and build-integration owner.
+- Replaced the temporary local bridge macro with the real proc macro while
+  preserving the generated `theorem_file!(...)` callsite contract from Step
+  `3.1.2`.
+- Added direct proc-macro unit coverage in `crates/theoremc-macros` plus
+  fixture-crate behavioural coverage in `tests/theorem_file_macro_bdd.rs`.
+- One risk materialized during implementation: moving shared schema code into
+  `theoremc-core` broke a test-fixture `include_str!` path that assumed the old
+  root layout. The fix was to update the relative fixture path inside the moved
+  module.
+- Follow-up work remains for Step `3.2.2`: add final `#[cfg(kani)]`,
+  `#[kani::proof]`, and `#[kani::unwind(...)]` semantics to the generated
+  harness stubs.
 
 ## Context and orientation
 

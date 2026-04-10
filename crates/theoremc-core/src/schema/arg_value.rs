@@ -101,8 +101,8 @@ pub enum ArgDecodeError {
 ///
 /// # Examples
 ///
-///     use theoremc::schema::ArgValue;
-///     use theoremc::schema::LiteralValue;
+///     use theoremc_core::schema::ArgValue;
+///     use theoremc_core::schema::LiteralValue;
 ///
 ///     let lit = ArgValue::Literal(LiteralValue::String("hello".into()));
 ///     let reference = ArgValue::Reference("graph".into());
@@ -125,7 +125,7 @@ pub enum ArgValue {
 ///
 /// # Examples
 ///
-///     use theoremc::schema::LiteralValue;
+///     use theoremc_core::schema::LiteralValue;
 ///
 ///     let s = LiteralValue::String("hello".into());
 ///     let n = LiteralValue::Integer(42);
@@ -182,8 +182,8 @@ pub enum LiteralValue {
 ///
 /// # Examples
 ///
-///     use theoremc::schema::{ArgValue, LiteralValue, TheoremValue};
-///     use theoremc::schema::arg_value::decode_arg_value;
+///     use theoremc_core::schema::{ArgValue, LiteralValue, TheoremValue};
+///     use theoremc_core::schema::arg_value::decode_arg_value;
 ///
 ///     let result = decode_arg_value("name", TheoremValue::String("hello".into()));
 ///     assert_eq!(result.unwrap(), ArgValue::Literal(LiteralValue::String("hello".into())));

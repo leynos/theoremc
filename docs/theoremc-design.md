@@ -1244,7 +1244,11 @@ For each `.theorem` file, the macro expands to:
   braces”; build.rs already wires rebuilds, but `include_str!` also ensures the
   theorem content is a compile-time input.)
 
-- One generated harness function per theorem document in the file:
+- A backend scaffold module (`kani`) inside that private module.
+
+- One generated harness function per theorem document in the file. Step 3.2.1
+  ships deterministic stub functions only; Step 3.2.2 will add the final Kani
+  attributes and unwind metadata:
 
   - `#[cfg(kani)]`
   - `#[kani::proof]`
@@ -1254,6 +1258,37 @@ Kani explicitly notes that naively writing `#[kani::proof]` in code will make a
 normal `cargo build` fail unless it is gated (because the `kani` crate is not
 present in non-Kani builds).[^8] Therefore, theoremc-generated harnesses are
 always behind `#[cfg(kani)]` (or an equivalent feature gate).
+
+### 7.2.1 Implementation decisions (Step 3.2.1)
+
+Step 3.2.1 keeps the generated suite contract from Step 3.1.2 unchanged:
+`build.rs` still emits one bare `theorem_file!("path/to/file.theorem");`
+invocation per discovered theorem file. What changed is the meaning of that
+callsite.
+
+The repository now matches the intended architecture more closely:
+
+- `crates/theoremc-core` owns shared schema loading, name mangling, and
+  collision detection;
+- `crates/theoremc-macros` owns the real `theorem_file!` proc macro; and
+- the root `theoremc` package remains the public facade and build-integration
+  owner.
+
+The current macro expansion is intentionally structural and lint-neutral. For
+each theorem file it emits:
+
+- a private module named by `mangle_module_path`,
+- `include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", P))`,
+- `pub(super) mod kani`,
+- one deterministic `pub(crate)` harness stub per theorem document using
+  `mangle_theorem_harness`, and
+- a private const array that references those stubs so normal builds do not
+  report them as dead code.
+
+Invalid theorem files now fail compilation through the proc-macro expansion
+path using the existing schema loader and its deterministic diagnostics. This
+keeps theorem parsing, validation, and compile-time code generation on one
+shared contract rather than introducing a second parser in the macro crate.
 
 ### 7.3 Binding probes
 
