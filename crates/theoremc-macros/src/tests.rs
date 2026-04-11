@@ -72,28 +72,49 @@ fn expected_expansion(path: &str, theorems: &[&str]) -> String {
     ))
 }
 
-#[test]
-fn single_document_expansion_matches_expected_shape() -> Result<(), Box<dyn std::error::Error>> {
-    let path = "theorems/single.theorem";
-    let theorem = concat!(
-        "Theorem: Smoke\n",
-        "About: Macro smoke test\n",
-        "Witness:\n",
-        "  - cover: \"true\"\n",
-        "    because: \"reachable\"\n",
-        "Prove:\n",
-        "  - assert: \"true\"\n",
-        "    because: \"trivial\"\n",
-        "Evidence:\n",
-        "  kani:\n",
-        "    unwind: 1\n",
-        "    expect: SUCCESS\n",
-    );
+fn make_single_theorem_fixture(name: &str, about: &str) -> String {
+    format!(
+        concat!(
+            "Theorem: {name}\n",
+            "About: {about}\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+        ),
+        name = name,
+        about = about,
+    )
+}
 
-    let actual = expand_fixture(path, theorem)?;
-    let expected = expected_expansion(path, &["Smoke"]);
+fn assert_expansion_matches(
+    path: &str,
+    fixture: &str,
+    expected_theorems: &[&str],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let actual = expand_fixture(path, fixture)?;
+    let expected = expected_expansion(path, expected_theorems);
     assert_eq!(actual, expected);
     Ok(())
+}
+
+fn assert_expansion_is_stable(path: &str, fixture: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let first = expand_fixture(path, fixture)?;
+    let second = expand_fixture(path, fixture)?;
+    assert_eq!(first, second);
+    Ok(())
+}
+
+#[test]
+fn single_document_expansion_matches_expected_shape() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = make_single_theorem_fixture("Smoke", "Macro smoke test");
+    assert_expansion_matches("theorems/single.theorem", &fixture, &["Smoke"])
 }
 
 #[test]
@@ -135,48 +156,16 @@ fn multi_document_expansion_preserves_document_order() -> Result<(), Box<dyn std
 
 #[test]
 fn nested_path_expansion_uses_stable_module_mangling() -> Result<(), Box<dyn std::error::Error>> {
-    let path = "theorems/Nested Path/HTTP-2.theorem";
-    let theorem = concat!(
-        "Theorem: HTTP2StreamID\n",
-        "About: Path mangling coverage\n",
-        "Witness:\n",
-        "  - cover: \"true\"\n",
-        "    because: \"reachable\"\n",
-        "Prove:\n",
-        "  - assert: \"true\"\n",
-        "    because: \"trivial\"\n",
-        "Evidence:\n",
-        "  kani:\n",
-        "    unwind: 1\n",
-        "    expect: SUCCESS\n",
-    );
-
-    let actual = expand_fixture(path, theorem)?;
-    let expected = expected_expansion(path, &["HTTP2StreamID"]);
-    assert_eq!(actual, expected);
-    Ok(())
+    let fixture = make_single_theorem_fixture("HTTP2StreamID", "Path mangling coverage");
+    assert_expansion_matches(
+        "theorems/Nested Path/HTTP-2.theorem",
+        &fixture,
+        &["HTTP2StreamID"],
+    )
 }
 
 #[test]
 fn expansion_is_stable_for_repeat_calls() -> Result<(), Box<dyn std::error::Error>> {
-    let path = "theorems/repeat.theorem";
-    let theorem = concat!(
-        "Theorem: RepeatableMacro\n",
-        "About: Repeatability test\n",
-        "Witness:\n",
-        "  - cover: \"true\"\n",
-        "    because: \"reachable\"\n",
-        "Prove:\n",
-        "  - assert: \"true\"\n",
-        "    because: \"trivial\"\n",
-        "Evidence:\n",
-        "  kani:\n",
-        "    unwind: 1\n",
-        "    expect: SUCCESS\n",
-    );
-
-    let first = expand_fixture(path, theorem)?;
-    let second = expand_fixture(path, theorem)?;
-    assert_eq!(first, second);
-    Ok(())
+    let fixture = make_single_theorem_fixture("RepeatableMacro", "Repeatability test");
+    assert_expansion_is_stable("theorems/repeat.theorem", &fixture)
 }

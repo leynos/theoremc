@@ -1274,6 +1274,47 @@ The repository now matches the intended architecture more closely:
 - the root `theoremc` package remains the public facade and build-integration
   owner.
 
+For screen readers: this sequence diagram shows the build-time handoff from
+`cargo build`, through `build.rs` theorem discovery and generated-suite
+rendering, into `rustc` invoking the `theorem_file!` proc macro for each
+discovered theorem path, and finally to either a successful compilation or a
+compile-time theorem error.
+
+```mermaid
+sequenceDiagram
+    actor Developer
+    participant Cargo
+    participant BuildRS as build_rs
+    participant Rustc as rustc_compiler
+    participant RootLib as theoremc_root_lib
+    participant ProcMacro as theoremc_macros_proc_macro
+    participant Core as theoremc_core
+    participant TheoremFile as theorem_file_P
+
+    Developer->>Cargo: cargo build
+    Cargo->>BuildRS: run build script
+    BuildRS->>TheoremFile: discover theorem files
+    BuildRS-->>BuildRS: render OUT_DIR/theorem_suite_rs
+    BuildRS-->>Cargo: build script finished
+
+    Cargo->>Rustc: compile crate theoremc
+    Rustc->>RootLib: compile src/lib.rs
+    RootLib->>RootLib: include!(OUT_DIR/theorem_suite.rs)
+    loop for_each_theorem_file_callsite
+        Rustc->>ProcMacro: invoke theorem_file("P")
+        ProcMacro->>Core: load_theorem_documents(P, manifest_dir)
+        Core-->>ProcMacro: parsed_theorems
+        ProcMacro->>Core: mangle_module_path(P)
+        Core-->>ProcMacro: module_name
+        ProcMacro->>Core: mangle_theorem_harness(P, theorem_id)
+        Core-->>ProcMacro: harness_name
+        ProcMacro-->>Rustc: expanded_tokens_per_file_module
+    end
+    Rustc-->>Developer: compilation_success_or_error
+```
+
+Figure 7. Build-time theorem discovery and per-file proc-macro expansion flow.
+
 The current macro expansion is intentionally structural and lint-neutral. For
 each theorem file it emits:
 

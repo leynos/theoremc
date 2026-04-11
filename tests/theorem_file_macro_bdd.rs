@@ -119,22 +119,19 @@ impl FixtureCrate {
     }
 
     fn cargo_test(&self) -> Result<(), String> {
-        let target_dir = self.manifest_dir.join("target");
-        let output = Command::new("cargo")
-            .current_dir(&self.manifest_dir)
-            .env("CARGO_TARGET_DIR", target_dir.as_str())
-            .args(["test", "--color", "never"])
-            .output()
-            .map_err(|error| error.to_string())?;
-        command_result(&output)
+        self.cargo_run("test")
     }
 
     fn cargo_build(&self) -> Result<(), String> {
+        self.cargo_run("build")
+    }
+
+    fn cargo_run(&self, subcommand: &str) -> Result<(), String> {
         let target_dir = self.manifest_dir.join("target");
         let output = Command::new("cargo")
             .current_dir(&self.manifest_dir)
             .env("CARGO_TARGET_DIR", target_dir.as_str())
-            .args(["build", "--color", "never"])
+            .args([subcommand, "--color", "never"])
             .output()
             .map_err(|error| error.to_string())?;
         command_result(&output)
@@ -237,6 +234,19 @@ fn fixture_lib_rs(theorem_path: &str, theorems: &[&str]) -> String {
     )
 }
 
+fn run_valid_fixture_test(
+    theorem_path: &str,
+    theorem_names: &[&str],
+    theorem_content: &str,
+) -> Result<(), String> {
+    let _guard = FIXTURE_CARGO_LOCK
+        .lock()
+        .map_err(|error| format!("failed to lock fixture cargo mutex: {error}"))?;
+    let fixture = FixtureCrate::new(&fixture_lib_rs(theorem_path, theorem_names))?;
+    fixture.write(Utf8Path::new(theorem_path), theorem_content)?;
+    fixture.cargo_test()
+}
+
 const fn invalid_fixture_lib_rs() -> &'static str {
     concat!(
         "//! Fixture crate for theorem_file macro behavioural tests.\n\n",
@@ -254,13 +264,11 @@ fn given_a_fixture_crate_with_one_valid_theorem_file() {}
 
 #[then("the fixture crate tests can refer to the generated private symbols")]
 fn then_the_fixture_crate_tests_can_refer_to_the_generated_private_symbols() -> Result<(), String> {
-    let _guard = FIXTURE_CARGO_LOCK
-        .lock()
-        .map_err(|error| format!("failed to lock fixture cargo mutex: {error}"))?;
-    let theorem_path = "theorems/single.theorem";
-    let fixture = FixtureCrate::new(&fixture_lib_rs(theorem_path, &["SmokeMacro"]))?;
-    fixture.write(Utf8Path::new(theorem_path), VALID_SINGLE_THEOREM)?;
-    fixture.cargo_test()
+    run_valid_fixture_test(
+        "theorems/single.theorem",
+        &["SmokeMacro"],
+        VALID_SINGLE_THEOREM,
+    )
 }
 
 #[given("a fixture crate with one valid multi-document theorem file")]
@@ -268,16 +276,11 @@ fn given_a_fixture_crate_with_one_valid_multi_document_theorem_file() {}
 
 #[then("the fixture crate tests can refer to all generated harness stubs")]
 fn then_the_fixture_crate_tests_can_refer_to_all_generated_harness_stubs() -> Result<(), String> {
-    let _guard = FIXTURE_CARGO_LOCK
-        .lock()
-        .map_err(|error| format!("failed to lock fixture cargo mutex: {error}"))?;
-    let theorem_path = "theorems/multi.theorem";
-    let fixture = FixtureCrate::new(&fixture_lib_rs(
-        theorem_path,
+    run_valid_fixture_test(
+        "theorems/multi.theorem",
         &["FirstMacroDoc", "SecondMacroDoc"],
-    ))?;
-    fixture.write(Utf8Path::new(theorem_path), VALID_MULTI_THEOREM)?;
-    fixture.cargo_test()
+        VALID_MULTI_THEOREM,
+    )
 }
 
 #[given("a fixture crate with one invalid theorem file")]
