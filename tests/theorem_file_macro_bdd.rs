@@ -8,6 +8,30 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::mangle::{mangle_module_path, mangle_theorem_harness};
 
+struct TheoremFixtureSpec<'a> {
+    path: &'a str,
+    names: &'a [&'a str],
+    content: &'a str,
+}
+
+#[derive(Clone, Copy)]
+struct TomlSectionName<'a>(&'a str);
+
+#[derive(Clone, Copy)]
+enum CargoSubcommand {
+    Build,
+    Test,
+}
+
+impl CargoSubcommand {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Build => "build",
+            Self::Test => "test",
+        }
+    }
+}
+
 const BUILD_SCRIPT_SOURCE: &str = include_str!("../build.rs");
 const BUILD_DISCOVERY_SOURCE: &str = include_str!("../src/build_discovery.rs");
 const BUILD_SUITE_SOURCE: &str = include_str!("../src/build_suite.rs");
@@ -119,19 +143,19 @@ impl FixtureCrate {
     }
 
     fn cargo_test(&self) -> Result<(), String> {
-        self.cargo_run("test")
+        self.cargo_run(CargoSubcommand::Test)
     }
 
     fn cargo_build(&self) -> Result<(), String> {
-        self.cargo_run("build")
+        self.cargo_run(CargoSubcommand::Build)
     }
 
-    fn cargo_run(&self, subcommand: &str) -> Result<(), String> {
+    fn cargo_run(&self, subcommand: CargoSubcommand) -> Result<(), String> {
         let target_dir = self.manifest_dir.join("target");
         let output = Command::new("cargo")
             .current_dir(&self.manifest_dir)
             .env("CARGO_TARGET_DIR", target_dir.as_str())
-            .args([subcommand, "--color", "never"])
+            .args([subcommand.as_str(), "--color", "never"])
             .output()
             .map_err(|error| error.to_string())?;
         command_result(&output)
@@ -151,8 +175,9 @@ fn command_result(output: &std::process::Output) -> Result<(), String> {
 }
 
 fn fixture_cargo_toml() -> Result<String, String> {
-    let build_dependencies = toml_section(ROOT_CARGO_TOML, "build-dependencies")
-        .ok_or_else(|| "root Cargo.toml is missing [build-dependencies]".to_owned())?;
+    let build_dependencies =
+        toml_section(ROOT_CARGO_TOML, TomlSectionName("build-dependencies"))
+            .ok_or_else(|| "root Cargo.toml is missing [build-dependencies]".to_owned())?;
 
     Ok(format!(
         concat!(
@@ -172,8 +197,8 @@ fn fixture_cargo_toml() -> Result<String, String> {
     ))
 }
 
-fn toml_section(document: &str, section_name: &str) -> Option<String> {
-    let header_line = format!("[{section_name}]");
+fn toml_section(document: &str, section_name: TomlSectionName<'_>) -> Option<String> {
+    let header_line = format!("[{}]", section_name.0);
     let mut in_section = false;
     let mut body_lines = Vec::new();
 
@@ -193,12 +218,13 @@ fn toml_section(document: &str, section_name: &str) -> Option<String> {
     in_section.then(|| format!("{}\n", body_lines.join("\n")))
 }
 
-fn fixture_lib_rs(theorem_path: &str, theorems: &[&str]) -> String {
-    let module_name = mangle_module_path(theorem_path).module_name().to_owned();
-    let harnesses: Vec<String> = theorems
+fn fixture_lib_rs(spec: &TheoremFixtureSpec<'_>) -> String {
+    let module_name = mangle_module_path(spec.path).module_name().to_owned();
+    let harnesses: Vec<String> = spec
+        .names
         .iter()
         .map(|theorem| {
-            mangle_theorem_harness(theorem_path, theorem)
+            mangle_theorem_harness(spec.path, theorem)
                 .identifier()
                 .to_owned()
         })
@@ -234,16 +260,12 @@ fn fixture_lib_rs(theorem_path: &str, theorems: &[&str]) -> String {
     )
 }
 
-fn run_valid_fixture_test(
-    theorem_path: &str,
-    theorem_names: &[&str],
-    theorem_content: &str,
-) -> Result<(), String> {
+fn run_valid_fixture_test(spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
     let _guard = FIXTURE_CARGO_LOCK
         .lock()
         .map_err(|error| format!("failed to lock fixture cargo mutex: {error}"))?;
-    let fixture = FixtureCrate::new(&fixture_lib_rs(theorem_path, theorem_names))?;
-    fixture.write(Utf8Path::new(theorem_path), theorem_content)?;
+    let fixture = FixtureCrate::new(&fixture_lib_rs(spec))?;
+    fixture.write(Utf8Path::new(spec.path), spec.content)?;
     fixture.cargo_test()
 }
 
@@ -264,11 +286,11 @@ fn given_a_fixture_crate_with_one_valid_theorem_file() {}
 
 #[then("the fixture crate tests can refer to the generated private symbols")]
 fn then_the_fixture_crate_tests_can_refer_to_the_generated_private_symbols() -> Result<(), String> {
-    run_valid_fixture_test(
-        "theorems/single.theorem",
-        &["SmokeMacro"],
-        VALID_SINGLE_THEOREM,
-    )
+    run_valid_fixture_test(&TheoremFixtureSpec {
+        path: "theorems/single.theorem",
+        names: &["SmokeMacro"],
+        content: VALID_SINGLE_THEOREM,
+    })
 }
 
 #[given("a fixture crate with one valid multi-document theorem file")]
@@ -276,11 +298,11 @@ fn given_a_fixture_crate_with_one_valid_multi_document_theorem_file() {}
 
 #[then("the fixture crate tests can refer to all generated harness stubs")]
 fn then_the_fixture_crate_tests_can_refer_to_all_generated_harness_stubs() -> Result<(), String> {
-    run_valid_fixture_test(
-        "theorems/multi.theorem",
-        &["FirstMacroDoc", "SecondMacroDoc"],
-        VALID_MULTI_THEOREM,
-    )
+    run_valid_fixture_test(&TheoremFixtureSpec {
+        path: "theorems/multi.theorem",
+        names: &["FirstMacroDoc", "SecondMacroDoc"],
+        content: VALID_MULTI_THEOREM,
+    })
 }
 
 #[given("a fixture crate with one invalid theorem file")]
