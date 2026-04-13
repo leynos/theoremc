@@ -6,9 +6,14 @@ use theoremc_core::mangle::{mangle_module_path, mangle_theorem_harness};
 
 use super::expand_theorem_file_at;
 
+struct TheoremSpec<'a> {
+    name: &'a str,
+    about: &'a str,
+}
+
 fn write_fixture(
     fixture_dir: &Utf8Path,
-    path: &str,
+    path: &Utf8Path,
     contents: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let full_path = fixture_dir.join(path);
@@ -28,10 +33,10 @@ fn temp_fixture_dir() -> Result<(TempDir, camino::Utf8PathBuf), Box<dyn std::err
     Ok((temp_dir, fixture_dir))
 }
 
-fn expand_fixture(path: &str, contents: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn expand_fixture(path: &Utf8Path, contents: &str) -> Result<String, Box<dyn std::error::Error>> {
     let (_temp_dir, fixture_dir) = temp_fixture_dir()?;
     write_fixture(&fixture_dir, path, contents)?;
-    let path_literal = syn::LitStr::new(path, proc_macro2::Span::call_site());
+    let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
     let tokens = expand_theorem_file_at(&fixture_dir, &path_literal)?;
     Ok(normalize(&tokens.to_string()))
 }
@@ -40,12 +45,12 @@ fn normalize(tokens: &str) -> String {
     tokens.chars().filter(|ch| !ch.is_whitespace()).collect()
 }
 
-fn expected_expansion(path: &str, theorems: &[&str]) -> String {
-    let module_name = mangle_module_path(path).module_name().to_owned();
+fn expected_expansion(path: &Utf8Path, theorems: &[&str]) -> String {
+    let module_name = mangle_module_path(path.as_str()).module_name().to_owned();
     let harnesses: Vec<String> = theorems
         .iter()
         .map(|theorem| {
-            mangle_theorem_harness(path, theorem)
+            mangle_theorem_harness(path.as_str(), theorem)
                 .identifier()
                 .to_owned()
         })
@@ -72,7 +77,7 @@ fn expected_expansion(path: &str, theorems: &[&str]) -> String {
     ))
 }
 
-fn make_single_theorem_fixture(name: &str, about: &str) -> String {
+fn make_single_theorem_fixture(spec: &TheoremSpec<'_>) -> String {
     format!(
         concat!(
             "Theorem: {name}\n",
@@ -88,13 +93,13 @@ fn make_single_theorem_fixture(name: &str, about: &str) -> String {
             "    unwind: 1\n",
             "    expect: SUCCESS\n",
         ),
-        name = name,
-        about = about,
+        name = spec.name,
+        about = spec.about,
     )
 }
 
 fn assert_expansion_matches(
-    path: &str,
+    path: &Utf8Path,
     fixture: &str,
     expected_theorems: &[&str],
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -104,7 +109,10 @@ fn assert_expansion_matches(
     Ok(())
 }
 
-fn assert_expansion_is_stable(path: &str, fixture: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn assert_expansion_is_stable(
+    path: &Utf8Path,
+    fixture: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let first = expand_fixture(path, fixture)?;
     let second = expand_fixture(path, fixture)?;
     assert_eq!(first, second);
@@ -113,13 +121,20 @@ fn assert_expansion_is_stable(path: &str, fixture: &str) -> Result<(), Box<dyn s
 
 #[test]
 fn single_document_expansion_matches_expected_shape() -> Result<(), Box<dyn std::error::Error>> {
-    let fixture = make_single_theorem_fixture("Smoke", "Macro smoke test");
-    assert_expansion_matches("theorems/single.theorem", &fixture, &["Smoke"])
+    let fixture = make_single_theorem_fixture(&TheoremSpec {
+        name: "Smoke",
+        about: "Macro smoke test",
+    });
+    assert_expansion_matches(
+        Utf8Path::new("theorems/single.theorem"),
+        &fixture,
+        &["Smoke"],
+    )
 }
 
 #[test]
 fn multi_document_expansion_preserves_document_order() -> Result<(), Box<dyn std::error::Error>> {
-    let path = "theorems/multi.theorem";
+    let path = Utf8Path::new("theorems/multi.theorem");
     let theorem = concat!(
         "Theorem: FirstMacro\n",
         "About: First theorem\n",
@@ -156,9 +171,12 @@ fn multi_document_expansion_preserves_document_order() -> Result<(), Box<dyn std
 
 #[test]
 fn nested_path_expansion_uses_stable_module_mangling() -> Result<(), Box<dyn std::error::Error>> {
-    let fixture = make_single_theorem_fixture("HTTP2StreamID", "Path mangling coverage");
+    let fixture = make_single_theorem_fixture(&TheoremSpec {
+        name: "HTTP2StreamID",
+        about: "Path mangling coverage",
+    });
     assert_expansion_matches(
-        "theorems/Nested Path/HTTP-2.theorem",
+        Utf8Path::new("theorems/Nested Path/HTTP-2.theorem"),
         &fixture,
         &["HTTP2StreamID"],
     )
@@ -166,6 +184,9 @@ fn nested_path_expansion_uses_stable_module_mangling() -> Result<(), Box<dyn std
 
 #[test]
 fn expansion_is_stable_for_repeat_calls() -> Result<(), Box<dyn std::error::Error>> {
-    let fixture = make_single_theorem_fixture("RepeatableMacro", "Repeatability test");
-    assert_expansion_is_stable("theorems/repeat.theorem", &fixture)
+    let fixture = make_single_theorem_fixture(&TheoremSpec {
+        name: "RepeatableMacro",
+        about: "Repeatability test",
+    });
+    assert_expansion_is_stable(Utf8Path::new("theorems/repeat.theorem"), &fixture)
 }
