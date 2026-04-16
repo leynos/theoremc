@@ -11,17 +11,25 @@ struct TheoremSpec<'a> {
     about: &'a str,
 }
 
+struct TheoremFixture(String);
+
+impl TheoremFixture {
+    fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
 fn write_fixture(
     fixture_dir: &Utf8Path,
     path: &Utf8Path,
-    contents: &str,
+    contents: &TheoremFixture,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let full_path = fixture_dir.join(path);
     let parent = full_path
         .parent()
         .ok_or_else(|| std::io::Error::other("fixture path must have a parent"))?;
     std::fs::create_dir_all(parent)?;
-    std::fs::write(full_path, contents)?;
+    std::fs::write(full_path, contents.as_str())?;
     Ok(())
 }
 
@@ -33,7 +41,10 @@ fn temp_fixture_dir() -> Result<(TempDir, camino::Utf8PathBuf), Box<dyn std::err
     Ok((temp_dir, fixture_dir))
 }
 
-fn expand_fixture(path: &Utf8Path, contents: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn expand_fixture(
+    path: &Utf8Path,
+    contents: &TheoremFixture,
+) -> Result<String, Box<dyn std::error::Error>> {
     let (_temp_dir, fixture_dir) = temp_fixture_dir()?;
     write_fixture(&fixture_dir, path, contents)?;
     let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
@@ -77,8 +88,8 @@ fn expected_expansion(path: &Utf8Path, theorems: &[&str]) -> String {
     ))
 }
 
-fn make_single_theorem_fixture(spec: &TheoremSpec<'_>) -> String {
-    format!(
+fn make_single_theorem_fixture(spec: &TheoremSpec<'_>) -> TheoremFixture {
+    TheoremFixture(format!(
         concat!(
             "Theorem: {name}\n",
             "About: {about}\n",
@@ -95,12 +106,12 @@ fn make_single_theorem_fixture(spec: &TheoremSpec<'_>) -> String {
         ),
         name = spec.name,
         about = spec.about,
-    )
+    ))
 }
 
 fn assert_expansion_matches(
     path: &Utf8Path,
-    fixture: &str,
+    fixture: &TheoremFixture,
     expected_theorems: &[&str],
 ) -> Result<(), Box<dyn std::error::Error>> {
     let actual = expand_fixture(path, fixture)?;
@@ -111,7 +122,7 @@ fn assert_expansion_matches(
 
 fn assert_expansion_is_stable(
     path: &Utf8Path,
-    fixture: &str,
+    fixture: &TheoremFixture,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let first = expand_fixture(path, fixture)?;
     let second = expand_fixture(path, fixture)?;
@@ -119,16 +130,22 @@ fn assert_expansion_is_stable(
     Ok(())
 }
 
+fn assert_single_theorem_expansion(
+    path: &Utf8Path,
+    spec: &TheoremSpec<'_>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = make_single_theorem_fixture(spec);
+    assert_expansion_matches(path, &fixture, &[spec.name])
+}
+
 #[test]
 fn single_document_expansion_matches_expected_shape() -> Result<(), Box<dyn std::error::Error>> {
-    let fixture = make_single_theorem_fixture(&TheoremSpec {
-        name: "Smoke",
-        about: "Macro smoke test",
-    });
-    assert_expansion_matches(
+    assert_single_theorem_expansion(
         Utf8Path::new("theorems/single.theorem"),
-        &fixture,
-        &["Smoke"],
+        &TheoremSpec {
+            name: "Smoke",
+            about: "Macro smoke test",
+        },
     )
 }
 
@@ -163,7 +180,7 @@ fn multi_document_expansion_preserves_document_order() -> Result<(), Box<dyn std
         "    expect: SUCCESS\n",
     );
 
-    let actual = expand_fixture(path, theorem)?;
+    let actual = expand_fixture(path, &TheoremFixture(theorem.to_owned()))?;
     let expected = expected_expansion(path, &["FirstMacro", "SecondMacro"]);
     assert_eq!(actual, expected);
     Ok(())
@@ -171,14 +188,12 @@ fn multi_document_expansion_preserves_document_order() -> Result<(), Box<dyn std
 
 #[test]
 fn nested_path_expansion_uses_stable_module_mangling() -> Result<(), Box<dyn std::error::Error>> {
-    let fixture = make_single_theorem_fixture(&TheoremSpec {
-        name: "HTTP2StreamID",
-        about: "Path mangling coverage",
-    });
-    assert_expansion_matches(
+    assert_single_theorem_expansion(
         Utf8Path::new("theorems/Nested Path/HTTP-2.theorem"),
-        &fixture,
-        &["HTTP2StreamID"],
+        &TheoremSpec {
+            name: "HTTP2StreamID",
+            about: "Path mangling coverage",
+        },
     )
 }
 
