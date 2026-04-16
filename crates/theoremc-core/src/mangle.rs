@@ -58,7 +58,7 @@ pub struct InvalidCanonicalActionName {
 /// Construct via [`CanonicalActionName::new`] (fallible) or
 /// [`TryFrom`].
 ///
-///     use theoremc::mangle::CanonicalActionName;
+///     use theoremc_core::mangle::CanonicalActionName;
 ///     let name = CanonicalActionName::new("account.deposit")
 ///         .expect("valid canonical name");
 ///     assert_eq!(name.as_str(), "account.deposit");
@@ -170,7 +170,7 @@ impl MangledAction {
 
 /// Escapes a single action-name segment by replacing `_` with `_u`.
 ///
-///     # use theoremc::mangle::action_slug;
+///     # use theoremc_core::mangle::action_slug;
 ///     // segment_escape("deposit") == "deposit"
 ///     // segment_escape("attach_node") == "attach_unode"
 ///     assert_eq!(action_slug("ns.attach_node"), "ns__attach_unode");
@@ -193,7 +193,7 @@ pub(crate) fn segment_escape(segment: &str) -> String {
 /// joins with `__`. Accepts `&str`, `String`, or
 /// `&CanonicalActionName`.
 ///
-///     use theoremc::mangle::{CanonicalActionName, action_slug};
+///     use theoremc_core::mangle::{CanonicalActionName, action_slug};
 ///     assert_eq!(action_slug("account.deposit"), "account__deposit");
 ///     let name = CanonicalActionName::new("account.deposit")
 ///         .expect("valid canonical name");
@@ -216,7 +216,7 @@ pub fn action_slug(canonical_name: impl AsRef<str>) -> String {
 /// Computes the first 12 lowercase hex characters of the blake3
 /// hash of the given value.
 ///
-///     use theoremc::mangle::hash12;
+///     use theoremc_core::mangle::hash12;
 ///     assert_eq!(hash12("account.deposit"), "05158894bfb4");
 #[must_use]
 pub fn hash12(value: &str) -> String {
@@ -228,7 +228,7 @@ pub fn hash12(value: &str) -> String {
 /// Mangles a canonical action name into a [`MangledAction`].
 /// Accepts `&str`, `String`, or `&CanonicalActionName`.
 ///
-///     use theoremc::mangle::mangle_action_name;
+///     use theoremc_core::mangle::mangle_action_name;
 ///     let m = mangle_action_name("account.deposit");
 ///     assert_eq!(m.identifier(), "account__deposit__h05158894bfb4");
 #[must_use]

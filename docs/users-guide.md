@@ -28,6 +28,14 @@ trees. As a result, changes elsewhere under that watched directory may still
 rerun the build script even though non-`.theorem` files are not parsed or fed
 into later theorem compilation steps.
 
+After discovery, theoremc compiles each discovered theorem file through the
+public `theorem_file!` proc macro. Each invocation expands to a deterministic
+private per-file module, includes the theorem source via
+`include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", P))`, and creates one
+stable harness stub per theorem document in that file. Invalid theorem files
+therefore fail the Rust build during macro expansion, using the same schema
+diagnostics returned by `load_theorem_docs_with_source`.
+
 ## Theorem document schema
 
 A `.theorem` file is a UTF-8 text file containing one or more YAML (YAML Ain't

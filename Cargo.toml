@@ -1,3 +1,7 @@
+[workspace]
+members = ["crates/theoremc-core", "crates/theoremc-macros"]
+resolver = "2"
+
 [package]
 name = "theoremc"
 version = "0.1.0"
@@ -5,19 +9,16 @@ edition = "2024"
 rust-version = "1.85"
 
 [features]
-test-support = []
+test-support = ["theoremc-core/test-support"]
 
 [dependencies]
-serde = { version = "1.0.228", features = ["derive"] }
-serde-saphyr = "0.0.17"
 indexmap = { version = "2.13.0", features = ["serde"] }
 thiserror = "2.0.18"
 syn = { version = "2.0.117", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
 quote = "1.0.45"
 proc-macro2 = "1.0.106"
-blake3 = "1.8.3"
-camino = "1.2.2"
-cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+theoremc-core = { path = "crates/theoremc-core" }
+theoremc-macros = { path = "crates/theoremc-macros" }
 
 [build-dependencies]
 camino = "1.2.2"
@@ -29,6 +30,8 @@ rstest = "0.26.1"
 rstest-bdd = "0.5.0"
 rstest-bdd-macros = "0.5.0"
 tempfile = "3.15.0"
+camino = "1.2.2"
+cap-std = { version = "4.0.2", features = ["fs_utf8"] }
 
 [[test]]
 name = "action_mangle_bdd"
@@ -48,7 +51,7 @@ name = "build_discovery_bdd"
 [[test]]
 name = "build_suite_bdd"
 
-[lints.clippy]
+[workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 
 # 1. hygiene
@@ -110,8 +113,11 @@ missing_panics_doc                  = "deny"
 error_impl_error                    = "deny"
 result_large_err                    = "deny"
 
-[lints.rust]
+[workspace.lints.rust]
 missing_docs                        = "deny"
 
-[lints.rustdoc]
+[workspace.lints.rustdoc]
 missing_crate_level_docs            = "deny"
+
+[lints]
+workspace = true

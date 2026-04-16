@@ -135,7 +135,7 @@ fn sanitize_slug_fragment(raw_slug: &str) -> String {
 /// Builds the exact theorem key `{P}#{T}` from the literal theorem path and
 /// theorem identifier.
 ///
-///     use theoremc::mangle::theorem_key;
+///     use theoremc_core::mangle::theorem_key;
 ///     assert_eq!(
 ///         theorem_key("theorems/bidirectional.theorem", "BidirectionalLinks"),
 ///         "theorems/bidirectional.theorem#BidirectionalLinks",
@@ -154,7 +154,7 @@ pub fn theorem_key(path: impl AsRef<Utf8Path>, theorem: impl AsRef<str>) -> Stri
 /// becomes `_`, consecutive underscores collapse, and digit-leading slugs are
 /// prefixed with `_`.
 ///
-///     use theoremc::mangle::theorem_slug;
+///     use theoremc_core::mangle::theorem_slug;
 ///     assert_eq!(
 ///         theorem_slug("BidirectionalLinksCommitPath3Nodes"),
 ///         "bidirectional_links_commit_path_3_nodes",
@@ -191,7 +191,7 @@ pub fn theorem_slug(theorem: impl AsRef<str>) -> String {
 /// identifier-safe fragment matching `^[a-z_][a-z0-9_]*$`, even when the input
 /// theorem string contains punctuation or starts with digits.
 ///
-///     use theoremc::mangle::mangle_theorem_harness;
+///     use theoremc_core::mangle::mangle_theorem_harness;
 ///     let harness = mangle_theorem_harness(
 ///         "theorems/bidirectional.theorem",
 ///         "BidirectionalLinksCommitPath3Nodes",

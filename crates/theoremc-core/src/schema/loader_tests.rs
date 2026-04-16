@@ -24,8 +24,11 @@ Witness:
 /// Parsed `valid_full.theorem` fixture document.
 #[fixture]
 fn full_doc() -> TheoremDoc {
-    let fixtures_dir =
-        Dir::open_ambient_dir("tests/fixtures", ambient_authority()).expect("should open fixtures");
+    let fixtures_dir = Dir::open_ambient_dir(
+        camino::Utf8Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures"),
+        ambient_authority(),
+    )
+    .expect("should open fixtures");
     let yaml = fixtures_dir
         .read_to_string("valid_full.theorem")
         .expect("should read fixture");

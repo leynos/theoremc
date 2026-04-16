@@ -41,8 +41,8 @@ Observable success:
    behaviour, and `docs/roadmap.md` marks the Step 3.1 suite-generation entry
    done after all gates pass.
 6. `make check-fmt`, `make lint`, and `make test` pass. Because documentation
-   changes are also in scope, `make fmt`, `make markdownlint`, and
-   `make nixie` must pass before implementation is considered complete.
+   changes are also in scope, `make fmt`, `make markdownlint`, and `make nixie`
+   must pass before implementation is considered complete.
 
 ## Constraints
 
@@ -53,15 +53,14 @@ Observable success:
   discovered theorem path, using the crate-relative forward-slash paths already
   produced by `src/build_discovery.rs`.
 - The seam between Step `3.1.2` and Step `3.2` must stay narrow. Step `3.1.2`
-  should establish the generated file format and include site, while Step
-  `3.2` owns the real per-file expansion behind the same `theorem_file!(...)`
+  should establish the generated file format and include site, while Step `3.2`
+  owns the real per-file expansion behind the same `theorem_file!(...)`
   callsite.
 - The current repository has no proc-macro crate and no existing
   `theorem_file!` macro. This step must therefore compile without introducing
   the full proc-macro architecture prematurely.
 - Empty theorem trees remain a first-class supported case. The generated suite
-  and crate include wiring must not require a pre-seeded `theorems/`
-  directory.
+  and crate include wiring must not require a pre-seeded `theorems/` directory.
 - Keep `build.rs` thin. Rendering and writing the suite file should live in a
   shared helper module under `src/` so direct unit tests can exercise it
   without shelling out to Cargo.
@@ -135,17 +134,22 @@ Observable success:
   `theorem_file!` implementation in this checkout, so this step needs a narrow
   compile-time bridge.
 - [x] 2026-04-05: drafted this ExecPlan.
-- [x] Milestone 0 (2026-04-05): add failing tests that describe exact suite rendering
+- [x] Milestone 0 (2026-04-05): add failing tests that describe exact suite
+      rendering
   and empty/single/multi-file compile behaviour.
 - [x] Milestone 1 (2026-04-05): add a shared generated-suite helper that renders
-  deterministic `theorem_file!(...)` lines and writes `OUT_DIR/theorem_suite.rs`.
-- [x] Milestone 2 (2026-04-05): extend `build.rs` to call the new helper after theorem
+  deterministic `theorem_file!(...)` lines and writes
+  `OUT_DIR/theorem_suite.rs`.
+- [x] Milestone 2 (2026-04-05): extend `build.rs` to call the new helper after
+      theorem
   discovery.
-- [x] Milestone 3 (2026-04-05): add hidden crate-side include wiring with a temporary
+- [x] Milestone 3 (2026-04-05): add hidden crate-side include wiring with a
+      temporary
   internal `theorem_file!` bridge macro.
 - [x] Milestone 4 (2026-04-05): add `rstest-bdd` behavioural coverage for empty,
   single, and multi-file suites.
-- [x] Milestone 5 (2026-04-05): update `docs/theoremc-design.md`, `docs/users-guide.md`,
+- [x] Milestone 5 (2026-04-05): update `docs/theoremc-design.md`,
+      `docs/users-guide.md`,
   and `docs/roadmap.md`.
 - [x] Milestone 6 (2026-04-05): run `make fmt`, `make markdownlint`,
   `make nixie`, `make check-fmt`, `make lint`, and `make test`, sequentially,
@@ -178,9 +182,9 @@ Observable success:
 
 - 2026-04-05: plan to place suite rendering and write-if-changed logic in a
   dedicated shared helper under `src/` rather than burying it in `build.rs`.
-  Rationale: the acceptance criteria require direct unit tests for deterministic
-  suite contents, which is awkward if the logic exists only inside the build
-  script entrypoint.
+  Rationale: the acceptance criteria require direct unit tests for
+  deterministic suite contents, which is awkward if the logic exists only
+  inside the build script entrypoint.
 
 - 2026-04-05: plan to keep behavioural tests focused on Cargo workflow success,
   while exact suite text is asserted in unit tests. Rationale: reading Cargo's
@@ -201,8 +205,8 @@ theorem_file!("path/to/file.theorem");
 Paths are sorted lexicographically, escaped for Rust string literals
 (backslashes and quotes doubled), and the file always ends with a trailing
 newline. The `theorem_file!` macro is defined in `src/lib.rs` within the hidden
-`__theoremc_generated_suite` module and expands to a compile-time `include_str!`
-verification.
+`__theoremc_generated_suite` module and expands to a compile-time
+`include_str!` verification.
 
 ### Tests Added
 
@@ -254,14 +258,14 @@ current files are:
 
 - `build.rs`
   Already loads `CARGO_MANIFEST_DIR`, delegates to `src/build_discovery.rs`,
-  and emits `cargo::rerun-if-changed=` lines. It does not yet read `OUT_DIR`
-  or write any generated Rust source.
+  and emits `cargo::rerun-if-changed=` lines. It does not yet read `OUT_DIR` or
+  write any generated Rust source.
 - `src/build_discovery.rs`
   Already exposes `discover_theorem_inputs(manifest_dir)` and returns sorted,
   forward-slash theorem paths via `BuildDiscovery::theorem_files()`.
 - `src/lib.rs`
-  Currently it exposes library modules only. There is no generated-suite include
-  site and no `theorem_file!` macro.
+  Currently it exposes library modules only. There is no generated-suite
+  include site and no `theorem_file!` macro.
 - `tests/build_discovery_bdd.rs`
   Provides a working fixture-crate pattern for Cargo behavioural testing. This
   is the strongest local reference for Step `3.1.2` behavioural tests.
@@ -442,7 +446,8 @@ Update the requested documentation in the same implementation change:
    area describing:
    - the generated `OUT_DIR/theorem_suite.rs` format,
    - the temporary internal `theorem_file!` bridge and why it exists,
-   - why the bridge uses `include_str!(concat!(env!("CARGO_MANIFEST_DIR"), ...))`,
+   - why the bridge uses
+     `include_str!(concat!(env!("CARGO_MANIFEST_DIR"), ...))`,
      and
    - how this preserves a clean handoff to Step `3.2`.
 2. `docs/users-guide.md`
