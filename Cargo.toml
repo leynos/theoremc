@@ -9,7 +9,7 @@ test-support = []
 
 [dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
-serde-saphyr = "0.0.17"
+serde-saphyr = "0.0.24"
 indexmap = { version = "2.13.0", features = ["serde"] }
 thiserror = "2.0.18"
 syn = { version = "2.0.117", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
