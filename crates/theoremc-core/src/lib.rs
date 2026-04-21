@@ -11,3 +11,7 @@ pub mod mangle;
 
 /// Schema types for `.theorem` document deserialization and validation.
 pub mod schema;
+
+mod theorem_file;
+
+pub use theorem_file::{TheoremFileLoadError, load_theorem_file_from_manifest_dir};

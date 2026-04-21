@@ -175,7 +175,9 @@ Observable success:
   macro while preserving the generated suite callsite.
 - [x] Milestone 4: update `docs/theoremc-design.md`,
   `docs/users-guide.md`, `docs/developers-guide.md`, and `docs/roadmap.md`.
-- [ ] Milestone 5: run the full validation sequence with captured logs.
+- [x] 2026-04-21: Milestone 5 complete. Ran `make fmt`,
+  `make markdownlint`, `make nixie`, `make check-fmt`, `make lint`, and
+  `make test`, with logs captured during validation.
 
 ## Surprises & Discoveries
 
@@ -551,4 +553,5 @@ This plan satisfies the roadmap item only when all of the following are true:
 - the requested documentation is updated, and
 - all required Makefile gates pass.
 
-Do not begin implementation until this plan is explicitly approved.
+This historical ExecPlan records completed implementation work and no longer
+requires approval before execution.

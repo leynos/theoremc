@@ -15,9 +15,6 @@ struct TheoremFixtureSpec<'a> {
 }
 
 #[derive(Clone, Copy)]
-struct TomlSectionName<'a>(&'a str);
-
-#[derive(Clone, Copy)]
 enum CargoSubcommand {
     Build,
     Test,
@@ -35,8 +32,12 @@ impl CargoSubcommand {
 const BUILD_SCRIPT_SOURCE: &str = include_str!("../build.rs");
 const BUILD_DISCOVERY_SOURCE: &str = include_str!("../src/build_discovery.rs");
 const BUILD_SUITE_SOURCE: &str = include_str!("../src/build_suite.rs");
-const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
 const ROOT_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
+const FIXTURE_BUILD_DEPENDENCIES: &str = concat!(
+    "camino = \"1.2.2\"\n",
+    "cap-std = { version = \"4.0.2\", features = [\"fs_utf8\"] }\n",
+    "thiserror = \"2.0.18\"\n",
+);
 static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
 
 const VALID_SINGLE_THEOREM: &str = concat!(
@@ -117,7 +118,7 @@ impl FixtureCrate {
             dir,
         };
 
-        fixture.write(Utf8Path::new("Cargo.toml"), &fixture_cargo_toml()?)?;
+        fixture.write(Utf8Path::new("Cargo.toml"), &fixture_cargo_toml())?;
         fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
         fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
         fixture.write(
@@ -174,12 +175,8 @@ fn command_result(output: &std::process::Output) -> Result<(), String> {
     ))
 }
 
-fn fixture_cargo_toml() -> Result<String, String> {
-    let build_dependencies =
-        toml_section(ROOT_CARGO_TOML, TomlSectionName("build-dependencies"))
-            .ok_or_else(|| "root Cargo.toml is missing [build-dependencies]".to_owned())?;
-
-    Ok(format!(
+fn fixture_cargo_toml() -> String {
+    format!(
         concat!(
             "[package]\n",
             "name = \"theorem_file_macro_fixture\"\n",
@@ -193,29 +190,8 @@ fn fixture_cargo_toml() -> Result<String, String> {
             "{build_dependencies}",
         ),
         root_manifest_dir = ROOT_MANIFEST_DIR,
-        build_dependencies = build_dependencies
-    ))
-}
-
-fn toml_section(document: &str, section_name: TomlSectionName<'_>) -> Option<String> {
-    let header_line = format!("[{}]", section_name.0);
-    let mut in_section = false;
-    let mut body_lines = Vec::new();
-
-    for line in document.lines() {
-        if !in_section {
-            in_section = line == header_line;
-            continue;
-        }
-
-        if line.starts_with('[') {
-            break;
-        }
-
-        body_lines.push(line);
-    }
-
-    in_section.then(|| format!("{}\n", body_lines.join("\n")))
+        build_dependencies = FIXTURE_BUILD_DEPENDENCIES
+    )
 }
 
 fn fixture_lib_rs(spec: &TheoremFixtureSpec<'_>) -> String {

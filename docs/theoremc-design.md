@@ -1247,8 +1247,8 @@ For each `.theorem` file, the macro expands to:
 - A backend scaffold module (`kani`) inside that private module.
 
 - One generated harness function per theorem document in the file. Step 3.2.1
-  ships deterministic stub functions only; Step 3.2.2 will add the final Kani
-  attributes and unwind metadata:
+  ships deterministic stub functions only. Step 3.2.2 will add the final Kani
+  gating, proof attributes, and unwind metadata:
 
   - `#[cfg(kani)]`
   - `#[kani::proof]`
@@ -1256,8 +1256,8 @@ For each `.theorem` file, the macro expands to:
 
 Kani explicitly notes that naively writing `#[kani::proof]` in code will make a
 normal `cargo build` fail unless it is gated (because the `kani` crate is not
-present in non-Kani builds).[^8] Therefore, theoremc-generated harnesses are
-always behind `#[cfg(kani)]` (or an equivalent feature gate).
+present in non-Kani builds).[^8] Therefore, theoremc defers Kani-specific
+gating to Step 3.2.2 rather than emitting those attributes in Step 3.2.1.
 
 ### 7.2.1 Implementation decisions (Step 3.2.1)
 

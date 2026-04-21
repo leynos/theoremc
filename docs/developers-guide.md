@@ -107,11 +107,11 @@ Step 3.1.1 (see
 `build_suite::write_theorem_suite()`, which writes `OUT_DIR/theorem_suite.rs`
 containing `theorem_file!("...")` invocations. The handoff is deliberately
 narrow: `build.rs` produces an ordered crate-relative file list plus rerun
-metadata; `build_suite` renders deterministic suite contents; and the temporary
-`__theoremc_generated_suite` bridge module in `src/lib.rs` provides a
-validating `theorem_file!` macro via `include_str!`. In Step 3.2, the bridge
-will be replaced by proc-macro-based per-file expansion while keeping the same
-generated callsites.
+metadata; `build_suite` renders deterministic suite contents; and the hidden
+`__theoremc_generated_suite` module in `src/lib.rs` imports the real
+`theorem_file!` proc macro before including the generated suite. Step 3.2.1
+keeps the generated callsites unchanged while moving the per-file expansion
+logic into `crates/theoremc-macros`.
 
 ## 2. Module architecture
 
@@ -236,7 +236,7 @@ The live workspace split is:
 - `crates/theoremc-macros` for proc-macro expansion, and
 - the root `theoremc` crate for the public API plus build integration.
 
-When you change theorem expansion behaviour, prefer testing it in two layers:
+When theorem expansion behaviour changes, prefer testing it in two layers:
 
 1. direct proc-macro unit tests in `crates/theoremc-macros`, and
 2. fixture-crate behavioural tests in `tests/theorem_file_macro_bdd.rs`.

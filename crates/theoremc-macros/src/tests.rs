@@ -1,6 +1,7 @@
 //! Unit tests for deterministic theorem-file macro expansion.
 
 use camino::Utf8Path;
+use cap_std::{ambient_authority, fs_utf8::Dir};
 use tempfile::TempDir;
 use theoremc_core::mangle::{mangle_module_path, mangle_theorem_harness};
 
@@ -24,12 +25,13 @@ fn write_fixture(
     path: &Utf8Path,
     contents: &TheoremFixture,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let full_path = fixture_dir.join(path);
-    let parent = full_path
-        .parent()
-        .ok_or_else(|| std::io::Error::other("fixture path must have a parent"))?;
-    std::fs::create_dir_all(parent)?;
-    std::fs::write(full_path, contents.as_str())?;
+    let fixture_root = Dir::open_ambient_dir(fixture_dir, ambient_authority())?;
+    if let Some(parent) = path.parent()
+        && !parent.as_str().is_empty()
+    {
+        fixture_root.create_dir_all(parent)?;
+    }
+    fixture_root.write(path.as_str(), contents.as_str())?;
     Ok(())
 }
 
@@ -138,6 +140,17 @@ fn assert_single_theorem_expansion(
     assert_expansion_matches(path, &fixture, &[spec.name])
 }
 
+fn expansion_error_message(manifest_dir: &Utf8Path, path: &Utf8Path) -> String {
+    let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
+    let error = expand_theorem_file_at(manifest_dir, &path_literal)
+        .expect_err("fixture should fail macro expansion");
+    normalize(
+        &error
+            .to_compile_error(proc_macro2::Span::call_site())
+            .to_string(),
+    )
+}
+
 #[test]
 fn single_document_expansion_matches_expected_shape() -> Result<(), Box<dyn std::error::Error>> {
     assert_single_theorem_expansion(
@@ -204,4 +217,65 @@ fn expansion_is_stable_for_repeat_calls() -> Result<(), Box<dyn std::error::Erro
         about: "Repeatability test",
     });
     assert_expansion_is_stable(Utf8Path::new("theorems/repeat.theorem"), &fixture)
+}
+
+#[test]
+fn invalid_theorem_file_reports_schema_diagnostic_in_compile_error() {
+    let (_temp_dir, fixture_dir) =
+        temp_fixture_dir().expect("should create temp fixture dir for invalid theorem");
+    let path = Utf8Path::new("theorems/invalid.theorem");
+    let fixture = TheoremFixture(
+        concat!(
+            "Theorem: BrokenMacro\n",
+            "About: \"\"\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+        )
+        .to_owned(),
+    );
+
+    write_fixture(&fixture_dir, path, &fixture).expect("should write invalid theorem fixture");
+
+    let error_string = expansion_error_message(&fixture_dir, path);
+    assert!(
+        error_string.contains("schema.validation_failure|theorems/invalid.theorem:"),
+        "expected rendered schema diagnostic in compile error, got: {error_string}"
+    );
+}
+
+#[test]
+fn missing_theorem_file_reports_io_error_in_compile_error() {
+    let (_temp_dir, fixture_dir) =
+        temp_fixture_dir().expect("should create temp fixture dir for missing theorem");
+    let path = Utf8Path::new("theorems/missing.theorem");
+
+    let error_string = expansion_error_message(&fixture_dir, path);
+    assert!(
+        error_string.contains("failedtoreadtheoremfile'theorems/missing.theorem'"),
+        "expected read failure text in compile error, got: {error_string}"
+    );
+}
+
+#[test]
+fn empty_theorem_file_reports_zero_document_error() {
+    let (_temp_dir, fixture_dir) =
+        temp_fixture_dir().expect("should create temp fixture dir for empty theorem");
+    let path = Utf8Path::new("theorems/empty.theorem");
+    let fixture = TheoremFixture(String::new());
+
+    write_fixture(&fixture_dir, path, &fixture).expect("should write empty theorem fixture");
+
+    let error_string = expansion_error_message(&fixture_dir, path);
+    assert!(
+        error_string.contains("doesnotcontainanytheoremdocuments"),
+        "expected zero-document error in compile error, got: {error_string}"
+    );
 }

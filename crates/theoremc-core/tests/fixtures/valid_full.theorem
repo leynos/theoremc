@@ -23,7 +23,7 @@ Let:
     call:
       action: account.deposit
       args:
-        account: { ref: a }
+        account: { ref: amount }
         amount: { ref: amount }
 Do:
   - must:
