@@ -18,7 +18,7 @@ erode these boundaries and make the codebase harder to reason about.
   theorem naming and vacuity defaults
 - [ADR-002: Library-first internationalization and localization with
   Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
-   — establishes internationalisation (i18n) strategy
+   — establishes internationalization (i18n) strategy
 - [ADR-003: Architectural boundary
   enforcement](adr-003-architectural-boundary-enforcement.md) — enforces
   layered schema boundaries and anti-corruption constraints

@@ -1279,6 +1279,7 @@ For screen readers: this sequence diagram shows the build-time handoff from
 rendering, into `rustc` invoking the `theorem_file!` proc macro for each
 discovered theorem path, and finally to either a successful compilation or a
 compile-time theorem error.
+![Build-time theorem discovery sequence diagram](path/to/image)
 
 ```mermaid
 sequenceDiagram
