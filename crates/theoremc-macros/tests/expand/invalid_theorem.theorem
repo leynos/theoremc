@@ -1,0 +1,10 @@
+Schema: 1
+Theorem: InvalidAbout
+About: ""
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS

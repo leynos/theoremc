@@ -1,0 +1,5 @@
+error: failed to read theorem file 'tests/expand/this_file_does_not_exist.theorem': No such file or directory (os error 2)
+ --> tests/expand/missing_theorem.rs:1:32
+  |
+1 | theoremc_macros::theorem_file!("tests/expand/this_file_does_not_exist.theorem");
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -18,6 +18,7 @@ thiserror = "2.0.18"
 [dev-dependencies]
 tempfile = "3.15.0"
 cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+trybuild = { version = "1", features = ["diff"] }
 
 [lints]
 workspace = true

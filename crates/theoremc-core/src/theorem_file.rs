@@ -109,3 +109,66 @@ pub fn load_theorem_file_from_manifest_dir(
 
     Ok(theorem_docs)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use camino::Utf8Path;
+    use tempfile::TempDir;
+
+    #[test]
+    fn open_manifest_dir_error_when_directory_is_absent() {
+        let result = load_theorem_file_from_manifest_dir(
+            Utf8Path::new("/this/path/must/not/exist/at/all"),
+            Utf8Path::new("theorems/any.theorem"),
+        );
+        assert!(
+            matches!(result, Err(TheoremFileLoadError::OpenManifestDir { .. })),
+            "expected OpenManifestDir, got {result:?}",
+        );
+    }
+
+    #[test]
+    fn read_theorem_file_error_when_theorem_is_absent() {
+        let tmp = TempDir::new().expect("should create temp dir");
+        let manifest_dir = Utf8Path::from_path(tmp.path()).expect("temp dir path is valid UTF-8");
+        let result = load_theorem_file_from_manifest_dir(
+            manifest_dir,
+            Utf8Path::new("no_such_file.theorem"),
+        );
+        assert!(
+            matches!(result, Err(TheoremFileLoadError::ReadTheoremFile { .. })),
+            "expected ReadTheoremFile, got {result:?}",
+        );
+    }
+
+    #[test]
+    fn empty_theorem_file_error_when_file_contains_no_documents() {
+        let tmp = TempDir::new().expect("should create temp dir");
+        let manifest_dir = Utf8Path::from_path(tmp.path()).expect("temp dir path is valid UTF-8");
+        let theorem_path = Utf8Path::new("empty.theorem");
+        std::fs::write(tmp.path().join("empty.theorem"), "").expect("should write empty fixture");
+        let result = load_theorem_file_from_manifest_dir(manifest_dir, theorem_path);
+        assert!(
+            matches!(result, Err(TheoremFileLoadError::EmptyTheoremFile { .. })),
+            "expected EmptyTheoremFile, got {result:?}",
+        );
+    }
+
+    #[test]
+    fn invalid_theorem_file_error_when_schema_validation_fails() {
+        let tmp = TempDir::new().expect("should create temp dir");
+        let manifest_dir = Utf8Path::from_path(tmp.path()).expect("temp dir path is valid UTF-8");
+        let theorem_path = Utf8Path::new("invalid.theorem");
+        std::fs::write(
+            tmp.path().join("invalid.theorem"),
+            "Schema: 1\nTheorem: NoAbout\nProve:\n  - assert: \"true\"\n    because: trivial\n",
+        )
+        .expect("should write invalid fixture");
+        let result = load_theorem_file_from_manifest_dir(manifest_dir, theorem_path);
+        assert!(
+            matches!(result, Err(TheoremFileLoadError::InvalidTheoremFile { .. })),
+            "expected InvalidTheoremFile, got {result:?}",
+        );
+    }
+}
