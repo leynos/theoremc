@@ -76,7 +76,7 @@ pub enum TheoremFileLoadError {
 ///
 /// Returns [`TheoremFileLoadError::OpenManifestDir`] if the manifest directory
 /// cannot be opened, [`TheoremFileLoadError::InvalidTheoremPath`] if the
-/// theorem path is absolute or attempts to traverse upward,
+/// theorem path is absolute, drive-prefixed, or attempts to traverse upward,
 /// [`TheoremFileLoadError::ReadTheoremFile`] if the theorem file cannot be
 /// read, [`TheoremFileLoadError::InvalidTheoremFile`] if schema parsing or
 /// validation fails, and [`TheoremFileLoadError::EmptyTheoremFile`] if the
@@ -99,9 +99,12 @@ pub fn load_theorem_file_from_manifest_dir(
     theorem_path: &Utf8Path,
 ) -> Result<Vec<TheoremDoc>, TheoremFileLoadError> {
     if theorem_path.is_absolute()
-        || theorem_path
-            .components()
-            .any(|component| matches!(component, Utf8Component::ParentDir))
+        || theorem_path.components().any(|component| {
+            matches!(
+                component,
+                Utf8Component::ParentDir | Utf8Component::Prefix(_)
+            )
+        })
     {
         return Err(TheoremFileLoadError::InvalidTheoremPath {
             path: theorem_path.to_path_buf(),
@@ -232,6 +235,20 @@ mod tests {
         assert!(
             matches!(result, Err(TheoremFileLoadError::OpenManifestDir { .. })),
             "expected OpenManifestDir, got {result:?}",
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn drive_prefixed_theorem_paths_are_rejected() {
+        let temp_manifest_dir = temp_manifest_dir();
+        let result = load_theorem_file_from_manifest_dir(
+            &temp_manifest_dir.manifest_dir,
+            Utf8Path::new("C:foo.theorem"),
+        );
+        assert!(
+            matches!(result, Err(TheoremFileLoadError::InvalidTheoremPath { .. })),
+            "expected InvalidTheoremPath, got {result:?}",
         );
     }
 
