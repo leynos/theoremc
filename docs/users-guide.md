@@ -36,6 +36,51 @@ stable harness stub per theorem document in that file. Invalid theorem files
 therefore fail the Rust build during macro expansion, using the same schema
 diagnostics returned by `load_theorem_docs_with_source`.
 
+## Theorem file loading
+
+`theoremc-core` exposes `load_theorem_file_from_manifest_dir` as the shared
+entry point for reading and validating a crate-relative `.theorem` file. The
+`theorem_file!` proc-macro delegates to this function at compile time.
+
+### Path validation rules
+
+Theorem paths passed to `theorem_file!` must satisfy all of the following:
+
+- The path must be relative (not starting with `/` or a Windows drive prefix
+  such as `C:`).
+- The path must not contain `..` components.
+- The path is resolved relative to the consuming crate's `CARGO_MANIFEST_DIR`.
+
+Paths that violate any rule cause a compile-time error at the macro call site.
+
+### Error variants
+
+`TheoremFileLoadError` is the error type returned by
+`load_theorem_file_from_manifest_dir`. Its variants are:
+
+| Variant              | When raised                                                |
+| -------------------- | ---------------------------------------------------------- |
+| `OpenManifestDir`    | The manifest directory cannot be opened                    |
+| `InvalidTheoremPath` | The path is absolute, contains `..`, or has a drive prefix |
+| `ReadTheoremFile`    | The theorem file cannot be read                            |
+| `EmptyTheoremFile`   | The file contains no YAML theorem documents                |
+| `InvalidTheoremFile` | Schema parsing or validation fails                         |
+
+### Example
+
+```rust
+use camino::Utf8Path;
+use theoremc_core::load_theorem_file_from_manifest_dir;
+
+let manifest_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
+let docs = load_theorem_file_from_manifest_dir(
+    manifest_dir,
+    Utf8Path::new("tests/fixtures/my_theorem.theorem"),
+)
+.expect("theorem file should be valid");
+assert!(!docs.is_empty());
+```
+
 ## Theorem document schema
 
 A `.theorem` file is a UTF-8 text file containing one or more YAML (YAML Ain't

@@ -120,13 +120,13 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 
 **Table:** Module layers and responsibilities
 
-| Layer         | Modules                                            | Responsibility                                                      |
-| ------------- | -------------------------------------------------- | ------------------------------------------------------------------- |
-| Schema        | `schema/`                                          | YAML deserialization and semantic validation                        |
-| Mangle        | `mangle*.rs`                                       | Deterministic identifier generation                                 |
-| Cross-cutting | `collision.rs`                                     | Collision detection across schema and mangle                        |
-| Lowering      | `arg_lowering.rs`                                  | Conversion of semantic values to Rust token trees                   |
-| Build         | `build_discovery.rs`, `build_suite.rs`, `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking |
+| Layer         | Crate           | Modules                                            | Responsibility                                                      |
+| ------------- | --------------- | -------------------------------------------------- | ------------------------------------------------------------------- |
+| Schema        | `theoremc-core` | `schema/`                                          | YAML deserialization and semantic validation                        |
+| Mangle        | `theoremc-core` | `mangle*.rs`                                       | Deterministic identifier generation                                 |
+| Cross-cutting | `theoremc-core` | `collision.rs`                                     | Collision detection across schema and mangle                        |
+| Lowering      | `theoremc`      | `arg_lowering.rs`                                  | Conversion of semantic values to Rust token trees                   |
+| Build         | `theoremc`      | `build_discovery.rs`, `build_suite.rs`, `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking |
 
 The schema layer must not import from `mangle`, and vice versa. The `collision`
 module exists as a separate top-level module specifically to orchestrate both
@@ -235,6 +235,20 @@ The live workspace split is:
 - `crates/theoremc-core` for shared schema, mangling, and collision logic,
 - `crates/theoremc-macros` for proc-macro expansion, and
 - the root `theoremc` crate for the public API plus build integration.
+
+### `theoremc-core` public API
+
+The following items are exported from `theoremc-core` and form the stable
+internal interface between the core library and the proc-macro crate:
+
+| Symbol                                | Kind   | Purpose                                                                                                                                             |
+| ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `load_theorem_file_from_manifest_dir` | `fn`   | Opens a crate-relative `.theorem` file via `cap_std`, validates it through the shared schema loader, and returns one `TheoremDoc` per YAML document |
+| `TheoremFileLoadError`                | `enum` | Typed error covering all failure modes: `OpenManifestDir`, `InvalidTheoremPath`, `ReadTheoremFile`, `EmptyTheoremFile`, `InvalidTheoremFile`        |
+
+`crates/theoremc-macros` must not re-implement IO, path validation, or schema
+diagnostics. All such logic lives in `crates/theoremc-core` so the two crates
+share one IO and diagnostic contract.
 
 When theorem expansion behaviour changes, prefer testing it in two layers:
 

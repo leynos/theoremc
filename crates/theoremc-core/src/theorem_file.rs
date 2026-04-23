@@ -25,9 +25,11 @@ pub enum TheoremFileLoadError {
         source: std::io::Error,
     },
 
-    /// The theorem file could not be read from the manifest directory.
+    /// The provided theorem path failed validation because absolute paths,
+    /// Windows drive-prefixed paths, and path traversal components (`..`) are
+    /// not allowed.
     #[error(
-        "invalid theorem path '{path}': theorem paths must be crate-relative and must not contain '..'"
+        "invalid theorem path '{path}': absolute, drive-prefixed, and traversal ('..') paths are not allowed"
     )]
     InvalidTheoremPath {
         /// The invalid theorem path.
@@ -99,6 +101,7 @@ pub fn load_theorem_file_from_manifest_dir(
     theorem_path: &Utf8Path,
 ) -> Result<Vec<TheoremDoc>, TheoremFileLoadError> {
     if theorem_path.is_absolute()
+        || has_windows_drive_prefix(theorem_path)
         || theorem_path.components().any(|component| {
             matches!(
                 component,
@@ -140,6 +143,11 @@ pub fn load_theorem_file_from_manifest_dir(
     Ok(theorem_docs)
 }
 
+fn has_windows_drive_prefix(path: &Utf8Path) -> bool {
+    let path_bytes = path.as_str().as_bytes();
+    path_bytes.len() >= 2 && path_bytes[0].is_ascii_alphabetic() && path_bytes[1] == b':'
+}
+
 const fn io_error_code(kind: std::io::ErrorKind) -> &'static str {
     match kind {
         std::io::ErrorKind::NotFound => "io:NotFound",
@@ -179,36 +187,38 @@ mod tests {
     }
 
     #[fixture]
-    fn temp_manifest_dir() -> TempManifestDir {
-        let temp_dir = TempDir::new().expect("should create temp dir");
+    fn temp_manifest_dir() -> Result<TempManifestDir, Box<dyn std::error::Error>> {
+        let temp_dir = TempDir::new()?;
         let manifest_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf())
-            .expect("temp dir path is valid UTF-8");
-        TempManifestDir {
+            .map_err(|path| {
+                std::io::Error::other(format!("non-UTF-8 temp path: {}", path.display()))
+            })?;
+        Ok(TempManifestDir {
             _temp_dir: temp_dir,
             manifest_dir,
-        }
+        })
     }
 
-    fn write_fixture(manifest_dir: &Utf8Path, theorem_path: &Utf8Path, contents: &str) {
-        let fixture_root = Utf8Dir::open_ambient_dir(manifest_dir, ambient_authority())
-            .expect("should open temp manifest dir");
+    fn write_fixture(
+        manifest_dir: &Utf8Path,
+        theorem_path: &Utf8Path,
+        contents: &str,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let fixture_root = Utf8Dir::open_ambient_dir(manifest_dir, ambient_authority())?;
         if let Some(parent) = theorem_path
             .parent()
             .filter(|parent| !parent.as_str().is_empty())
         {
-            fixture_root
-                .create_dir_all(parent)
-                .expect("should create theorem fixture parent directory");
+            fixture_root.create_dir_all(parent)?;
         }
-        fixture_root
-            .write(theorem_path.as_str(), contents)
-            .expect("should write theorem fixture");
+        fixture_root.write(theorem_path.as_str(), contents)?;
+        Ok(())
     }
 
     fn assert_expected_error(
         result: &Result<Vec<TheoremDoc>, TheoremFileLoadError>,
         expected: ExpectedErrorKind,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let matches_expected = match expected {
             ExpectedErrorKind::InvalidTheoremPath => {
                 matches!(result, Err(TheoremFileLoadError::InvalidTheoremPath { .. }))
@@ -223,33 +233,47 @@ mod tests {
                 matches!(result, Err(TheoremFileLoadError::InvalidTheoremFile { .. }))
             }
         };
-        assert!(matches_expected, "expected {expected:?}, got {result:?}");
+        if matches_expected {
+            Ok(())
+        } else {
+            Err(std::io::Error::other(format!("expected {expected:?}, got {result:?}",)).into())
+        }
     }
 
     #[test]
-    fn open_manifest_dir_error_when_directory_is_absent() {
-        let result = load_theorem_file_from_manifest_dir(
-            Utf8Path::new("/this/path/must/not/exist/at/all"),
-            Utf8Path::new("theorems/any.theorem"),
-        );
-        assert!(
-            matches!(result, Err(TheoremFileLoadError::OpenManifestDir { .. })),
-            "expected OpenManifestDir, got {result:?}",
-        );
+    fn open_manifest_dir_error_when_directory_is_absent() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let temp_dir = TempDir::new()?;
+        let missing = temp_dir.path().join("nonexistent");
+        let missing = Utf8PathBuf::from_path_buf(missing)
+            .map_err(|path| {
+                std::io::Error::other(format!("non-UTF-8 temp path: {}", path.display()))
+            })?;
+        let result =
+            load_theorem_file_from_manifest_dir(&missing, Utf8Path::new("theorems/any.theorem"));
+        match result {
+            Err(TheoremFileLoadError::OpenManifestDir { .. }) => Ok(()),
+            _ => Err(
+                std::io::Error::other(format!("expected OpenManifestDir, got {result:?}",)).into(),
+            ),
+        }
     }
 
     #[cfg(windows)]
     #[test]
-    fn drive_prefixed_theorem_paths_are_rejected() {
-        let temp_manifest_dir = temp_manifest_dir();
+    fn drive_prefixed_theorem_paths_are_rejected() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_manifest_dir = temp_manifest_dir()?;
         let result = load_theorem_file_from_manifest_dir(
             &temp_manifest_dir.manifest_dir,
             Utf8Path::new("C:foo.theorem"),
         );
-        assert!(
-            matches!(result, Err(TheoremFileLoadError::InvalidTheoremPath { .. })),
-            "expected InvalidTheoremPath, got {result:?}",
-        );
+        match result {
+            Err(TheoremFileLoadError::InvalidTheoremPath { .. }) => Ok(()),
+            _ => Err(std::io::Error::other(
+                format!("expected InvalidTheoremPath, got {result:?}",),
+            )
+            .into()),
+        }
     }
 
     #[rstest]
@@ -259,6 +283,7 @@ mod tests {
         None,
         ExpectedErrorKind::InvalidTheoremPath
     )]
+    #[case("C:foo.theorem", None, ExpectedErrorKind::InvalidTheoremPath)]
     #[case("no_such_file.theorem", None, ExpectedErrorKind::ReadTheoremFile)]
     #[case("empty.theorem", Some(""), ExpectedErrorKind::EmptyTheoremFile)]
     #[case(
@@ -269,18 +294,19 @@ mod tests {
         ExpectedErrorKind::InvalidTheoremFile
     )]
     fn theorem_file_load_errors_are_reported_consistently(
-        temp_manifest_dir: TempManifestDir,
+        temp_manifest_dir: Result<TempManifestDir, Box<dyn std::error::Error>>,
         #[case] theorem_path: &str,
         #[case] file_contents: Option<&str>,
         #[case] expected: ExpectedErrorKind,
-    ) {
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let temp_manifest_dir = temp_manifest_dir?;
         let theorem_path = Utf8Path::new(theorem_path);
         if let Some(file_contents) = file_contents {
-            write_fixture(&temp_manifest_dir.manifest_dir, theorem_path, file_contents);
+            write_fixture(&temp_manifest_dir.manifest_dir, theorem_path, file_contents)?;
         }
         let result =
             load_theorem_file_from_manifest_dir(&temp_manifest_dir.manifest_dir, theorem_path);
-        assert_expected_error(&result, expected);
+        assert_expected_error(&result, expected)
     }
 
     #[test]
