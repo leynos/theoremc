@@ -242,6 +242,8 @@ The live workspace split is:
 The following items are exported from `theoremc-core` and form the stable
 internal interface between the core library and the proc-macro crate:
 
+**Table:** `theoremc-core` stable internal API
+
 | Symbol                                | Kind   | Purpose                                                                                                                                             |
 | ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `load_theorem_file_from_manifest_dir` | `fn`   | Opens a crate-relative `.theorem` file via `cap_std`, validates it through the shared schema loader, and returns one `TheoremDoc` per YAML document |

@@ -252,7 +252,7 @@ mod tests {
         })?;
         let result =
             load_theorem_file_from_manifest_dir(&missing, Utf8Path::new("theorems/any.theorem"));
-        match result {
+        match &result {
             Err(TheoremFileLoadError::OpenManifestDir { .. }) => Ok(()),
             _ => Err(
                 std::io::Error::other(format!("expected OpenManifestDir, got {result:?}",)).into(),
@@ -268,7 +268,7 @@ mod tests {
             &temp_manifest_dir.manifest_dir,
             Utf8Path::new("C:foo.theorem"),
         );
-        match result {
+        match &result {
             Err(TheoremFileLoadError::InvalidTheoremPath { .. }) => Ok(()),
             _ => Err(std::io::Error::other(
                 format!("expected InvalidTheoremPath, got {result:?}",),
@@ -278,7 +278,14 @@ mod tests {
     }
 
     #[rstest]
-    #[case("/absolute.theorem", None, ExpectedErrorKind::InvalidTheoremPath)]
+    #[cfg_attr(
+        not(windows),
+        case("/absolute.theorem", None, ExpectedErrorKind::InvalidTheoremPath)
+    )]
+    #[cfg_attr(
+        windows,
+        case("C:/absolute.theorem", None, ExpectedErrorKind::InvalidTheoremPath)
+    )]
     #[case(
         "theorems/../escape.theorem",
         None,
