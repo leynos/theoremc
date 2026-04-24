@@ -173,16 +173,19 @@ Accessors return iterators over `&Utf8Path`:
 Before committing any change, run the following gates. The Makefile wraps each
 underlying command:
 
-**Table:** Quality gates and their Makefile commands
+**Table:** Quality gates and their commands
 
-| Gate             | Command             | What it checks                         |
-| ---------------- | ------------------- | -------------------------------------- |
-| Formatting       | `make check-fmt`    | `cargo fmt --all -- --check`           |
-| Linting          | `make lint`         | Clippy with `-D warnings` plus rustdoc |
-| Tests            | `make test`         | `cargo test --workspace`               |
-| Markdown lint    | `make markdownlint` | markdownlint-cli2 on all `.md` files   |
-| Mermaid diagrams | `make nixie`        | Validates Mermaid blocks in Markdown   |
-| Formatting fix   | `make fmt`          | `cargo fmt --all` plus mdformat        |
+| Gate                 | Command                                                                                            | What it checks                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Formatting           | `make check-fmt`                                                                                   | `cargo fmt --all -- --check`                                       |
+| Linting              | `make lint`                                                                                        | Clippy with `-D warnings` plus rustdoc                             |
+| Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                           |
+| Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit           |
+| Architecture linting | `cargo dylint theoremc_arch_lint --all -- -D warnings`                                             | Flags schema layer boundary and other architecture rule violations |
+| Tests                | `make test`                                                                                        | `cargo test --workspace`                                           |
+| Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                               |
+| Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                               |
+| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all` plus mdformat                                    |
 
 When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 `make nixie` must also pass.

@@ -88,13 +88,16 @@ pub enum TheoremFileLoadError {
 ///
 /// ```no_run
 /// use camino::Utf8Path;
-/// use theoremc_core::load_theorem_file_from_manifest_dir;
+/// use theoremc_core::{load_theorem_file_from_manifest_dir, TheoremFileLoadError};
 ///
-/// let manifest_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
-/// let theorem_path = Utf8Path::new("tests/fixtures/valid_full.theorem");
-/// let docs = load_theorem_file_from_manifest_dir(manifest_dir, theorem_path).unwrap();
+/// fn main() -> Result<(), TheoremFileLoadError> {
+///     let manifest_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));
+///     let theorem_path = Utf8Path::new("tests/fixtures/valid_full.theorem");
+///     let docs = load_theorem_file_from_manifest_dir(manifest_dir, theorem_path)?;
 ///
-/// assert_eq!(docs.len(), 1);
+///     assert_eq!(docs.len(), 1);
+///     Ok(())
+/// }
 /// ```
 pub fn load_theorem_file_from_manifest_dir(
     manifest_dir: &Utf8Path,
