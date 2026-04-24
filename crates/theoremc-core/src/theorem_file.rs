@@ -100,15 +100,7 @@ pub fn load_theorem_file_from_manifest_dir(
     manifest_dir: &Utf8Path,
     theorem_path: &Utf8Path,
 ) -> Result<Vec<TheoremDoc>, TheoremFileLoadError> {
-    if theorem_path.is_absolute()
-        || has_windows_drive_prefix(theorem_path)
-        || theorem_path.components().any(|component| {
-            matches!(
-                component,
-                Utf8Component::ParentDir | Utf8Component::Prefix(_)
-            )
-        })
-    {
+    if is_invalid_theorem_path(theorem_path) {
         return Err(TheoremFileLoadError::InvalidTheoremPath {
             path: theorem_path.to_path_buf(),
         });
@@ -144,8 +136,18 @@ pub fn load_theorem_file_from_manifest_dir(
 }
 
 fn has_windows_drive_prefix(path: &Utf8Path) -> bool {
-    let path_bytes = path.as_str().as_bytes();
-    path_bytes.len() >= 2 && path_bytes[0].is_ascii_alphabetic() && path_bytes[1] == b':'
+    matches!(
+        path.as_str().as_bytes(),
+        [drive, b':', ..] if drive.is_ascii_alphabetic()
+    )
+}
+
+fn is_invalid_theorem_path(path: &Utf8Path) -> bool {
+    path.is_absolute()
+        || has_windows_drive_prefix(path)
+        || path
+            .components()
+            .any(|c| matches!(c, Utf8Component::ParentDir | Utf8Component::Prefix(_)))
 }
 
 const fn io_error_code(kind: std::io::ErrorKind) -> &'static str {
@@ -189,8 +191,8 @@ mod tests {
     #[fixture]
     fn temp_manifest_dir() -> Result<TempManifestDir, Box<dyn std::error::Error>> {
         let temp_dir = TempDir::new()?;
-        let manifest_dir = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf())
-            .map_err(|path| {
+        let manifest_dir =
+            Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).map_err(|path| {
                 std::io::Error::other(format!("non-UTF-8 temp path: {}", path.display()))
             })?;
         Ok(TempManifestDir {
@@ -245,10 +247,9 @@ mod tests {
     {
         let temp_dir = TempDir::new()?;
         let missing = temp_dir.path().join("nonexistent");
-        let missing = Utf8PathBuf::from_path_buf(missing)
-            .map_err(|path| {
-                std::io::Error::other(format!("non-UTF-8 temp path: {}", path.display()))
-            })?;
+        let missing = Utf8PathBuf::from_path_buf(missing).map_err(|path| {
+            std::io::Error::other(format!("non-UTF-8 temp path: {}", path.display()))
+        })?;
         let result =
             load_theorem_file_from_manifest_dir(&missing, Utf8Path::new("theorems/any.theorem"));
         match result {

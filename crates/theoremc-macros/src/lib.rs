@@ -121,13 +121,15 @@ fn expand_theorem_file_at(
     manifest_dir: &Utf8Path,
     path_literal: &LitStr,
 ) -> Result<TokenStream2, MacroExpansionError> {
-    let theorem_path = Utf8PathBuf::from(path_literal.value());
+    let canonical_path = path_literal.value().replace('\\', "/");
+    let canonical_path_literal = LitStr::new(&canonical_path, path_literal.span());
+    let theorem_path = Utf8PathBuf::from(&canonical_path);
     let theorem_docs = load_theorem_file_from_manifest_dir(manifest_dir, &theorem_path)
         .map_err(|error| MacroExpansionError::from_load(&error))?;
 
     Ok(render_expansion(
-        path_literal,
-        theorem_path.as_str(),
+        &canonical_path_literal,
+        &canonical_path,
         &theorem_docs,
     ))
 }
