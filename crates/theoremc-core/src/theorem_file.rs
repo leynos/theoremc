@@ -173,6 +173,8 @@ const fn io_error_code(kind: std::io::ErrorKind) -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for theorem file parsing and helper behaviour.
+
     use super::*;
     use rstest::{fixture, rstest};
     use tempfile::TempDir;

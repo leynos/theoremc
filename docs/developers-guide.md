@@ -170,8 +170,8 @@ Accessors return iterators over `&Utf8Path`:
 
 ### 3.1 Quality gates
 
-Before committing any change, run the following gates. The Makefile wraps each
-underlying command:
+Before committing any change, run the following gates. Use the Makefile targets
+where available, and run the direct Cargo invocations for specialised checks:
 
 **Table:** Quality gates and their commands
 
