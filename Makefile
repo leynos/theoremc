@@ -3,13 +3,13 @@
 
 TARGET ?= theoremc
 
-CARGO ?= cargo
+CARGO ?= $(HOME)/.cargo/bin/cargo
 BUILD_JOBS ?=
 RUST_FLAGS ?= -D warnings
 CARGO_FLAGS ?= --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 TEST_FLAGS ?= $(CARGO_FLAGS)
-MDLINT ?= markdownlint-cli2
+MDLINT ?= $(HOME)/.bun/bin/markdownlint-cli2
 NIXIE ?= nixie
 
 build: target/debug/$(TARGET) ## Build debug binary
