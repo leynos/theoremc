@@ -42,8 +42,8 @@ fn mangle_to_identifier(name: &str) -> String {
 ///
 /// # Examples
 ///
-///     use theoremc::schema::load_theorem_docs;
-///     use theoremc::collision::check_action_collisions;
+///     use theoremc_core::schema::load_theorem_docs;
+///     use theoremc_core::collision::check_action_collisions;
 ///
 ///     let yaml = r#"
 ///     Theorem: A

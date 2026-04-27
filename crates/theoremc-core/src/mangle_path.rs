@@ -10,7 +10,7 @@ pub(crate) const MODULE_PREFIX: &str = "__theoremc__file__";
 
 /// A path stem: a `.theorem` file path with its extension removed.
 ///
-///     use theoremc::mangle::PathStem;
+///     use theoremc_core::mangle::PathStem;
 ///     let stem = PathStem::from("foo/bar");
 ///     assert_eq!(stem.as_str(), "foo/bar");
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,7 +82,7 @@ impl MangledModule {
 /// a [`PathStem`]. Returns the path unchanged when no `.theorem`
 /// suffix exists.
 ///
-///     use theoremc::mangle::path_stem;
+///     use theoremc_core::mangle::path_stem;
 ///     assert_eq!(path_stem("foo/bar.theorem").as_str(), "foo/bar");
 ///     assert_eq!(path_stem("no_extension").as_str(), "no_extension");
 #[must_use]
@@ -116,7 +116,7 @@ const fn mangle_char(ch: char) -> char {
 ///
 /// # Examples
 ///
-///     use theoremc::mangle::{PathStem, path_mangle};
+///     use theoremc_core::mangle::{PathStem, path_mangle};
 ///     assert_eq!(path_mangle(&PathStem::from("theorems/bidirectional")), "theorems_bidirectional");
 ///     assert_eq!(path_mangle(&PathStem::from("123foo")), "_123foo");
 #[must_use]
@@ -149,7 +149,7 @@ pub fn path_mangle(stem: &PathStem) -> String {
 /// mangled stem, so paths that sanitize identically still produce
 /// distinct module names.
 ///
-///     use theoremc::mangle::mangle_module_path;
+///     use theoremc_core::mangle::mangle_module_path;
 ///     let m = mangle_module_path("theorems/bidirectional.theorem");
 ///     assert_eq!(m.mangled_stem(), "theorems_bidirectional");
 #[must_use]

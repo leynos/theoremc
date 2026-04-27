@@ -18,7 +18,7 @@ erode these boundaries and make the codebase harder to reason about.
   theorem naming and vacuity defaults
 - [ADR-002: Library-first internationalization and localization with
   Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
-  — establishes internationalisation (i18n) strategy
+   — establishes internationalization (i18n) strategy
 - [ADR-003: Architectural boundary
   enforcement](adr-003-architectural-boundary-enforcement.md) — enforces
   layered schema boundaries and anti-corruption constraints
@@ -41,10 +41,10 @@ crates declared under `[build-dependencies]` in `Cargo.toml`:
 
 **Table:** Build dependencies
 
-| Crate | Purpose |
-| ----------- | ------------------------------------------------- |
-| `camino` | UTF-8 path types for cross-platform path handling |
-| `cap-std` | Capability-oriented filesystem access |
+| Crate       | Purpose                                                      |
+| ----------- | ------------------------------------------------------------ |
+| `camino`    | UTF-8 path types for cross-platform path handling            |
+| `cap-std`   | Capability-oriented filesystem access                        |
 | `thiserror` | Derive macro for `BuildDiscoveryError` and `BuildSuiteError` |
 
 These are separate from the library's `[dependencies]` and the test-only
@@ -103,15 +103,15 @@ set so Cargo can detect when the directory is created later.
 
 Step 3.1.1 (see
 [`execplans/3-1-1-build-rs-scanning-of-theorems.md`](execplans/3-1-1-build-rs-scanning-of-theorems.md))
-owns discovery and Cargo invalidation. Step 3.1.2 adds suite generation via
+ owns discovery and Cargo invalidation. Step 3.1.2 adds suite generation via
 `build_suite::write_theorem_suite()`, which writes `OUT_DIR/theorem_suite.rs`
 containing `theorem_file!("...")` invocations. The handoff is deliberately
 narrow: `build.rs` produces an ordered crate-relative file list plus rerun
-metadata; `build_suite` renders deterministic suite contents; and the temporary
-`__theoremc_generated_suite` bridge module in `src/lib.rs` provides a validating
-`theorem_file!` macro via `include_str!`. In Step 3.2, the bridge will be
-replaced by proc-macro-based per-file expansion while keeping the same generated
-callsites.
+metadata; `build_suite` renders deterministic suite contents; and the hidden
+`__theoremc_generated_suite` module in `src/lib.rs` imports the real
+`theorem_file!` proc macro before including the generated suite. Step 3.2.1
+keeps the generated callsites unchanged while moving the per-file expansion
+logic into `crates/theoremc-macros`.
 
 ## 2. Module architecture
 
@@ -120,13 +120,14 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 
 **Table:** Module layers and responsibilities
 
-| Layer | Modules | Responsibility |
-| ------------- | -------------------------------------------------- | ------------------------------------------------------------------- |
-| Schema | `schema/` | YAML deserialization and semantic validation |
-| Mangle | `mangle*.rs` | Deterministic identifier generation |
-| Cross-cutting | `collision.rs` | Collision detection across schema and mangle |
-| Lowering | `arg_lowering.rs` | Conversion of semantic values to Rust token trees |
-| Build | `build_discovery.rs`, `build_suite.rs`, `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking |
+| Layer         | Crate             | Modules                                            | Responsibility                                                                |
+| ------------- | ----------------- | -------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Schema        | `theoremc-core`   | `schema/`                                          | YAML deserialization and semantic validation                                  |
+| Mangle        | `theoremc-core`   | `mangle*.rs`                                       | Deterministic identifier generation                                           |
+| Cross-cutting | `theoremc-core`   | `collision.rs`                                     | Collision detection across schema and mangle                                  |
+| Proc-macro    | `theoremc-macros` | `lib.rs`                                           | Proc-macro entry points, theorem-file loading delegation, and code generation |
+| Lowering      | `theoremc`        | `arg_lowering.rs`                                  | Conversion of semantic values to Rust token trees                             |
+| Build         | `theoremc`        | `build_discovery.rs`, `build_suite.rs`, `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking           |
 
 The schema layer must not import from `mangle`, and vice versa. The `collision`
 module exists as a separate top-level module specifically to orchestrate both
@@ -169,19 +170,22 @@ Accessors return iterators over `&Utf8Path`:
 
 ### 3.1 Quality gates
 
-Before committing any change, run the following gates. The Makefile wraps each
-underlying command:
+Before committing any change, run the following gates. Use the Makefile targets
+where available, and run the direct Cargo invocations for specialized checks:
 
-**Table:** Quality gates and their Makefile commands
+**Table:** Quality gates and their commands
 
-| Gate | Command | What it checks |
-| ---------------- | ------------------- | -------------------------------------- |
-| Formatting | `make check-fmt` | `cargo fmt --all -- --check` |
-| Linting | `make lint` | Clippy with `-D warnings` plus rustdoc |
-| Tests | `make test` | `cargo test --workspace` |
-| Markdown lint | `make markdownlint` | markdownlint-cli2 on all `.md` files |
-| Mermaid diagrams | `make nixie` | Validates Mermaid blocks in Markdown |
-| Formatting fix | `make fmt` | `cargo fmt --all` plus mdformat |
+| Gate                 | Command                                                                                            | What it checks                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Formatting           | `make check-fmt`                                                                                   | `cargo fmt --all -- --check`                                       |
+| Linting              | `make lint`                                                                                        | Clippy with `-D warnings` plus rustdoc                             |
+| Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                           |
+| Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit           |
+| Architecture linting | `cargo dylint theoremc_arch_lint --all -- -D warnings`                                             | Flags schema layer boundary and other architecture rule violations |
+| Tests                | `make test`                                                                                        | `cargo test --workspace`                                           |
+| Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                               |
+| Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                               |
+| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all` plus mdformat                                    |
 
 When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 `make nixie` must also pass.
@@ -226,11 +230,51 @@ To add new build-time discovery or generation:
 5. Update `docs/theoremc-design.md` §7 and this guide.
 
 Step 3.1.2 extends this pattern by adding suite generation (`build_suite.rs`)
-to the build script. The `__theoremc_generated_suite` bridge module in
-`src/lib.rs` defines a temporary `theorem_file!` macro that validates theorem
-paths at compile time via `include_str!`. This bridge will be replaced with
-real proc-macro-based per-file expansion in Step 3.2 while keeping the same
-generated `theorem_file!(...)` callsite.
+to the build script. Step 3.2.1 keeps that generated `theorem_file!("...")`
+callsite unchanged, but the hidden `__theoremc_generated_suite` module in
+`src/lib.rs` now imports the real proc macro re-exported by the root facade.
+
+The live workspace split is:
+
+- `crates/theoremc-core` for shared schema, mangling, and collision logic,
+- `crates/theoremc-macros` for proc-macro expansion, and
+- the root `theoremc` crate for the public API plus build integration.
+
+#### 3.4.1 `theoremc-core` and proc-macro boundary
+
+The following items are exported from `theoremc-core` and form the stable
+internal interface between the core library and the proc-macro crate:
+
+**Table:** `theoremc-core` stable internal API
+
+| Symbol                                | Kind   | Purpose                                                                                                                                             |
+| ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `load_theorem_file_from_manifest_dir` | `fn`   | Opens a crate-relative `.theorem` file via `cap_std`, validates it through the shared schema loader, and returns one `TheoremDoc` per YAML document |
+| `TheoremFileLoadError`                | `enum` | Typed error covering all failure modes: `OpenManifestDir`, `InvalidTheoremPath`, `ReadTheoremFile`, `EmptyTheoremFile`, `InvalidTheoremFile`        |
+
+The proc-macro crate exposes the companion expansion boundary:
+
+**Table:** `theoremc-macros` stable internal API
+
+| Symbol          | Kind         | Purpose                                                                                                                                                                                                          |
+| --------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `theorem_file!` | `proc macro` | Receives one crate-relative `.theorem` path literal, loads it from `CARGO_MANIFEST_DIR`, and expands each YAML document into deterministic theorem module and harness stubs surfaced through the generated suite |
+
+`theorem_file!` must fail macro expansion with the diagnostic rendered from the
+shared loader error when the path is invalid, the file cannot be read, the file
+is empty, or schema validation fails. It must call
+`load_theorem_file_from_manifest_dir` for IO, path validation, and schema
+diagnostics rather than re-implementing those behaviours locally.
+
+The mutual invariant is that `TheoremFileLoadError` variants are the canonical
+error types at the macro/runtime boundary. The proc macro may render those
+errors into compile diagnostics, but it must not introduce a parallel taxonomy
+for theorem-file loading failures.
+
+When theorem expansion behaviour changes, prefer testing it in two layers:
+
+1. direct proc-macro unit tests in `crates/theoremc-macros`, and
+2. fixture-crate behavioural tests in `tests/theorem_file_macro_bdd.rs`.
 
 ## 4. Filesystem and path conventions
 
