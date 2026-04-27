@@ -131,7 +131,7 @@ pub(crate) use path::MODULE_PREFIX;
 mod prop_tests {
     //! Property-based tests for mangling determinism and uniqueness.
 
-    use super::{mangle_module_path, mangle_theorem_harness};
+    use super::{hash12, mangle_module_path, mangle_theorem_harness};
     use proptest::prelude::{prop_assert_eq, prop_assert_ne, prop_assume, proptest};
 
     proptest! {
@@ -169,6 +169,32 @@ mod prop_tests {
             let ha = mangle_theorem_harness(&path, &a);
             let hb = mangle_theorem_harness(&path, &b);
             prop_assert_ne!(ha.identifier(), hb.identifier());
+        }
+
+        /// `hash12` must produce distinct outputs for distinct inputs across a
+        /// wide variety of canonical action names; empirically validates
+        /// collision-resistance of the 12-hex-character truncation.
+        #[test]
+        fn hash12_is_distinct_for_diverse_canonical_names(
+            a in "[a-z][a-z0-9]{0,10}\\.[a-z][a-z0-9]{0,10}",
+            b in "[a-z][a-z0-9]{0,10}\\.[a-z][a-z0-9]{0,10}",
+        ) {
+            prop_assume!(a != b);
+            prop_assert_ne!(
+                hash12(&a),
+                hash12(&b),
+                "hash12 collision between '{}' and '{}'",
+                a,
+                b,
+            );
+        }
+
+        /// `hash12` must be deterministic.
+        #[test]
+        fn hash12_is_deterministic(
+            input in "[a-z0-9._-]{1,50}",
+        ) {
+            prop_assert_eq!(hash12(&input), hash12(&input));
         }
     }
 }

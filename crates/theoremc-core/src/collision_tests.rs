@@ -301,3 +301,44 @@ fn group_by_canonical_behaviour(
     let theorems = grouped.get("account.deposit").expect("key should exist");
     assert_eq!(theorems.len(), expected_theorem_count, "{message}");
 }
+
+#[cfg(test)]
+mod prop_tests {
+    //! Property-based tests for collision-detection invariants.
+
+    use std::collections::BTreeSet;
+
+    use proptest::prelude::{prop_assert, proptest};
+
+    use super::super::find_mangled_collisions;
+
+    proptest! {
+        /// The collision detector must report no collisions for a single
+        /// distinct canonical name (trivially no collision possible).
+        #[test]
+        fn single_canonical_name_never_collides(
+            name in "[a-z][a-z0-9]{0,8}\\.[a-z][a-z0-9]{0,8}",
+        ) {
+            let names: BTreeSet<&str> = std::iter::once(name.as_str()).collect();
+            let collisions = find_mangled_collisions(&names);
+            prop_assert!(
+                collisions.is_empty(),
+                "single name '{name}' should not self-collide",
+            );
+        }
+
+        /// Two identical canonical names must not be reported as a collision
+        /// (same name -> same identifier, but that is not a collision by
+        /// definition).
+        #[test]
+        fn identical_names_do_not_collide(
+            name in "[a-z][a-z0-9]{0,8}\\.[a-z][a-z0-9]{0,8}",
+        ) {
+            // `BTreeSet` deduplicates, so this is equivalent to a single-name set.
+            let mut names: BTreeSet<&str> = BTreeSet::new();
+            names.insert(name.as_str());
+            let collisions = find_mangled_collisions(&names);
+            prop_assert!(collisions.is_empty());
+        }
+    }
+}
