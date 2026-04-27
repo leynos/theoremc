@@ -171,7 +171,7 @@ Accessors return iterators over `&Utf8Path`:
 ### 3.1 Quality gates
 
 Before committing any change, run the following gates. Use the Makefile targets
-where available, and run the direct Cargo invocations for specialised checks:
+where available, and run the direct Cargo invocations for specialized checks:
 
 **Table:** Quality gates and their commands
 
@@ -240,7 +240,7 @@ The live workspace split is:
 - `crates/theoremc-macros` for proc-macro expansion, and
 - the root `theoremc` crate for the public API plus build integration.
 
-### `theoremc-core` public API
+#### 3.4.1 `theoremc-core` and proc-macro boundary
 
 The following items are exported from `theoremc-core` and form the stable
 internal interface between the core library and the proc-macro crate:
@@ -252,9 +252,24 @@ internal interface between the core library and the proc-macro crate:
 | `load_theorem_file_from_manifest_dir` | `fn`   | Opens a crate-relative `.theorem` file via `cap_std`, validates it through the shared schema loader, and returns one `TheoremDoc` per YAML document |
 | `TheoremFileLoadError`                | `enum` | Typed error covering all failure modes: `OpenManifestDir`, `InvalidTheoremPath`, `ReadTheoremFile`, `EmptyTheoremFile`, `InvalidTheoremFile`        |
 
-`crates/theoremc-macros` must not re-implement IO, path validation, or schema
-diagnostics. All such logic lives in `crates/theoremc-core` so the two crates
-share one IO and diagnostic contract.
+The proc-macro crate exposes the companion expansion boundary:
+
+**Table:** `theoremc-macros` stable internal API
+
+| Symbol          | Kind         | Purpose                                                                                                                                                                                                          |
+| --------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `theorem_file!` | `proc macro` | Receives one crate-relative `.theorem` path literal, loads it from `CARGO_MANIFEST_DIR`, and expands each YAML document into deterministic theorem module and harness stubs surfaced through the generated suite |
+
+`theorem_file!` must fail macro expansion with the diagnostic rendered from the
+shared loader error when the path is invalid, the file cannot be read, the file
+is empty, or schema validation fails. It must call
+`load_theorem_file_from_manifest_dir` for IO, path validation and schema
+diagnostics rather than re-implementing those behaviours locally.
+
+The mutual invariant is that `TheoremFileLoadError` variants are the canonical
+error types at the macro/runtime boundary. The proc macro may render those
+errors into compile diagnostics, but it must not introduce a parallel taxonomy
+for theorem-file loading failures.
 
 When theorem expansion behaviour changes, prefer testing it in two layers:
 
