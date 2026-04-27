@@ -148,9 +148,12 @@ fn has_windows_drive_prefix(path: &Utf8Path) -> bool {
 fn is_invalid_theorem_path(path: &Utf8Path) -> bool {
     path.is_absolute()
         || has_windows_drive_prefix(path)
-        || path
-            .components()
-            .any(|c| matches!(c, Utf8Component::ParentDir | Utf8Component::Prefix(_)))
+        || path.components().any(|c| {
+            matches!(
+                c,
+                Utf8Component::ParentDir | Utf8Component::Prefix(_) | Utf8Component::RootDir
+            )
+        })
 }
 
 const fn io_error_code(kind: std::io::ErrorKind) -> &'static str {
@@ -175,15 +178,18 @@ const fn io_error_code(kind: std::io::ErrorKind) -> &'static str {
 mod tests {
     //! Unit tests for theorem file parsing and helper behaviour.
 
-    use super::*;
+    use super::{
+        TheoremDoc, TheoremFileLoadError, Utf8Dir, Utf8Path, Utf8PathBuf, ambient_authority,
+        is_invalid_theorem_path, load_theorem_file_from_manifest_dir,
+    };
     use rstest::{fixture, rstest};
     use tempfile::TempDir;
 
     mod prop_tests {
         //! Property-based tests for theorem file path validation.
 
-        use super::*;
-        use proptest::prelude::*;
+        use super::{Utf8Path, is_invalid_theorem_path};
+        use proptest::prelude::{prop_assert, proptest};
 
         proptest! {
             /// Any path component containing `..` must be rejected.

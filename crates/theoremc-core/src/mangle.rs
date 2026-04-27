@@ -131,8 +131,8 @@ pub(crate) use path::MODULE_PREFIX;
 mod prop_tests {
     //! Property-based tests for mangling determinism and uniqueness.
 
-    use super::*;
-    use proptest::prelude::*;
+    use super::{mangle_module_path, mangle_theorem_harness};
+    use proptest::prelude::{prop_assert_eq, prop_assert_ne, prop_assume, proptest};
 
     proptest! {
         /// `mangle_module_path` must be deterministic: same input always
