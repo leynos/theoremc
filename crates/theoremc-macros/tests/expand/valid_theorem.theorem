@@ -1,0 +1,13 @@
+Schema: 1
+Theorem: SmokeExpansion
+About: Compile-pass trybuild fixture
+Witness:
+  - cover: "true"
+    because: reachable
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
