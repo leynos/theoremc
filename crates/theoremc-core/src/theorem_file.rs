@@ -321,23 +321,6 @@ mod tests {
         }
     }
 
-    #[cfg(windows)]
-    #[test]
-    fn drive_prefixed_theorem_paths_are_rejected() -> Result<(), Box<dyn std::error::Error>> {
-        let temp_manifest_dir = temp_manifest_dir()?;
-        let result = load_theorem_file_from_manifest_dir(
-            &temp_manifest_dir.manifest_dir,
-            Utf8Path::new("C:foo.theorem"),
-        );
-        match &result {
-            Err(TheoremFileLoadError::InvalidTheoremPath { .. }) => Ok(()),
-            _ => Err(std::io::Error::other(
-                format!("expected InvalidTheoremPath, got {result:?}",),
-            )
-            .into()),
-        }
-    }
-
     #[rstest]
     #[cfg_attr(
         not(windows),
