@@ -186,6 +186,16 @@ impl FixtureCrate {
     /// artefact collisions. The caller must supply a [`CargoGuard`] proving
     /// that `FIXTURE_CARGO_LOCK` is held, because registry cache access and
     /// workspace-level lock files are still shared across invocations.
+    ///
+    /// # Timeout
+    ///
+    /// `Command::output()` blocks until the subprocess exits. No explicit
+    /// timeout is imposed: `cargo` is a first-party trusted tool, and
+    /// introducing cross-platform `wait_timeout` polling would add significant
+    /// complexity disproportionate to this test suite's scope. If a runaway
+    /// `cargo` process causes a stall in CI, the job-level timeout enforced by
+    /// the CI runtime (e.g. GitHub Actions' `timeout-minutes`) provides the
+    /// outer bound.
     fn cargo_run(
         &self,
         subcommand: CargoSubcommand,
@@ -365,3 +375,20 @@ fn a_multi_document_theorem_file_generates_one_harness_stub_per_document() {}
     name = "An invalid theorem file fails compilation during macro expansion"
 )]
 fn an_invalid_theorem_file_fails_compilation_during_macro_expansion() {}
+
+#[test]
+fn fixture_cargo_lock_recovers_from_poison() {
+    // Poison the mutex by panicking while holding the guard.
+    let result = std::panic::catch_unwind(|| {
+        let _guard = FIXTURE_CARGO_LOCK
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        panic!("deliberate panic to poison the mutex");
+    });
+    assert!(result.is_err(), "catch_unwind should have caught the panic");
+
+    // After poisoning, `CargoGuard::acquire` must still succeed.
+    let guard = CargoGuard::acquire();
+    // The guard is usable: this line compiles and runs without panic.
+    drop(guard);
+}
