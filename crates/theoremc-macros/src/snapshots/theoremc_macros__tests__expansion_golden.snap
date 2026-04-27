@@ -1,0 +1,6 @@
+---
+source: crates/theoremc-macros/src/tests.rs
+assertion_line: 234
+expression: normalize(&tokens.to_string())
+---
+mod__theoremc__file__theorems_snapshot__fd7e35d80da8{const_:&str=include_str!(concat!(env!("CARGO_MANIFEST_DIR"),"/","theorems/snapshot.theorem"));pub(super)modkani{pub(crate)fntheorem__snapshot_thm__h33ca6583bcb0(){}}const_:[fn();1]=[kani::theorem__snapshot_thm__h33ca6583bcb0];}

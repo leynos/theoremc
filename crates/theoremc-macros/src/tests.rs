@@ -220,6 +220,22 @@ fn expansion_is_stable_for_repeat_calls() -> Result<(), Box<dyn std::error::Erro
 }
 
 #[test]
+fn expansion_snapshot_matches_golden_output() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = make_single_theorem_fixture(&TheoremSpec {
+        name: "SnapshotThm",
+        about: "Snapshot coverage",
+    });
+    let path = Utf8Path::new("theorems/snapshot.theorem");
+    let (_temp_dir, fixture_dir) = temp_fixture_dir()?;
+    write_fixture(&fixture_dir, path, &fixture)?;
+    let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
+    let tokens = expand_theorem_file_at(&fixture_dir, &path_literal)?;
+    // Normalise only for snapshot storage; insta diffs will surface structural regressions.
+    insta::assert_snapshot!("expansion_golden", normalize(&tokens.to_string()));
+    Ok(())
+}
+
+#[test]
 fn invalid_theorem_file_reports_schema_diagnostic_in_compile_error() {
     let (_temp_dir, fixture_dir) =
         temp_fixture_dir().expect("should create temp fixture dir for invalid theorem");
