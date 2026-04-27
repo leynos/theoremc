@@ -180,6 +180,8 @@ mod tests {
     use tempfile::TempDir;
 
     mod prop_tests {
+        //! Property-based tests for theorem file path validation.
+
         use super::*;
         use proptest::prelude::*;
 

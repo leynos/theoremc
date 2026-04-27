@@ -129,6 +129,8 @@ pub(crate) use path::MODULE_PREFIX;
 
 #[cfg(test)]
 mod prop_tests {
+    //! Property-based tests for mangling determinism and uniqueness.
+
     use super::*;
     use proptest::prelude::*;
 
