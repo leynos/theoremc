@@ -263,7 +263,7 @@ The proc-macro crate exposes the companion expansion boundary:
 `theorem_file!` must fail macro expansion with the diagnostic rendered from the
 shared loader error when the path is invalid, the file cannot be read, the file
 is empty, or schema validation fails. It must call
-`load_theorem_file_from_manifest_dir` for IO, path validation and schema
+`load_theorem_file_from_manifest_dir` for IO, path validation, and schema
 diagnostics rather than re-implementing those behaviours locally.
 
 The mutual invariant is that `TheoremFileLoadError` variants are the canonical
