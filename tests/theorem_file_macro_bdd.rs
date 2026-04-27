@@ -1,7 +1,7 @@
 //! Behavioural tests for real `theorem_file!` proc-macro expansion.
 
 use std::process::Command;
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
@@ -38,6 +38,17 @@ const FIXTURE_BUILD_DEPENDENCIES: &str = concat!(
     "cap-std = { version = \"4.0.2\", features = [\"fs_utf8\"] }\n",
     "thiserror = \"2.0.18\"\n",
 );
+/// Serializes all fixture `cargo` invocations.
+///
+/// `cargo` writes lock files, registry caches, and incremental artefacts to
+/// paths derived from the manifest directory. When multiple fixture crates run
+/// `cargo build` concurrently they race on the shared `~/.cargo` registry
+/// cache and on any workspace-level `Cargo.lock`, producing spurious build
+/// failures even with isolated `CARGO_TARGET_DIR` values. A single global
+/// mutex is the minimal correct serialization mechanism for in-process test
+/// parallelism; the alternative--spawning each fixture in a fully isolated
+/// toolchain environment--would require per-test network access and is
+/// disproportionate for a test suite this size.
 static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
 
 const VALID_SINGLE_THEOREM: &str = concat!(
@@ -151,6 +162,12 @@ impl FixtureCrate {
         self.cargo_run(CargoSubcommand::Build)
     }
 
+    /// Runs a Cargo subcommand in the fixture crate directory.
+    ///
+    /// `CARGO_TARGET_DIR` is set to a per-fixture subdirectory to avoid
+    /// artefact collisions. Registry cache access (`~/.cargo/registry`) and
+    /// workspace-level lock files are still shared across invocations, so
+    /// callers must hold [`FIXTURE_CARGO_LOCK`] before calling this method.
     fn cargo_run(&self, subcommand: CargoSubcommand) -> Result<(), String> {
         let target_dir = self.manifest_dir.join("target");
         let output = Command::new("cargo")
@@ -237,9 +254,11 @@ fn fixture_lib_rs(spec: &TheoremFixtureSpec<'_>) -> String {
 }
 
 fn run_valid_fixture_test(spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
+    // Recover from a poisoned mutex: the guard value `()` carries no state, so
+    // it is safe to continue with the recovered guard.
     let _guard = FIXTURE_CARGO_LOCK
         .lock()
-        .map_err(|error| format!("failed to lock fixture cargo mutex: {error}"))?;
+        .unwrap_or_else(PoisonError::into_inner);
     let fixture = FixtureCrate::new(&fixture_lib_rs(spec))?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
     fixture.cargo_test()
@@ -287,9 +306,11 @@ fn given_a_fixture_crate_with_one_invalid_theorem_file() {}
 #[then("compiling the fixture crate fails with an actionable theorem diagnostic")]
 fn then_compiling_the_fixture_crate_fails_with_an_actionable_theorem_diagnostic()
 -> Result<(), String> {
+    // Recover from a poisoned mutex: the guard value `()` carries no state, so
+    // it is safe to continue with the recovered guard.
     let _guard = FIXTURE_CARGO_LOCK
         .lock()
-        .map_err(|error| format!("failed to lock fixture cargo mutex: {error}"))?;
+        .unwrap_or_else(PoisonError::into_inner);
     let theorem_path = "theorems/invalid.theorem";
     let fixture = FixtureCrate::new(invalid_fixture_lib_rs())?;
     fixture.write(Utf8Path::new(theorem_path), INVALID_THEOREM)?;
