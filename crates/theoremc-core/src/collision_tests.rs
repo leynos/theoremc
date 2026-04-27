@@ -6,6 +6,7 @@ use crate::schema::{
     StepMust, TheoremDoc, TheoremName, WitnessCheck,
 };
 use indexmap::IndexMap;
+use proptest::prelude::{Just, prop, prop_assert, proptest};
 use rstest::rstest;
 
 // ── rstest fixtures ─────────────────────────────────────────────────
@@ -308,9 +309,8 @@ mod prop_tests {
 
     use std::collections::BTreeSet;
 
-    use proptest::prelude::{prop_assert, proptest};
-
     use super::super::find_mangled_collisions;
+    use super::{Just, prop, prop_assert, proptest};
 
     proptest! {
         /// The collision detector must report no collisions for a single
@@ -323,8 +323,18 @@ mod prop_tests {
             let collisions = find_mangled_collisions(&names);
             prop_assert!(
                 collisions.is_empty(),
-                "single name '{name}' should not self-collide",
+                "single name '{name}' should not self-collide; got: {collisions:?}",
             );
+        }
+
+        /// An empty name set produces no collisions.
+        #[test]
+        fn empty_name_set_produces_no_collisions(
+            // No generator needed; always use an empty set.
+            _unused in Just(()),
+        ) {
+            let names: BTreeSet<&str> = BTreeSet::new();
+            prop_assert!(find_mangled_collisions(&names).is_empty());
         }
 
         /// Two identical canonical names must not be reported as a collision
@@ -339,6 +349,64 @@ mod prop_tests {
             names.insert(name.as_str());
             let collisions = find_mangled_collisions(&names);
             prop_assert!(collisions.is_empty());
+        }
+
+        /// Two names that are equal after deduplication (i.e. the same name
+        /// provided twice) produce no collisions because a `BTreeSet`
+        /// deduplicates them; only genuinely distinct names can collide.
+        #[test]
+        fn duplicate_insertion_of_same_name_is_not_a_collision(
+            name in "[a-z][a-z0-9]{0,8}\\.[a-z][a-z0-9]{0,8}",
+        ) {
+            let mut names: BTreeSet<&str> = BTreeSet::new();
+            names.insert(name.as_str());
+            names.insert(name.as_str());
+            prop_assert!(find_mangled_collisions(&names).is_empty());
+        }
+
+        /// The number of collision groups reported is never greater than
+        /// floor(n/2) for n input names, because a collision requires at least
+        /// two names to share an identifier.
+        #[test]
+        fn collision_group_count_bounded_by_input_size(
+            names in prop::collection::btree_set(
+                "[a-z][a-z0-9]{0,6}\\.[a-z][a-z0-9]{0,6}",
+                0..=8_usize,
+            ),
+        ) {
+            let name_refs: BTreeSet<&str> = names.iter().map(String::as_str).collect();
+            let n = name_refs.len();
+            let collisions = find_mangled_collisions(&name_refs);
+            prop_assert!(
+                collisions.len() <= n / 2,
+                "expected at most {} collision groups for {} names, got {}",
+                n / 2,
+                n,
+                collisions.len(),
+            );
+        }
+
+        /// Every name reported inside a collision group must have been present
+        /// in the input set; the detector must not invent phantom names.
+        #[test]
+        fn collision_groups_contain_only_input_names(
+            names in prop::collection::btree_set(
+                "[a-z][a-z0-9]{0,6}\\.[a-z][a-z0-9]{0,6}",
+                0..=8_usize,
+            ),
+        ) {
+            let name_refs: BTreeSet<&str> = names.iter().map(String::as_str).collect();
+            let collisions = find_mangled_collisions(&name_refs);
+            for (_identifier, colliding_names) in &collisions {
+                for colliding_name in colliding_names {
+                    prop_assert!(
+                        names.contains(colliding_name.as_str()),
+                        "collision group contains unexpected name '{}' not in input {:?}",
+                        colliding_name,
+                        names,
+                    );
+                }
+            }
         }
     }
 }
