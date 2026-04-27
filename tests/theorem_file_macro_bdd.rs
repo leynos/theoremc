@@ -29,6 +29,24 @@ impl CargoSubcommand {
     }
 }
 
+/// Proof that `FIXTURE_CARGO_LOCK` is held by the current thread.
+///
+/// Pass a `CargoGuard<'_>` to [`FixtureCrate::cargo_run`] to enforce at compile
+/// time that no caller bypasses the serialisation contract.
+struct CargoGuard<'a> {
+    _guard: std::sync::MutexGuard<'a, ()>,
+}
+
+impl CargoGuard<'_> {
+    fn acquire() -> Self {
+        Self {
+            _guard: FIXTURE_CARGO_LOCK
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner),
+        }
+    }
+}
+
 const BUILD_SCRIPT_SOURCE: &str = include_str!("../build.rs");
 const BUILD_DISCOVERY_SOURCE: &str = include_str!("../src/build_discovery.rs");
 const BUILD_SUITE_SOURCE: &str = include_str!("../src/build_suite.rs");
@@ -154,21 +172,25 @@ impl FixtureCrate {
             .map_err(|error| error.to_string())
     }
 
-    fn cargo_test(&self) -> Result<(), String> {
-        self.cargo_run(CargoSubcommand::Test)
+    fn cargo_test(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
+        self.cargo_run(CargoSubcommand::Test, guard)
     }
 
-    fn cargo_build(&self) -> Result<(), String> {
-        self.cargo_run(CargoSubcommand::Build)
+    fn cargo_build(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
+        self.cargo_run(CargoSubcommand::Build, guard)
     }
 
     /// Runs a Cargo subcommand in the fixture crate directory.
     ///
     /// `CARGO_TARGET_DIR` is set to a per-fixture subdirectory to avoid
-    /// artefact collisions. Registry cache access (`~/.cargo/registry`) and
-    /// workspace-level lock files are still shared across invocations, so
-    /// callers must hold [`FIXTURE_CARGO_LOCK`] before calling this method.
-    fn cargo_run(&self, subcommand: CargoSubcommand) -> Result<(), String> {
+    /// artefact collisions. The caller must supply a [`CargoGuard`] proving
+    /// that `FIXTURE_CARGO_LOCK` is held, because registry cache access and
+    /// workspace-level lock files are still shared across invocations.
+    fn cargo_run(
+        &self,
+        subcommand: CargoSubcommand,
+        _guard: &CargoGuard<'_>,
+    ) -> Result<(), String> {
         let target_dir = self.manifest_dir.join("target");
         let output = Command::new("cargo")
             .current_dir(&self.manifest_dir)
@@ -254,14 +276,10 @@ fn fixture_lib_rs(spec: &TheoremFixtureSpec<'_>) -> String {
 }
 
 fn run_valid_fixture_test(spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
-    // Recover from a poisoned mutex: the guard value `()` carries no state, so
-    // it is safe to continue with the recovered guard.
-    let _guard = FIXTURE_CARGO_LOCK
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let guard = CargoGuard::acquire();
     let fixture = FixtureCrate::new(&fixture_lib_rs(spec))?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
-    fixture.cargo_test()
+    fixture.cargo_test(&guard)
 }
 
 const fn invalid_fixture_lib_rs() -> &'static str {
@@ -306,16 +324,12 @@ fn given_a_fixture_crate_with_one_invalid_theorem_file() {}
 #[then("compiling the fixture crate fails with an actionable theorem diagnostic")]
 fn then_compiling_the_fixture_crate_fails_with_an_actionable_theorem_diagnostic()
 -> Result<(), String> {
-    // Recover from a poisoned mutex: the guard value `()` carries no state, so
-    // it is safe to continue with the recovered guard.
-    let _guard = FIXTURE_CARGO_LOCK
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let guard = CargoGuard::acquire();
     let theorem_path = "theorems/invalid.theorem";
     let fixture = FixtureCrate::new(invalid_fixture_lib_rs())?;
     fixture.write(Utf8Path::new(theorem_path), INVALID_THEOREM)?;
     let build_error = fixture
-        .cargo_build()
+        .cargo_build(&guard)
         .err()
         .ok_or_else(|| "invalid theorem fixture unexpectedly compiled".to_owned())?;
 
