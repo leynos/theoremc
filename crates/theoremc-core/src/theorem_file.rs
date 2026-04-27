@@ -179,6 +179,54 @@ mod tests {
     use rstest::{fixture, rstest};
     use tempfile::TempDir;
 
+    mod prop_tests {
+        use super::*;
+        use proptest::prelude::*;
+
+        proptest! {
+            /// Any path component containing `..` must be rejected.
+            #[test]
+            fn traversal_paths_are_always_rejected(
+                prefix in "[a-z]{1,8}",
+                suffix in "[a-z]{1,8}\\.theorem",
+            ) {
+                let path_str = format!("{prefix}/../{suffix}");
+                let path = Utf8Path::new(&path_str);
+                prop_assert!(is_invalid_theorem_path(path));
+            }
+
+            /// Absolute paths are always rejected regardless of content.
+            #[test]
+            fn absolute_paths_are_always_rejected(segment in "[a-z]{1,8}") {
+                let path_str = format!("/{segment}.theorem");
+                let path = Utf8Path::new(&path_str);
+                prop_assert!(is_invalid_theorem_path(path));
+            }
+
+            /// Drive-prefixed paths (Windows style) are always rejected.
+            #[test]
+            fn drive_prefixed_paths_are_always_rejected(
+                drive in "[A-Za-z]",
+                name in "[a-z]{1,8}",
+            ) {
+                let path_str = format!("{drive}:{name}.theorem");
+                let path = Utf8Path::new(&path_str);
+                prop_assert!(is_invalid_theorem_path(path));
+            }
+
+            /// Simple relative paths with no `..` or drive prefix are accepted.
+            #[test]
+            fn clean_relative_paths_are_accepted(
+                dir in "[a-z]{1,8}",
+                name in "[a-z]{1,8}",
+            ) {
+                let path_str = format!("{dir}/{name}.theorem");
+                let path = Utf8Path::new(&path_str);
+                prop_assert!(!is_invalid_theorem_path(path));
+            }
+        }
+    }
+
     #[derive(Debug)]
     struct TempManifestDir {
         _temp_dir: TempDir,

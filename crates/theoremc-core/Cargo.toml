@@ -20,6 +20,7 @@ camino = "1.2.2"
 cap-std = { version = "4.0.2", features = ["fs_utf8"] }
 
 [dev-dependencies]
+proptest = "1"
 rstest = "0.26.1"
 tempfile = "3"
 

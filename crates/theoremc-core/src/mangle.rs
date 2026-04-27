@@ -127,6 +127,50 @@ pub use path::{MangledModule, PathStem, mangle_module_path, path_mangle, path_st
 #[cfg(test)]
 pub(crate) use path::MODULE_PREFIX;
 
+#[cfg(test)]
+mod prop_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// `mangle_module_path` must be deterministic: same input always
+        /// produces same output.
+        #[test]
+        fn mangle_module_path_is_deterministic(
+            path in "[a-z0-9/._-]{1,40}\\.theorem",
+        ) {
+            let first = mangle_module_path(&path);
+            let second = mangle_module_path(&path);
+            prop_assert_eq!(first.module_name(), second.module_name());
+        }
+
+        /// `mangle_theorem_harness` must be deterministic.
+        #[test]
+        fn mangle_theorem_harness_is_deterministic(
+            path in "[a-z0-9/._-]{1,40}\\.theorem",
+            theorem in "[A-Za-z][A-Za-z0-9]{0,30}",
+        ) {
+            let first = mangle_theorem_harness(&path, &theorem);
+            let second = mangle_theorem_harness(&path, &theorem);
+            prop_assert_eq!(first.identifier(), second.identifier());
+        }
+
+        /// Different theorem names within the same file must not produce the
+        /// same harness identifier.
+        #[test]
+        fn distinct_theorem_names_produce_distinct_harnesses(
+            path in "[a-z]{1,8}\\.theorem",
+            a in "[A-Za-z][A-Za-z0-9]{1,15}",
+            b in "[A-Za-z][A-Za-z0-9]{1,15}",
+        ) {
+            prop_assume!(a != b);
+            let ha = mangle_theorem_harness(&path, &a);
+            let hb = mangle_theorem_harness(&path, &b);
+            prop_assert_ne!(ha.identifier(), hb.identifier());
+        }
+    }
+}
+
 // ── Action name mangling ──────────────────────────────────────────
 
 /// The module path into which mangled action identifiers resolve.
