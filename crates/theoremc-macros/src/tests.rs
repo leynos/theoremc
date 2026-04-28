@@ -230,7 +230,7 @@ fn expansion_snapshot_matches_golden_output() -> Result<(), Box<dyn std::error::
     write_fixture(&fixture_dir, path, &fixture)?;
     let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
     let tokens = expand_theorem_file_at(&fixture_dir, &path_literal)?;
-    // Normalise only for snapshot storage; insta diffs will surface structural regressions.
+    // Normalize only for snapshot storage; insta diffs will surface structural regressions.
     insta::assert_snapshot!("expansion_golden", normalize(&tokens.to_string()));
     Ok(())
 }

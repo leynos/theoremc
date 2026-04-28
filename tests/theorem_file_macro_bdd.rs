@@ -225,6 +225,7 @@ fn command_result(output: &std::process::Output) -> Result<(), String> {
 }
 
 fn fixture_cargo_toml() -> String {
+    let root_manifest_dir = ROOT_MANIFEST_DIR.replace('\\', "/");
     format!(
         concat!(
             "[package]\n",
@@ -232,13 +233,13 @@ fn fixture_cargo_toml() -> String {
             "version = \"0.1.0\"\n",
             "edition = \"2024\"\n\n",
             "[dependencies]\n",
-            "theoremc = {{ path = \"{root_manifest_dir}\", features = [\"test-support\"] }}\n\n",
+            "theoremc = {{ path = '{root_manifest_dir}', features = [\"test-support\"] }}\n\n",
             "[dev-dependencies]\n",
-            "theoremc = {{ path = \"{root_manifest_dir}\", features = [\"test-support\"] }}\n\n",
+            "theoremc = {{ path = '{root_manifest_dir}', features = [\"test-support\"] }}\n\n",
             "[build-dependencies]\n",
             "{build_dependencies}",
         ),
-        root_manifest_dir = ROOT_MANIFEST_DIR,
+        root_manifest_dir = root_manifest_dir,
         build_dependencies = FIXTURE_BUILD_DEPENDENCIES
     )
 }

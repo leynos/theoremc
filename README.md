@@ -42,7 +42,7 @@ See [`docs/users-guide.md`](docs/users-guide.md) for full API documentation.
 
 ## Workspace split (since Step 3.2.1)
 
-Prior to Step 3.2.1, `theorem_file!` was a `macro_rules!` bridge in
-`src/lib.rs`. The real proc-macro now lives in `crates/theoremc-macros` and all
-schema, mangling, and IO logic lives in `crates/theoremc-core`. The root
-`theoremc` crate re-exports both. Import paths from `theoremc` are unchanged.
+Before Step 3.2.1, `theorem_file!` was a `macro_rules!` bridge in `src/lib.rs`.
+The real proc-macro now lives in `crates/theoremc-macros`, and schema,
+mangling, and IO logic live in `crates/theoremc-core`. The root `theoremc`
+crate re-exports both. Import paths from `theoremc` are unchanged.
