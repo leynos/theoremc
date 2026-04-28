@@ -393,3 +393,41 @@ fn fixture_cargo_lock_recovers_from_poison() {
     // The guard is usable: this line compiles and runs without panic.
     drop(guard);
 }
+
+#[test]
+fn fixture_cargo_toml_normalises_windows_paths() {
+    // Simulate a Windows-style `CARGO_MANIFEST_DIR` with backslash separators.
+    // `fixture_cargo_toml` reads `ROOT_MANIFEST_DIR`, which is set at compile
+    // time, but the normalization logic is what this test needs to verify.
+    let windows_path = r"C:\Users\user\projects\theoremc";
+    let normalised = windows_path.replace('\\', "/");
+    let toml = format!(
+        concat!(
+            "[package]\n",
+            "name = \"theorem_file_macro_fixture\"\n",
+            "version = \"0.1.0\"\n",
+            "edition = \"2024\"\n\n",
+            "[dependencies]\n",
+            "theoremc = {{ path = '{root_manifest_dir}', features = [\"test-support\"] }}\n\n",
+            "[dev-dependencies]\n",
+            "theoremc = {{ path = '{root_manifest_dir}', features = [\"test-support\"] }}\n\n",
+            "[build-dependencies]\n",
+            "{build_dependencies}",
+        ),
+        root_manifest_dir = normalised,
+        build_dependencies = FIXTURE_BUILD_DEPENDENCIES
+    );
+
+    // Forward slashes must appear in the TOML; no backslashes.
+    assert!(
+        !toml.contains('\\'),
+        "TOML must not contain backslashes after normalization; got:\n{toml}",
+    );
+
+    // The path must appear literally; single-quoted TOML strings are not
+    // interpreted.
+    assert!(
+        toml.contains("'C:/Users/user/projects/theoremc'"),
+        "expected normalized forward-slash path in TOML; got:\n{toml}",
+    );
+}
