@@ -58,6 +58,30 @@ fn normalize(tokens: &str) -> String {
     tokens.chars().filter(|ch| !ch.is_whitespace()).collect()
 }
 
+/// Replaces the non-deterministic 12-hex-character hash suffixes appended by
+/// the mangling functions with a stable placeholder, making snapshots
+/// deterministic across compilations without collapsing structural whitespace.
+fn redact_hashes(s: &str) -> String {
+    // Mangle suffixes are `__h` plus exactly 12 lowercase hex characters.
+    let mut result = String::with_capacity(s.len());
+    let marker = "__h";
+    let mut rest = s;
+    while let Some(pos) = rest.find(marker) {
+        result.push_str(&rest[..pos]);
+        let after_marker = &rest[pos + marker.len()..];
+        let suffix = &after_marker[..after_marker.len().min(12)];
+        if suffix.len() == 12 && suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+            result.push_str("__hXXXXXXXXXXXX");
+            rest = &after_marker[12..];
+        } else {
+            result.push_str(marker);
+            rest = after_marker;
+        }
+    }
+    result.push_str(rest);
+    result
+}
+
 fn expected_expansion(path: &Utf8Path, theorems: &[&str]) -> String {
     let module_name = mangle_module_path(path.as_str()).module_name().to_owned();
     let harnesses: Vec<String> = theorems
@@ -230,8 +254,11 @@ fn expansion_snapshot_matches_golden_output() -> Result<(), Box<dyn std::error::
     write_fixture(&fixture_dir, path, &fixture)?;
     let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
     let tokens = expand_theorem_file_at(&fixture_dir, &path_literal)?;
-    // Normalize only for snapshot storage; insta diffs will surface structural regressions.
-    insta::assert_snapshot!("expansion_golden", normalize(&tokens.to_string()));
+    // Format via `prettyplease` to produce a readable, structured snapshot.
+    let file: syn::File = syn::parse2(tokens)?;
+    let formatted = prettyplease::unparse(&file);
+    // Redact non-deterministic hash suffixes; preserve structural whitespace.
+    insta::assert_snapshot!("expansion_golden", redact_hashes(&formatted));
     Ok(())
 }
 
