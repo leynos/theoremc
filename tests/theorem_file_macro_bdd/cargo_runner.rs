@@ -1,7 +1,7 @@
 //! Cargo command serialization helpers for theorem-file macro fixtures.
 
 use std::process::Command;
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use camino::Utf8Path;
 
@@ -31,9 +31,7 @@ pub(crate) struct CargoGuard<'a> {
 impl CargoGuard<'_> {
     pub(crate) fn acquire() -> Self {
         Self {
-            _guard: FIXTURE_CARGO_LOCK
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner),
+            _guard: recover_mutex_guard(&FIXTURE_CARGO_LOCK),
         }
     }
 }
@@ -78,17 +76,50 @@ pub(crate) fn cargo_run(
         .args([subcommand.as_str(), "--color", "never"])
         .output()
         .map_err(|error| error.to_string())?;
-    command_result(&output)
+    command_result(subcommand, &output)
 }
 
-fn command_result(output: &std::process::Output) -> Result<(), String> {
+pub(crate) fn recover_mutex_guard(mutex: &Mutex<()>) -> MutexGuard<'_, ()> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+fn command_result(
+    subcommand: CargoSubcommand,
+    output: &std::process::Output,
+) -> Result<(), String> {
     if output.status.success() {
         return Ok(());
     }
 
     Err(format!(
-        "{}{}",
+        "cargo {} failed with status {}\nstdout:\n{}\nstderr:\n{}",
+        subcommand.as_str(),
+        output.status,
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for fixture cargo runner helpers.
+
+    use std::sync::Mutex;
+
+    use super::recover_mutex_guard;
+
+    #[test]
+    fn recover_mutex_guard_recovers_from_poisoned_local_mutex() {
+        let mutex = Mutex::new(());
+        let result = std::panic::catch_unwind(|| {
+            let _guard = mutex
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            panic!("deliberate panic to poison local mutex");
+        });
+        assert!(result.is_err(), "catch_unwind should have caught the panic");
+
+        let guard = recover_mutex_guard(&mutex);
+        drop(guard);
+    }
 }

@@ -1,7 +1,5 @@
 //! Behavioural tests for real `theorem_file!` proc-macro expansion.
 
-use std::sync::PoisonError;
-
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
 
@@ -10,7 +8,7 @@ mod cargo_runner;
 #[path = "theorem_file_macro_bdd/fixture_crate.rs"]
 mod fixture_crate;
 
-use cargo_runner::{CargoGuard, FIXTURE_CARGO_LOCK};
+use cargo_runner::CargoGuard;
 use fixture_crate::{
     FIXTURE_BUILD_DEPENDENCIES, FixtureCrate, TheoremFixtureSpec, fixture_cargo_toml_for,
     invalid_fixture_lib_rs, run_valid_fixture_test,
@@ -147,19 +145,8 @@ fn a_multi_document_theorem_file_generates_one_harness_stub_per_document() {}
 fn an_invalid_theorem_file_fails_compilation_during_macro_expansion() {}
 
 #[test]
-fn fixture_cargo_lock_recovers_from_poison() {
-    // Poison the mutex by panicking while holding the guard.
-    let result = std::panic::catch_unwind(|| {
-        let _guard = FIXTURE_CARGO_LOCK
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        panic!("deliberate panic to poison the mutex");
-    });
-    assert!(result.is_err(), "catch_unwind should have caught the panic");
-
-    // After poisoning, `CargoGuard::acquire` must still succeed.
+fn fixture_cargo_lock_acquires_without_poisoning() {
     let guard = CargoGuard::acquire();
-    // The guard is usable: this line compiles and runs without panic.
     drop(guard);
 }
 
@@ -169,8 +156,7 @@ fn fixture_cargo_toml_normalizes_windows_paths() {
     // `fixture_cargo_toml` reads `ROOT_MANIFEST_DIR`, which is set at compile
     // time, but the normalization logic is what this test needs to verify.
     let windows_path = r"C:\Users\user\projects\theoremc";
-    let normalised = windows_path.replace('\\', "/");
-    let toml = fixture_cargo_toml_for(&normalised);
+    let toml = fixture_cargo_toml_for(windows_path);
 
     // Forward slashes must appear in the TOML; no backslashes.
     assert!(

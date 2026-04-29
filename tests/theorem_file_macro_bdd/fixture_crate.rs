@@ -86,6 +86,7 @@ pub(crate) fn fixture_cargo_toml() -> String {
 }
 
 pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
+    let normalized_root_manifest_dir = root_manifest_dir.replace('\\', "/");
     format!(
         concat!(
             "[package]\n",
@@ -99,7 +100,7 @@ pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
             "[build-dependencies]\n",
             "{build_dependencies}",
         ),
-        root_manifest_dir = root_manifest_dir,
+        root_manifest_dir = normalized_root_manifest_dir,
         build_dependencies = FIXTURE_BUILD_DEPENDENCIES
     )
 }

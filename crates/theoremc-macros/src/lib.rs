@@ -191,5 +191,8 @@ impl MacroExpansionError {
 }
 
 #[cfg(test)]
+mod tests_support;
+
+#[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
