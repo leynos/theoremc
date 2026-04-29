@@ -1429,6 +1429,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-helpers"
+version = "0.1.0"
+
+[[package]]
 name = "textwrap"
 version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1490,6 +1494,7 @@ dependencies = [
  "rstest",
  "syn 2.0.117",
  "tempfile",
+ "test-helpers",
  "theoremc-core",
  "thiserror 2.0.18",
  "trybuild",

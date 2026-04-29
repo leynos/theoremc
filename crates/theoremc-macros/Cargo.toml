@@ -21,6 +21,7 @@ cap-std = { version = "4.0.2", features = ["fs_utf8"] }
 insta = "1"
 prettyplease = "0.2"
 rstest = "0.26.1"
+test-helpers = { version = "0.1.0", path = "../test-helpers" }
 trybuild = { version = "1", features = ["diff"] }
 
 [lints]

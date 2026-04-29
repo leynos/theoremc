@@ -87,6 +87,7 @@ pub(crate) fn fixture_cargo_toml() -> String {
 
 pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
     let normalized_root_manifest_dir = root_manifest_dir.replace('\\', "/");
+    let escaped_root_manifest_dir = toml_basic_string_value(&normalized_root_manifest_dir);
     format!(
         concat!(
             "[package]\n",
@@ -94,15 +95,19 @@ pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
             "version = \"0.1.0\"\n",
             "edition = \"2024\"\n\n",
             "[dependencies]\n",
-            "theoremc = {{ path = '{root_manifest_dir}', features = [\"test-support\"] }}\n\n",
+            "theoremc = {{ path = \"{root_manifest_dir}\", features = [\"test-support\"] }}\n\n",
             "[dev-dependencies]\n",
-            "theoremc = {{ path = '{root_manifest_dir}', features = [\"test-support\"] }}\n\n",
+            "theoremc = {{ path = \"{root_manifest_dir}\", features = [\"test-support\"] }}\n\n",
             "[build-dependencies]\n",
             "{build_dependencies}",
         ),
-        root_manifest_dir = normalized_root_manifest_dir,
+        root_manifest_dir = escaped_root_manifest_dir,
         build_dependencies = FIXTURE_BUILD_DEPENDENCIES
     )
+}
+
+fn toml_basic_string_value(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 fn fixture_lib_rs(spec: &TheoremFixtureSpec<'_>) -> String {

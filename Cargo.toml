@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/theoremc-core", "crates/theoremc-macros"]
+members = ["crates/test-helpers", "crates/theoremc-core", "crates/theoremc-macros"]
 resolver = "2"
 
 [package]

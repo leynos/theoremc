@@ -1,51 +1,12 @@
 //! Shared test helpers for theorem-file macro expansion tests.
 
-use std::env;
-use std::sync::{Mutex, MutexGuard, PoisonError};
-
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use tempfile::TempDir;
+pub(super) use test_helpers::set_cargo_manifest_dir_for_test;
 use theoremc_core::mangle::{mangle_module_path, mangle_theorem_harness};
 
 use super::expand_theorem_file_at;
-
-static ENV_LOCK: Mutex<()> = Mutex::new(());
-
-pub(super) struct EnvVarGuard<'a> {
-    previous: Option<String>,
-    _guard: MutexGuard<'a, ()>,
-}
-
-impl Drop for EnvVarGuard<'_> {
-    fn drop(&mut self) {
-        // SAFETY: tests that mutate `CARGO_MANIFEST_DIR` hold `ENV_LOCK`, so
-        // this process-global mutation is serialized within these tests.
-        unsafe {
-            match &self.previous {
-                Some(value) => env::set_var("CARGO_MANIFEST_DIR", value),
-                None => env::remove_var("CARGO_MANIFEST_DIR"),
-            }
-        }
-    }
-}
-
-pub(super) fn set_cargo_manifest_dir_for_test(value: Option<&str>) -> EnvVarGuard<'_> {
-    let guard = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-    let previous = env::var("CARGO_MANIFEST_DIR").ok();
-    // SAFETY: `ENV_LOCK` prevents concurrent mutation by tests that use this
-    // helper.
-    unsafe {
-        match value {
-            Some(value) => env::set_var("CARGO_MANIFEST_DIR", value),
-            None => env::remove_var("CARGO_MANIFEST_DIR"),
-        }
-    }
-    EnvVarGuard {
-        previous,
-        _guard: guard,
-    }
-}
 
 pub(super) struct TheoremSpec<'a> {
     pub(super) name: &'a str,
