@@ -164,15 +164,19 @@ fn assert_single_theorem_expansion(
     assert_expansion_matches(path, &fixture, &[spec.name])
 }
 
-fn expansion_error_message(manifest_dir: &Utf8Path, path: &Utf8Path) -> String {
+fn expansion_error_message(
+    manifest_dir: &Utf8Path,
+    path: &Utf8Path,
+) -> Result<String, Box<dyn std::error::Error>> {
     let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
     let error = expand_theorem_file_at(manifest_dir, &path_literal)
-        .expect_err("fixture should fail macro expansion");
-    normalize(
+        .err()
+        .ok_or_else(|| std::io::Error::other("fixture unexpectedly expanded successfully"))?;
+    Ok(normalize(
         &error
             .to_compile_error(proc_macro2::Span::call_site())
             .to_string(),
-    )
+    ))
 }
 
 #[test]
@@ -287,7 +291,8 @@ fn invalid_theorem_file_reports_schema_diagnostic_in_compile_error() {
 
     write_fixture(&fixture_dir, path, &fixture).expect("should write invalid theorem fixture");
 
-    let error_string = expansion_error_message(&fixture_dir, path);
+    let error_string =
+        expansion_error_message(&fixture_dir, path).expect("should render expansion error");
     assert!(
         error_string.contains("schema.validation_failure|theorems/invalid.theorem:"),
         "expected rendered schema diagnostic in compile error, got: {error_string}"
@@ -300,7 +305,8 @@ fn missing_theorem_file_reports_io_error_in_compile_error() {
         temp_fixture_dir().expect("should create temp fixture dir for missing theorem");
     let path = Utf8Path::new("theorems/missing.theorem");
 
-    let error_string = expansion_error_message(&fixture_dir, path);
+    let error_string =
+        expansion_error_message(&fixture_dir, path).expect("should render expansion error");
     assert!(
         error_string.contains("failedtoreadtheoremfile'theorems/missing.theorem'"),
         "expected read failure text in compile error, got: {error_string}"
@@ -316,7 +322,8 @@ fn empty_theorem_file_reports_zero_document_error() {
 
     write_fixture(&fixture_dir, path, &fixture).expect("should write empty theorem fixture");
 
-    let error_string = expansion_error_message(&fixture_dir, path);
+    let error_string =
+        expansion_error_message(&fixture_dir, path).expect("should render expansion error");
     assert!(
         error_string.contains("doesnotcontainanytheoremdocuments"),
         "expected zero-document error in compile error, got: {error_string}"

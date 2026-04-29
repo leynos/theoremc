@@ -1,73 +1,20 @@
 //! Behavioural tests for real `theorem_file!` proc-macro expansion.
 
-use std::process::Command;
-use std::sync::{Mutex, PoisonError};
+use std::sync::PoisonError;
 
-use camino::{Utf8Path, Utf8PathBuf};
-use cap_std::{ambient_authority, fs_utf8::Dir};
+use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
-use theoremc::mangle::{mangle_module_path, mangle_theorem_harness};
 
-struct TheoremFixtureSpec<'a> {
-    path: &'a str,
-    names: &'a [&'a str],
-    content: &'a str,
-}
+#[path = "theorem_file_macro_bdd/cargo_runner.rs"]
+mod cargo_runner;
+#[path = "theorem_file_macro_bdd/fixture_crate.rs"]
+mod fixture_crate;
 
-#[derive(Clone, Copy)]
-enum CargoSubcommand {
-    Build,
-    Test,
-}
-
-impl CargoSubcommand {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::Build => "build",
-            Self::Test => "test",
-        }
-    }
-}
-
-/// Proof that `FIXTURE_CARGO_LOCK` is held by the current thread.
-///
-/// Pass a `CargoGuard<'_>` to [`FixtureCrate::cargo_run`] to enforce at compile
-/// time that no caller bypasses the serialisation contract.
-struct CargoGuard<'a> {
-    _guard: std::sync::MutexGuard<'a, ()>,
-}
-
-impl CargoGuard<'_> {
-    fn acquire() -> Self {
-        Self {
-            _guard: FIXTURE_CARGO_LOCK
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner),
-        }
-    }
-}
-
-const BUILD_SCRIPT_SOURCE: &str = include_str!("../build.rs");
-const BUILD_DISCOVERY_SOURCE: &str = include_str!("../src/build_discovery.rs");
-const BUILD_SUITE_SOURCE: &str = include_str!("../src/build_suite.rs");
-const ROOT_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-const FIXTURE_BUILD_DEPENDENCIES: &str = concat!(
-    "camino = \"1.2.2\"\n",
-    "cap-std = { version = \"4.0.2\", features = [\"fs_utf8\"] }\n",
-    "thiserror = \"2.0.18\"\n",
-);
-/// Serializes all fixture `cargo` invocations.
-///
-/// `cargo` writes lock files, registry caches, and incremental artefacts to
-/// paths derived from the manifest directory. When multiple fixture crates run
-/// `cargo build` concurrently they race on the shared `~/.cargo` registry
-/// cache and on any workspace-level `Cargo.lock`, producing spurious build
-/// failures even with isolated `CARGO_TARGET_DIR` values. A single global
-/// mutex is the minimal correct serialization mechanism for in-process test
-/// parallelism; the alternative--spawning each fixture in a fully isolated
-/// toolchain environment--would require per-test network access and is
-/// disproportionate for a test suite this size.
-static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
+use cargo_runner::{CargoGuard, FIXTURE_CARGO_LOCK};
+use fixture_crate::{
+    FIXTURE_BUILD_DEPENDENCIES, FixtureCrate, TheoremFixtureSpec, fixture_cargo_toml_for,
+    invalid_fixture_lib_rs, run_valid_fixture_test,
+};
 
 const VALID_SINGLE_THEOREM: &str = concat!(
     "Theorem: SmokeMacro\n",
@@ -126,184 +73,6 @@ const INVALID_THEOREM: &str = concat!(
     "    unwind: 1\n",
     "    expect: SUCCESS\n",
 );
-
-struct FixtureCrate {
-    _temp_dir: tempfile::TempDir,
-    manifest_dir: Utf8PathBuf,
-    dir: Dir,
-}
-
-impl FixtureCrate {
-    fn new(lib_rs: &str) -> Result<Self, String> {
-        let temp_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
-        let manifest_dir = Utf8Path::from_path(temp_dir.path())
-            .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
-            .to_path_buf();
-        let dir = Dir::open_ambient_dir(&manifest_dir, ambient_authority())
-            .map_err(|error| error.to_string())?;
-        let fixture = Self {
-            _temp_dir: temp_dir,
-            manifest_dir,
-            dir,
-        };
-
-        fixture.write(Utf8Path::new("Cargo.toml"), &fixture_cargo_toml())?;
-        fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
-        fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
-        fixture.write(
-            Utf8Path::new("src/build_discovery.rs"),
-            BUILD_DISCOVERY_SOURCE,
-        )?;
-        fixture.write(Utf8Path::new("src/build_suite.rs"), BUILD_SUITE_SOURCE)?;
-
-        Ok(fixture)
-    }
-
-    fn write(&self, path: &Utf8Path, contents: &str) -> Result<(), String> {
-        if let Some(parent) = path.parent()
-            && !parent.as_str().is_empty()
-        {
-            self.dir
-                .create_dir_all(parent)
-                .map_err(|error| error.to_string())?;
-        }
-        self.dir
-            .write(path.as_str(), contents)
-            .map_err(|error| error.to_string())
-    }
-
-    fn cargo_test(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
-        self.cargo_run(CargoSubcommand::Test, guard)
-    }
-
-    fn cargo_build(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
-        self.cargo_run(CargoSubcommand::Build, guard)
-    }
-
-    /// Runs a Cargo subcommand in the fixture crate directory.
-    ///
-    /// `CARGO_TARGET_DIR` is set to a per-fixture subdirectory to avoid
-    /// artefact collisions. The caller must supply a [`CargoGuard`] proving
-    /// that `FIXTURE_CARGO_LOCK` is held, because registry cache access and
-    /// workspace-level lock files are still shared across invocations.
-    ///
-    /// # Timeout
-    ///
-    /// `Command::output()` blocks until the subprocess exits. No explicit
-    /// timeout is imposed: `cargo` is a first-party trusted tool, and
-    /// introducing cross-platform `wait_timeout` polling would add significant
-    /// complexity disproportionate to this test suite's scope. If a runaway
-    /// `cargo` process causes a stall in CI, the job-level timeout enforced by
-    /// the CI runtime (e.g. GitHub Actions' `timeout-minutes`) provides the
-    /// outer bound.
-    fn cargo_run(
-        &self,
-        subcommand: CargoSubcommand,
-        _guard: &CargoGuard<'_>,
-    ) -> Result<(), String> {
-        let target_dir = self.manifest_dir.join("target");
-        let output = Command::new("cargo")
-            .current_dir(&self.manifest_dir)
-            .env("CARGO_TARGET_DIR", target_dir.as_str())
-            .args([subcommand.as_str(), "--color", "never"])
-            .output()
-            .map_err(|error| error.to_string())?;
-        command_result(&output)
-    }
-}
-
-fn command_result(output: &std::process::Output) -> Result<(), String> {
-    if output.status.success() {
-        return Ok(());
-    }
-
-    Err(format!(
-        "{}{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr),
-    ))
-}
-
-fn fixture_cargo_toml() -> String {
-    let root_manifest_dir = ROOT_MANIFEST_DIR.replace('\\', "/");
-    format!(
-        concat!(
-            "[package]\n",
-            "name = \"theorem_file_macro_fixture\"\n",
-            "version = \"0.1.0\"\n",
-            "edition = \"2024\"\n\n",
-            "[dependencies]\n",
-            "theoremc = {{ path = '{root_manifest_dir}', features = [\"test-support\"] }}\n\n",
-            "[dev-dependencies]\n",
-            "theoremc = {{ path = '{root_manifest_dir}', features = [\"test-support\"] }}\n\n",
-            "[build-dependencies]\n",
-            "{build_dependencies}",
-        ),
-        root_manifest_dir = root_manifest_dir,
-        build_dependencies = FIXTURE_BUILD_DEPENDENCIES
-    )
-}
-
-fn fixture_lib_rs(spec: &TheoremFixtureSpec<'_>) -> String {
-    let module_name = mangle_module_path(spec.path).module_name().to_owned();
-    let harnesses: Vec<String> = spec
-        .names
-        .iter()
-        .map(|theorem| {
-            mangle_theorem_harness(spec.path, theorem)
-                .identifier()
-                .to_owned()
-        })
-        .collect();
-    let harness_assertions = harnesses
-        .iter()
-        .map(|harness| format!("                super::{module_name}::kani::{harness},"))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    format!(
-        concat!(
-            "//! Fixture crate for theorem_file macro behavioural tests.\n\n",
-            "#[doc(hidden)]\n",
-            "mod __theoremc_generated_suite {{\n",
-            "    #[cfg(theoremc_has_theorems)]\n",
-            "    use theoremc::theorem_file;\n",
-            "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
-            "\n",
-            "    #[cfg(test)]\n",
-            "    mod generated_symbol_tests {{\n",
-            "        #[test]\n",
-            "        fn generated_symbols_exist() {{\n",
-            "            let _: [fn(); {count}] = [\n",
-            "{harness_assertions}\n",
-            "            ];\n",
-            "        }}\n",
-            "    }}\n",
-            "}}\n",
-        ),
-        count = harnesses.len(),
-        harness_assertions = harness_assertions
-    )
-}
-
-fn run_valid_fixture_test(spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
-    let guard = CargoGuard::acquire();
-    let fixture = FixtureCrate::new(&fixture_lib_rs(spec))?;
-    fixture.write(Utf8Path::new(spec.path), spec.content)?;
-    fixture.cargo_test(&guard)
-}
-
-const fn invalid_fixture_lib_rs() -> &'static str {
-    concat!(
-        "//! Fixture crate for theorem_file macro behavioural tests.\n\n",
-        "#[doc(hidden)]\n",
-        "mod __theoremc_generated_suite {\n",
-        "    #[cfg(theoremc_has_theorems)]\n",
-        "    use theoremc::theorem_file;\n",
-        "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
-        "}\n",
-    )
-}
 
 #[given("a fixture crate with one valid theorem file")]
 fn given_a_fixture_crate_with_one_valid_theorem_file() {}
@@ -401,22 +170,7 @@ fn fixture_cargo_toml_normalises_windows_paths() {
     // time, but the normalization logic is what this test needs to verify.
     let windows_path = r"C:\Users\user\projects\theoremc";
     let normalised = windows_path.replace('\\', "/");
-    let toml = format!(
-        concat!(
-            "[package]\n",
-            "name = \"theorem_file_macro_fixture\"\n",
-            "version = \"0.1.0\"\n",
-            "edition = \"2024\"\n\n",
-            "[dependencies]\n",
-            "theoremc = {{ path = '{root_manifest_dir}', features = [\"test-support\"] }}\n\n",
-            "[dev-dependencies]\n",
-            "theoremc = {{ path = '{root_manifest_dir}', features = [\"test-support\"] }}\n\n",
-            "[build-dependencies]\n",
-            "{build_dependencies}",
-        ),
-        root_manifest_dir = normalised,
-        build_dependencies = FIXTURE_BUILD_DEPENDENCIES
-    );
+    let toml = fixture_cargo_toml_for(&normalised);
 
     // Forward slashes must appear in the TOML; no backslashes.
     assert!(
@@ -430,4 +184,5 @@ fn fixture_cargo_toml_normalises_windows_paths() {
         toml.contains("'C:/Users/user/projects/theoremc'"),
         "expected normalized forward-slash path in TOML; got:\n{toml}",
     );
+    assert!(toml.contains(FIXTURE_BUILD_DEPENDENCIES));
 }
