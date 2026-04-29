@@ -1,4 +1,4 @@
-//! Cargo command serialisation helpers for theorem-file macro fixtures.
+//! Cargo command serialization helpers for theorem-file macro fixtures.
 
 use std::process::Command;
 use std::sync::{Mutex, PoisonError};
@@ -23,7 +23,7 @@ impl CargoSubcommand {
 /// Proof that `FIXTURE_CARGO_LOCK` is held by the current thread.
 ///
 /// Pass a `CargoGuard<'_>` to fixture Cargo helpers to enforce at compile time
-/// that no caller bypasses the serialisation contract.
+/// that no caller bypasses the serialization contract.
 pub(crate) struct CargoGuard<'a> {
     _guard: std::sync::MutexGuard<'a, ()>,
 }

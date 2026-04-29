@@ -164,7 +164,7 @@ fn fixture_cargo_lock_recovers_from_poison() {
 }
 
 #[test]
-fn fixture_cargo_toml_normalises_windows_paths() {
+fn fixture_cargo_toml_normalizes_windows_paths() {
     // Simulate a Windows-style `CARGO_MANIFEST_DIR` with backslash separators.
     // `fixture_cargo_toml` reads `ROOT_MANIFEST_DIR`, which is set at compile
     // time, but the normalization logic is what this test needs to verify.
