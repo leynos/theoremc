@@ -38,6 +38,14 @@
 //! 2. `theorem_slug` preserves snake-case identifiers and otherwise performs
 //!    deterministic acronym-aware snake-case conversion.
 //! 3. `mangle_theorem_harness` assembles the final harness identifier.
+//!
+//! # Collision safety
+//!
+//! Collision resistance of the 12-hex truncation is not relied upon for
+//! correctness. The build performs compile-time collision detection over all
+//! generated identifiers and fails fast if a collision is found. The truncated
+//! hash is used as a disambiguator to reduce collision probability; safety is
+//! enforced by detection.
 
 // ── Domain newtypes ───────────────────────────────────────────────
 
