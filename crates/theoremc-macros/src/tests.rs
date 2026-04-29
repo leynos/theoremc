@@ -1,11 +1,50 @@
 //! Unit tests for deterministic theorem-file macro expansion.
 
+use std::env;
+use std::sync::{Mutex, MutexGuard, PoisonError};
+
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use tempfile::TempDir;
 use theoremc_core::mangle::{mangle_module_path, mangle_theorem_harness};
 
-use super::expand_theorem_file_at;
+use super::{MacroExpansionError, expand_theorem_file_at, manifest_dir_from_env};
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+struct EnvVarGuard<'a> {
+    previous: Option<String>,
+    _guard: MutexGuard<'a, ()>,
+}
+
+impl Drop for EnvVarGuard<'_> {
+    fn drop(&mut self) {
+        // SAFETY: tests that mutate `CARGO_MANIFEST_DIR` hold `ENV_LOCK`, so
+        // this process-global mutation is serialized within this test module.
+        unsafe {
+            match &self.previous {
+                Some(value) => env::set_var("CARGO_MANIFEST_DIR", value),
+                None => env::remove_var("CARGO_MANIFEST_DIR"),
+            }
+        }
+    }
+}
+
+fn set_cargo_manifest_dir_for_test(value: Option<&str>) -> EnvVarGuard<'_> {
+    let guard = ENV_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+    let previous = env::var("CARGO_MANIFEST_DIR").ok();
+    // SAFETY: `ENV_LOCK` prevents concurrent mutation by tests in this module.
+    unsafe {
+        match value {
+            Some(value) => env::set_var("CARGO_MANIFEST_DIR", value),
+            None => env::remove_var("CARGO_MANIFEST_DIR"),
+        }
+    }
+    EnvVarGuard {
+        previous,
+        _guard: guard,
+    }
+}
 
 struct TheoremSpec<'a> {
     name: &'a str,
@@ -245,6 +284,36 @@ fn expansion_is_stable_for_repeat_calls() -> Result<(), Box<dyn std::error::Erro
         about: "Repeatability test",
     });
     assert_expansion_is_stable(Utf8Path::new("theorems/repeat.theorem"), &fixture)
+}
+
+#[test]
+fn manifest_dir_from_env_reports_missing_manifest_dir() {
+    let _env = set_cargo_manifest_dir_for_test(None);
+
+    let error = manifest_dir_from_env()
+        .err()
+        .expect("missing CARGO_MANIFEST_DIR should return an error");
+
+    assert!(matches!(error, MacroExpansionError::MissingManifestDir));
+}
+
+#[test]
+fn manifest_dir_from_env_supports_expansion_from_valid_manifest_dir()
+-> Result<(), Box<dyn std::error::Error>> {
+    let path = Utf8Path::new("theorems/env.theorem");
+    let fixture = make_single_theorem_fixture(&TheoremSpec {
+        name: "EnvMacro",
+        about: "Environment manifest directory coverage",
+    });
+    let (_temp_dir, fixture_dir) = temp_fixture_dir()?;
+    write_fixture(&fixture_dir, path, &fixture)?;
+    let _env = set_cargo_manifest_dir_for_test(Some(fixture_dir.as_str()));
+
+    let manifest_dir = manifest_dir_from_env()?;
+    let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
+
+    expand_theorem_file_at(&manifest_dir, &path_literal)?;
+    Ok(())
 }
 
 #[test]
