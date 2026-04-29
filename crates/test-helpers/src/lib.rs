@@ -19,8 +19,13 @@ pub struct EnvGuard {
 
 impl Drop for EnvGuard {
     fn drop(&mut self) {
-        // SAFETY: `EnvGuard` holds `ENV_LOCK`, so environment mutation through
-        // this helper is serialized across tests that use it.
+        // SAFETY: `EnvGuard` holds the global `ENV_LOCK` mutex, guaranteeing
+        // exclusive access to process environment mutations performed by this
+        // helper. No other thread or test can call `env::set_var` or
+        // `env::remove_var` through this helper while the lock is held. Under
+        // Rust 2024, concurrent environment mutation is UB; restoring
+        // `variable` from `previous` here is sound because the mutex protects
+        // these operations.
         unsafe {
             match self.previous.as_deref() {
                 Some(value) => env::set_var(self.variable, value),
