@@ -12,7 +12,7 @@ rust-version = "1.85"
 test-support = ["theoremc-core/test-support"]
 
 [dependencies]
-indexmap = { version = "2.13.0", features = ["serde"] }
+indexmap = { version = "2.14.0", features = ["serde"] }
 thiserror = "2.0.18"
 syn = { version = "2.0.117", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
 quote = "1.0.45"
