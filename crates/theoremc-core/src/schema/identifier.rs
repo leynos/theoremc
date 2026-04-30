@@ -40,7 +40,7 @@ const RUST_KEYWORDS: &[&str] = &[
 ///
 /// # Examples
 ///
-///     use theoremc::schema::validate_identifier;
+///     use theoremc_core::schema::validate_identifier;
 ///
 ///     assert!(validate_identifier("MyTheorem").is_ok());
 ///     assert!(validate_identifier("_private").is_ok());

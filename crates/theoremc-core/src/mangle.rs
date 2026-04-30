@@ -38,6 +38,14 @@
 //! 2. `theorem_slug` preserves snake-case identifiers and otherwise performs
 //!    deterministic acronym-aware snake-case conversion.
 //! 3. `mangle_theorem_harness` assembles the final harness identifier.
+//!
+//! # Collision safety
+//!
+//! Collision resistance of the 12-hex truncation is not relied upon for
+//! correctness. The build performs compile-time collision detection over all
+//! generated identifiers and fails fast if a collision is found. The truncated
+//! hash is used as a disambiguator to reduce collision probability; safety is
+//! enforced by detection.
 
 // ── Domain newtypes ───────────────────────────────────────────────
 
@@ -58,7 +66,7 @@ pub struct InvalidCanonicalActionName {
 /// Construct via [`CanonicalActionName::new`] (fallible) or
 /// [`TryFrom`].
 ///
-///     use theoremc::mangle::CanonicalActionName;
+///     use theoremc_core::mangle::CanonicalActionName;
 ///     let name = CanonicalActionName::new("account.deposit")
 ///         .expect("valid canonical name");
 ///     assert_eq!(name.as_str(), "account.deposit");
@@ -127,6 +135,78 @@ pub use path::{MangledModule, PathStem, mangle_module_path, path_mangle, path_st
 #[cfg(test)]
 pub(crate) use path::MODULE_PREFIX;
 
+#[cfg(test)]
+mod prop_tests {
+    //! Property-based tests for mangling determinism and uniqueness.
+
+    use super::{hash12, mangle_module_path, mangle_theorem_harness};
+    use proptest::prelude::{prop_assert_eq, prop_assert_ne, prop_assume, proptest};
+
+    proptest! {
+        /// `mangle_module_path` must be deterministic: same input always
+        /// produces same output.
+        #[test]
+        fn mangle_module_path_is_deterministic(
+            path in "[a-z0-9/._-]{1,40}\\.theorem",
+        ) {
+            let first = mangle_module_path(&path);
+            let second = mangle_module_path(&path);
+            prop_assert_eq!(first.module_name(), second.module_name());
+        }
+
+        /// `mangle_theorem_harness` must be deterministic.
+        #[test]
+        fn mangle_theorem_harness_is_deterministic(
+            path in "[a-z0-9/._-]{1,40}\\.theorem",
+            theorem in "[A-Za-z][A-Za-z0-9]{0,30}",
+        ) {
+            let first = mangle_theorem_harness(&path, &theorem);
+            let second = mangle_theorem_harness(&path, &theorem);
+            prop_assert_eq!(first.identifier(), second.identifier());
+        }
+
+        /// Different theorem names within the same file must not produce the
+        /// same harness identifier.
+        #[test]
+        fn distinct_theorem_names_produce_distinct_harnesses(
+            path in "[a-z]{1,8}\\.theorem",
+            a in "[A-Za-z][A-Za-z0-9]{1,15}",
+            b in "[A-Za-z][A-Za-z0-9]{1,15}",
+        ) {
+            prop_assume!(a != b);
+            let ha = mangle_theorem_harness(&path, &a);
+            let hb = mangle_theorem_harness(&path, &b);
+            prop_assert_ne!(ha.identifier(), hb.identifier());
+        }
+
+        /// `hash12` must produce distinct outputs for distinct inputs across a
+        /// wide variety of canonical action names; empirically validates
+        /// collision-resistance of the 12-hex-character truncation.
+        #[test]
+        fn hash12_is_distinct_for_diverse_canonical_names(
+            a in "[a-z][a-z0-9]{0,10}\\.[a-z][a-z0-9]{0,10}",
+            b in "[a-z][a-z0-9]{0,10}\\.[a-z][a-z0-9]{0,10}",
+        ) {
+            prop_assume!(a != b);
+            prop_assert_ne!(
+                hash12(&a),
+                hash12(&b),
+                "hash12 collision between '{}' and '{}'",
+                a,
+                b,
+            );
+        }
+
+        /// `hash12` must be deterministic.
+        #[test]
+        fn hash12_is_deterministic(
+            input in "[a-z0-9._-]{1,50}",
+        ) {
+            prop_assert_eq!(hash12(&input), hash12(&input));
+        }
+    }
+}
+
 // ── Action name mangling ──────────────────────────────────────────
 
 /// The module path into which mangled action identifiers resolve.
@@ -170,7 +250,7 @@ impl MangledAction {
 
 /// Escapes a single action-name segment by replacing `_` with `_u`.
 ///
-///     # use theoremc::mangle::action_slug;
+///     # use theoremc_core::mangle::action_slug;
 ///     // segment_escape("deposit") == "deposit"
 ///     // segment_escape("attach_node") == "attach_unode"
 ///     assert_eq!(action_slug("ns.attach_node"), "ns__attach_unode");
@@ -193,7 +273,7 @@ pub(crate) fn segment_escape(segment: &str) -> String {
 /// joins with `__`. Accepts `&str`, `String`, or
 /// `&CanonicalActionName`.
 ///
-///     use theoremc::mangle::{CanonicalActionName, action_slug};
+///     use theoremc_core::mangle::{CanonicalActionName, action_slug};
 ///     assert_eq!(action_slug("account.deposit"), "account__deposit");
 ///     let name = CanonicalActionName::new("account.deposit")
 ///         .expect("valid canonical name");
@@ -216,7 +296,7 @@ pub fn action_slug(canonical_name: impl AsRef<str>) -> String {
 /// Computes the first 12 lowercase hex characters of the blake3
 /// hash of the given value.
 ///
-///     use theoremc::mangle::hash12;
+///     use theoremc_core::mangle::hash12;
 ///     assert_eq!(hash12("account.deposit"), "05158894bfb4");
 #[must_use]
 pub fn hash12(value: &str) -> String {
@@ -228,7 +308,7 @@ pub fn hash12(value: &str) -> String {
 /// Mangles a canonical action name into a [`MangledAction`].
 /// Accepts `&str`, `String`, or `&CanonicalActionName`.
 ///
-///     use theoremc::mangle::mangle_action_name;
+///     use theoremc_core::mangle::mangle_action_name;
 ///     let m = mangle_action_name("account.deposit");
 ///     assert_eq!(m.identifier(), "account__deposit__h05158894bfb4");
 #[must_use]

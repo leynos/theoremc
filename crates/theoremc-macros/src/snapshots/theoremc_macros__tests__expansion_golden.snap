@@ -1,0 +1,14 @@
+---
+source: crates/theoremc-macros/src/tests.rs
+assertion_line: 261
+expression: redact_hashes(&formatted)
+---
+mod __theoremc__file__theorems_snapshot__fd7e35d80da8 {
+    const _: &str = include_str!(
+        concat!(env!("CARGO_MANIFEST_DIR"), "/", "theorems/snapshot.theorem")
+    );
+    pub(super) mod kani {
+        pub(crate) fn theorem__snapshot_thm__hXXXXXXXXXXXX() {}
+    }
+    const _: [fn(); 1] = [kani::theorem__snapshot_thm__hXXXXXXXXXXXX];
+}

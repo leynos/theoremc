@@ -1244,7 +1244,11 @@ For each `.theorem` file, the macro expands to:
   braces”; build.rs already wires rebuilds, but `include_str!` also ensures the
   theorem content is a compile-time input.)
 
-- One generated harness function per theorem document in the file:
+- A backend scaffold module (`kani`) inside that private module.
+
+- One generated harness function per theorem document in the file. Step 3.2.1
+  ships deterministic stub functions only. Step 3.2.2 will add the final Kani
+  gating, proof attributes, and unwind metadata:
 
   - `#[cfg(kani)]`
   - `#[kani::proof]`
@@ -1252,8 +1256,81 @@ For each `.theorem` file, the macro expands to:
 
 Kani explicitly notes that naively writing `#[kani::proof]` in code will make a
 normal `cargo build` fail unless it is gated (because the `kani` crate is not
-present in non-Kani builds).[^8] Therefore, theoremc-generated harnesses are
-always behind `#[cfg(kani)]` (or an equivalent feature gate).
+present in non-Kani builds).[^8] Therefore, theoremc defers Kani-specific
+gating to Step 3.2.2 rather than emitting those attributes in Step 3.2.1.
+
+### 7.2.1 Implementation decisions (Step 3.2.1)
+
+Step 3.2.1 keeps the generated suite contract from Step 3.1.2 unchanged:
+`build.rs` still emits one bare `theorem_file!("path/to/file.theorem");`
+invocation per discovered theorem file. What changed is the meaning of that
+callsite.
+
+The repository now matches the intended architecture more closely:
+
+- `crates/theoremc-core` owns shared schema loading, name mangling, and
+  collision detection;
+- `crates/theoremc-macros` owns the real `theorem_file!` proc macro; and
+- the root `theoremc` package remains the public facade and build-integration
+  owner.
+
+For screen readers: this sequence diagram shows the build-time handoff from
+`cargo build`, through `build.rs` theorem discovery and generated-suite
+rendering, into `rustc` invoking the `theorem_file!` proc macro for each
+discovered theorem path, and finally to either a successful compilation or a
+compile-time theorem error.
+![Build-time theorem discovery sequence diagram](path/to/image)
+
+```mermaid
+sequenceDiagram
+    actor Developer
+    participant Cargo
+    participant BuildRS as build_rs
+    participant Rustc as rustc_compiler
+    participant RootLib as theoremc_root_lib
+    participant ProcMacro as theoremc_macros_proc_macro
+    participant Core as theoremc_core
+    participant TheoremFile as theorem_file_P
+
+    Developer->>Cargo: cargo build
+    Cargo->>BuildRS: run build script
+    BuildRS->>TheoremFile: discover theorem files
+    BuildRS-->>BuildRS: render OUT_DIR/theorem_suite_rs
+    BuildRS-->>Cargo: build script finished
+
+    Cargo->>Rustc: compile crate theoremc
+    Rustc->>RootLib: compile src/lib.rs
+    RootLib->>RootLib: include!(OUT_DIR/theorem_suite.rs)
+    loop for_each_theorem_file_callsite
+        Rustc->>ProcMacro: invoke theorem_file("P")
+        ProcMacro->>Core: load_theorem_documents(P, manifest_dir)
+        Core-->>ProcMacro: parsed_theorems
+        ProcMacro->>Core: mangle_module_path(P)
+        Core-->>ProcMacro: module_name
+        ProcMacro->>Core: mangle_theorem_harness(P, theorem_id)
+        Core-->>ProcMacro: harness_name
+        ProcMacro-->>Rustc: expanded_tokens_per_file_module
+    end
+    Rustc-->>Developer: compilation_success_or_error
+```
+
+Figure 7. Build-time theorem discovery and per-file proc-macro expansion flow.
+
+The current macro expansion is intentionally structural and lint-neutral. For
+each theorem file it emits:
+
+- a private module named by `mangle_module_path`,
+- `include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", P))`,
+- `pub(super) mod kani`,
+- one deterministic `pub(crate)` harness stub per theorem document using
+  `mangle_theorem_harness`, and
+- a private const array that references those stubs so normal builds do not
+  report them as dead code.
+
+Invalid theorem files now fail compilation through the proc-macro expansion
+path using the existing schema loader and its deterministic diagnostics. This
+keeps theorem parsing, validation, and compile-time code generation on one
+shared contract rather than introducing a second parser in the macro crate.
 
 ### 7.3 Binding probes
 

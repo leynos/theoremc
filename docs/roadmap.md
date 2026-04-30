@@ -278,7 +278,7 @@ and generated harness stubs.
 
 Out of scope: final backend semantics.
 
-- [ ] Implement macro expansion that emits the stable per-file module, includes
+- [x] Implement macro expansion that emits the stable per-file module, includes
   theorem source content via `include_str!`, and builds one harness entry per
   theorem document. Acceptance: macro-expansion snapshots remain stable across
   repeated builds. Signposts: `DES-7`, `NMR-1`, `ADR-2`.

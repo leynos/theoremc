@@ -71,7 +71,7 @@ const INLINE_SOURCE: &str = "<inline>";
 ///
 /// # Examples
 ///
-///     use theoremc::schema::load_theorem_docs;
+///     use theoremc_core::schema::load_theorem_docs;
 ///
 ///     let yaml = r#"
 ///     Theorem: MyTheorem

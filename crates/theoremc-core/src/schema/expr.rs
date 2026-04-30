@@ -17,7 +17,7 @@
 /// # Examples
 ///
 /// ```rust,ignore
-/// use theoremc::schema::expr::validate_rust_expr;
+/// use theoremc_core::schema::expr::validate_rust_expr;
 ///
 /// assert!(validate_rust_expr("x > 0").is_ok());
 /// assert!(validate_rust_expr("{ let x = 1; x }").is_err());
