@@ -2,8 +2,9 @@
 
 use super::tests_support::{
     TheoremFixture, TheoremSpec, assert_expansion_is_stable, assert_single_theorem_expansion,
-    expand_fixture, expansion_error_message, expected_expansion, make_single_theorem_fixture,
-    redact_hashes, set_cargo_manifest_dir_for_test, temp_fixture_dir, write_fixture,
+    expand_fixture, expansion_error_message, expected_expansion_with_unwinds,
+    make_single_theorem_fixture, redact_hashes, set_cargo_manifest_dir_for_test, temp_fixture_dir,
+    write_fixture,
 };
 use super::{MacroExpansionError, expand_theorem_file_at, manifest_dir_from_env};
 use camino::Utf8Path;
@@ -47,12 +48,12 @@ fn multi_document_expansion_preserves_document_order() -> Result<(), Box<dyn std
         "    because: \"trivial\"\n",
         "Evidence:\n",
         "  kani:\n",
-        "    unwind: 1\n",
+        "    unwind: 3\n",
         "    expect: SUCCESS\n",
     );
 
     let actual = expand_fixture(path, &TheoremFixture(theorem.to_owned()))?;
-    let expected = expected_expansion(path, &["FirstMacro", "SecondMacro"]);
+    let expected = expected_expansion_with_unwinds(path, &["FirstMacro", "SecondMacro"], &[1, 3]);
     assert_eq!(actual, expected);
     Ok(())
 }
@@ -154,6 +155,24 @@ fn expansion_snapshot_matches_golden_output() -> Result<(), Box<dyn std::error::
     "theorems/empty.theorem",
     Some(""),
     "doesnotcontainanytheoremdocuments"
+)]
+#[case::zero_unwind(
+    "theorems/zero-unwind.theorem",
+    Some(concat!(
+        "Theorem: ZeroUnwindMacro\n",
+        "About: Invalid Kani evidence coverage\n",
+        "Witness:\n",
+        "  - cover: \"true\"\n",
+        "    because: \"reachable\"\n",
+        "Prove:\n",
+        "  - assert: \"true\"\n",
+        "    because: \"trivial\"\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 0\n",
+        "    expect: SUCCESS\n",
+    )),
+    "Evidence.kani.unwindmustbeapositiveinteger"
 )]
 fn theorem_file_errors_report_expected_compile_error(
     #[case] path: &str,

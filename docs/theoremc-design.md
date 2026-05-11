@@ -1244,11 +1244,11 @@ For each `.theorem` file, the macro expands to:
   braces”; build.rs already wires rebuilds, but `include_str!` also ensures the
   theorem content is a compile-time input.)
 
-- A backend scaffold module (`kani`) inside that private module.
+- A backend scaffold module (`kani`) inside that private module, gated behind
+  `#[cfg(kani)]`.
 
-- One generated harness function per theorem document in the file. Step 3.2.1
-  ships deterministic stub functions only. Step 3.2.2 will add the final Kani
-  gating, proof attributes, and unwind metadata:
+- One generated Kani harness function per theorem document in the file. Step
+  3.2.2 adds the Kani gating, proof attributes, and unwind metadata:
 
   - `#[cfg(kani)]`
   - `#[kani::proof]`
@@ -1256,8 +1256,8 @@ For each `.theorem` file, the macro expands to:
 
 Kani explicitly notes that naively writing `#[kani::proof]` in code will make a
 normal `cargo build` fail unless it is gated (because the `kani` crate is not
-present in non-Kani builds).[^8] Therefore, theoremc defers Kani-specific
-gating to Step 3.2.2 rather than emitting those attributes in Step 3.2.1.
+present in non-Kani builds).[^8] Therefore, theoremc emits Kani-specific
+attributes only inside `#[cfg(kani)]` generated items.
 
 ### 7.2.1 Implementation decisions (Step 3.2.1)
 
@@ -1316,21 +1316,41 @@ sequenceDiagram
 
 Figure 7. Build-time theorem discovery and per-file proc-macro expansion flow.
 
-The current macro expansion is intentionally structural and lint-neutral. For
-each theorem file it emits:
+Step 3.2.1 made the macro expansion intentionally structural and lint-neutral.
+For each theorem file it emitted:
 
 - a private module named by `mangle_module_path`,
 - `include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", P))`,
 - `pub(super) mod kani`,
 - one deterministic `pub(crate)` harness stub per theorem document using
   `mangle_theorem_harness`, and
-- a private const array that references those stubs so normal builds do not
+- a private const array that references those stubs so normal builds did not
   report them as dead code.
 
 Invalid theorem files now fail compilation through the proc-macro expansion
 path using the existing schema loader and its deterministic diagnostics. This
 keeps theorem parsing, validation, and compile-time code generation on one
 shared contract rather than introducing a second parser in the macro crate.
+
+### 7.2.2 Implementation decisions (Step 3.2.2)
+
+Step 3.2.2 keeps the generated suite and per-file module contracts unchanged.
+The generated Kani backend module is now gated with `#[cfg(kani)]`, and each
+generated harness stub carries:
+
+- `#[kani::proof]`, and
+- `#[kani::unwind(n)]`, where `n` is read from that theorem document's
+  validated `Evidence.kani.unwind` value.
+
+The generated harness bodies remain empty stubs in this step. Phase 4 still
+owns symbolic input generation, assumptions, assertions, witnesses, and action
+lowering.
+
+The per-file module also carries a tightly scoped
+`#[allow(unexpected_cfgs, reason = "...")]`. This is needed because `cfg(kani)`
+is supplied by Kani rather than by Cargo feature configuration, and normal
+consumer crates should compile theorem files without adding their own
+`check-cfg` configuration.
 
 ### 7.3 Binding probes
 

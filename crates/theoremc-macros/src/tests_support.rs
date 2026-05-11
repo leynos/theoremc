@@ -83,6 +83,15 @@ pub(super) fn redact_hashes(s: &str) -> String {
 }
 
 pub(super) fn expected_expansion(path: &Utf8Path, theorems: &[&str]) -> String {
+    let unwinds = vec![1; theorems.len()];
+    expected_expansion_with_unwinds(path, theorems, &unwinds)
+}
+
+pub(super) fn expected_expansion_with_unwinds(
+    path: &Utf8Path,
+    theorems: &[&str],
+    unwinds: &[u32],
+) -> String {
     let module_name = mangle_module_path(path.as_str()).module_name().to_owned();
     let harnesses: Vec<String> = theorems
         .iter()
@@ -94,7 +103,12 @@ pub(super) fn expected_expansion(path: &Utf8Path, theorems: &[&str]) -> String {
         .collect();
     let harness_defs = harnesses
         .iter()
-        .map(|harness| format!("pub(crate) fn {harness} () {{ }}"))
+        .zip(unwinds)
+        .map(|(harness, unwind)| {
+            format!(
+                "# [kani :: proof] # [kani :: unwind ({unwind})] pub(crate) fn {harness} () {{ }}"
+            )
+        })
         .collect::<Vec<_>>()
         .join(" ");
     let harness_refs = harnesses
@@ -104,9 +118,12 @@ pub(super) fn expected_expansion(path: &Utf8Path, theorems: &[&str]) -> String {
         .join(" , ");
 
     normalize(&format!(
-        "mod {module_name} {{
+        "# [allow (unexpected_cfgs, reason = \"Kani sets cfg(kani) when compiling proof harnesses\")]
+        mod {module_name} {{
             const _: & str = include_str! ( concat! ( env! (\"CARGO_MANIFEST_DIR\") , \"/\" , \"{path}\" ) ) ;
+            # [cfg (kani)]
             pub(super) mod kani {{ {harness_defs} }}
+            # [cfg (kani)]
             const _: [fn(); {}] = [ {} ] ;
         }}",
         harnesses.len(),

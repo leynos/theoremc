@@ -34,11 +34,12 @@ use theoremc_core::{
 ///
 /// - A `const _: &str = include_str!(…)` anchors the theorem source to
 ///   `CARGO_MANIFEST_DIR` so the file is tracked as a compile-time dependency.
-/// - A `pub(super) mod kani` sub-module contains one zero-sized
-///   `pub(crate) fn` per theorem document, named via
+/// - A `#[cfg(kani)] pub(super) mod kani` sub-module contains one
+///   `#[kani::proof]` and `#[kani::unwind(n)]` `pub(crate) fn` per theorem
+///   document, named via
 ///   [`theoremc_core::mangle::mangle_theorem_harness`].
-/// - A const array of `fn()` pointers sized to the harness count anchors all
-///   generated symbols.
+/// - A cfg-gated const array of `fn()` pointers sized to the harness count
+///   anchors all generated symbols when Kani is compiling the crate.
 ///
 /// Document order is preserved: the first theorem document in the file
 /// produces the first harness function.
@@ -91,9 +92,14 @@ use theoremc_core::{
 ///     const _: &str = include_str!(
 ///         concat!(env!("CARGO_MANIFEST_DIR"), "/", "theorems/my_theorem.theorem")
 ///     );
+///     #[allow(unexpected_cfgs, reason = "Kani sets cfg(kani) when compiling proof harnesses")]
+///     #[cfg(kani)]
 ///     pub(super) mod kani {
+///         #[kani::proof]
+///         #[kani::unwind(1)]
 ///         pub(crate) fn theorem__my_lemma__h<hash>() {}
 ///     }
+///     #[cfg(kani)]
 ///     const _: [fn(); 1] = [kani::theorem__my_lemma__h<hash>];
 /// }
 /// ```
@@ -127,49 +133,84 @@ fn expand_theorem_file_at(
     let theorem_docs = load_theorem_file_from_manifest_dir(manifest_dir, &theorem_path)
         .map_err(|error| MacroExpansionError::from_load(&error))?;
 
-    Ok(render_expansion(
-        &canonical_path_literal,
-        &canonical_path,
-        &theorem_docs,
-    ))
+    render_expansion(&canonical_path_literal, &canonical_path, &theorem_docs)
 }
 
 fn render_expansion(
     path_literal: &LitStr,
     theorem_path: &str,
     theorem_docs: &[theoremc_core::schema::TheoremDoc],
-) -> TokenStream2 {
+) -> Result<TokenStream2, MacroExpansionError> {
     let module_ident = identifier(mangle_module_path(theorem_path).module_name());
-    let harness_idents: Vec<Ident> = theorem_docs
+    let harnesses = generated_harnesses(theorem_path, theorem_docs)?;
+    let harness_idents: Vec<&Ident> = harnesses.iter().map(|harness| &harness.ident).collect();
+    let unwind_literals: Vec<&syn::LitInt> = harnesses
         .iter()
-        .map(|doc| {
-            identifier(mangle_theorem_harness(theorem_path, doc.theorem.as_str()).identifier())
-        })
+        .map(|harness| &harness.unwind_literal)
         .collect();
     let harness_count = syn::LitInt::new(&harness_idents.len().to_string(), Span::call_site());
 
-    quote! {
+    Ok(quote! {
+        #[allow(
+            unexpected_cfgs,
+            reason = "Kani sets cfg(kani) when compiling proof harnesses"
+        )]
         mod #module_ident {
             const _: &str =
                 include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", #path_literal));
 
+            #[cfg(kani)]
             pub(super) mod kani {
-                #(pub(crate) fn #harness_idents() {})*
+                #(
+                    #[kani::proof]
+                    #[kani::unwind(#unwind_literals)]
+                    pub(crate) fn #harness_idents() {}
+                )*
             }
 
+            #[cfg(kani)]
             const _: [fn(); #harness_count] = [#(kani::#harness_idents),*];
         }
-    }
+    })
+}
+
+fn generated_harnesses(
+    theorem_path: &str,
+    theorem_docs: &[theoremc_core::schema::TheoremDoc],
+) -> Result<Vec<GeneratedHarness>, MacroExpansionError> {
+    theorem_docs
+        .iter()
+        .map(|doc| {
+            let kani = doc.evidence.kani.as_ref().ok_or_else(|| {
+                MacroExpansionError::MissingKaniEvidence {
+                    theorem: doc.theorem.as_str().to_owned(),
+                }
+            })?;
+            Ok(GeneratedHarness {
+                ident: identifier(
+                    mangle_theorem_harness(theorem_path, doc.theorem.as_str()).identifier(),
+                ),
+                unwind_literal: syn::LitInt::new(&kani.unwind.to_string(), Span::call_site()),
+            })
+        })
+        .collect()
 }
 
 fn identifier(name: &str) -> Ident {
     Ident::new(name, Span::call_site())
 }
 
+struct GeneratedHarness {
+    ident: Ident,
+    unwind_literal: syn::LitInt,
+}
+
 #[derive(Debug, thiserror::Error)]
 enum MacroExpansionError {
     #[error("`CARGO_MANIFEST_DIR` is not set during theorem macro expansion")]
     MissingManifestDir,
+    #[error("theorem `{theorem}` does not declare required `Evidence.kani` configuration")]
+    MissingKaniEvidence { theorem: String },
     #[error("{0}")]
     LoadTheoremFile(String),
 }

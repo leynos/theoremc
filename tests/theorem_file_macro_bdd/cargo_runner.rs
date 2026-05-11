@@ -8,14 +8,21 @@ use camino::Utf8Path;
 #[derive(Clone, Copy)]
 pub(crate) enum CargoSubcommand {
     Build,
-    Test,
+    KaniList,
 }
 
 impl CargoSubcommand {
-    const fn as_str(self) -> &'static str {
+    const fn args(self) -> &'static [&'static str] {
+        match self {
+            Self::Build => &["build", "--color", "never"],
+            Self::KaniList => &["kani", "list"],
+        }
+    }
+
+    const fn label(self) -> &'static str {
         match self {
             Self::Build => "build",
-            Self::Test => "test",
+            Self::KaniList => "kani list",
         }
     }
 }
@@ -67,13 +74,21 @@ pub(crate) static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
 pub(crate) fn cargo_run(
     manifest_dir: &Utf8Path,
     subcommand: CargoSubcommand,
-    _guard: &CargoGuard<'_>,
+    guard: &CargoGuard<'_>,
 ) -> Result<(), String> {
+    cargo_run_output(manifest_dir, subcommand, guard).map(|_| ())
+}
+
+pub(crate) fn cargo_run_output(
+    manifest_dir: &Utf8Path,
+    subcommand: CargoSubcommand,
+    _guard: &CargoGuard<'_>,
+) -> Result<String, String> {
     let target_dir = manifest_dir.join("target");
     let output = Command::new("cargo")
         .current_dir(manifest_dir)
         .env("CARGO_TARGET_DIR", target_dir.as_str())
-        .args([subcommand.as_str(), "--color", "never"])
+        .args(subcommand.args())
         .output()
         .map_err(|error| error.to_string())?;
     command_result(subcommand, &output)
@@ -86,14 +101,18 @@ pub(crate) fn recover_mutex_guard(mutex: &Mutex<()>) -> MutexGuard<'_, ()> {
 fn command_result(
     subcommand: CargoSubcommand,
     output: &std::process::Output,
-) -> Result<(), String> {
+) -> Result<String, String> {
     if output.status.success() {
-        return Ok(());
+        return Ok(format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr),
+        ));
     }
 
     Err(format!(
         "cargo {} failed with status {}\nstdout:\n{}\nstderr:\n{}",
-        subcommand.as_str(),
+        subcommand.label(),
         output.status,
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr),

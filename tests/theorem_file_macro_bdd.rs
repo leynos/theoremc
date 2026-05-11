@@ -11,7 +11,7 @@ mod fixture_crate;
 use cargo_runner::CargoGuard;
 use fixture_crate::{
     FIXTURE_BUILD_DEPENDENCIES, FixtureCrate, TheoremFixtureSpec, fixture_cargo_toml_for,
-    invalid_fixture_lib_rs, run_valid_fixture_test,
+    invalid_fixture_lib_rs, list_kani_harnesses, run_valid_fixture_build,
 };
 
 const VALID_SINGLE_THEOREM: &str = concat!(
@@ -75,23 +75,38 @@ const INVALID_THEOREM: &str = concat!(
 #[given("a fixture crate with one valid theorem file")]
 fn given_a_fixture_crate_with_one_valid_theorem_file() {}
 
-#[then("the fixture crate tests can refer to the generated private symbols")]
-fn then_the_fixture_crate_tests_can_refer_to_the_generated_private_symbols() -> Result<(), String> {
-    run_valid_fixture_test(&TheoremFixtureSpec {
+#[then("the fixture crate builds without a Kani dependency")]
+fn then_the_fixture_crate_builds_without_a_kani_dependency() -> Result<(), String> {
+    run_valid_fixture_build(&TheoremFixtureSpec {
         path: "theorems/single.theorem",
-        names: &["SmokeMacro"],
         content: VALID_SINGLE_THEOREM,
     })
+}
+
+#[then("Kani lists the generated proof harness")]
+fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
+    let output = list_kani_harnesses(&TheoremFixtureSpec {
+        path: "theorems/single.theorem",
+        content: VALID_SINGLE_THEOREM,
+    })?;
+
+    if !output.contains("theorem__smoke_macro__h") {
+        return Err(format!(
+            "expected Kani list output to include SmokeMacro harness, got:\n{output}"
+        ));
+    }
+
+    Ok(())
 }
 
 #[given("a fixture crate with one valid multi-document theorem file")]
 fn given_a_fixture_crate_with_one_valid_multi_document_theorem_file() {}
 
-#[then("the fixture crate tests can refer to all generated harness stubs")]
-fn then_the_fixture_crate_tests_can_refer_to_all_generated_harness_stubs() -> Result<(), String> {
-    run_valid_fixture_test(&TheoremFixtureSpec {
+#[then("the fixture crate builds all generated theorem entries without a Kani dependency")]
+fn then_the_fixture_crate_builds_all_generated_theorem_entries_without_a_kani_dependency()
+-> Result<(), String> {
+    run_valid_fixture_build(&TheoremFixtureSpec {
         path: "theorems/multi.theorem",
-        names: &["FirstMacroDoc", "SecondMacroDoc"],
         content: VALID_MULTI_THEOREM,
     })
 }
@@ -128,15 +143,21 @@ fn then_compiling_the_fixture_crate_fails_with_an_actionable_theorem_diagnostic(
 
 #[scenario(
     path = "tests/features/theorem_file_macro.feature",
-    name = "A valid theorem file produces the expected generated symbol paths"
+    name = "A valid theorem file compiles without Kani installed"
 )]
-fn a_valid_theorem_file_produces_the_expected_generated_symbol_paths() {}
+fn a_valid_theorem_file_compiles_without_kani_installed() {}
 
 #[scenario(
     path = "tests/features/theorem_file_macro.feature",
-    name = "A multi-document theorem file generates one harness stub per document"
+    name = "A valid theorem file exposes a Kani proof harness"
 )]
-fn a_multi_document_theorem_file_generates_one_harness_stub_per_document() {}
+fn a_valid_theorem_file_exposes_a_kani_proof_harness() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "A multi-document theorem file compiles without Kani installed"
+)]
+fn a_multi_document_theorem_file_compiles_without_kani_installed() {}
 
 #[scenario(
     path = "tests/features/theorem_file_macro.feature",

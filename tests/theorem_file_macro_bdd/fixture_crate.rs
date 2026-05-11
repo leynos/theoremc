@@ -2,9 +2,8 @@
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
-use theoremc::mangle::{mangle_module_path, mangle_theorem_harness};
 
-use super::cargo_runner::{CargoGuard, CargoSubcommand, cargo_run};
+use super::cargo_runner::{CargoGuard, CargoSubcommand, cargo_run, cargo_run_output};
 
 const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
 const BUILD_DISCOVERY_SOURCE: &str = include_str!("../../src/build_discovery.rs");
@@ -18,7 +17,6 @@ pub(crate) const FIXTURE_BUILD_DEPENDENCIES: &str = concat!(
 
 pub(crate) struct TheoremFixtureSpec<'a> {
     pub(crate) path: &'a str,
-    pub(crate) names: &'a [&'a str],
     pub(crate) content: &'a str,
 }
 
@@ -67,12 +65,12 @@ impl FixtureCrate {
             .map_err(|error| error.to_string())
     }
 
-    pub(crate) fn cargo_test(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
-        self.cargo_run(CargoSubcommand::Test, guard)
-    }
-
     pub(crate) fn cargo_build(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
         self.cargo_run(CargoSubcommand::Build, guard)
+    }
+
+    pub(crate) fn cargo_kani_list(&self, guard: &CargoGuard<'_>) -> Result<String, String> {
+        cargo_run_output(&self.manifest_dir, CargoSubcommand::KaniList, guard)
     }
 
     fn cargo_run(&self, subcommand: CargoSubcommand, guard: &CargoGuard<'_>) -> Result<(), String> {
@@ -110,53 +108,30 @@ fn toml_basic_string_value(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-fn fixture_lib_rs(spec: &TheoremFixtureSpec<'_>) -> String {
-    let module_name = mangle_module_path(spec.path).module_name().to_owned();
-    let harnesses: Vec<String> = spec
-        .names
-        .iter()
-        .map(|theorem| {
-            mangle_theorem_harness(spec.path, theorem)
-                .identifier()
-                .to_owned()
-        })
-        .collect();
-    let harness_assertions = harnesses
-        .iter()
-        .map(|harness| format!("                super::{module_name}::kani::{harness},"))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    format!(
-        concat!(
-            "//! Fixture crate for theorem_file macro behavioural tests.\n\n",
-            "#[doc(hidden)]\n",
-            "mod __theoremc_generated_suite {{\n",
-            "    #[cfg(theoremc_has_theorems)]\n",
-            "    use theoremc::theorem_file;\n",
-            "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
-            "\n",
-            "    #[cfg(test)]\n",
-            "    mod generated_symbol_tests {{\n",
-            "        #[test]\n",
-            "        fn generated_symbols_exist() {{\n",
-            "            let _: [fn(); {count}] = [\n",
-            "{harness_assertions}\n",
-            "            ];\n",
-            "        }}\n",
-            "    }}\n",
-            "}}\n",
-        ),
-        count = harnesses.len(),
-        harness_assertions = harness_assertions
+const fn fixture_lib_rs() -> &'static str {
+    concat!(
+        "//! Fixture crate for theorem_file macro behavioural tests.\n\n",
+        "#[doc(hidden)]\n",
+        "mod __theoremc_generated_suite {\n",
+        "    #[cfg(theoremc_has_theorems)]\n",
+        "    use theoremc::theorem_file;\n",
+        "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
+        "}\n",
     )
 }
 
-pub(crate) fn run_valid_fixture_test(spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
+pub(crate) fn run_valid_fixture_build(spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
     let guard = CargoGuard::acquire();
-    let fixture = FixtureCrate::new(&fixture_lib_rs(spec))?;
+    let fixture = FixtureCrate::new(fixture_lib_rs())?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
-    fixture.cargo_test(&guard)
+    fixture.cargo_build(&guard)
+}
+
+pub(crate) fn list_kani_harnesses(spec: &TheoremFixtureSpec<'_>) -> Result<String, String> {
+    let guard = CargoGuard::acquire();
+    let fixture = FixtureCrate::new(fixture_lib_rs())?;
+    fixture.write(Utf8Path::new(spec.path), spec.content)?;
+    fixture.cargo_kani_list(&guard)
 }
 
 pub(crate) const fn invalid_fixture_lib_rs() -> &'static str {

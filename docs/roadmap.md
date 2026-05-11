@@ -282,7 +282,7 @@ Out of scope: final backend semantics.
   theorem source content via `include_str!`, and builds one harness entry per
   theorem document. Acceptance: macro-expansion snapshots remain stable across
   repeated builds. Signposts: `DES-7`, `NMR-1`, `ADR-2`.
-- [ ] Gate generated Kani harnesses with `#[cfg(kani)]` and emit required
+- [x] Gate generated Kani harnesses with `#[cfg(kani)]` and emit required
   `#[kani::proof]` and `#[kani::unwind(n)]` attributes from evidence.
   Acceptance: non-Kani `cargo build` succeeds and Kani-targeted builds discover
   harnesses. Signposts: `DES-7`, `DES-8`, `TFS-6`.
