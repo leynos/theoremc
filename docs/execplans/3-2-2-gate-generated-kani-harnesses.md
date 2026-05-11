@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -179,19 +179,49 @@ Observable success:
   `crates/theoremc-core/src/schema/types.rs` and
   `crates/theoremc-core/src/schema/validate.rs`.
 - [x] 2026-05-01: drafted this ExecPlan.
-- [ ] Await explicit user approval before implementation.
-- [ ] Milestone 0: add or adjust failing tests that describe the exact desired
+- [x] 2026-05-11: user approved implementation and requested milestone
+  validation with `coderabbit review --agent`, frequent commits, and continuous
+  ExecPlan updates.
+- [x] 2026-05-11: re-read the ExecPlan, checked the branch state, and confirmed
+  the worktree was clean before implementation.
+- [x] 2026-05-11: Milestone 0 red tests added. `cargo test -p
+  theoremc-macros
+  ` failed as expected because generated expansions do not yet contain `#[
+  cfg(kani)]`, `#[kani::proof]`, or evidence-derived `#[kani::unwind(n)]
+  `; the new `unwind:
+  0` macro-boundary case already passes through existing schema validation.
+- [x] Milestone 0: add or adjust failing tests that describe the exact desired
   Kani-gated expansion shape.
-- [ ] Milestone 1: update `theorem_file!` code generation so Kani harnesses are
+- [x] 2026-05-11: Milestone 1 implemented. `cargo test -p theoremc-macros`
+  passes after generating a `#[cfg(kani)]` backend module, adding
+  `#[kani::proof]` and `#[kani::unwind(n)]` per harness, and moving the
+  existing symbol anchor behind the same Kani cfg.
+- [x] Milestone 1: update `theorem_file!` code generation so Kani harnesses are
   cfg-gated and carry `#[kani::proof]` plus evidence-derived
   `#[kani::unwind(n)]`.
-- [ ] Milestone 2: update behavioural fixture coverage for non-Kani build
+- [x] 2026-05-11: Milestone 2 behavioural coverage updated.
+  `cargo test --test theorem_file_macro_bdd` passes with scenarios for non-Kani
+  fixture builds, invalid macro diagnostics, and `cargo kani list` discovery of
+  the generated proof harness.
+- [x] Milestone 2: update behavioural fixture coverage for non-Kani build
   success and Kani-configured harness discovery.
-- [ ] Milestone 3: update `docs/theoremc-design.md`, `docs/users-guide.md`,
+- [x] 2026-05-11: Milestone 3 documentation updated.
+  `docs/theoremc-design.md` records the Step 3.2.2 generation decisions,
+  `docs/users-guide.md` explains the consumer-visible cfg-gated Kani harness
+  behaviour, and `docs/roadmap.md` marks the Step 3.2.2 item done.
+- [x] Milestone 3: update `docs/theoremc-design.md`, `docs/users-guide.md`,
   and `docs/roadmap.md`.
-- [ ] Milestone 4: run formatting, documentation, lint, and test gates
+- [x] 2026-05-11: Milestone 4 validation complete. `make markdownlint`,
+  `make check-fmt`, `make nixie`, `make lint`, and `make test` pass.
+  `make fmt` runs `cargo fmt` but exits non-zero in its Markdown phase because
+  `markdownlint --fix` reports pre-existing MD013 line-length findings in
+  older repository docs; the repository-level `make markdownlint` target
+  passes after this change.
+- [x] Milestone 4: run formatting, documentation, lint, and test gates
   sequentially with captured logs.
-- [ ] Milestone 5: commit the completed implementation if all gates pass.
+- [x] 2026-05-11: Milestone 5 implementation committed as `106f7eb`
+  (`Gate generated Kani proof harnesses`).
+- [x] Milestone 5: commit the completed implementation if all gates pass.
 
 ## Surprises & Discoveries
 
@@ -208,6 +238,18 @@ Observable success:
   justification already exists in `theoremc-core`; this step should test that
   those failures still surface through the macro path rather than duplicating
   validation in the macro crate.
+- 2026-05-11: the macro-boundary `unwind: 0` test passes without production
+  changes, confirming that `theoremc-core` validation already rejects invalid
+  Kani unwind evidence before generation.
+- 2026-05-11: emitting `#[cfg(kani)]` from a macro triggers Rust's
+  `unexpected_cfgs` check in downstream crates unless the generated code also
+  scopes an allow for that lint. The allow must be on the generated per-file
+  module, not only on the individual cfg-gated items, to suppress the warning
+  at the macro callsite.
+- 2026-05-11: `cargo kani` is installed in this environment (`cargo-kani
+  0.67.0`), so behavioural coverage can run `cargo kani
+  list` against a fixture crate instead of relying only on token-shape
+  assertions for Kani discovery.
 
 ## Decision Log
 
@@ -230,10 +272,26 @@ Observable success:
   compilation, and Step 3.1 already established the stable `theorem_file!(...)`
   handoff.
 
+- 2026-05-11: use a tightly scoped generated
+  `#[allow(unexpected_cfgs, reason = "...")]` on the per-file theorem module.
+  Rationale: `cfg(kani)` is supplied by Kani rather than Cargo features, and
+  normal downstream crates should not need to configure check-cfg just to
+  compile theorem files.
+
 ## Outcomes & Retrospective
 
-No implementation has been performed yet. This ExecPlan is a draft awaiting
-explicit approval.
+Implemented generated Kani harness gating for Step 3.2.2. The macro now emits
+Kani proof harness stubs only under `#[cfg(kani)]`, adds `#[kani::proof]`, and
+uses each theorem document's validated `Evidence.kani.unwind` value for
+`#[kani::unwind(n)]`. Normal Rust builds continue to compile theorem files
+without requiring Kani, while `cargo kani list` discovers the generated proof
+harnesses.
+
+One implementation detail mattered more than expected: generated `cfg(kani)`
+items trigger Rust's `unexpected_cfgs` warning in ordinary downstream crates.
+The final implementation places a tightly scoped allow with a reason on the
+generated per-file module so consumers do not need to configure Cargo
+`check-cfg` for theoremc-generated code.
 
 ## Implementation plan
 
@@ -374,7 +432,8 @@ The commit subject should be imperative, for example:
 Gate generated Kani proof harnesses
 ```
 
-Do not commit if any required quality gate fails.
+Completed in commit `106f7eb` after the required quality gates passed. Do not
+commit if any required quality gate fails.
 
 ## Documentation and skill signposts
 
