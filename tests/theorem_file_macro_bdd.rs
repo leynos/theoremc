@@ -10,8 +10,8 @@ mod fixture_crate;
 
 use cargo_runner::CargoGuard;
 use fixture_crate::{
-    FIXTURE_BUILD_DEPENDENCIES, FixtureCrate, TheoremFixtureSpec, fixture_cargo_toml_for,
-    invalid_fixture_lib_rs, list_kani_harnesses, run_valid_fixture_build,
+    FIXTURE_BUILD_DEPENDENCIES, FIXTURE_LIB_RS, FixtureCrate, TheoremFixtureSpec,
+    fixture_cargo_toml_for, list_kani_harnesses, run_valid_fixture_build,
 };
 
 const VALID_SINGLE_THEOREM: &str = concat!(
@@ -119,7 +119,7 @@ fn then_compiling_the_fixture_crate_fails_with_an_actionable_theorem_diagnostic(
 -> Result<(), String> {
     let guard = CargoGuard::acquire();
     let theorem_path = "theorems/invalid.theorem";
-    let fixture = FixtureCrate::new(invalid_fixture_lib_rs())?;
+    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new(theorem_path), INVALID_THEOREM)?;
     let build_error = fixture
         .cargo_build(&guard)

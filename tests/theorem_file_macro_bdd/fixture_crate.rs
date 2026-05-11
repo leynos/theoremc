@@ -108,40 +108,26 @@ fn toml_basic_string_value(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-const fn fixture_lib_rs() -> &'static str {
-    concat!(
-        "//! Fixture crate for theorem_file macro behavioural tests.\n\n",
-        "#[doc(hidden)]\n",
-        "mod __theoremc_generated_suite {\n",
-        "    #[cfg(theoremc_has_theorems)]\n",
-        "    use theoremc::theorem_file;\n",
-        "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
-        "}\n",
-    )
-}
+pub(crate) const FIXTURE_LIB_RS: &str = concat!(
+    "//! Fixture crate for theorem_file macro behavioural tests.\n\n",
+    "#[doc(hidden)]\n",
+    "mod __theoremc_generated_suite {\n",
+    "    #[cfg(theoremc_has_theorems)]\n",
+    "    use theoremc::theorem_file;\n",
+    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
+    "}\n",
+);
 
 pub(crate) fn run_valid_fixture_build(spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
     let guard = CargoGuard::acquire();
-    let fixture = FixtureCrate::new(fixture_lib_rs())?;
+    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
     fixture.cargo_build(&guard)
 }
 
 pub(crate) fn list_kani_harnesses(spec: &TheoremFixtureSpec<'_>) -> Result<String, String> {
     let guard = CargoGuard::acquire();
-    let fixture = FixtureCrate::new(fixture_lib_rs())?;
+    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
     fixture.cargo_kani_list(&guard)
-}
-
-pub(crate) const fn invalid_fixture_lib_rs() -> &'static str {
-    concat!(
-        "//! Fixture crate for theorem_file macro behavioural tests.\n\n",
-        "#[doc(hidden)]\n",
-        "mod __theoremc_generated_suite {\n",
-        "    #[cfg(theoremc_has_theorems)]\n",
-        "    use theoremc::theorem_file;\n",
-        "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
-        "}\n",
-    )
 }
