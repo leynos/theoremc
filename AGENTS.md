@@ -137,14 +137,14 @@ project:
 
     ```sh
     cargo nextest run --workspace --all-targets --all-features
+    cargo test --workspace --all-features --doc
     ```
 
-    running the configured test suite through cargo-nextest. Use `make fmt`
-    (`cargo fmt --all` plus `mdformat-all`) to apply formatting fixes reported
-    by the formatter check.
-    `NEXTEST_FLAGS` is reserved for options supported by cargo-nextest; add
-    doctest-specific checks as separate targets instead of passing
-    `cargo test`-only flags through `make test`.
+    running the configured test suite through cargo-nextest and then compiling
+    Rustdoc examples through Cargo's doctest runner. Use `make fmt` (`cargo fmt
+    --all` plus `mdformat-all`) to apply formatting fixes reported by the
+    formatter check. `NEXTEST_FLAGS` is reserved for options supported by
+    cargo-nextest; use `DOCTEST_FLAGS` for the doctest pass.
 - Clippy warnings MUST be disallowed.
 - Fix any warnings emitted during tests in the code itself rather than
   silencing them.
