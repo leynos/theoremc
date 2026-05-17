@@ -140,8 +140,8 @@ project:
     ```
 
     running the configured test suite through cargo-nextest. Use `make fmt`
-    (`cargo fmt --workspace`) to apply formatting fixes reported by the
-    formatter check.
+    (`cargo fmt --all` plus `mdformat-all`) to apply formatting fixes reported
+    by the formatter check.
 - Clippy warnings MUST be disallowed.
 - Fix any warnings emitted during tests in the code itself rather than
   silencing them.
