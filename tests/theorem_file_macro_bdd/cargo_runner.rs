@@ -98,6 +98,20 @@ pub(crate) fn recover_mutex_guard(mutex: &Mutex<()>) -> MutexGuard<'_, ()> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+/// Returns `true` if `cargo kani` is available in the current environment.
+///
+/// Probes by running `cargo kani --version`. When `cargo-kani` is not
+/// installed, `cargo` exits with a non-zero status and emits
+/// `error: no such command: 'kani'`; `Command::output()` itself still succeeds
+/// because the `cargo` binary was found. The boolean is derived from the exit
+/// status alone, so no stderr parsing is required.
+pub(crate) fn kani_is_installed() -> bool {
+    Command::new("cargo")
+        .args(["kani", "--version"])
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+
 fn command_result(
     subcommand: CargoSubcommand,
     output: &std::process::Output,
