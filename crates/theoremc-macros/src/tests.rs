@@ -17,6 +17,7 @@ use super::{
 };
 use camino::Utf8Path;
 use proptest::prelude::{prop, prop_assert_eq, proptest};
+use proptest::{prop_assert, prop_assume};
 use rstest::rstest;
 use theoremc_core::{
     mangle::mangle_theorem_harness,
@@ -216,7 +217,7 @@ fn theorem_doc_with_unwind(name: String, unwind: u32) -> TheoremDoc {
 proptest! {
     #[test]
     fn generated_harnesses_preserve_count_order_and_unwinds(
-        unwinds in prop::collection::vec(1_u32..64, 1..8),
+        unwinds in prop::collection::vec(1_u32..=u32::MAX, 1..8),
     ) {
         let theorem_path = "theorems/generated.theorem";
         let docs = unwinds
@@ -241,6 +242,70 @@ proptest! {
             prop_assert_eq!(harness.ident.to_string(), expected_ident);
             prop_assert_eq!(actual_unwind, *unwind);
         }
+    }
+}
+
+proptest! {
+    #[test]
+    fn generated_harnesses_fails_when_any_doc_lacks_kani_evidence(
+        has_kani in prop::collection::vec(prop::bool::ANY, 1..8),
+    ) {
+        prop_assume!(!has_kani.iter().all(|&b| b));
+
+        let theorem_path = "theorems/mixed.theorem";
+        let docs: Vec<TheoremDoc> = has_kani
+            .iter()
+            .enumerate()
+            .map(|(index, &present)| {
+                let name = format!("Mixed{index}");
+                if present {
+                    theorem_doc_with_unwind(name, 1)
+                } else {
+                    TheoremDoc {
+                        schema: None,
+                        theorem: TheoremName::new(name).expect("valid theorem name"),
+                        about: "Missing kani".to_owned(),
+                        tags: Vec::new(),
+                        given: Vec::new(),
+                        forall: Default::default(),
+                        assume: Vec::new(),
+                        witness: vec![WitnessCheck {
+                            cover: "true".to_owned(),
+                            because: "reachable".to_owned(),
+                        }],
+                        let_bindings: Default::default(),
+                        do_steps: Vec::new(),
+                        prove: vec![Assertion {
+                            assert_expr: "true".to_owned(),
+                            because: "trivial".to_owned(),
+                        }],
+                        evidence: Evidence {
+                            kani: None,
+                            verus: None,
+                            stateright: None,
+                        },
+                    }
+                }
+            })
+            .collect();
+        let missing_names: Vec<String> = has_kani
+            .iter()
+            .enumerate()
+            .filter(|(_, present)| !**present)
+            .map(|(index, _)| format!("Mixed{index}"))
+            .collect();
+
+        let error = generated_harnesses(theorem_path, &docs)
+            .err()
+            .expect("at least one missing-kani doc must cause failure");
+
+        let MacroExpansionError::MissingKaniEvidence { theorem } = error else {
+            panic!("expected MissingKaniEvidence, got {error:?}");
+        };
+        prop_assert!(
+            missing_names.contains(&theorem),
+            "error named {theorem:?}, expected one of {missing_names:?}"
+        );
     }
 }
 
