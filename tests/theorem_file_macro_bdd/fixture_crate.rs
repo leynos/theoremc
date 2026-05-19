@@ -125,7 +125,9 @@ pub(crate) fn run_valid_fixture_build(spec: &TheoremFixtureSpec<'_>) -> Result<(
     fixture.cargo_build(&guard)
 }
 
-pub(crate) fn list_kani_harnesses(spec: &TheoremFixtureSpec<'_>) -> Result<String, String> {
+pub(crate) fn build_fixture_and_list_kani_harnesses(
+    spec: &TheoremFixtureSpec<'_>,
+) -> Result<String, String> {
     let guard = CargoGuard::acquire();
     let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;

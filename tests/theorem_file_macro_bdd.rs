@@ -11,7 +11,7 @@ mod fixture_crate;
 use cargo_runner::CargoGuard;
 use fixture_crate::{
     FIXTURE_BUILD_DEPENDENCIES, FIXTURE_LIB_RS, FixtureCrate, TheoremFixtureSpec,
-    fixture_cargo_toml_for, list_kani_harnesses, run_valid_fixture_build,
+    build_fixture_and_list_kani_harnesses, fixture_cargo_toml_for, run_valid_fixture_build,
 };
 
 const VALID_SINGLE_THEOREM: &str = concat!(
@@ -102,7 +102,7 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
         return Ok(());
     }
 
-    let output = list_kani_harnesses(&TheoremFixtureSpec {
+    let output = build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
         path: "theorems/single.theorem",
         content: VALID_SINGLE_THEOREM,
     })?;
