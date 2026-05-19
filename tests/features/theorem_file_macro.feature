@@ -21,3 +21,7 @@ Feature: theorem_file macro expansion
   Scenario: A theorem file without Kani evidence fails macro expansion
     Given a fixture crate with one theorem file missing Kani evidence
     Then compiling the fixture crate fails with a missing Kani evidence diagnostic
+
+  Scenario: A multi-document theorem file with partial Kani evidence fails macro expansion
+    Given a fixture crate with a multi-document theorem file missing one Kani evidence block
+    Then compiling the fixture crate fails with the partial Kani evidence diagnostic

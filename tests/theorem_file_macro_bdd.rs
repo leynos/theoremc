@@ -4,9 +4,12 @@ use std::io::Write as _;
 
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
+use theoremc::mangle::mangle_theorem_harness;
 
+/// Cargo command helpers shared by theorem-file macro BDD fixtures.
 #[path = "theorem_file_macro_bdd/cargo_runner.rs"]
 mod cargo_runner;
+/// Fixture crate construction for theorem-file macro BDD scenarios.
 #[path = "theorem_file_macro_bdd/fixture_crate.rs"]
 mod fixture_crate;
 
@@ -87,6 +90,32 @@ const MISSING_KANI_EVIDENCE_THEOREM: &str = concat!(
     "  verus: \"future backend\"\n",
 );
 
+const PARTIAL_KANI_EVIDENCE_THEOREM: &str = concat!(
+    "Theorem: CompleteKaniMacro\n",
+    "About: Complete Kani evidence macro coverage\n",
+    "Witness:\n",
+    "  - cover: \"true\"\n",
+    "    because: \"reachable\"\n",
+    "Prove:\n",
+    "  - assert: \"true\"\n",
+    "    because: \"trivial\"\n",
+    "Evidence:\n",
+    "  kani:\n",
+    "    unwind: 1\n",
+    "    expect: SUCCESS\n",
+    "---\n",
+    "Theorem: PartialKaniMacro\n",
+    "About: Partial Kani evidence macro coverage\n",
+    "Witness:\n",
+    "  - cover: \"true\"\n",
+    "    because: \"reachable\"\n",
+    "Prove:\n",
+    "  - assert: \"true\"\n",
+    "    because: \"trivial\"\n",
+    "Evidence:\n",
+    "  verus: \"future backend\"\n",
+);
+
 #[given("a fixture crate with one valid theorem file")]
 fn given_a_fixture_crate_with_one_valid_theorem_file() {}
 
@@ -113,10 +142,18 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
         path: "theorems/single.theorem",
         content: VALID_SINGLE_THEOREM,
     })?;
+    let expected_mangled_harness = mangle_theorem_harness("theorems/single.theorem", "SmokeMacro");
+    let expected_harness_identifier = expected_mangled_harness.identifier();
 
-    if !output.contains("theorem__smoke_macro__h") {
+    if !output.contains("Standard Harnesses (#[kani::proof]):")
+        || !output.contains("No contracts or contract harnesses found.")
+        || !output.contains(expected_harness_identifier)
+        || output.matches("theorem__").count() != 1
+        || !output.contains("| Total |")
+        || !output.contains("| 1")
+    {
         return Err(format!(
-            "expected Kani list output to include SmokeMacro harness, got:\n{output}"
+            "expected Kani list output to contain exactly the SmokeMacro harness, got:\n{output}"
         ));
     }
 
@@ -140,6 +177,9 @@ fn given_a_fixture_crate_with_one_invalid_theorem_file() {}
 
 #[given("a fixture crate with one theorem file missing Kani evidence")]
 fn given_a_fixture_crate_with_one_theorem_file_missing_kani_evidence() {}
+
+#[given("a fixture crate with a multi-document theorem file missing one Kani evidence block")]
+fn given_a_fixture_crate_with_a_multi_document_theorem_file_missing_one_kani_evidence_block() {}
 
 /// Asserts that a fixture build using the given theorem file fails and that the
 /// build error contains every string in `expected_fragments`.
@@ -191,6 +231,20 @@ fn then_compiling_the_fixture_crate_fails_with_a_missing_kani_evidence_diagnosti
     )
 }
 
+#[then("compiling the fixture crate fails with the partial Kani evidence diagnostic")]
+fn then_compiling_the_fixture_crate_fails_with_the_partial_kani_evidence_diagnostic()
+-> Result<(), String> {
+    assert_fixture_build_fails_with(
+        "theorems/partial-kani.theorem",
+        PARTIAL_KANI_EVIDENCE_THEOREM,
+        "multi-document theorem with partial Kani evidence unexpectedly compiled",
+        &[
+            "PartialKaniMacro",
+            "does not declare required `Evidence.kani` configuration",
+        ],
+    )
+}
+
 #[scenario(
     path = "tests/features/theorem_file_macro.feature",
     name = "A valid theorem file compiles without Kani installed"
@@ -220,6 +274,12 @@ fn an_invalid_theorem_file_fails_compilation_during_macro_expansion() {}
     name = "A theorem file without Kani evidence fails macro expansion"
 )]
 fn a_theorem_file_without_kani_evidence_fails_macro_expansion() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "A multi-document theorem file with partial Kani evidence fails macro expansion"
+)]
+fn a_multi_document_theorem_file_with_partial_kani_evidence_fails_macro_expansion() {}
 
 #[test]
 fn fixture_cargo_lock_acquires_without_poisoning() {
