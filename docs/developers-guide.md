@@ -182,13 +182,20 @@ where available, and run the direct Cargo invocations for specialized checks:
 | Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                           |
 | Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit           |
 | Architecture linting | `cargo dylint theoremc_arch_lint --all -- -D warnings`                                             | Flags schema layer boundary and other architecture rule violations |
-| Tests                | `make test`                                                                                        | `cargo test --workspace`                                           |
+| Tests                | `make test`                                                                                        | nextest test binaries plus Cargo doctests                          |
 | Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                               |
 | Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                               |
 | Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all` plus mdformat                                    |
 
 When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 `make nixie` must also pass.
+
+`make test` is intentionally nextest-backed for test binaries, followed by a
+Cargo doctest pass for Rustdoc examples. It runs
+`cargo nextest run --workspace --all-targets --all-features`, then
+`cargo test --workspace --all-features --doc`. Override `NEXTEST_FLAGS` only
+with options supported by cargo-nextest, and use `DOCTEST_FLAGS` for doctest
+scope.
 
 Capture long command output through `tee` with `set -o pipefail` to avoid
 losing truncated results:

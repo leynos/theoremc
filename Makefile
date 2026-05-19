@@ -10,7 +10,8 @@ BUILD_JOBS ?=
 RUST_FLAGS ?= -D warnings
 CARGO_FLAGS ?= --all-targets --all-features
 CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
-TEST_FLAGS ?= $(CARGO_FLAGS)
+NEXTEST_FLAGS ?= --workspace $(CARGO_FLAGS)
+DOCTEST_FLAGS ?= --workspace --all-features --doc
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
 
@@ -23,7 +24,8 @@ clean: ## Remove build artifacts
 	$(CARGO) clean
 
 test: ## Run tests with warnings treated as errors
-	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test $(TEST_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) nextest run $(NEXTEST_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$(RUST_FLAGS)" $(CARGO) test $(DOCTEST_FLAGS) $(BUILD_JOBS)
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)
