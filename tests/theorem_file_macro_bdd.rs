@@ -154,10 +154,10 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     Ok(())
 }
 
-fn is_expected_single_harness_listing(output: &str, expected_harness: &str) -> bool {
+fn is_expected_single_harness_listing(output: &str, expected_harness_identifier: &str) -> bool {
     output.contains("Standard Harnesses (#[kani::proof]):")
         && output.contains("No contracts or contract harnesses found.")
-        && output.contains(expected_harness)
+        && output.contains(expected_harness_identifier)
         && output.matches("theorem__").count() == 1
         && output.contains("| Total |")
         && output.contains("| 1")
