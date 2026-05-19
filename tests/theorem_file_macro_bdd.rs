@@ -145,19 +145,22 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     let expected_mangled_harness = mangle_theorem_harness("theorems/single.theorem", "SmokeMacro");
     let expected_harness_identifier = expected_mangled_harness.identifier();
 
-    if !output.contains("Standard Harnesses (#[kani::proof]):")
-        || !output.contains("No contracts or contract harnesses found.")
-        || !output.contains(expected_harness_identifier)
-        || output.matches("theorem__").count() != 1
-        || !output.contains("| Total |")
-        || !output.contains("| 1")
-    {
+    if !is_expected_single_harness_listing(&output, expected_harness_identifier) {
         return Err(format!(
             "expected Kani list output to contain exactly the SmokeMacro harness, got:\n{output}"
         ));
     }
 
     Ok(())
+}
+
+fn is_expected_single_harness_listing(output: &str, expected_harness: &str) -> bool {
+    output.contains("Standard Harnesses (#[kani::proof]):")
+        && output.contains("No contracts or contract harnesses found.")
+        && output.contains(expected_harness)
+        && output.matches("theorem__").count() == 1
+        && output.contains("| Total |")
+        && output.contains("| 1")
 }
 
 #[given("a fixture crate with one valid multi-document theorem file")]

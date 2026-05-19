@@ -1,0 +1,12 @@
+Theorem: ZeroUnwind
+About: Compile-fail trybuild fixture for invalid Kani unwind
+Witness:
+  - cover: "true"
+    because: "reachable"
+Prove:
+  - assert: "true"
+    because: "trivial"
+Evidence:
+  kani:
+    unwind: 0
+    expect: SUCCESS
