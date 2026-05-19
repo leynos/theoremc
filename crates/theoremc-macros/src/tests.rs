@@ -6,9 +6,14 @@ use super::tests_support::{
     make_single_theorem_fixture, redact_hashes, set_cargo_manifest_dir_for_test, temp_fixture_dir,
     write_fixture,
 };
-use super::{MacroExpansionError, expand_theorem_file_at, manifest_dir_from_env};
+use super::{
+    MacroExpansionError, expand_theorem_file_at, generated_harnesses, manifest_dir_from_env,
+};
 use camino::Utf8Path;
 use rstest::rstest;
+use theoremc_core::schema::{
+    Assertion, Evidence, TheoremDoc, TheoremName, TheoremValue, WitnessCheck,
+};
 
 #[test]
 fn single_document_expansion_matches_expected_shape() -> Result<(), Box<dyn std::error::Error>> {
@@ -125,6 +130,44 @@ fn expansion_snapshot_matches_golden_output() -> Result<(), Box<dyn std::error::
     // Redact non-deterministic hash suffixes; preserve structural whitespace.
     insta::assert_snapshot!("expansion_golden", redact_hashes(&formatted));
     Ok(())
+}
+
+#[test]
+fn generated_harnesses_reports_missing_kani_evidence() {
+    let doc = TheoremDoc {
+        schema: None,
+        theorem: TheoremName::new("NoKaniEvidence".to_owned()).expect("valid theorem name"),
+        about: "Missing Kani evidence coverage".to_owned(),
+        tags: Vec::new(),
+        given: Vec::new(),
+        forall: Default::default(),
+        assume: Vec::new(),
+        witness: vec![WitnessCheck {
+            cover: "true".to_owned(),
+            because: "reachable".to_owned(),
+        }],
+        let_bindings: Default::default(),
+        do_steps: Vec::new(),
+        prove: vec![Assertion {
+            assert_expr: "true".to_owned(),
+            because: "trivial".to_owned(),
+        }],
+        evidence: Evidence {
+            kani: None,
+            verus: Some(TheoremValue::String("future backend".to_owned())),
+            stateright: None,
+        },
+    };
+
+    let error = generated_harnesses("theorems/no-kani.theorem", &[doc])
+        .err()
+        .expect("missing Kani evidence should fail harness generation");
+
+    assert!(matches!(
+        error,
+        MacroExpansionError::MissingKaniEvidence { theorem }
+            if theorem == "NoKaniEvidence"
+    ));
 }
 
 #[rstest]
