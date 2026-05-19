@@ -1,5 +1,7 @@
 //! Behavioural tests for real `theorem_file!` proc-macro expansion.
 
+use std::io::Write as _;
+
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
 
@@ -99,6 +101,11 @@ fn then_the_fixture_crate_builds_without_a_kani_dependency() -> Result<(), Strin
 #[then("cargo-kani lists the generated proof harness when installed")]
 fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     if !cargo_runner::kani_is_installed() {
+        writeln!(
+            std::io::stderr(),
+            "cargo-kani not installed; skipping Kani harness listing check"
+        )
+        .map_err(|error| error.to_string())?;
         return Ok(());
     }
 
