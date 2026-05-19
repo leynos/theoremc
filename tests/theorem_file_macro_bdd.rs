@@ -134,58 +134,54 @@ fn given_a_fixture_crate_with_one_invalid_theorem_file() {}
 #[given("a fixture crate with one theorem file missing Kani evidence")]
 fn given_a_fixture_crate_with_one_theorem_file_missing_kani_evidence() {}
 
-#[then("compiling the fixture crate fails with an actionable theorem diagnostic")]
-fn then_compiling_the_fixture_crate_fails_with_an_actionable_theorem_diagnostic()
--> Result<(), String> {
+/// Asserts that a fixture build using the given theorem file fails and that the
+/// build error contains every string in `expected_fragments`.
+fn assert_fixture_build_fails_with(
+    theorem_path: &str,
+    theorem_content: &str,
+    unexpected_success_msg: &str,
+    expected_fragments: &[&str],
+) -> Result<(), String> {
     let guard = CargoGuard::acquire();
-    let theorem_path = "theorems/invalid.theorem";
     let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
-    fixture.write(Utf8Path::new(theorem_path), INVALID_THEOREM)?;
+    fixture.write(Utf8Path::new(theorem_path), theorem_content)?;
     let build_error = fixture
         .cargo_build(&guard)
         .err()
-        .ok_or_else(|| "invalid theorem fixture unexpectedly compiled".to_owned())?;
-
-    if !build_error.contains(theorem_path) {
-        return Err(format!(
-            "expected build failure to mention '{theorem_path}', got:\n{build_error}"
-        ));
+        .ok_or_else(|| unexpected_success_msg.to_owned())?;
+    for fragment in expected_fragments {
+        if !build_error.contains(fragment) {
+            return Err(format!(
+                "expected build failure to contain {fragment:?}, got:\n{build_error}"
+            ));
+        }
     }
-
-    if !build_error.contains("About must be non-empty") {
-        return Err(format!(
-            "expected build failure to mention 'About must be non-empty', got:\n{build_error}"
-        ));
-    }
-
     Ok(())
+}
+
+#[then("compiling the fixture crate fails with an actionable theorem diagnostic")]
+fn then_compiling_the_fixture_crate_fails_with_an_actionable_theorem_diagnostic()
+-> Result<(), String> {
+    assert_fixture_build_fails_with(
+        "theorems/invalid.theorem",
+        INVALID_THEOREM,
+        "invalid theorem fixture unexpectedly compiled",
+        &["theorems/invalid.theorem", "About must be non-empty"],
+    )
 }
 
 #[then("compiling the fixture crate fails with a missing Kani evidence diagnostic")]
 fn then_compiling_the_fixture_crate_fails_with_a_missing_kani_evidence_diagnostic()
 -> Result<(), String> {
-    let guard = CargoGuard::acquire();
-    let theorem_path = "theorems/missing-kani.theorem";
-    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
-    fixture.write(Utf8Path::new(theorem_path), MISSING_KANI_EVIDENCE_THEOREM)?;
-    let build_error = fixture
-        .cargo_build(&guard)
-        .err()
-        .ok_or_else(|| "theorem without Kani evidence unexpectedly compiled".to_owned())?;
-
-    if !build_error.contains("MissingKaniMacro") {
-        return Err(format!(
-            "expected build failure to mention MissingKaniMacro, got:\n{build_error}"
-        ));
-    }
-
-    if !build_error.contains("does not declare required `Evidence.kani` configuration") {
-        return Err(format!(
-            "expected build failure to mention missing Kani evidence, got:\n{build_error}"
-        ));
-    }
-
-    Ok(())
+    assert_fixture_build_fails_with(
+        "theorems/missing-kani.theorem",
+        MISSING_KANI_EVIDENCE_THEOREM,
+        "theorem without Kani evidence unexpectedly compiled",
+        &[
+            "MissingKaniMacro",
+            "does not declare required `Evidence.kani` configuration",
+        ],
+    )
 }
 
 #[scenario(
