@@ -92,7 +92,7 @@ use theoremc_core::{
 ///     const _: &str = include_str!(
 ///         concat!(env!("CARGO_MANIFEST_DIR"), "/", "theorems/my_theorem.theorem")
 ///     );
-///     #[allow(unexpected_cfgs, reason = "Kani sets cfg(kani) when compiling proof harnesses")]
+///     #[expect(unexpected_cfgs, reason = "Kani sets cfg(kani) when compiling proof harnesses")]
 ///     #[cfg(kani)]
 ///     pub(super) mod kani {
 ///         #[kani::proof]
@@ -151,7 +151,7 @@ fn render_expansion(
     let harness_count = syn::LitInt::new(&harness_idents.len().to_string(), Span::call_site());
 
     Ok(quote! {
-        #[allow(
+        #[expect(
             unexpected_cfgs,
             reason = "Kani sets cfg(kani) when compiling proof harnesses"
         )]

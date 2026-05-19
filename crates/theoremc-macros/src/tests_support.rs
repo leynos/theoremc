@@ -92,6 +92,12 @@ pub(super) fn expected_expansion_with_unwinds(
     theorems: &[&str],
     unwinds: &[u32],
 ) -> String {
+    assert_eq!(
+        theorems.len(),
+        unwinds.len(),
+        "theorem and unwind fixture counts must match"
+    );
+
     let module_name = mangle_module_path(path.as_str()).module_name().to_owned();
     let harnesses: Vec<String> = theorems
         .iter()
@@ -118,8 +124,8 @@ pub(super) fn expected_expansion_with_unwinds(
         .join(" , ");
 
     normalize(&format!(
-        "# [allow (unexpected_cfgs, reason = \"Kani sets cfg(kani) when compiling proof harnesses\")]
-        mod {module_name} {{
+        "# [expect (unexpected_cfgs, reason = \"Kani sets cfg(kani) when compiling proof harnesses\")]
+         mod {module_name} {{
             const _: & str = include_str! ( concat! ( env! (\"CARGO_MANIFEST_DIR\") , \"/\" , \"{path}\" ) ) ;
             # [cfg (kani)]
             pub(super) mod kani {{ {harness_defs} }}
