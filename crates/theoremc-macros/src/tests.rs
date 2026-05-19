@@ -10,9 +10,14 @@ use super::{
     MacroExpansionError, expand_theorem_file_at, generated_harnesses, manifest_dir_from_env,
 };
 use camino::Utf8Path;
+use proptest::prelude::{prop, prop_assert_eq, proptest};
 use rstest::rstest;
-use theoremc_core::schema::{
-    Assertion, Evidence, TheoremDoc, TheoremName, TheoremValue, WitnessCheck,
+use theoremc_core::{
+    mangle::mangle_theorem_harness,
+    schema::{
+        Assertion, Evidence, KaniEvidence, KaniExpectation, TheoremDoc, TheoremName, TheoremValue,
+        WitnessCheck,
+    },
 };
 
 #[test]
@@ -168,6 +173,69 @@ fn generated_harnesses_reports_missing_kani_evidence() {
         MacroExpansionError::MissingKaniEvidence { theorem }
             if theorem == "NoKaniEvidence"
     ));
+}
+
+fn theorem_doc_with_unwind(name: String, unwind: u32) -> TheoremDoc {
+    TheoremDoc {
+        schema: None,
+        theorem: TheoremName::new(name).expect("generated theorem name should be valid"),
+        about: "Generated theorem".to_owned(),
+        tags: Vec::new(),
+        given: Vec::new(),
+        forall: Default::default(),
+        assume: Vec::new(),
+        witness: vec![WitnessCheck {
+            cover: "true".to_owned(),
+            because: "reachable".to_owned(),
+        }],
+        let_bindings: Default::default(),
+        do_steps: Vec::new(),
+        prove: vec![Assertion {
+            assert_expr: "true".to_owned(),
+            because: "trivial".to_owned(),
+        }],
+        evidence: Evidence {
+            kani: Some(KaniEvidence {
+                unwind,
+                expect: KaniExpectation::Success,
+                allow_vacuous: false,
+                vacuity_because: None,
+            }),
+            verus: None,
+            stateright: None,
+        },
+    }
+}
+
+proptest! {
+    #[test]
+    fn generated_harnesses_preserve_count_order_and_unwinds(
+        unwinds in prop::collection::vec(1_u32..64, 1..8),
+    ) {
+        let theorem_path = "theorems/generated.theorem";
+        let docs = unwinds
+            .iter()
+            .enumerate()
+            .map(|(index, unwind)| theorem_doc_with_unwind(format!("Generated{index}"), *unwind))
+            .collect::<Vec<_>>();
+
+        let harnesses = generated_harnesses(theorem_path, &docs)
+            .expect("generated theorem documents should produce harnesses");
+
+        prop_assert_eq!(harnesses.len(), docs.len());
+        for ((harness, doc), unwind) in harnesses.iter().zip(&docs).zip(&unwinds) {
+            let expected_ident = mangle_theorem_harness(theorem_path, doc.theorem.as_str())
+                .identifier()
+                .to_owned();
+            let actual_unwind = harness
+                .unwind_literal
+                .base10_parse::<u32>()
+                .expect("generated unwind literal should parse as u32");
+
+            prop_assert_eq!(harness.ident.to_string(), expected_ident);
+            prop_assert_eq!(actual_unwind, *unwind);
+        }
+    }
 }
 
 #[rstest]

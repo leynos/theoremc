@@ -55,6 +55,7 @@ use theoremc_core::{
 /// | Theorem file cannot be read | `ReadTheoremFile` message with IO code |
 /// | File contains no theorem documents | `EmptyTheoremFile` message |
 /// | Schema parsing or validation fails | rendered `SchemaDiagnostic` (includes source location) |
+/// | A theorem omits `Evidence.kani` | theorem `<name>` does not declare required `Evidence.kani` configuration |
 ///
 /// # Panics
 ///
