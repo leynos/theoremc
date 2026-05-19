@@ -1,4 +1,10 @@
 //! Fixture crate construction for theorem-file macro behavioural tests.
+//!
+//! This module is the filesystem side of `theorem_file_macro_bdd.rs`: it
+//! creates isolated Cargo projects that include the real build script and
+//! generated-suite helpers from the root crate. It depends on `cargo_runner`
+//! for serialized Cargo execution, keeping fixture layout separate from
+//! process orchestration.
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};

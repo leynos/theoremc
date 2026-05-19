@@ -1,4 +1,10 @@
 //! Unit tests for deterministic theorem-file macro expansion.
+//!
+//! These tests exercise the private expansion pipeline in `lib.rs` directly,
+//! using `tests_support.rs` for temporary theorem fixtures and golden token
+//! rendering. The separate trybuild suite covers public compiler diagnostics;
+//! this module concentrates on internal expansion shape, ordering, and
+//! harness metadata before those tokens reach rustc.
 
 use super::tests_support::{
     TheoremFixture, TheoremSpec, assert_expansion_is_stable, assert_single_theorem_expansion,

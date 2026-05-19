@@ -232,11 +232,11 @@ impl MacroExpansionError {
     }
 }
 
-/// Test support helpers shared by macro expansion unit tests.
+/// Fixture and assertion helpers consumed by the private macro expansion tests.
 #[cfg(test)]
 mod tests_support;
 
-/// Unit tests for theorem-file proc-macro token generation.
+/// Private expansion tests that exercise this module through `tests_support`.
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;

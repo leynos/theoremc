@@ -6,10 +6,10 @@ use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::mangle::mangle_theorem_harness;
 
-/// Cargo command helpers shared by theorem-file macro BDD fixtures.
+/// Cargo process helpers used by the fixture crate module and BDD steps.
 #[path = "theorem_file_macro_bdd/cargo_runner.rs"]
 mod cargo_runner;
-/// Fixture crate construction for theorem-file macro BDD scenarios.
+/// Temporary crate builder that lets these BDD scenarios compile real macros.
 #[path = "theorem_file_macro_bdd/fixture_crate.rs"]
 mod fixture_crate;
 

@@ -1,4 +1,9 @@
 //! Cargo command serialization helpers for theorem-file macro fixtures.
+//!
+//! This module is the process boundary for `theorem_file_macro_bdd.rs`.
+//! `fixture_crate.rs` builds temporary crates, then delegates all Cargo
+//! invocations here so fixture builds and `cargo kani list` runs share one
+//! lock, target-directory policy, and error-reporting format.
 
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard, PoisonError};
