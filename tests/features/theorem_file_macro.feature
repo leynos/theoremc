@@ -17,3 +17,7 @@ Feature: theorem_file macro expansion
   Scenario: An invalid theorem file fails compilation during macro expansion
     Given a fixture crate with one invalid theorem file
     Then compiling the fixture crate fails with an actionable theorem diagnostic
+
+  Scenario: A theorem file without Kani evidence fails macro expansion
+    Given a fixture crate with one theorem file missing Kani evidence
+    Then compiling the fixture crate fails with a missing Kani evidence diagnostic

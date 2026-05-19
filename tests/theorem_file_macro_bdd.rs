@@ -72,6 +72,19 @@ const INVALID_THEOREM: &str = concat!(
     "    expect: SUCCESS\n",
 );
 
+const MISSING_KANI_EVIDENCE_THEOREM: &str = concat!(
+    "Theorem: MissingKaniMacro\n",
+    "About: Missing Kani evidence macro coverage\n",
+    "Witness:\n",
+    "  - cover: \"true\"\n",
+    "    because: \"reachable\"\n",
+    "Prove:\n",
+    "  - assert: \"true\"\n",
+    "    because: \"trivial\"\n",
+    "Evidence:\n",
+    "  verus: \"future backend\"\n",
+);
+
 #[given("a fixture crate with one valid theorem file")]
 fn given_a_fixture_crate_with_one_valid_theorem_file() {}
 
@@ -118,6 +131,9 @@ fn then_the_fixture_crate_builds_all_generated_theorem_entries_without_a_kani_de
 #[given("a fixture crate with one invalid theorem file")]
 fn given_a_fixture_crate_with_one_invalid_theorem_file() {}
 
+#[given("a fixture crate with one theorem file missing Kani evidence")]
+fn given_a_fixture_crate_with_one_theorem_file_missing_kani_evidence() {}
+
 #[then("compiling the fixture crate fails with an actionable theorem diagnostic")]
 fn then_compiling_the_fixture_crate_fails_with_an_actionable_theorem_diagnostic()
 -> Result<(), String> {
@@ -139,6 +155,33 @@ fn then_compiling_the_fixture_crate_fails_with_an_actionable_theorem_diagnostic(
     if !build_error.contains("About must be non-empty") {
         return Err(format!(
             "expected build failure to mention 'About must be non-empty', got:\n{build_error}"
+        ));
+    }
+
+    Ok(())
+}
+
+#[then("compiling the fixture crate fails with a missing Kani evidence diagnostic")]
+fn then_compiling_the_fixture_crate_fails_with_a_missing_kani_evidence_diagnostic()
+-> Result<(), String> {
+    let guard = CargoGuard::acquire();
+    let theorem_path = "theorems/missing-kani.theorem";
+    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
+    fixture.write(Utf8Path::new(theorem_path), MISSING_KANI_EVIDENCE_THEOREM)?;
+    let build_error = fixture
+        .cargo_build(&guard)
+        .err()
+        .ok_or_else(|| "theorem without Kani evidence unexpectedly compiled".to_owned())?;
+
+    if !build_error.contains("MissingKaniMacro") {
+        return Err(format!(
+            "expected build failure to mention MissingKaniMacro, got:\n{build_error}"
+        ));
+    }
+
+    if !build_error.contains("does not declare required `Evidence.kani` configuration") {
+        return Err(format!(
+            "expected build failure to mention missing Kani evidence, got:\n{build_error}"
         ));
     }
 
@@ -168,6 +211,12 @@ fn a_multi_document_theorem_file_compiles_without_kani_installed() {}
     name = "An invalid theorem file fails compilation during macro expansion"
 )]
 fn an_invalid_theorem_file_fails_compilation_during_macro_expansion() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "A theorem file without Kani evidence fails macro expansion"
+)]
+fn a_theorem_file_without_kani_evidence_fails_macro_expansion() {}
 
 #[test]
 fn fixture_cargo_lock_acquires_without_poisoning() {
