@@ -258,13 +258,19 @@ The proc-macro crate exposes the companion expansion boundary:
 
 | Symbol          | Kind         | Purpose                                                                                                                                                                                                          |
 | --------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `theorem_file!` | `proc macro` | Receives one crate-relative `.theorem` path literal, loads it from `CARGO_MANIFEST_DIR`, and expands each YAML document into deterministic theorem module and harness stubs surfaced through the generated suite |
+| `theorem_file!` | `proc macro` | Receives one crate-relative `.theorem` path literal, loads it from `CARGO_MANIFEST_DIR`, and expands each YAML document into a deterministic theorem module with `cfg(kani)`-gated harnesses derived from validated `Evidence.kani` fields |
 
 `theorem_file!` must fail macro expansion with the diagnostic rendered from the
 shared loader error when the path is invalid, the file cannot be read, the file
 is empty, or schema validation fails. It must call
 `load_theorem_file_from_manifest_dir` for IO, path validation, and schema
 diagnostics rather than re-implementing those behaviours locally.
+
+If a theorem document omits `Evidence.kani`, the macro fails expansion with
+`MissingKaniEvidence` for that theorem rather than generating a harness stub.
+The generated Kani module remains behind `#[cfg(kani)]`, and each harness gets
+its `#[kani::proof]` and `#[kani::unwind(n)]` attributes from the validated
+Kani evidence for that theorem document.
 
 The mutual invariant is that `TheoremFileLoadError` variants are the canonical
 error types at the macro/runtime boundary. The proc macro may render those
