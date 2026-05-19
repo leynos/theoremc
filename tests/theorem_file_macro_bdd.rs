@@ -96,7 +96,7 @@ fn then_the_fixture_crate_builds_without_a_kani_dependency() -> Result<(), Strin
     })
 }
 
-#[then("Kani lists the generated proof harness")]
+#[then("cargo-kani lists the generated proof harness when installed")]
 fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     if !cargo_runner::kani_is_installed() {
         return Ok(());
@@ -196,7 +196,7 @@ fn a_valid_theorem_file_compiles_without_kani_installed() {}
 
 #[scenario(
     path = "tests/features/theorem_file_macro.feature",
-    name = "A valid theorem file exposes a Kani proof harness"
+    name = "A valid theorem file exposes a Kani proof harness when cargo-kani is installed"
 )]
 fn a_valid_theorem_file_exposes_a_kani_proof_harness() {}
 

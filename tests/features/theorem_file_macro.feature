@@ -6,9 +6,9 @@ Feature: theorem_file macro expansion
     Given a fixture crate with one valid theorem file
     Then the fixture crate builds without a Kani dependency
 
-  Scenario: A valid theorem file exposes a Kani proof harness
+  Scenario: A valid theorem file exposes a Kani proof harness when cargo-kani is installed
     Given a fixture crate with one valid theorem file
-    Then Kani lists the generated proof harness
+    Then cargo-kani lists the generated proof harness when installed
 
   Scenario: A multi-document theorem file compiles without Kani installed
     Given a fixture crate with one valid multi-document theorem file
