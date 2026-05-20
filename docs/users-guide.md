@@ -32,9 +32,15 @@ After discovery, theoremc compiles each discovered theorem file through the
 public `theorem_file!` proc macro. Each invocation expands to a deterministic
 private per-file module, includes the theorem source via
 `include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", P))`, and creates one
-stable harness stub per theorem document in that file. Invalid theorem files
-therefore fail the Rust build during macro expansion, using the same schema
-diagnostics returned by `load_theorem_docs_with_source`.
+stable Kani proof harness stub per theorem document in that file.
+`Evidence.kani` is required for every theorem compiled by `theorem_file!`;
+omitting it fails macro expansion with `MissingKaniEvidence`. The generated
+Kani module is compiled only when `cfg(kani)` is active, so ordinary
+`cargo build` does not require Kani to be installed or available as a
+dependency. Invalid theorem files therefore fail the Rust build during macro
+expansion, using the same schema diagnostics returned by
+`load_theorem_docs_with_source` or the macro-specific missing Kani evidence
+diagnostic.
 
 ## Theorem file loading
 
@@ -300,7 +306,10 @@ Do:
 - `as` (optional): binding name for the return value.
 
 **Evidence**: backend configuration. Currently, supports `kani`, with `verus`
-and `stateright` as placeholders.
+and `stateright` as placeholders. The `Evidence` section is required for every
+theorem document, and `theorem_file!` requires an `Evidence.kani` entry so it
+can generate the Kani proof harness. Omitting `Evidence.kani` causes macro
+expansion to fail with `MissingKaniEvidence`.
 
 ```yaml
 Evidence:
@@ -620,6 +629,20 @@ identifier of the form:
 ```plaintext
 theorem__{theorem_slug(T)}__h{hash12(P#T)}
 ```
+
+Generated Kani proof harnesses live under the generated per-file module's
+`kani` submodule. That submodule is gated with `#[cfg(kani)]`; ordinary Rust
+builds still parse and validate theorem files, but they do not compile Kani
+attributes or require the Kani crate. Kani-targeted builds can discover these
+harnesses with their short harness identifiers or full module-qualified paths.
+
+Each generated harness currently has an empty body and carries:
+
+- `#[kani::proof]`
+- `#[kani::unwind(n)]`, where `n` comes from `Evidence.kani.unwind`
+
+Final theorem step semantics, including symbolic inputs, assumptions,
+assertions, witnesses, and action calls, are implemented in later roadmap steps.
 
 Where:
 

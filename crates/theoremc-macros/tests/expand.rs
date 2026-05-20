@@ -33,10 +33,14 @@ fn stage_fixture(name: &str) -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn compile_errors() -> Result<(), Box<dyn std::error::Error>> {
     stage_fixture("invalid_theorem.theorem")?;
+    stage_fixture("missing_kani_evidence.theorem")?;
     stage_fixture("valid_theorem.theorem")?;
+    stage_fixture("zero_unwind.theorem")?;
     let t = trybuild::TestCases::new();
     t.pass("tests/expand/valid_theorem.rs");
     t.compile_fail("tests/expand/invalid_theorem.rs");
+    t.compile_fail("tests/expand/missing_kani_evidence.rs");
     t.compile_fail("tests/expand/missing_theorem.rs");
+    t.compile_fail("tests/expand/zero_unwind.rs");
     Ok(())
 }

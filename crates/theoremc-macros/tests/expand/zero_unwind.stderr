@@ -1,0 +1,5 @@
+error: schema.validation_failure | tests/expand/zero_unwind.theorem:11:13 | Evidence.kani.unwind must be a positive integer (> 0)
+ --> tests/expand/zero_unwind.rs:7:32
+  |
+7 | theoremc_macros::theorem_file!("tests/expand/zero_unwind.theorem");
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

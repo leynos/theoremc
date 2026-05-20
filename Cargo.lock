@@ -1490,6 +1490,7 @@ dependencies = [
  "insta",
  "prettyplease",
  "proc-macro2",
+ "proptest",
  "quote",
  "rstest",
  "syn 2.0.117",

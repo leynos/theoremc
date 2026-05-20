@@ -1,0 +1,5 @@
+error: theorem `MissingKaniEvidence` does not declare required `Evidence.kani` configuration
+ --> tests/expand/missing_kani_evidence.rs:8:32
+  |
+8 | theoremc_macros::theorem_file!("tests/expand/missing_kani_evidence.theorem");
+  |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

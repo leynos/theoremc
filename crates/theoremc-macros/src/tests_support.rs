@@ -1,4 +1,11 @@
 //! Shared test helpers for theorem-file macro expansion tests.
+//!
+//! This module sits below `tests.rs` and owns the fixture-writing, environment
+//! isolation, and expected-token rendering needed to exercise
+//! `expand_theorem_file_at` without going through the public proc-macro entry
+//! point. Keeping these helpers separate lets the unit tests focus on macro
+//! behaviour while reusing one fixture shape for stability, diagnostics, and
+//! property-style coverage.
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
@@ -83,6 +90,21 @@ pub(super) fn redact_hashes(s: &str) -> String {
 }
 
 pub(super) fn expected_expansion(path: &Utf8Path, theorems: &[&str]) -> String {
+    let unwinds = vec![1; theorems.len()];
+    expected_expansion_with_unwinds(path, theorems, &unwinds)
+}
+
+pub(super) fn expected_expansion_with_unwinds(
+    path: &Utf8Path,
+    theorems: &[&str],
+    unwinds: &[u32],
+) -> String {
+    assert_eq!(
+        theorems.len(),
+        unwinds.len(),
+        "theorem and unwind fixture counts must match"
+    );
+
     let module_name = mangle_module_path(path.as_str()).module_name().to_owned();
     let harnesses: Vec<String> = theorems
         .iter()
@@ -94,7 +116,12 @@ pub(super) fn expected_expansion(path: &Utf8Path, theorems: &[&str]) -> String {
         .collect();
     let harness_defs = harnesses
         .iter()
-        .map(|harness| format!("pub(crate) fn {harness} () {{ }}"))
+        .zip(unwinds)
+        .map(|(harness, unwind)| {
+            format!(
+                "# [kani :: proof] # [kani :: unwind ({unwind})] pub(crate) fn {harness} () {{ }}"
+            )
+        })
         .collect::<Vec<_>>()
         .join(" ");
     let harness_refs = harnesses
@@ -104,9 +131,12 @@ pub(super) fn expected_expansion(path: &Utf8Path, theorems: &[&str]) -> String {
         .join(" , ");
 
     normalize(&format!(
-        "mod {module_name} {{
+        "# [expect (unexpected_cfgs, reason = \"Kani sets cfg(kani) when compiling proof harnesses\")]
+         mod {module_name} {{
             const _: & str = include_str! ( concat! ( env! (\"CARGO_MANIFEST_DIR\") , \"/\" , \"{path}\" ) ) ;
+            # [cfg (kani)]
             pub(super) mod kani {{ {harness_defs} }}
+            # [cfg (kani)]
             const _: [fn(); {}] = [ {} ] ;
         }}",
         harnesses.len(),

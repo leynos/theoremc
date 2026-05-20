@@ -4,12 +4,11 @@ use theoremc_macros::theorem_file;
 
 theorem_file!("tests/expand/valid_theorem.theorem");
 
-/// Assert the generated module contains the expected callable harness.
+/// Assert valid theorem files compile during ordinary Rust builds.
 ///
-/// This is a compile-time check: if the path, visibility, or generated
-/// signature is wrong, this fixture will not compile.
+/// Kani harness symbols are gated behind `cfg(kani)`, so this fixture proves
+/// that non-Kani builds do not need the Kani crate or Kani attributes.
 fn _assert_structure() {
-    let _: fn() = __theoremc__file__tests_expand_valid_theorem__c972e62265e3::kani::theorem__smoke_expansion__h19a3b63a856a;
 }
 
 fn main() {

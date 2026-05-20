@@ -1,0 +1,11 @@
+Schema: 1
+Theorem: MissingKaniEvidence
+About: Compile-fail fixture without Kani evidence
+Witness:
+  - cover: "true"
+    because: reachable
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  verus: "future backend"
