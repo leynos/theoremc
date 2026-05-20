@@ -247,6 +247,22 @@ proptest! {
 
 proptest! {
     #[test]
+    fn mangle_theorem_harness_is_deterministic(
+        path in "theorems/[a-zA-Z0-9_/]{1,32}\\.theorem",
+        name in "[A-Z][a-zA-Z0-9]{1,31}",
+    ) {
+        let first = mangle_theorem_harness(&path, &name);
+        let second = mangle_theorem_harness(&path, &name);
+        prop_assert_eq!(
+            first.identifier(),
+            second.identifier(),
+            "mangle_theorem_harness must return identical identifiers for identical inputs"
+        );
+    }
+}
+
+proptest! {
+    #[test]
     fn generated_harnesses_fails_when_any_doc_lacks_kani_evidence(
         has_kani in prop::collection::vec(prop::bool::ANY, 1..8),
     ) {
