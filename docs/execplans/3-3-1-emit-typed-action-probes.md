@@ -534,6 +534,9 @@ and documentation.
   `/tmp/test-theoremc-3-3-1-macro-probes-gate.out`.
 - [x] 2026-05-25 21:29 CEST: Marked the Step 3.3.1 roadmap entry done after
   the deterministic gates passed.
+- [x] 2026-05-25 21:40 CEST: Committed the typed probe implementation as
+  `d06ba1e` and ran `coderabbit review --agent`; CodeRabbit reported zero
+  findings.
 
 ## Surprises & Discoveries
 
