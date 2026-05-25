@@ -521,12 +521,33 @@ used for reporting and coverage, not for compile-time resolution.)
 
 ### 5.4 Action signature rules
 
-To keep generation predictable and avoid implicit cloning/magic:
+Action signatures are specified by theorem documents, not inferred from Rust
+action implementations. This follows
+[ADR 004](adr-004-action-signature-specification.md): `theorem_file!` must
+receive a stable expected signature before Rust type checking, and procedural
+macros cannot query rustc for the resolved type of
+`crate::theorem_actions::...` during expansion.
 
-- Parameters must be simple patterns: identifiers only (`graph: &mut Graph`,
-  not destructuring).
-- Parameter identifiers must be unique; they become the keys used in `.theorem`
+Each theorem document declares the expected signatures for referenced actions
+in a top-level `Actions` mapping:
+
+```yaml
+Actions:
+  hnsw.attach_node:
+    params:
+      graph: "&mut crate::hnsw::Graph"
+      node: "crate::hnsw::NodeId"
+    returns: "Result<(), crate::hnsw::AttachError>"
+```
+
+Rules:
+
+- `params` is an insertion-ordered mapping from parameter identifier to Rust
+  type. The map order is the generated function-pointer parameter order.
+- Parameter identifiers must be unique and must be the keys used in `.theorem`
   `args: { ... }`.
+- Parameter and return type strings must parse as `syn::Type`.
+- `returns` defaults to `()` when omitted.
 - Return types may be:
 
   - `()`
@@ -542,7 +563,8 @@ semantics in MVP.
 The generator constructs a Rust expression for each argument based on:
 
 - the YAML value,
-- and the *expected parameter type* from the action signature.
+- and the *expected parameter type* from the theorem-side action signature
+  declaration.
 
 Supported YAML value forms:
 
@@ -715,9 +737,9 @@ syntax validation (Step 1.2.2 of the roadmap):
   and separation of concerns.
 - A denylist approach rejects 14 `syn::Expr` variants that represent
   statement-like or block-like constructs: `Assign`, `Async`, `Block`, `Break`,
-  `Const`, `Continue`, `ForLoop`, `Let`, `Loop`, `Return`, `TryBlock`,
-  `Unsafe`, `While`, and `Yield`. This matches the spec requirement ("no
-  statement blocks, no `let`, no `for`, etc.").
+  `Const`, `Continue`, `ForLoop`, `Let`, `Loop`, `Return`, `TryBlock`, `Unsafe`,
+   `While`, and `Yield`. This matches the spec requirement ("no statement
+  blocks, no `let`, no `for`, etc.").
 - `if` and `match` expressions are allowed because they are value-producing
   expressions in Rust, not statement blocks.
 - Expression validation runs after non-blank field validation so that empty
@@ -734,10 +756,9 @@ deserialization (Step 1.1 of the roadmap):
   inner structs (`ActionCall`, `MaybeBlock`) instead; the untagged enum's
   variant matching already rejects unknown shapes structurally.
 - `serde-saphyr` does not provide a `Value` type. A project-specific
-  `TheoremValue` enum is used (`Bool`, `Integer`, `Float`, `String`,
-  `Sequence`, `Mapping`) with a handwritten `Deserialize` implementation. This
-  enforces no-null at the type level and avoids an unnecessary `serde_json`
-  dependency.
+  `TheoremValue` enum is used (`Bool`, `Integer`, `Float`, `String`, `Sequence`,
+   `Mapping`) with a handwritten `Deserialize` implementation. This enforces
+  no-null at the type level and avoids an unnecessary `serde_json` dependency.
 - `KaniExpectation` is modelled as a Rust enum with four variants (`Success`,
   `Failure`, `Unreachable`, `Undetermined`) and `#[serde(rename)]` attributes
   for the `UPPERCASE` string forms, catching invalid values at deserialization
@@ -872,8 +893,8 @@ collision detection (Step 2.1.3 of the roadmap):
 
 - Collision detection is placed in a new top-level `collision` module
   (`src/collision.rs`), separate from both `schema` and `mangle`. This
-  preserves the ADR-003 boundary: `schema` and `mangle` do not cross-depend.
-  The `collision` module wires both together as a cross-cutting concern.
+  preserves the ADR-003 boundary: `schema` and `mangle` do not cross-depend. The
+   `collision` module wires both together as a cross-cutting concern.
 - The collision check detects **mangled-identifier collisions**: different
   canonical names that produce the same mangled Rust identifier. This is a
   defensive safety net since the mangling algorithm is injective by design.
@@ -903,8 +924,8 @@ decoding for plain YAML strings (Step 2.3.1 of the roadmap):
   `Evidence` configs and other raw YAML values.
 - Decoding is performed in `RawTheoremDoc::to_theorem_doc()` rather than in a
   separate post-validation pass. The raw-to-public conversion is the natural
-  boundary where YAML-level types become domain-level types, consistent with
-  how `Spanned<String>` becomes `String` for other fields.
+  boundary where YAML-level types become domain-level types, consistent with how
+   `Spanned<String>` becomes `String` for other fields.
 - Nine raw serde-compatible types (`RawActionCall`, `RawLetCall`, `RawLetMust`,
   `RawLetBinding`, `RawStepCall`, `RawStepMust`, `RawStepMaybe`,
   `RawMaybeBlock`, `RawStep`) are extracted into `src/schema/raw_action.rs` to
@@ -963,8 +984,8 @@ roadmap):
   remains the public API surface and re-export point.
 - `theorem_slug` preserves identifiers already matching
   `^[a-z_][a-z0-9_]*$` exactly. Non-snake identifiers are converted with an
-  explicit character-walk algorithm that handles acronym runs (`HNSWInvariant`
-  → `hnsw_invariant`) and numeric boundaries (`HTTP2StreamID` →
+  explicit character-walk algorithm that handles acronym runs (`HNSWInvariant` →
+   `hnsw_invariant`) and numeric boundaries (`HTTP2StreamID` →
   `http_2_stream_id`) without depending on a generic case-conversion crate.
 - Duplicate theorem-key checking is implemented inside
   `load_theorem_docs_with_source`, after per-document conversion and validation
@@ -1032,8 +1053,8 @@ roadmap):
   expressions by parsing the validated identifier string into `syn::Ident`.
 - Sequences (`ArgValue::RawSequence`) are recursively lowered to `vec![...]`
   macro expressions. Each element is lowered via `lower_theorem_value`, which
-  handles nested scalars, references, and sequences. Empty lists are supported
-  (`vec![]`).
+  handles nested scalars, references, and sequences. Empty lists are supported (
+  `vec![]`).
 - Maps (`ArgValue::RawMap`) are lowered to struct literals using the type name
   extracted from `expected_type`. Field names must be valid Rust identifiers;
   field values are lowered recursively. No validation of field names or types
@@ -1354,11 +1375,29 @@ consumer crates should compile theorem files without adding their own
 
 ### 7.3 Binding probes
 
-“Typecheck probes” are generated to make drift obvious:
+“Typecheck probes” are generated to make drift obvious. For every distinct
+action referenced by `Let` or `Do`, `theorem_file!` reads the expected
+signature from the document's `Actions` declaration, mangles the canonical
+action name according to `docs/name-mangling-rules.md`, and emits an ordinary
+Rust function-pointer coercion:
 
-- For each referenced action function, emit a
-  `let _: fn(...) -> ... = crate::theorem_actions::...;`
-- For referenced types, emit phantom usages.
+```rust
+#[allow(dead_code, reason = "compile-time theorem action probes are never called")]
+fn __theoremc_action_probes() {
+    let _: fn(graph: &mut crate::hnsw::Graph, node: crate::hnsw::NodeId)
+        -> Result<(), crate::hnsw::AttachError> =
+        crate::theorem_actions::hnsw__attach_unode__h3f6b2a80c9d1;
+}
+```
+
+Missing action signature declarations fail as theorem schema diagnostics.
+Missing exports and incompatible Rust action signatures fail as ordinary rustc
+diagnostics against the generated probe. Placeholder probes such as
+`fn(_) -> _` are forbidden because Rust infers those placeholders from the
+current function item and therefore cannot detect signature drift.
+
+Referenced-type probes are separate from action probes. For referenced types,
+emit phantom usages in Step 3.3.2.
 
 This ensures that renames, signature drift, or missing re-exports fail
 compilation immediately, not “later when running theoremd”.
@@ -1556,8 +1595,8 @@ the settled syntax and the “no inline Rust blocks” rule.
 
 ### 12.1 Vacuous success and over-constraint
 
-Risk: a theorem “passes” because the harness never reaches the assertion
-(`UNREACHABLE`) or constraints remove all interesting executions.
+Risk: a theorem “passes” because the harness never reaches the assertion (
+`UNREACHABLE`) or constraints remove all interesting executions.
 
 Mitigation:
 

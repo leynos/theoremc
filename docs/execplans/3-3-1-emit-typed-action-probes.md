@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections
 `Surprises & Discoveries`, `Decision Log`, and
 `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: BLOCKED
+Status: IN PROGRESS
 
 ## Purpose / big picture
 
@@ -56,8 +56,10 @@ Observable success:
    happy-path builds, missing actions, and signature drift.
 9. Compile-fail tests cover generated-code diagnostics for missing action
    exports and incompatible signatures.
-10. `docs/theoremc-design.md`, `docs/users-guide.md`, and
-    `docs/developers-guide.md` describe the implemented probe contract.
+10. `docs/adr-004-action-signature-specification.md`,
+    `docs/theoremc-design.md`, `docs/theorem-file-specification.md`,
+    `docs/users-guide.md`, and `docs/developers-guide.md` describe the
+    implemented probe contract.
 11. `docs/roadmap.md` marks the Step 3.3.1 checkbox done only after
     implementation, validation, CodeRabbit review, and commit gates pass.
 12. `make check-fmt`, `make lint`, and `make test` pass. Because documentation
@@ -86,9 +88,9 @@ Observable success:
 - Do not introduce runtime action registries, `inventory`-based compile-time
   resolution, or reflection. DES-5 permits metadata for future reporting, but
   Step 3.3.1 must remain a compile-time binding check.
-- Do not broaden the `.theorem` file syntax unless the signature source
-  prototype proves there is no maintainable path using existing documented
-  action declarations and the user approves the schema change.
+- Use the theorem-side `Actions` signature declarations specified by
+  `docs/adr-004-action-signature-specification.md`. Do not broaden the
+  `.theorem` syntax beyond that declaration shape while implementing this step.
 - Keep new public API narrow. Prefer a small `theoremc-core` helper that
   returns distinct referenced actions over exposing collision internals.
 - Use `cap_std` and `camino` for filesystem work if implementation needs to
@@ -116,10 +118,10 @@ Observable success:
 
 - Approval: if this plan is not explicitly approved, do not make implementation
   changes.
-- Signature source: if a maintainable source of expected action signatures
-  cannot be established within one focused prototype milestone, stop, document
-  the failed approaches, and ask whether to split a preceding action-signature
-  declaration task.
+- Signature source: the maintainable source of expected action signatures is
+  now ADR-004 theorem-side `Actions` declarations. If implementation cannot use
+  that source without inventing a second manifest, source scanner, or
+  attribute-macro side channel, stop and reassess.
 - Scope: if implementation requires changing `.theorem` syntax, build-suite
   generation, Step 3.2 Kani harness layout, or Phase 4 harness bodies, stop and
   ask for direction.
@@ -147,15 +149,15 @@ Observable success:
 
 ## Risks
 
-- Risk: the current theorem schema stores action names and argument values, but
-  does not obviously store Rust action signatures. Severity: high. Likelihood:
-  high. Mitigation: start implementation with a signature-source prototype, and
-  do not weaken the acceptance criterion to a name-only probe.
+- Risk: the current code schema stores action names and argument values, but
+  does not yet implement the ADR-004 `Actions` signature field. Severity: high.
+  Likelihood: high. Mitigation: make schema support for `ActionSignature` the
+  first implementation step and keep typed probes dependent on it.
 
 - Risk: Rust procedural macros cannot ask the Rust type checker for a
   function's signature during expansion. Severity: high. Likelihood: high.
-  Mitigation: rely on explicit, parseable action signature information or stop
-  for a preceding design change rather than attempting runtime reflection.
+  Mitigation: rely only on explicit, parseable ADR-004 action signature
+  declarations and do not attempt runtime reflection or source scanning.
 
 - Risk: direct probes in non-Kani builds will make existing fixture crates fail
   unless they define `crate::theorem_actions`. Severity: medium. Likelihood:
@@ -202,6 +204,8 @@ Observable success:
 - `TFS-4`: `docs/theorem-file-specification.md` §4, step and action schemas.
 - `TFS-5`: `docs/theorem-file-specification.md` §5, value forms and explicit
   reference semantics.
+- `ADR-004`: `docs/adr-004-action-signature-specification.md`, theorem-side
+  action signature declarations and rejected inference approaches.
 - `docs/rust-testing-with-rstest-fixtures.md` for unit-test style.
 - `docs/reliable-testing-in-rust-via-dependency-injection.md` for fixture
   isolation and external process boundaries.
@@ -237,19 +241,22 @@ Use the existing `trybuild` harness in
 `crates/theoremc-macros/tests/expand.rs`, staging any `.theorem` fixtures it
 needs.
 
-Before implementing the feature, prototype the source of expected function
-signatures. The prototype must answer where `ExpectedArg1`, `ExpectedArg2`, and
-`ExpectedReturn` come from without runtime reflection. Acceptable outcomes are:
+The signature-source decision is now made by ADR-004. Implement the theorem-side
+`Actions` schema first, and make the initial red tests use declared signatures
+such as:
 
-1. Reuse existing documented action declaration information if it is already
-   parseable and sufficient.
-2. Add a narrow explicit signature declaration path that is still within the
-   documented action model and does not change `.theorem` syntax.
-3. Stop and ask for approval to split a preceding signature-declaration design
-   task.
+```yaml
+Actions:
+  account.deposit:
+    params:
+      account: "&mut crate::account::Account"
+      amount: "u64"
+    returns: "Result<(), crate::account::DepositError>"
+```
 
-Do not proceed to Milestone 1 until the red tests fail for the expected reason
-and the signature-source decision is recorded in this plan's Decision Log. Run:
+Do not proceed to Milestone 1 until the red tests fail for the expected reason:
+the schema understands signatures, but expansion does not yet emit typed action
+probes. Run:
 
 ```sh
 cargo test -p theoremc-macros --test expand 2>&1 | tee /tmp/test-theoremc-3-3-1-expand-red.out
@@ -467,13 +474,28 @@ and documentation.
   `let _: fn(_) -> _ = ...;`; rustc accepts the syntax, but it merely infers
   the current function item type and therefore cannot enforce a stable expected
   signature.
-- [ ] 2026-05-24: Implementation is blocked at the Milestone 0 signature-source
+- [x] 2026-05-24: Implementation reached the Milestone 0 signature-source
   tolerance. A maintainable source for `ExpectedArg...` and `ExpectedReturn`
-  is not present in the current theorem schema, macro input, or documented
+  was not present in the current theorem schema, macro input, or documented
   action metadata path.
 - [x] 2026-05-24: Ran targeted Markdown linting, `git diff --check`, and
-  `coderabbit review --agent` for the blocked-state ExecPlan update.
-  CodeRabbit reported zero findings.
+  `coderabbit review --agent` for the blocked-state ExecPlan update. CodeRabbit
+  reported zero findings.
+- [x] 2026-05-25: Drafted and finalized
+  `docs/adr-004-action-signature-specification.md`, using Firecrawl prior-art
+  research and local Rust experiments to decide on theorem-side `Actions`
+  declarations instead of inference from Rust action implementations.
+- [x] 2026-05-25: Updated `docs/theoremc-design.md`,
+  `docs/theorem-file-specification.md`, and `docs/contents.md` for ADR-004.
+- [x] 2026-05-25: Cleared the Milestone 0 signature-source blocker in this
+  plan. Implementation can resume with schema support for ADR-004 action
+  signatures.
+- [x] 2026-05-25: Ran scoped Markdown linting for the changed documents,
+  `git diff --check`, `make fmt`, `make markdownlint`, `make nixie`, and
+  `coderabbit review --agent` for the ADR-004 design milestone. Scoped linting,
+  diff checking, and `make nixie` passed. CodeRabbit reported ADR structure,
+  prose, and wrapping findings across review passes; all were fixed, and the
+  final rerun reported zero findings.
 
 ## Surprises & Discoveries
 
@@ -506,6 +528,17 @@ and documentation.
   proves name reachability and function-item coercion, but not the stable
   theorem-expected signature. It would let a changed action signature compile,
   violating the roadmap acceptance criterion.
+- Firecrawl prior-art research found no Rust mechanism that lets a proc macro
+  infer arbitrary resolved function signatures during expansion. The relevant
+  ecosystem patterns instead support either token-based procedural macros,
+  link-time distributed registries (`inventory`, `linkme`), or executable step
+  definitions such as Cucumber. None supplies a theorem-owned expected
+  signature to `theorem_file!`.
+- `make fmt` and `make markdownlint` still report pre-existing Markdown issues
+  outside the ADR-004 change. The current blocking repo-wide `make markdownlint`
+  finding is `docs/developers-guide.md:268:271` (`MD060` table column style).
+  `make fmt` also reports existing `MD013` line-length findings across older
+  documents after applying formatters. Unrelated formatter churn was discarded.
 
 ## Decision Log
 
@@ -536,11 +569,16 @@ and documentation.
   out of scope for this implementation pass. Rationale: deriving the expected
   signature from the current exported function cannot detect drift, and a
   general source resolver is explicitly beyond this ExecPlan's tolerances.
+- 2026-05-25: Resolve the signature-source blocker with ADR-004 theorem-side
+  `Actions` declarations. Rationale: the declaration is available to
+  `theorem_file!` during expansion, is independent of the current Rust action
+  implementation, provides parameter order and types for future argument
+  shaping, and keeps typed probes honest.
 
 ## Outcomes & Retrospective
 
-Implementation is blocked before production code changes. Milestone 0
-confirmed that the current repository has no maintainable source for expected
+Implementation was blocked before production code changes. Milestone 0
+confirmed that the previous design had no maintainable source for expected
 action signatures that can feed probes of the required form:
 
 ```rust
@@ -548,10 +586,8 @@ let _: fn(ExpectedArg1, ExpectedArg2) -> ExpectedReturn =
     crate::theorem_actions::mangled_action_identifier;
 ```
 
-The next viable step is a preceding design/implementation task that introduces
-an explicit action-signature declaration consumed by `theorem_file!`. Possible
-directions include a theorem-side declaration section, an action manifest
-generated by a build step, or an attribute-macro sidecar that produces a
-compile-time-readable signature list. Each option changes the contract beyond
-the current Step 3.3.1 implementation plan and requires approval before this
-feature can proceed.
+ADR-004 now supplies that source through theorem-side `Actions` declarations.
+The implementation remains incomplete, but the design blocker is cleared. The
+next implementation step is to add `ActionSignature` schema support and red
+tests that prove typed probe emission is still absent before Milestone 1
+continues.

@@ -241,6 +241,39 @@ Each `Step` is exactly one of:
 
 (Details below.)
 
+### 3.9.1 `Actions` (required when actions are referenced)
+
+- Type: mapping of `ActionName -> ActionSignature`
+- Default: `{}`
+
+Each entry declares the expected Rust function signature for an action named by
+`Let` or `Do`. The theorem document, not the current Rust implementation, is
+the source of this expected contract. This follows
+[ADR 004](adr-004-action-signature-specification.md).
+
+Example:
+
+```yaml
+Actions:
+  hnsw.attach_node:
+    params:
+      graph: "&mut crate::hnsw::Graph"
+      node: "crate::hnsw::NodeId"
+    returns: "Result<(), crate::hnsw::AttachError>"
+```
+
+Semantics:
+
+- Every action referenced by this document's `Let` and `Do` sections must have
+  a matching `Actions` entry.
+- `params` order is significant and defines the generated `fn(...)` probe
+  parameter order.
+- Parameter names must match `args` keys used by calls to the action.
+- Parameter and return type strings must parse as Rust type expressions.
+- `returns` defaults to `()` when omitted.
+- The generated probe checks the declared signature against the resolved
+  `crate::theorem_actions::{mangled_identifier}` export.
+
 ### 3.10 `Prove` (required)
 
 - Type: list of `Assertion`
@@ -308,6 +341,35 @@ Binding rules:
 
   - The `Let` key is the binding name; `as` is ignored (and should error if
     present, to prevent confusion).
+
+### 4.1.1 `ActionSignature`
+
+An `ActionSignature` is a mapping:
+
+- `params` (optional): ordered mapping of `Identifier -> RustType`
+- `returns` (optional): `RustType`, defaulting to `()`
+
+Examples:
+
+```yaml
+Actions:
+  account.deposit:
+    params:
+      account: "&mut crate::account::Account"
+      amount: "u64"
+    returns: "Result<(), crate::account::DepositError>"
+
+  audit.flush:
+    params: {}
+```
+
+`params` is optional only for zero-argument actions. If present, it may be an
+empty mapping. The implementation must preserve the order of `params`, because
+Rust function pointer types are positional even when their parameters are
+written with names.
+
+The `ActionSignature` declaration does not resolve or call the action. It is
+input to generated compile-time probes and later Kani action lowering.
 
 ### 4.2 `Step` variants
 
@@ -546,8 +608,8 @@ Collision checks:
 - Detect duplicate canonical action names and fail with source locations.
 - Detect duplicate mangled action identifiers and fail with all colliding names.
 
-This rule gives compile-time binding without relying on link-time registries
-(`inventory` remains useful for reporting, but is not required for resolution).
+This rule gives compile-time binding without relying on link-time registries (
+`inventory` remains useful for reporting, but is not required for resolution).
 This directly supports the “always connected” pattern described in the
 exploratory work.
 
@@ -691,8 +753,8 @@ This is not “extra design”; it is the schema expressed in the shape actually
 deserialized into.
 
 This can be implemented with `serde` derives and deserialized using
-`serde-saphyr` (e.g., `serde_saphyr::from_str`, or multi-doc APIs), as
-required.[^1]
+`serde-saphyr` (e.g., `serde_saphyr::from_str`, or multi-doc APIs), as required.
+[^1]
 
 ```rust
 // Pseudocode-level skeleton; fields omitted for brevity.
@@ -729,6 +791,9 @@ pub struct TheoremDoc {
 
     #[serde(rename = "Do", alias = "do", default)]
     pub do_steps: Vec<Step>,
+
+    #[serde(rename = "Actions", alias = "actions", default)]
+    pub actions: indexmap::IndexMap<String, ActionSignature>,
 
     #[serde(rename = "Prove", alias = "prove")]
     pub prove: Vec<Assertion>,
@@ -788,9 +853,19 @@ pub struct MaybeBlock {
 #[serde(deny_unknown_fields)]
 pub struct ActionCall {
     pub action: String,
-    pub args: indexmap::IndexMap<String, serde_saphyr::Value>, // or your own Value type
+    // Or your own Value type.
+    pub args: indexmap::IndexMap<String, serde_saphyr::Value>,
     #[serde(default)]
     pub as_: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActionSignature {
+    #[serde(default)]
+    pub params: indexmap::IndexMap<String, String>, // Identifier -> RustType
+    #[serde(default = "unit_type")]
+    pub returns: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -813,6 +888,10 @@ pub struct KaniEvidence {
     pub allow_vacuous: bool,
     #[serde(default)]
     pub vacuity_because: Option<String>,
+}
+
+fn unit_type() -> String {
+    "()".to_owned()
 }
 ```
 

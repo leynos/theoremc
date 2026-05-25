@@ -11,6 +11,9 @@
 - [Architecture Decision Record (ADR) 003: architectural boundary enforcement for schema layers](adr-003-architectural-boundary-enforcement.md)
   - Decision record for schema layering constraints, module boundary policy,
   and an incremental architecture-enforcement stack.
+- [Architecture Decision Record (ADR) 004: theorem-side action signatures](adr-004-action-signature-specification.md)
+  - Decision record for explicit theorem-side action signatures used by typed
+  action probes and future argument shaping.
 - [Navigating code complexity: a guide for implementers and maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring
   strategies for long-lived codebases.
