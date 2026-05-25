@@ -1,5 +1,9 @@
 Theorem: ArgLiteralWrapper
 About: Explicit literal wrapper is decoded as a string literal
+Actions:
+  label.set:
+    params:
+      label: String
 Let:
   result:
     call:

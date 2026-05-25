@@ -153,6 +153,7 @@ fn generated_harnesses_reports_missing_kani_evidence() {
         tags: Vec::new(),
         given: Vec::new(),
         forall: Default::default(),
+        actions: Default::default(),
         assume: Vec::new(),
         witness: vec![WitnessCheck {
             cover: "true".to_owned(),
@@ -190,6 +191,7 @@ fn theorem_doc_with_unwind(name: String, unwind: u32) -> TheoremDoc {
         tags: Vec::new(),
         given: Vec::new(),
         forall: Default::default(),
+        actions: Default::default(),
         assume: Vec::new(),
         witness: vec![WitnessCheck {
             cover: "true".to_owned(),
@@ -284,6 +286,7 @@ proptest! {
                         tags: Vec::new(),
                         given: Vec::new(),
                         forall: Default::default(),
+                        actions: Default::default(),
                         assume: Vec::new(),
                         witness: vec![WitnessCheck {
                             cover: "true".to_owned(),

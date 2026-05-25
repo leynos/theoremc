@@ -1,5 +1,13 @@
 Theorem: AlphaTheorem
 About: First theorem referencing account.deposit
+Actions:
+  account.deposit:
+    params:
+      amount: u64
+    returns: crate::account::Account
+  account.validate:
+    params:
+      account: crate::account::Account
 Let:
   result:
     call:
@@ -24,6 +32,11 @@ Witness:
 ---
 Theorem: BetaTheorem
 About: Second theorem also referencing account.deposit
+Actions:
+  account.deposit:
+    params:
+      amount: u64
+    returns: crate::account::Account
 Let:
   result:
     call:

@@ -89,11 +89,25 @@ fn check_action_collisions_with(
 // ── Action-name collection ──────────────────────────────────────────
 
 /// A single occurrence of a canonical action name within a theorem.
-struct ActionOccurrence<'a> {
+pub struct ActionOccurrence<'a> {
     /// The canonical dot-separated action name.
-    canonical: &'a str,
+    pub canonical: &'a str,
     /// The theorem name where this action was referenced.
-    theorem: &'a str,
+    pub theorem: &'a str,
+}
+
+/// Returns each distinct canonical action referenced by the loaded theorem
+/// documents in deterministic first-seen order.
+#[must_use]
+pub fn referenced_actions(docs: &[TheoremDoc]) -> Vec<&str> {
+    let mut seen = BTreeSet::new();
+    let mut distinct = Vec::new();
+    for occurrence in collect_all_occurrences(docs) {
+        if seen.insert(occurrence.canonical) {
+            distinct.push(occurrence.canonical);
+        }
+    }
+    distinct
 }
 
 /// Collects all canonical action name occurrences from all documents.

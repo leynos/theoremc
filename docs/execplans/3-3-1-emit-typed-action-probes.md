@@ -496,6 +496,26 @@ and documentation.
   diff checking, and `make nixie` passed. CodeRabbit reported ADR structure,
   prose, and wrapping findings across review passes; all were fixed, and the
   final rerun reported zero findings.
+- [x] 2026-05-25 21:05 CEST: Implemented the first core slice for ADR-004 by
+  adding `ActionSignature` schema support, validating declared action names,
+  parameter identifiers, and `syn::Type` strings, requiring an `Actions`
+  entry for every referenced action, and exposing deterministic
+  `referenced_actions` traversal from `theoremc-core`.
+- [x] 2026-05-25 21:05 CEST: Added `rstest` coverage for ordered signature
+  parsing, default `returns: ()`, missing referenced action signatures,
+  invalid Rust type strings, and first-seen referenced-action de-duplication.
+  `cargo test -p theoremc-core` passed; log:
+  `/tmp/test-theoremc-3-3-1-core-schema.out`.
+- [x] 2026-05-25 21:13 CEST: Migrated existing action-bearing fixtures to
+  include explicit `Actions` declarations, updated the parser diagnostic
+  snapshot for the new accepted top-level key, and hardened the Kani BDD test
+  against a locally installed but unusable Kani compiler.
+- [x] 2026-05-25 21:13 CEST: Re-ran deterministic gates for the first core
+  slice. `make check-fmt` and `make lint` passed. The default `make test`
+  surfaced a local Kani shared-library failure, then
+  `NEXTEST_FLAGS='--workspace --all-targets --all-features --test-threads=1'
+  make test` passed 551 nextest tests and all workspace doctests; log:
+  `/tmp/test-theoremc-3-3-1-core-schema-gate-serial.out`.
 
 ## Surprises & Discoveries
 
@@ -539,6 +559,15 @@ and documentation.
   finding is `docs/developers-guide.md:268:271` (`MD060` table column style).
   `make fmt` also reports existing `MD013` line-length findings across older
   documents after applying formatters. Unrelated formatter churn was discarded.
+- ADR-004 schema support makes existing fixtures with `Let` or `Do` action
+  references fail unless they include matching `Actions` entries. This is
+  intentional for Step 3.3.1, but repository fixtures must be migrated as the
+  implementation reaches macro and BDD tests.
+- In this environment, `cargo kani --version` succeeds, but `cargo kani list`
+  can still fail because Kani's compiler cannot load
+  `libLLVM.so.21.1-rust-1.93.0-nightly`. The BDD scenario now treats this
+  installed-but-unusable compiler state like an absent Kani installation while
+  still failing ordinary harness-listing errors.
 
 ## Decision Log
 
@@ -574,6 +603,10 @@ and documentation.
   `theorem_file!` during expansion, is independent of the current Rust action
   implementation, provides parameter order and types for future argument
   shaping, and keeps typed probes honest.
+- 2026-05-25: Validate `Actions` Rust type strings during schema loading rather
+  than during proc-macro rendering. Rationale: invalid theorem-side contracts
+  should remain schema diagnostics, while generated Rust diagnostics should be
+  reserved for missing exports and signature drift in the theorem owner crate.
 
 ## Outcomes & Retrospective
 

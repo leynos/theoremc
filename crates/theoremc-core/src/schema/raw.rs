@@ -123,6 +123,8 @@ pub(crate) struct RawTheoremDoc {
     pub(crate) given: Vec<String>,
     #[serde(rename = "Forall", alias = "forall", default)]
     pub(crate) forall: IndexMap<ForallVar, String>,
+    #[serde(rename = "Actions", alias = "actions", default)]
+    pub(crate) actions: IndexMap<String, super::types::ActionSignature>,
     #[serde(rename = "Assume", alias = "assume", default)]
     pub(crate) assume: Vec<RawAssumption>,
     #[serde(rename = "Witness", alias = "witness", default)]
@@ -206,6 +208,7 @@ impl RawTheoremDoc {
             tags: self.tags.clone(),
             given: self.given.clone(),
             forall: self.forall.clone(),
+            actions: self.actions.clone(),
             assume: self
                 .assume
                 .iter()

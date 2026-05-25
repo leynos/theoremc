@@ -5,10 +5,13 @@
 //! The entry point is [`validate_theorem_doc`], called by the loader after
 //! successful YAML deserialization.
 
+use super::action_name::validate_canonical_action_name;
 use super::error::SchemaError;
 use super::expr;
+use super::identifier::validate_identifier;
 use super::step;
 use super::types::{KaniEvidence, LetBinding, TheoremDoc};
+use crate::collision::referenced_actions;
 
 #[path = "validate_reason_markers.rs"]
 pub(crate) mod reason_markers;
@@ -104,8 +107,10 @@ pub(crate) fn validate_theorem_doc(doc: &TheoremDoc) -> Result<(), SchemaError> 
     validate_assumptions(doc)?;
     validate_witnesses(doc)?;
     validate_expressions(doc)?;
+    validate_action_signatures(doc)?;
     validate_let_bindings(doc)?;
     validate_do_steps(doc)?;
+    validate_referenced_action_signatures(doc)?;
     validate_evidence(doc)?;
     Ok(())
 }
@@ -178,6 +183,37 @@ fn validate_expressions(doc: &TheoremDoc) -> Result<(), SchemaError> {
     Ok(())
 }
 
+/// Every declared action signature must have a canonical name, valid parameter
+/// identifiers, and Rust type strings that parse as `syn::Type`.
+fn validate_action_signatures(doc: &TheoremDoc) -> Result<(), SchemaError> {
+    for (action, signature) in &doc.actions {
+        validate_canonical_action_name(action)
+            .map_err(|r| fail(doc, format!("Actions entry '{action}': {r}")))?;
+        for (param, ty) in &signature.params {
+            validate_identifier(param)
+                .map_err(|r| fail(doc, format!("Actions entry '{action}': param {r}")))?;
+            validate_rust_type(doc, action, param, ty)?;
+        }
+        validate_rust_type(doc, action, "returns", &signature.returns)?;
+    }
+    Ok(())
+}
+
+fn validate_rust_type(
+    doc: &TheoremDoc,
+    action: &str,
+    field: &str,
+    ty: &str,
+) -> Result<(), SchemaError> {
+    syn::parse_str::<syn::Type>(ty.trim()).map_err(|error| {
+        fail(
+            doc,
+            format!("Actions entry '{action}': {field} type is not a valid Rust type: {error}"),
+        )
+    })?;
+    Ok(())
+}
+
 // ── Step and Let binding validation ──────────────────────────────
 
 /// Every `Let` binding's `ActionCall.action` must be non-empty
@@ -197,6 +233,21 @@ fn validate_let_bindings(doc: &TheoremDoc) -> Result<(), SchemaError> {
 /// Every `Do` step must have valid shape (`TFS-4` §3.9, §4.2.3).
 fn validate_do_steps(doc: &TheoremDoc) -> Result<(), SchemaError> {
     step::validate_step_list(&doc.do_steps, "Do step").map_err(|r| fail(doc, r))
+}
+
+/// Every referenced action must have a theorem-side `Actions` signature
+/// declaration before code generation can emit typed probes.
+fn validate_referenced_action_signatures(doc: &TheoremDoc) -> Result<(), SchemaError> {
+    let docs = std::slice::from_ref(doc);
+    for action in referenced_actions(docs) {
+        if !doc.actions.contains_key(action) {
+            return Err(fail(
+                doc,
+                format!("referenced action '{action}' is missing an Actions signature entry"),
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Evidence section must specify at least one backend, and Kani

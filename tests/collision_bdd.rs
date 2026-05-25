@@ -45,6 +45,10 @@ fn given_single_theorem_with_repeated_action_calls() {}
 const REPEATED_ACTION_YAML: &str = r"
 Theorem: RepeatedActions
 About: Calls account.deposit twice in the Do sequence
+Actions:
+  account.deposit:
+    params:
+      amount: u64
 Do:
   - call:
       action: account.deposit
@@ -84,6 +88,8 @@ fn then_loading_succeeds_for_distinct_names() -> Result<(), String> {
     let yaml_a = r"
 Theorem: A
 About: first
+Actions:
+  alpha.action: {}
 Let:
   r:
     call:
@@ -103,6 +109,8 @@ Witness:
     let yaml_b = r"
 Theorem: B
 About: second
+Actions:
+  beta.action: {}
 Let:
   r:
     call:

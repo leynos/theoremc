@@ -1,5 +1,13 @@
 theorem: LowerAliasMustFlow
 about: Lowercase aliases with must bindings remain supported.
+actions:
+  account.params:
+    params:
+      max_balance: u64
+    returns: crate::account::Params
+  account.validate:
+    params:
+      account: crate::account::Params
 let:
   start:
     must:

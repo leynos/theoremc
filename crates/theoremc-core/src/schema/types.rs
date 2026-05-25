@@ -67,6 +67,9 @@ pub struct TheoremDoc {
     /// Symbolic quantified variables mapped to Rust types.
     pub forall: IndexMap<ForallVar, String>,
 
+    /// Expected Rust signatures for referenced theorem actions.
+    pub actions: IndexMap<String, ActionSignature>,
+
     /// Constraints on symbolic inputs.
     pub assume: Vec<Assumption>,
 
@@ -231,6 +234,27 @@ pub struct ActionCall {
     pub args: IndexMap<String, ArgValue>,
     /// Optional binding name for the action's return value.
     pub as_binding: Option<String>,
+}
+
+// ── Action signatures ──────────────────────────────────────────────
+
+/// A theorem-owned expected Rust signature for an action.
+///
+/// `params` preserves YAML insertion order because generated probes use this
+/// order for the bare function pointer parameter list.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActionSignature {
+    /// Ordered parameter names and Rust type strings.
+    #[serde(default)]
+    pub params: IndexMap<String, String>,
+    /// Rust return type. Omitted declarations default to unit.
+    #[serde(default = "unit_return_type")]
+    pub returns: String,
+}
+
+fn unit_return_type() -> String {
+    "()".to_owned()
 }
 
 // ── Evidence ────────────────────────────────────────────────────────
