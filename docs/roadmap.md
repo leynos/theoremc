@@ -295,7 +295,7 @@ In scope: generated probe bindings for actions and types to detect drift.
 
 Out of scope: runtime reflection.
 
-- [ ] Emit typed action probes (`let _: fn(...) -> ... = ...;`) for every
+- [x] Emit typed action probes (`let _: fn(...) -> ... = ...;`) for every
   referenced action to force signature compatibility at compile time.
   Acceptance: signature drift causes compile failure in the theorem owner
   crate. Signposts: `DES-7`, `DES-5`, `NMR-1`.

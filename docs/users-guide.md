@@ -478,6 +478,37 @@ Evidence:
     expect: SUCCESS
 ```
 
+## Declaring action signatures
+
+Theorem files that reference actions in `Let` or `Do` must declare the
+expected Rust signature for each referenced action in a top-level `Actions`
+mapping. The theorem document is the source of truth for this contract; the
+macro checks it against the Rust export during compilation.
+
+```yaml
+Actions:
+  account.deposit:
+    params:
+      account: "&mut crate::account::Account"
+      amount: u64
+    returns: "Result<(), crate::account::DepositError>"
+```
+
+Each `Actions` key is the canonical action name used by `Let` and `Do`.
+Parameter order is the order written in `params`, and `returns` defaults to
+`()`. Parameter and return values are Rust type strings.
+
+During `theorem_file!` expansion, theoremc mangles the canonical action name
+and emits a compile-time probe of this form:
+
+```rust
+let _: fn(&mut crate::account::Account, u64) -> Result<(), crate::account::DepositError> =
+    crate::theorem_actions::account__deposit__h05158894bfb4;
+```
+
+If the `crate::theorem_actions` export is missing, renamed, or has a different
+signature, the theorem owner crate fails to compile.
+
 ## Action name mangling
 
 The `theoremc::mangle` module provides deterministic, injective transformation

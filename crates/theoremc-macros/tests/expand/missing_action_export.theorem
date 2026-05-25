@@ -1,0 +1,23 @@
+Schema: 1
+Theorem: MissingActionExport
+About: Compile-fail missing action export fixture
+Actions:
+  account.deposit:
+    params:
+      account: u64
+    returns: bool
+Do:
+  - call:
+      action: account.deposit
+      args:
+        account: 10
+Witness:
+  - cover: "true"
+    because: reachable
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS

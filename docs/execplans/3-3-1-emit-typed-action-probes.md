@@ -1,9 +1,8 @@
 # Step 3.3.1: emit typed action probes
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`,
-`Surprises & Discoveries`, `Decision Log`, and
-`Outcomes & Retrospective` must be kept up to date as work proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+ `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: IN PROGRESS
 
@@ -39,7 +38,7 @@ Observable success:
    `cargo build`.
 2. The generated expansion contains one deterministic typed action probe per
    distinct referenced canonical action, covering both `Let` bindings and nested
-   `Do` steps.
+    `Do` steps.
 3. A fixture crate whose theorem references a missing action export fails
    compilation with a Rust diagnostic pointing at the generated probe's
    `crate::theorem_actions::...` path.
@@ -242,7 +241,7 @@ Use the existing `trybuild` harness in
 needs.
 
 The signature-source decision is now made by ADR-004. Implement the theorem-side
-`Actions` schema first, and make the initial red tests use declared signatures
+ `Actions` schema first, and make the initial red tests use declared signatures
 such as:
 
 ```yaml
@@ -498,12 +497,12 @@ and documentation.
   final rerun reported zero findings.
 - [x] 2026-05-25 21:05 CEST: Implemented the first core slice for ADR-004 by
   adding `ActionSignature` schema support, validating declared action names,
-  parameter identifiers, and `syn::Type` strings, requiring an `Actions`
-  entry for every referenced action, and exposing deterministic
-  `referenced_actions` traversal from `theoremc-core`.
+  parameter identifiers, and `syn::Type` strings, requiring an `Actions` entry
+  for every referenced action, and exposing deterministic `referenced_actions`
+  traversal from `theoremc-core`.
 - [x] 2026-05-25 21:05 CEST: Added `rstest` coverage for ordered signature
-  parsing, default `returns: ()`, missing referenced action signatures,
-  invalid Rust type strings, and first-seen referenced-action de-duplication.
+  parsing, default `returns: ()`, missing referenced action signatures, invalid
+  Rust type strings, and first-seen referenced-action de-duplication.
   `cargo test -p theoremc-core` passed; log:
   `/tmp/test-theoremc-3-3-1-core-schema.out`.
 - [x] 2026-05-25 21:13 CEST: Migrated existing action-bearing fixtures to
@@ -513,9 +512,28 @@ and documentation.
 - [x] 2026-05-25 21:13 CEST: Re-ran deterministic gates for the first core
   slice. `make check-fmt` and `make lint` passed. The default `make test`
   surfaced a local Kani shared-library failure, then
-  `NEXTEST_FLAGS='--workspace --all-targets --all-features --test-threads=1'
-  make test` passed 551 nextest tests and all workspace doctests; log:
+  the serialised full-suite command passed 551 nextest tests and all workspace
+  doctests; log:
   `/tmp/test-theoremc-3-3-1-core-schema-gate-serial.out`.
+- [x] 2026-05-25 21:22 CEST: Committed the ADR-004 schema and validation
+  milestone as `0f9cb63` and ran `coderabbit review --agent`; CodeRabbit
+  reported zero findings.
+- [x] 2026-05-25 21:27 CEST: Implemented typed action probe emission in
+  `theoremc-macros`, using `referenced_actions` plus `mangle_action_name` to
+  generate non-Kani `let _: fn(...) -> ... = crate::theorem_actions::...;`
+  checks for each distinct referenced action.
+- [x] 2026-05-25 21:27 CEST: Added macro unit tests for emitted probe shape
+  and conflicting shared action signatures, plus trybuild coverage proving a
+  valid export compiles, a missing export fails, and return-type drift fails.
+  `cargo test -p theoremc-macros` passed; log:
+  `/tmp/test-theoremc-3-3-1-macro-probes-trybuild.out`.
+- [x] 2026-05-25 21:29 CEST: Re-ran implementation gates for the macro probe
+  milestone. `make check-fmt`, targeted Markdown linting for changed docs,
+  `make lint`, and `make test` passed. The full test target ran 554 nextest
+  tests plus all workspace doctests; log:
+  `/tmp/test-theoremc-3-3-1-macro-probes-gate.out`.
+- [x] 2026-05-25 21:29 CEST: Marked the Step 3.3.1 roadmap entry done after
+  the deterministic gates passed.
 
 ## Surprises & Discoveries
 
@@ -555,10 +573,11 @@ and documentation.
   definitions such as Cucumber. None supplies a theorem-owned expected
   signature to `theorem_file!`.
 - `make fmt` and `make markdownlint` still report pre-existing Markdown issues
-  outside the ADR-004 change. The current blocking repo-wide `make markdownlint`
-  finding is `docs/developers-guide.md:268:271` (`MD060` table column style).
-  `make fmt` also reports existing `MD013` line-length findings across older
-  documents after applying formatters. Unrelated formatter churn was discarded.
+  outside the ADR-004 change. The current blocking repo-wide
+  `make markdownlint` finding is `docs/developers-guide.md:268:271` (`MD060`
+  table column style). `make fmt` also reports existing `MD013` line-length
+  findings across older documents after applying formatters. Unrelated
+  formatter churn was discarded.
 - ADR-004 schema support makes existing fixtures with `Let` or `Do` action
   references fail unless they include matching `Actions` entries. This is
   intentional for Step 3.3.1, but repository fixtures must be migrated as the
@@ -568,6 +587,14 @@ and documentation.
   `libLLVM.so.21.1-rust-1.93.0-nightly`. The BDD scenario now treats this
   installed-but-unusable compiler state like an absent Kani installation while
   still failing ordinary harness-listing errors.
+- `make fmt` still fails after running `cargo fmt` because repository-wide
+  Markdown linting reports pre-existing `MD013` findings. The task-related
+  Rust formatting from `cargo fmt` was retained; unrelated Markdown formatter
+  churn was discarded.
+- The default parallel `make test` path can also make local `cargo kani list`
+  fail with `Broken pipe` panics in dependency build scripts. That is another
+  installed-but-unusable Kani state, not a theoremc proof-harness failure, so
+  the BDD skip guard now recognises it.
 
 ## Decision Log
 

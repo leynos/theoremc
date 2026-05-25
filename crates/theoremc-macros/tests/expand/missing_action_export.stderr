@@ -1,0 +1,7 @@
+error[E0425]: cannot find value `account__deposit__h05158894bfb4` in module `crate::theorem_actions`
+ --> tests/expand/missing_action_export.rs:7:1
+  |
+7 | theorem_file!("tests/expand/missing_action_export.theorem");
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in `crate::theorem_actions`
+  |
+  = note: this error originates in the macro `theorem_file` (in Nightly builds, run with -Z macro-backtrace for more info)

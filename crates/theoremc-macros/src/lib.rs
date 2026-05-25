@@ -8,9 +8,11 @@ use proc_macro2::{Ident, Span, TokenStream as TokenStream2};
 use quote::quote;
 use syn::{LitStr, parse_macro_input};
 use theoremc_core::{
-    TheoremFileLoadError, load_theorem_file_from_manifest_dir,
-    mangle::{mangle_module_path, mangle_theorem_harness},
-    schema::SchemaDiagnostic,
+    TheoremFileLoadError,
+    collision::referenced_actions,
+    load_theorem_file_from_manifest_dir,
+    mangle::{mangle_action_name, mangle_module_path, mangle_theorem_harness},
+    schema::{ActionSignature, SchemaDiagnostic},
 };
 
 /// Expands a crate-relative `.theorem` file into a stable private module.
@@ -144,6 +146,8 @@ fn render_expansion(
 ) -> Result<TokenStream2, MacroExpansionError> {
     let module_ident = identifier(mangle_module_path(theorem_path).module_name());
     let harnesses = generated_harnesses(theorem_path, theorem_docs)?;
+    let action_probes = generated_action_probes(theorem_docs)?;
+    let action_probe_tokens = render_action_probes(&action_probes);
     let harness_idents: Vec<&Ident> = harnesses.iter().map(|harness| &harness.ident).collect();
     let unwind_literals: Vec<&syn::LitInt> = harnesses
         .iter()
@@ -159,6 +163,8 @@ fn render_expansion(
         mod #module_ident {
             const _: &str =
                 include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", #path_literal));
+
+            #action_probe_tokens
 
             #[cfg(kani)]
             pub(super) mod kani {
@@ -197,6 +203,87 @@ fn generated_harnesses(
         .collect()
 }
 
+fn generated_action_probes(
+    theorem_docs: &[theoremc_core::schema::TheoremDoc],
+) -> Result<Vec<GeneratedActionProbe>, MacroExpansionError> {
+    referenced_actions(theorem_docs)
+        .into_iter()
+        .map(|canonical| {
+            let signature = action_signature_for(theorem_docs, canonical)?;
+            action_probe(canonical, signature)
+        })
+        .collect()
+}
+
+fn action_signature_for<'a>(
+    theorem_docs: &'a [theoremc_core::schema::TheoremDoc],
+    canonical: &str,
+) -> Result<&'a ActionSignature, MacroExpansionError> {
+    let signatures = theorem_docs
+        .iter()
+        .filter_map(|doc| doc.actions.get(canonical))
+        .collect::<Vec<_>>();
+    let Some(first) = signatures.first().copied() else {
+        return Err(MacroExpansionError::MissingActionSignature {
+            action: canonical.to_owned(),
+        });
+    };
+    if signatures.iter().any(|signature| *signature != first) {
+        return Err(MacroExpansionError::ConflictingActionSignature {
+            action: canonical.to_owned(),
+        });
+    }
+    Ok(first)
+}
+
+fn action_probe(
+    canonical: &str,
+    signature: &ActionSignature,
+) -> Result<GeneratedActionProbe, MacroExpansionError> {
+    let param_types = signature
+        .params
+        .values()
+        .map(|param| parse_action_type(canonical, param))
+        .collect::<Result<Vec<_>, _>>()?;
+    let return_type = parse_action_type(canonical, &signature.returns)?;
+
+    Ok(GeneratedActionProbe {
+        ident: identifier(mangle_action_name(canonical).identifier()),
+        param_types,
+        return_type,
+    })
+}
+
+fn parse_action_type(canonical: &str, ty: &str) -> Result<syn::Type, MacroExpansionError> {
+    syn::parse_str(ty).map_err(|source| MacroExpansionError::InvalidActionSignature {
+        action: canonical.to_owned(),
+        message: source.to_string(),
+    })
+}
+
+fn render_action_probes(action_probes: &[GeneratedActionProbe]) -> TokenStream2 {
+    if action_probes.is_empty() {
+        return TokenStream2::new();
+    }
+
+    let probe_idents = action_probes.iter().map(|probe| &probe.ident);
+    let probe_param_types = action_probes.iter().map(|probe| &probe.param_types);
+    let probe_return_types = action_probes.iter().map(|probe| &probe.return_type);
+
+    quote! {
+        #[allow(
+            dead_code,
+            reason = "compile-time theorem action probes are never called"
+        )]
+        fn __theoremc_action_probes() {
+            #(
+                let _: fn(#(#probe_param_types),*) -> #probe_return_types =
+                    crate::theorem_actions::#probe_idents;
+            )*
+        }
+    }
+}
+
 fn identifier(name: &str) -> Ident {
     Ident::new(name, Span::call_site())
 }
@@ -206,12 +293,24 @@ struct GeneratedHarness {
     unwind_literal: syn::LitInt,
 }
 
+struct GeneratedActionProbe {
+    ident: Ident,
+    param_types: Vec<syn::Type>,
+    return_type: syn::Type,
+}
+
 #[derive(Debug, thiserror::Error)]
 enum MacroExpansionError {
     #[error("`CARGO_MANIFEST_DIR` is not set during theorem macro expansion")]
     MissingManifestDir,
     #[error("theorem `{theorem}` does not declare required `Evidence.kani` configuration")]
     MissingKaniEvidence { theorem: String },
+    #[error("referenced action `{action}` is missing an Actions signature entry")]
+    MissingActionSignature { action: String },
+    #[error("referenced action `{action}` has conflicting Actions signatures")]
+    ConflictingActionSignature { action: String },
+    #[error("referenced action `{action}` has an invalid Actions signature: {message}")]
+    InvalidActionSignature { action: String, message: String },
     #[error("{0}")]
     LoadTheoremFile(String),
 }
@@ -240,3 +339,8 @@ mod tests_support;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+/// Private expansion tests for compile-time action probe generation.
+#[cfg(test)]
+#[path = "action_probe_tests.rs"]
+mod action_probe_tests;

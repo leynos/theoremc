@@ -162,6 +162,7 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
 fn is_unusable_kani_environment(error: &str) -> bool {
     error.contains("error while loading shared libraries")
         || error.contains("cannot open shared object file")
+        || error.contains("Broken pipe")
 }
 
 fn is_expected_single_harness_listing(output: &str, expected_harness_identifier: &str) -> bool {
