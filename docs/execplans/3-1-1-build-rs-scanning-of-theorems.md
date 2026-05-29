@@ -1,9 +1,8 @@
 # Step 3.1.1: `build.rs` scanning of theorem files
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -251,8 +250,8 @@ inclusion.
   cites directory watching, but the current repository state makes this detail
   user-visible on day one.
 - 2026-03-29: ship Step `3.1.1` with a shared internal helper compiled by both
-  `build.rs` and unit tests via `#[path = ...]` inclusion. Rationale: this
-  keeps `build.rs` thin without exporting new public API surface just to make
+  `build.rs` and unit tests via `#[path = ...]` inclusion. Rationale: this keeps
+  `build.rs` thin without exporting new public API surface just to make
   discovery testable.
 - 2026-03-29: emit the root `theorems` watch unconditionally and emit nested
   directories when present, even though that makes reruns conservative for the

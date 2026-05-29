@@ -228,7 +228,10 @@ fn action_signature_for<'a>(
             action: canonical.to_owned(),
         });
     };
-    if signatures.iter().any(|signature| *signature != first) {
+    if signatures
+        .iter()
+        .any(|signature| !signature.is_semantically_equivalent(first))
+    {
         return Err(MacroExpansionError::ConflictingActionSignature {
             action: canonical.to_owned(),
         });
@@ -270,17 +273,15 @@ fn render_action_probes(action_probes: &[GeneratedActionProbe]) -> TokenStream2 
     let probe_param_types = action_probes.iter().map(|probe| &probe.param_types);
     let probe_return_types = action_probes.iter().map(|probe| &probe.return_type);
 
+    // Each `const _: fn(...) -> ... = crate::theorem_actions::...;` anchors the
+    // referenced symbol at compile time. Anonymous `_` items bypass dead-code
+    // checks without an `#[allow]`, so a signature mismatch surfaces as a
+    // normal type error rather than a silenced lint.
     quote! {
-        #[allow(
-            dead_code,
-            reason = "compile-time theorem action probes are never called"
-        )]
-        fn __theoremc_action_probes() {
-            #(
-                let _: fn(#(#probe_param_types),*) -> #probe_return_types =
-                    crate::theorem_actions::#probe_idents;
-            )*
-        }
+        #(
+            const _: fn(#(#probe_param_types),*) -> #probe_return_types =
+                crate::theorem_actions::#probe_idents;
+        )*
     }
 }
 

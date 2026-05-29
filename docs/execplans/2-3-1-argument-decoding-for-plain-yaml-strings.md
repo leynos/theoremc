@@ -1,9 +1,8 @@
 # Step 2.3.1: argument decoding for plain YAML strings
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -356,10 +355,10 @@ Update the import in `types.rs` to bring in `ArgValue` from `super::arg_value`.
 In `src/schema/raw.rs`, `RawTheoremDoc` currently imports and uses the public
 `LetBinding`, `Step`, and related types directly (line 12):
 `use super::types::{Evidence, KaniEvidence, KaniExpectation, LetBinding, Step, TheoremDoc};`.
- Since `ActionCall.args` changes from `TheoremValue` to `ArgValue`, serde can
+Since `ActionCall.args` changes from `TheoremValue` to `ArgValue`, serde can
 no longer deserialize YAML directly into the public `ActionCall` (the YAML
-contains raw `TheoremValue`-shaped data). Raw versions of all types that
-contain `ActionCall` are therefore required.
+contains raw `TheoremValue`-shaped data). Raw versions of all types that contain
+`ActionCall` are therefore required.
 
 The dependency chain requiring raw counterparts:
 
@@ -662,10 +661,10 @@ Updated artefacts:
   `pub use` for `ArgValue`, `LiteralValue`.
 - `src/schema/types.rs` — change `ActionCall.args` from
   `IndexMap<String, TheoremValue>` to `IndexMap<String, ArgValue>`. Remove the
-  `TheoremValue` import; add `ArgValue` import. Remove `Deserialize` derive
-  from `ActionCall` and all types that contain it (`LetCall`, `LetMust`,
-  `StepCall`, `StepMust`, `StepMaybe`, `MaybeBlock`, `LetBinding`, `Step`) —
-  serde now deserializes the raw versions instead.
+  `TheoremValue` import; add `ArgValue` import. Remove `Deserialize` derive from
+  `ActionCall` and all types that contain it (`LetCall`, `LetMust`, `StepCall`,
+  `StepMust`, `StepMaybe`, `MaybeBlock`, `LetBinding`, `Step`) — serde now
+  deserializes the raw versions instead.
 - `src/schema/raw.rs` — change `RawTheoremDoc.let_bindings` type from
   `IndexMap<String, LetBinding>` to `IndexMap<String, RawLetBinding>` and
   `do_steps` from `Vec<Step>` to `Vec<RawStep>`. Update `to_theorem_doc()` to

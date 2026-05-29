@@ -1,9 +1,8 @@
 # Parse `Assume.expr`, `Prove.assert`, and `Witness.cover` as `syn::Expr`
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -285,10 +284,10 @@ Private predicate:
 fn is_statement_like(expr: &syn::Expr) -> bool
 ```
 
-Uses `matches!` to check for these 14 denied `syn::Expr` variants, plus a
-helper `is_compound_assignment` that detects compound assignment operators
-(`+=`, `-=`, etc.) which `syn` 2.x represents as `Expr::Binary` with
-`BinOp::*Assign` variants:
+Uses `matches!` to check for these 14 denied `syn::Expr` variants, plus a helper
+`is_compound_assignment` that detects compound assignment operators (`+=`,
+`-=`, etc.) which `syn` 2.x represents as `Expr::Binary` with `BinOp::*Assign`
+variants:
 
 | Variant                   | Why rejected                                         |
 | ------------------------- | ---------------------------------------------------- |

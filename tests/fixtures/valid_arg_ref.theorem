@@ -1,7 +1,8 @@
 Theorem: ArgRef
 About: Explicit ref arguments are decoded as variable references
 Actions:
-  graph.create: {}
+  graph.create:
+    returns: crate::graph::Graph
   graph.attach:
     params:
       target: crate::graph::Graph

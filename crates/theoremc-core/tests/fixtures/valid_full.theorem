@@ -9,6 +9,8 @@ Forall:
   amount: u64
 Actions:
   account.params:
+    params:
+      max_balance: u64
     returns: crate::account::Params
   account.deposit:
     params:

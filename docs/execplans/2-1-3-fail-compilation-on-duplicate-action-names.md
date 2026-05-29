@@ -1,9 +1,8 @@
 # Step 2.1.3: fail compilation on duplicate action names
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -69,8 +68,8 @@ classes are detected. `make check-fmt`, `make lint`, and `make test` pass.
   top-level module `src/collision.rs`.
 
 - Risk: Clippy `indexing_slicing = "deny"` may be triggered by collection
-  access patterns. Severity: low. Likelihood: low. Mitigation: use iterators
-  and `.get()` methods exclusively.
+  access patterns. Severity: low. Likelihood: low. Mitigation: use iterators and
+  `.get()` methods exclusively.
 
 ## Progress
 
@@ -100,7 +99,7 @@ classes are detected. `make check-fmt`, `make lint`, and `make test` pass.
   `collect_all_occurrences<'a>(docs: &'a [TheoremDoc])`. Evidence: `make lint`
   failed with this warning denied. Impact: replaced with elided lifetime
   `fn collect_all_occurrences(docs: &[TheoremDoc]) -> Vec<ActionOccurrence<'_>>`
-   per Clippy's suggestion. Minimal impact.
+  per Clippy's suggestion. Minimal impact.
 
 - Observation: `TheoremName::new` takes `String` not `&str`. Evidence: compile
   error when constructing `TheoremDoc` in unit tests. Impact: used

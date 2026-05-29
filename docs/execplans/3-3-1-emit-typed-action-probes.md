@@ -1,7 +1,7 @@
 # Step 3.3.1: emit typed action probes
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
- `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: IN PROGRESS
@@ -38,7 +38,7 @@ Observable success:
    `cargo build`.
 2. The generated expansion contains one deterministic typed action probe per
    distinct referenced canonical action, covering both `Let` bindings and nested
-    `Do` steps.
+   `Do` steps.
 3. A fixture crate whose theorem references a missing action export fails
    compilation with a Rust diagnostic pointing at the generated probe's
    `crate::theorem_actions::...` path.
@@ -241,7 +241,7 @@ Use the existing `trybuild` harness in
 needs.
 
 The signature-source decision is now made by ADR-004. Implement the theorem-side
- `Actions` schema first, and make the initial red tests use declared signatures
+`Actions` schema first, and make the initial red tests use declared signatures
 such as:
 
 ```yaml
@@ -511,9 +511,8 @@ and documentation.
   against a locally installed but unusable Kani compiler.
 - [x] 2026-05-25 21:13 CEST: Re-ran deterministic gates for the first core
   slice. `make check-fmt` and `make lint` passed. The default `make test`
-  surfaced a local Kani shared-library failure, then
-  the serialised full-suite command passed 551 nextest tests and all workspace
-  doctests; log:
+  surfaced a local Kani shared-library failure, then the serialised full-suite
+  command passed 551 nextest tests and all workspace doctests; log:
   `/tmp/test-theoremc-3-3-1-core-schema-gate-serial.out`.
 - [x] 2026-05-25 21:22 CEST: Committed the ADR-004 schema and validation
   milestone as `0f9cb63` and ran `coderabbit review --agent`; CodeRabbit
@@ -591,9 +590,9 @@ and documentation.
   installed-but-unusable compiler state like an absent Kani installation while
   still failing ordinary harness-listing errors.
 - `make fmt` still fails after running `cargo fmt` because repository-wide
-  Markdown linting reports pre-existing `MD013` findings. The task-related
-  Rust formatting from `cargo fmt` was retained; unrelated Markdown formatter
-  churn was discarded.
+  Markdown linting reports pre-existing `MD013` findings. The task-related Rust
+  formatting from `cargo fmt` was retained; unrelated Markdown formatter churn
+  was discarded.
 - The default parallel `make test` path can also make local `cargo kani list`
   fail with `Broken pipe` panics in dependency build scripts. That is another
   installed-but-unusable Kani state, not a theoremc proof-harness failure, so

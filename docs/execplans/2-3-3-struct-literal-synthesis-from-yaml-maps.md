@@ -1,9 +1,8 @@
 # Step 2.3.3: struct literal synthesis from YAML maps
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -289,9 +288,9 @@ make test              # 281 tests passed
 
 ## Context and orientation
 
-The current theoremc crate has only three public top-level modules:
-`collision`, `mangle`, and `schema`. There is no existing proc-macro,
-expression emitter, or lowering module in this checkout yet.
+The current theoremc crate has only three public top-level modules: `collision`,
+`mangle`, and `schema`. There is no existing proc-macro, expression emitter,
+or lowering module in this checkout yet.
 
 Relevant current code:
 

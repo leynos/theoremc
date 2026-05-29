@@ -86,9 +86,9 @@ codes and structured fields; localized human text is optional metadata.
 
 ### 5. Scope parser internationalization separately
 
-Unlike `gherkin`, theoremc will not localize schema keywords (such as
-`Theorem`, `Given`, `Prove`) in this decision. The theorem schema remains
-canonical and language-stable for now.
+Unlike `gherkin`, theoremc will not localize schema keywords (such as `Theorem`,
+`Given`, `Prove`) in this decision. The theorem schema remains canonical and
+language-stable for now.
 
 Internationalization of theorem syntax is deferred to a future ADR, after
 validating demand and migration implications.

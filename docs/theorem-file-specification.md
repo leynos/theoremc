@@ -608,8 +608,8 @@ Collision checks:
 - Detect duplicate canonical action names and fail with source locations.
 - Detect duplicate mangled action identifiers and fail with all colliding names.
 
-This rule gives compile-time binding without relying on link-time registries (
-`inventory` remains useful for reporting, but is not required for resolution).
+This rule gives compile-time binding without relying on link-time registries;
+`inventory` remains useful for reporting but is not required for resolution.
 This directly supports the “always connected” pattern described in the
 exploratory work.
 

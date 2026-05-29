@@ -1,9 +1,8 @@
 # Step 2.2.1: per-file module naming using path_mangle and hash12
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -386,7 +385,7 @@ Acceptance behaviours:
 - `mangle_module_path("theorems/bidirectional.theorem")` returns a
   `MangledModule` whose `module_name()` matches
   `__theoremc__file__theorems_bidirectional__{hash12("theorems/bidirectional.theorem")}`.
-   (The exact hash is determined in Milestone 1.)
+  (The exact hash is determined in Milestone 1.)
 
 - `mangle_module_path("theorems/my-file.theorem")` and
   `mangle_module_path("theorems/my_file.theorem")` produce different
@@ -485,5 +484,5 @@ pub fn mangle_module_path(path: impl AsRef<Utf8Path>) -> MangledModule;
 
 ### Dependencies
 
-No new dependencies required. The existing `blake3 = "1.8.3"` crate provides
-the `hash12` building block.
+No new dependencies required. The existing `blake3 = "1.8.3"` crate provides the
+`hash12` building block.

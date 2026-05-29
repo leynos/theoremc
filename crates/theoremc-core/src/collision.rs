@@ -241,5 +241,13 @@ fn format_collision_message(mangled_collisions: &BTreeMap<String, BTreeSet<Strin
 }
 
 #[cfg(test)]
+#[path = "collision_test_helpers.rs"]
+mod test_helpers;
+
+#[cfg(test)]
 #[path = "collision_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "collision_referenced_tests.rs"]
+mod referenced_tests;

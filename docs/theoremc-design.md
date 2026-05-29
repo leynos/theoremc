@@ -155,9 +155,9 @@ domain types.
 
 Normative boundary rules live in
 [ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
- and
+and
 [ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
- This section is intentionally informative and maps current module placement.
+This section is intentionally informative and maps current module placement.
 
 Table 1: Current schema layer to module mapping (informative).
 
@@ -428,8 +428,8 @@ Evidence:
 - `vacuity_because`: required when `allow_vacuous: true`.
 
 In MVP, `UNREACHABLE` and `UNDETERMINED` are treated as failures by default
-unless explicitly expected, because “green but vacuous/unknown” is a
-reliability hazard.[^4]
+unless explicitly expected, because “green but vacuous/unknown” is a reliability
+hazard.[^4]
 
 ### 4.7 Theorem schema internationalization scope
 
@@ -738,7 +738,7 @@ syntax validation (Step 1.2.2 of the roadmap):
 - A denylist approach rejects 14 `syn::Expr` variants that represent
   statement-like or block-like constructs: `Assign`, `Async`, `Block`, `Break`,
   `Const`, `Continue`, `ForLoop`, `Let`, `Loop`, `Return`, `TryBlock`, `Unsafe`,
-   `While`, and `Yield`. This matches the spec requirement ("no statement
+  `While`, and `Yield`. This matches the spec requirement ("no statement
   blocks, no `let`, no `for`, etc.").
 - `if` and `match` expressions are allowed because they are value-producing
   expressions in Rust, not statement blocks.
@@ -757,7 +757,7 @@ deserialization (Step 1.1 of the roadmap):
   variant matching already rejects unknown shapes structurally.
 - `serde-saphyr` does not provide a `Value` type. A project-specific
   `TheoremValue` enum is used (`Bool`, `Integer`, `Float`, `String`, `Sequence`,
-   `Mapping`) with a handwritten `Deserialize` implementation. This enforces
+  `Mapping`) with a handwritten `Deserialize` implementation. This enforces
   no-null at the type level and avoids an unnecessary `serde_json` dependency.
 - `KaniExpectation` is modelled as a Rust enum with four variants (`Success`,
   `Failure`, `Unreachable`, `Undetermined`) and `#[serde(rename)]` attributes
@@ -894,7 +894,7 @@ collision detection (Step 2.1.3 of the roadmap):
 - Collision detection is placed in a new top-level `collision` module
   (`src/collision.rs`), separate from both `schema` and `mangle`. This
   preserves the ADR-003 boundary: `schema` and `mangle` do not cross-depend. The
-   `collision` module wires both together as a cross-cutting concern.
+  `collision` module wires both together as a cross-cutting concern.
 - The collision check detects **mangled-identifier collisions**: different
   canonical names that produce the same mangled Rust identifier. This is a
   defensive safety net since the mangling algorithm is injective by design.
@@ -925,7 +925,7 @@ decoding for plain YAML strings (Step 2.3.1 of the roadmap):
 - Decoding is performed in `RawTheoremDoc::to_theorem_doc()` rather than in a
   separate post-validation pass. The raw-to-public conversion is the natural
   boundary where YAML-level types become domain-level types, consistent with how
-   `Spanned<String>` becomes `String` for other fields.
+  `Spanned<String>` becomes `String` for other fields.
 - Nine raw serde-compatible types (`RawActionCall`, `RawLetCall`, `RawLetMust`,
   `RawLetBinding`, `RawStepCall`, `RawStepMust`, `RawStepMaybe`,
   `RawMaybeBlock`, `RawStep`) are extracted into `src/schema/raw_action.rs` to
@@ -985,7 +985,7 @@ roadmap):
 - `theorem_slug` preserves identifiers already matching
   `^[a-z_][a-z0-9_]*$` exactly. Non-snake identifiers are converted with an
   explicit character-walk algorithm that handles acronym runs (`HNSWInvariant` →
-   `hnsw_invariant`) and numeric boundaries (`HTTP2StreamID` →
+  `hnsw_invariant`) and numeric boundaries (`HTTP2StreamID` →
   `http_2_stream_id`) without depending on a generic case-conversion crate.
 - Duplicate theorem-key checking is implemented inside
   `load_theorem_docs_with_source`, after per-document conversion and validation
@@ -1382,13 +1382,14 @@ action name according to `docs/name-mangling-rules.md`, and emits an ordinary
 Rust function-pointer coercion:
 
 ```rust
-#[allow(dead_code, reason = "compile-time theorem action probes are never called")]
-fn __theoremc_action_probes() {
-    let _: fn(graph: &mut crate::hnsw::Graph, node: crate::hnsw::NodeId)
-        -> Result<(), crate::hnsw::AttachError> =
-        crate::theorem_actions::hnsw__attach_unode__h3f6b2a80c9d1;
-}
+const _: fn(graph: &mut crate::hnsw::Graph, node: crate::hnsw::NodeId)
+    -> Result<(), crate::hnsw::AttachError> =
+    crate::theorem_actions::hnsw__attach_unode__h3f6b2a80c9d1;
 ```
+
+Each probe is emitted as an anonymous `const _` item. The compiler still
+type-checks the coercion, and the `_` name avoids `dead_code` lints without an
+`#[allow]` attribute.
 
 Missing action signature declarations fail as theorem schema diagnostics.
 Missing exports and incompatible Rust action signatures fail as ordinary rustc
@@ -1511,9 +1512,9 @@ inside the schema subsystem. The boundary policy is defined by ADR 003.
 
 The normative boundary rules are defined in
 [ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
- and
+and
 [ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
- This section focuses on enforcement tooling and rollout.
+This section focuses on enforcement tooling and rollout.
 
 ### 10.2 Enforcement stack and priority
 

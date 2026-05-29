@@ -1,9 +1,8 @@
 # Step 3.2.2: gate generated Kani harnesses
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -105,8 +104,8 @@ Observable success:
 - Dependencies: if proving Kani-targeted discovery appears to require adding a
   new crates.io dependency, stop after one prototype and document the trade-off.
 - Kani tooling: if the local environment does not have `cargo kani` or cannot
-  run a true Kani discovery command, keep deterministic token-shape tests plus
-  a `cfg(kani)` fixture compile check if possible, record the limitation, and
+  run a true Kani discovery command, keep deterministic token-shape tests plus a
+  `cfg(kani)` fixture compile check if possible, record the limitation, and
   ask whether to require Kani in the gate.
 - Fixture complexity: if the existing fixture crate harness cannot support a
   Kani-configured compile check after two focused attempts, stop and propose a
@@ -188,8 +187,8 @@ Observable success:
   theoremc-macros
   ` failed as expected because generated expansions do not yet contain `#[
   cfg(kani)]`, `#[kani::proof]`, or evidence-derived `#[kani::unwind(n)]
-  `; the new `unwind:
-  0` macro-boundary case already passes through existing schema validation.
+  `; the new `unwind: 0
+  ` macro-boundary case already passes through existing schema validation.
 - [x] Milestone 0: add or adjust failing tests that describe the exact desired
   Kani-gated expansion shape.
 - [x] 2026-05-11: Milestone 1 implemented. `cargo test -p theoremc-macros`
@@ -212,11 +211,11 @@ Observable success:
 - [x] Milestone 3: update `docs/theoremc-design.md`, `docs/users-guide.md`,
   and `docs/roadmap.md`.
 - [x] 2026-05-11: Milestone 4 validation complete. `make markdownlint`,
-  `make check-fmt`, `make nixie`, `make lint`, and `make test` pass.
-  `make fmt` runs `cargo fmt` but exits non-zero in its Markdown phase because
-  `markdownlint --fix` reports pre-existing MD013 line-length findings in
-  older repository docs; the repository-level `make markdownlint` target
-  passes after this change.
+  `make check-fmt`, `make nixie`, `make lint`, and `make test` pass. `make fmt`
+  runs `cargo fmt` but exits non-zero in its Markdown phase because
+  `markdownlint --fix` reports pre-existing MD013 line-length findings in older
+  repository docs; the repository-level `make markdownlint` target passes after
+  this change.
 - [x] Milestone 4: run formatting, documentation, lint, and test gates
   sequentially with captured logs.
 - [x] 2026-05-11: Milestone 5 implementation committed as `106f7eb`
@@ -247,9 +246,8 @@ Observable success:
   module, not only on the individual cfg-gated items, to suppress the warning
   at the macro callsite.
 - 2026-05-11: `cargo kani` is installed in this environment (`cargo-kani
-  0.67.0`), so behavioural coverage can run `cargo kani
-  list` against a fixture crate instead of relying only on token-shape
-  assertions for Kani discovery.
+  0.67.0`), so behavioural coverage can run `cargo kani list
+  ` against a fixture crate instead of relying only on token-shape assertions for Kani discovery.
 
 ## Decision Log
 

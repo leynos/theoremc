@@ -1,9 +1,8 @@
 # Step 2.3.2: optional `{ literal: "text" }` wrapper and sentinel key rejection
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -214,9 +213,9 @@ function, or Clippy's exhaustive-match lint will fail compilation.
 `ArgDecodeError` as `#[source]`. This does not need modification because it
 wraps `ArgDecodeError` generically.
 
-`src/schema/mod.rs` re-exports `ArgDecodeError`, `ArgValue`, `LiteralValue`
-from `arg_value`. No changes needed because the new error variant is part of
-the existing `ArgDecodeError` enum.
+`src/schema/mod.rs` re-exports `ArgDecodeError`, `ArgValue`, `LiteralValue` from
+`arg_value`. No changes needed because the new error variant is part of the
+existing `ArgDecodeError` enum.
 
 `tests/arg_decode_bdd.rs` (276 lines) contains 5 BDD scenarios with helpers
 `load_ok`, `load_err`, `first_let_args`, `first_do_arg`, and
