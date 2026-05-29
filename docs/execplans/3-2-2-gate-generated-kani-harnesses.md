@@ -246,8 +246,9 @@ Observable success:
   module, not only on the individual cfg-gated items, to suppress the warning
   at the macro callsite.
 - 2026-05-11: `cargo kani` is installed in this environment (`cargo-kani
-  0.67.0`), so behavioural coverage can run `cargo kani list
-  ` against a fixture crate instead of relying only on token-shape assertions for Kani discovery.
+  0.67.0`), so behavioural coverage can run `cargo kani list` against a
+  fixture crate instead of relying only on token-shape assertions for Kani
+  discovery.
 
 ## Decision Log
 
