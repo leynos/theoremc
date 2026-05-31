@@ -134,6 +134,11 @@ fn then_loading_fails_with_error() -> Result<(), String> {
 const STABILITY_BASE: &str = r#"
 Theorem: Stability
 About: Semantic stability of plain string arguments
+Actions:
+  label.set:
+    params:
+      param: String
+  other.action: {}
 {LET_SECTION}
 Do:
   - call:
@@ -183,6 +188,11 @@ fn then_arg_remains_literal_regardless_of_bindings() -> Result<(), String> {
     let yaml_ref = r"
 Theorem: StabilityRef
 About: Explicit ref produces a reference
+Actions:
+  label.set:
+    params:
+      param: String
+  other.action: {}
 Let:
   x:
     call:

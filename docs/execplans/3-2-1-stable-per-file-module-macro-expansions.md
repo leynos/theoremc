@@ -1,9 +1,8 @@
 # Step 3.2.1: stable per-file `theorem_file!` macro expansions
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -52,9 +51,9 @@ Observable success:
 ## Constraints
 
 - Scope is limited to Roadmap Step `3.2.1`. Do not implement the second Step
-  `3.2` checkbox in this change. In particular, do not add final
-  `#[cfg(kani)]`, `#[kani::proof]`, or `#[kani::unwind(...)]` semantics here.
-  This step owns stable structure and stub generation only.
+  `3.2` checkbox in this change. In particular, do not add final `#[cfg(kani)]`,
+  `#[kani::proof]`, or `#[kani::unwind(...)]` semantics here. This step owns
+  stable structure and stub generation only.
 - The generated callsite shape from Step `3.1.2` must remain unchanged:
   `theorem_file!("crate/relative/path.theorem");`. Step `3.2.1` changes only
   the imported macro implementation behind that callsite.
@@ -68,8 +67,8 @@ Observable success:
   generated stub order must remain `A`, then `B`.
 - The expansion must include the theorem source via
   `include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", P))`, not a plain
-  relative `include_str!(P)`. The macro callsites live in a file generated
-  under `OUT_DIR`, so plain relative includes are not acceptable.
+  relative `include_str!(P)`. The macro callsites live in a file generated under
+  `OUT_DIR`, so plain relative includes are not acceptable.
 - Invalid theorem files must fail at compile time through the proc-macro
   expansion path, using the same schema-loading contract already established by
   the current library code. Do not introduce a second, weaker theorem parser in

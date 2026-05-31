@@ -1,109 +1,14 @@
 //! Unit tests for mangled-identifier collision detection.
 
-use super::*;
-use crate::schema::{
-    ActionCall, Assertion, Evidence, KaniEvidence, KaniExpectation, LetCall, StepCall, StepMaybe,
-    StepMust, TheoremDoc, TheoremName, WitnessCheck,
+use super::test_helpers::{
+    DocBoilerplate, action_call, boilerplate, doc_with_do_actions, doc_with_let_actions,
+    theorem_doc,
 };
+use super::*;
+use crate::schema::{StepCall, StepMaybe, StepMust};
 use indexmap::IndexMap;
 use proptest::prelude::{Just, prop, prop_assert, proptest};
 use rstest::rstest;
-
-// ── rstest fixtures ─────────────────────────────────────────────────
-
-/// Shared boilerplate fields required by every `TheoremDoc` in tests.
-#[derive(Clone)]
-struct DocBoilerplate {
-    evidence: Evidence,
-    assertions: Vec<Assertion>,
-    witnesses: Vec<WitnessCheck>,
-}
-
-/// Minimal valid boilerplate for constructing test documents.
-#[rstest::fixture]
-fn boilerplate() -> DocBoilerplate {
-    DocBoilerplate {
-        evidence: Evidence {
-            kani: Some(KaniEvidence {
-                unwind: 1,
-                expect: KaniExpectation::Success,
-                allow_vacuous: false,
-                vacuity_because: None,
-            }),
-            verus: None,
-            stateright: None,
-        },
-        assertions: vec![Assertion {
-            assert_expr: "true".to_owned(),
-            because: "trivial".to_owned(),
-        }],
-        witnesses: vec![WitnessCheck {
-            cover: "true".to_owned(),
-            because: "reachable".to_owned(),
-        }],
-    }
-}
-
-// ── Test builders ───────────────────────────────────────────────────
-
-/// Builds an `ActionCall` with the given action name and empty args.
-fn action_call(name: &str) -> ActionCall {
-    ActionCall {
-        action: name.to_owned(),
-        args: IndexMap::new(),
-        as_binding: None,
-    }
-}
-
-/// Builds a minimal valid `TheoremDoc` with custom bindings and steps.
-fn theorem_doc(
-    name: &str,
-    let_bindings: IndexMap<String, LetBinding>,
-    do_steps: Vec<Step>,
-    bp: &DocBoilerplate,
-) -> TheoremDoc {
-    TheoremDoc {
-        schema: None,
-        theorem: TheoremName::new(name.to_owned()).expect("valid theorem name"),
-        about: "test theorem".to_owned(),
-        tags: Vec::new(),
-        given: Vec::new(),
-        forall: IndexMap::new(),
-        assume: Vec::new(),
-        witness: bp.witnesses.clone(),
-        let_bindings,
-        do_steps,
-        prove: bp.assertions.clone(),
-        evidence: bp.evidence.clone(),
-    }
-}
-
-/// Builds a `TheoremDoc` with the given action names in `Let` bindings.
-fn doc_with_let_actions(name: &str, actions: &[&str], bp: &DocBoilerplate) -> TheoremDoc {
-    let mut let_bindings = IndexMap::new();
-    for (i, action) in actions.iter().enumerate() {
-        let_bindings.insert(
-            format!("binding_{i}"),
-            LetBinding::Call(LetCall {
-                call: action_call(action),
-            }),
-        );
-    }
-    theorem_doc(name, let_bindings, Vec::new(), bp)
-}
-
-/// Builds a `TheoremDoc` with the given action names in `Do` steps.
-fn doc_with_do_actions(name: &str, actions: &[&str], bp: &DocBoilerplate) -> TheoremDoc {
-    let steps: Vec<Step> = actions
-        .iter()
-        .map(|a| {
-            Step::Call(StepCall {
-                call: action_call(a),
-            })
-        })
-        .collect();
-    theorem_doc(name, IndexMap::new(), steps, bp)
-}
 
 // ── Collection tests ────────────────────────────────────────────────
 
@@ -148,7 +53,7 @@ fn collect_from_let_and_do_combined(boilerplate: DocBoilerplate) {
     let mut let_bindings = IndexMap::new();
     let_bindings.insert(
         "result".to_owned(),
-        LetBinding::Call(LetCall {
+        LetBinding::Call(crate::schema::LetCall {
             call: action_call("account.deposit"),
         }),
     );

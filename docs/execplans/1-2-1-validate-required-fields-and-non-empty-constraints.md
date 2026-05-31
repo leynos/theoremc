@@ -9,8 +9,8 @@ Status: COMPLETE
 ## Purpose / big picture
 
 After this change, `theoremc::schema::load_theorem_docs` enforces semantic
-constraints that `serde` attributes cannot express. A document with
-`About: ""`, `Prove: [{ assert: "  ", because: "" }]`, or
+constraints that `serde` attributes cannot express. A document with `About: ""`,
+`Prove: [{ assert: "  ", because: "" }]`, or
 `Evidence: { kani: { unwind: 0, ... } }` is now rejected with a deterministic,
 actionable error message identifying the theorem name and the failing
 constraint.

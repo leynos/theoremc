@@ -122,10 +122,10 @@ into correctly populated `TheoremDoc` structs.
   `serde-saphyr` has no `Value` type. The spec notes "a wrapper around
   `serde_saphyr::Value` is likely useful so a project-specific `Value` enum can
   enforce 'no nulls'". We define `TheoremValue` with variants `Bool(bool)`,
-  `Integer(i64)`, `Float(f64)`, `String(String)`,
-  `Sequence(Vec<TheoremValue>)`, `Mapping(IndexMap<String, TheoremValue>)`.
-  This avoids pulling in `serde_json` for a YAML-only project and enforces
-  no-null at the type level. Date: 2026-02-09.
+  `Integer(i64)`, `Float(f64)`, `String(String)`, `Sequence(Vec<TheoremValue>)`,
+  `Mapping(IndexMap<String, TheoremValue>)`. This avoids pulling in
+  `serde_json` for a YAML-only project and enforces no-null at the type level.
+  Date: 2026-02-09.
 
 - D3: `KaniExpectation` as a proper enum.
   The spec lists exactly four valid values for `Evidence.kani.expect`. Model as
@@ -197,10 +197,10 @@ Key reference documents:
 - `AGENTS.md` — coding standards and quality gates.
 
 The `.theorem` file format is YAML. A single file may contain one or more YAML
-documents separated by `---`. Each document describes one theorem with
-sections: `Theorem`, `About`, `Tags`, `Given`, `Forall`, `Assume`, `Witness`,
-`Let`, `Do`, `Prove`, and `Evidence`. Keys use TitleCase canonically but
-lowercase aliases are accepted.
+documents separated by `---`. Each document describes one theorem with sections:
+`Theorem`, `About`, `Tags`, `Given`, `Forall`, `Assume`, `Witness`, `Let`,
+`Do`, `Prove`, and `Evidence`. Keys use TitleCase canonically but lowercase
+aliases are accepted.
 
 Toolchain: Rust nightly-2026-01-30 (edition 2024). Build: `make check-fmt`,
 `make lint`, `make test`.

@@ -1,9 +1,8 @@
 # Enforce `Step` and `LetBinding` shape rules
 
-This Execution Plan (ExecPlan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -23,10 +22,10 @@ alone can enforce. Specifically:
 
 This is Roadmap Phase 1, Step 1.2.3. It builds on Steps 1.2.1
 (post-deserialization non-empty validation) and 1.2.2 (expression syntax
-validation). The specification requirements are Theorem File Specification
-(TFS) `TFS-4` sections 3.8, 3.9, and 4.2.3 (step and action schemas, maybe
-block requirements) and Design document (DES) `DES-4` section 4.4 (step forms
-in Let and Do).
+validation). The specification requirements are Theorem File Specification (TFS)
+`TFS-4` sections 3.8, 3.9, and 4.2.3 (step and action schemas, maybe block
+requirements) and Design document (DES) `DES-4` section 4.4 (step forms in Let
+and Do).
 
 Observable success: running `make test` passes with new tests that confirm (a)
 valid documents with Let bindings and Do steps (including nested maybe blocks)
@@ -229,10 +228,10 @@ Gate: visual audit only. No code changes.
 
 ### Milestone 1: create `src/schema/step.rs` with validation logic and unit tests
 
-Create `src/schema/step.rs` following the `expr.rs` pattern. The module
-provides `pub(crate)` validation functions that return `Result<(), String>`
-(decoupled from `SchemaError`), allowing `validate.rs` to wrap them with
-theorem-context error messages.
+Create `src/schema/step.rs` following the `expr.rs` pattern. The module provides
+`pub(crate)` validation functions that return `Result<(), String>` (decoupled
+from `SchemaError`), allowing `validate.rs` to wrap them with theorem-context
+error messages.
 
 Module doc comment (`//!`) explaining its purpose: post-deserialization
 structural validation for `Step`, `LetBinding`, `MaybeBlock`, and `ActionCall`

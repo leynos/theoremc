@@ -5,11 +5,11 @@ theoremc is a Rust workspace for compile-time theorem validation via
 
 ## Crate layout
 
-| Crate | Purpose |
-| --- | --- |
-| `theoremc` | Root facade — re-exports `theoremc-core` modules and the `theorem_file!` proc-macro |
-| `theoremc-core` | Schema parsing, name mangling, collision detection, and the crate-relative theorem loader |
-| `theoremc-macros` | The `theorem_file!` proc-macro implementation |
+| Crate             | Purpose                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------- |
+| `theoremc`        | Root facade — re-exports `theoremc-core` modules and the `theorem_file!` proc-macro       |
+| `theoremc-core`   | Schema parsing, name mangling, collision detection, and the crate-relative theorem loader |
+| `theoremc-macros` | The `theorem_file!` proc-macro implementation                                             |
 
 ## `theorem_file!` proc-macro
 

@@ -1,0 +1,25 @@
+Schema: 1
+Theorem: SignatureDrift
+About: Compile-fail typed action probe fixture
+Actions:
+  account.deposit:
+    params:
+      account: u64
+      amount: u32
+    returns: bool
+Do:
+  - call:
+      action: account.deposit
+      args:
+        account: 10
+        amount: 3
+Witness:
+  - cover: "true"
+    because: reachable
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS

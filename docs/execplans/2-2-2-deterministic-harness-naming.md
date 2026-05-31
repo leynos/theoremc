@@ -1,9 +1,8 @@
 # Step 2.2.2: deterministic harness naming and theorem-key checks
 
-This ExecPlan (execution plan) is a living document. The sections
-`Constraints`, `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`,
-`Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work
-proceeds.
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 Status: COMPLETE
 
@@ -211,8 +210,8 @@ The relevant existing code is:
 
 - `src/mangle.rs`
   Defines the public naming helpers and their domain types. This is the natural
-  home for new theorem naming helpers such as `theorem_key`, `theorem_slug`,
-  and `mangle_theorem_harness`.
+  home for new theorem naming helpers such as `theorem_key`, `theorem_slug`, and
+  `mangle_theorem_harness`.
 - `src/mangle_tests.rs`
   Holds unit tests for both action mangling and module naming. Extend this file
   or split it further if theorem naming pushes it near the 400-line limit.

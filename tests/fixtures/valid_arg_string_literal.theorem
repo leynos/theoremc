@@ -1,5 +1,10 @@
 Theorem: ArgStringLiteral
 About: Plain string arguments are decoded as string literals
+Actions:
+  label.set:
+    params:
+      name: String
+      tag: String
 Let:
   result:
     call:

@@ -7,6 +7,20 @@ Given:
   - a deposit amount under the overflow limit
 Forall:
   amount: u64
+Actions:
+  account.params:
+    params:
+      max_balance: u64
+    returns: crate::account::Params
+  account.deposit:
+    params:
+      account: crate::account::Account
+      amount: u64
+    returns: crate::account::Account
+  account.validate:
+    params:
+      account: crate::account::Account
+    returns: bool
 Assume:
   - expr: "amount <= 100"
     because: prevent overflow

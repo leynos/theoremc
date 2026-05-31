@@ -22,8 +22,8 @@ supported toolchain, theoremc watches the root `theorems` path even when it is
 absent, so creating the directory and adding the first theorem later still
 causes the next build to rerun the build script.
 
-Only files ending in `.theorem` are treated as theorem inputs. However, the
-root `theorems/` directory is watched so Cargo can notice newly created theorem
+Only files ending in `.theorem` are treated as theorem inputs. However, the root
+`theorems/` directory is watched so Cargo can notice newly created theorem
 trees. As a result, changes elsewhere under that watched directory may still
 rerun the build script even though non-`.theorem` files are not parsed or fed
 into later theorem compilation steps.
@@ -132,20 +132,21 @@ Every theorem document is a YAML mapping with the following fields. Keys use
 `TitleCase` canonically, but lowercase aliases are also accepted (e.g.,
 `Theorem` or `theorem`).
 
-| Field      | Type                              | Required | Default              | Notes                                                                   |
-| ---------- | --------------------------------- | -------- | -------------------- | ----------------------------------------------------------------------- |
-| `Schema`   | integer                           | no       | `None` (unspecified) | Forwards compatibility.                                                 |
-| `Theorem`  | string                            | **yes**  | —                    | Must be a valid identifier (see below).                                 |
-| `About`    | string                            | **yes**  | —                    | Human-readable description of intent. Must be non-empty after trimming. |
-| `Tags`     | list of strings                   | no       | `[]`                 | Metadata for filtering and reporting.                                   |
-| `Given`    | list of strings                   | no       | `[]`                 | Narrative context (no codegen impact).                                  |
-| `Forall`   | map (identifier → type)           | no       | `{}`                 | Symbolic quantified variables.                                          |
-| `Assume`   | list of `Assumption`              | no       | `[]`                 | Constraints on symbolic inputs.                                         |
-| `Witness`  | list of `WitnessCheck`            | no       | `[]`                 | Non-vacuity witnesses.                                                  |
-| `Let`      | map (identifier → `LetBinding`)   | no       | `{}`                 | Named fixtures.                                                         |
-| `Do`       | list of `Step`                    | no       | `[]`                 | Theorem step sequence.                                                  |
-| `Prove`    | list of `Assertion`               | **yes**  | —                    | Proof obligations.                                                      |
-| `Evidence` | `Evidence`                        | **yes**  | —                    | Backend configuration.                                                  |
+| Field      | Type                               | Required                                   | Default              | Notes                                                                                                                                      |
+| ---------- | ---------------------------------- | ------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Schema`   | integer                            | no                                         | `None` (unspecified) | Forwards compatibility.                                                                                                                    |
+| `Theorem`  | string                             | **yes**                                    | —                    | Must be a valid identifier (see below).                                                                                                    |
+| `About`    | string                             | **yes**                                    | —                    | Human-readable description of intent. Must be non-empty after trimming.                                                                    |
+| `Tags`     | list of strings                    | no                                         | `[]`                 | Metadata for filtering and reporting.                                                                                                      |
+| `Given`    | list of strings                    | no                                         | `[]`                 | Narrative context (no codegen impact).                                                                                                     |
+| `Forall`   | map (identifier → type)            | no                                         | `{}`                 | Symbolic quantified variables.                                                                                                             |
+| `Assume`   | list of `Assumption`               | no                                         | `[]`                 | Constraints on symbolic inputs.                                                                                                            |
+| `Witness`  | list of `WitnessCheck`             | no                                         | `[]`                 | Non-vacuity witnesses.                                                                                                                     |
+| `Let`      | map (identifier → `LetBinding`)    | no                                         | `{}`                 | Named fixtures.                                                                                                                            |
+| `Do`       | list of `Step`                     | no                                         | `[]`                 | Theorem step sequence.                                                                                                                     |
+| `Actions`  | map (canonical action → signature) | required when `Let`/`Do` reference actions | `{}`                 | Maps canonical action names to Rust signatures used by `Let`/`Do` probes. See [Declaring action signatures](#declaring-action-signatures). |
+| `Prove`    | list of `Assertion`                | **yes**                                    | —                    | Proof obligations.                                                                                                                         |
+| `Evidence` | `Evidence`                         | **yes**                                    | —                    | Backend configuration.                                                                                                                     |
 
 ### Identifier rules
 
@@ -477,6 +478,37 @@ Evidence:
     unwind: 10
     expect: SUCCESS
 ```
+
+## Declaring action signatures
+
+Theorem files that reference actions in `Let` or `Do` must declare the expected
+Rust signature for each referenced action in a top-level `Actions` mapping. The
+theorem document is the source of truth for this contract; the macro checks it
+against the Rust export during compilation.
+
+```yaml
+Actions:
+  account.deposit:
+    params:
+      account: "&mut crate::account::Account"
+      amount: u64
+    returns: "Result<(), crate::account::DepositError>"
+```
+
+Each `Actions` key is the canonical action name used by `Let` and `Do`.
+Parameter order is the order written in `params`, and `returns` defaults to
+`()`. Parameter and return values are Rust type strings.
+
+During `theorem_file!` expansion, theoremc mangles the canonical action name
+and emits a compile-time probe of this form:
+
+```rust
+const _: fn(&mut crate::account::Account, u64) -> Result<(), crate::account::DepositError> =
+    crate::theorem_actions::account__deposit__h05158894bfb4;
+```
+
+If the `crate::theorem_actions` export is missing, renamed, or has a different
+signature, the theorem owner crate fails to compile.
 
 ## Action name mangling
 

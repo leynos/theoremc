@@ -1,5 +1,13 @@
 Theorem: NestedMaybeProof
 About: Nested maybe blocks remain valid when all reasons and actions are present.
+Actions:
+  account.params:
+    params:
+      max_balance: u64
+    returns: crate::account::Params
+  account.validate:
+    params:
+      account: crate::account::Params
 Let:
   baseline:
     must:

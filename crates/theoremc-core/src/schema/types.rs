@@ -67,6 +67,9 @@ pub struct TheoremDoc {
     /// Symbolic quantified variables mapped to Rust types.
     pub forall: IndexMap<ForallVar, String>,
 
+    /// Expected Rust signatures for referenced theorem actions.
+    pub actions: IndexMap<String, ActionSignature>,
+
     /// Constraints on symbolic inputs.
     pub assume: Vec<Assumption>,
 
@@ -233,6 +236,67 @@ pub struct ActionCall {
     pub as_binding: Option<String>,
 }
 
+// ── Action signatures ──────────────────────────────────────────────
+
+/// A theorem-owned expected Rust signature for an action.
+///
+/// `params` preserves YAML insertion order because generated probes use this
+/// order for the bare function pointer parameter list.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActionSignature {
+    /// Ordered parameter names and Rust type strings.
+    #[serde(default)]
+    pub params: IndexMap<String, String>,
+    /// Rust return type. Omitted declarations default to unit.
+    #[serde(default = "unit_return_type")]
+    pub returns: String,
+}
+
+impl ActionSignature {
+    /// Returns `true` when `self` and `other` describe the same Rust signature
+    /// once parameter and return types are canonicalised.
+    ///
+    /// Raw string equality treats `Vec<u8>` and `Vec <u8>` as distinct, which
+    /// is wrong: schema validation already accepts both as the same Rust type.
+    /// This helper round-trips each type through `syn::Type` so equivalent
+    /// signatures across multiple theorem documents compare equal.
+    #[must_use]
+    pub fn is_semantically_equivalent(&self, other: &Self) -> bool {
+        if self.params.len() != other.params.len() {
+            return false;
+        }
+        let params_match = self.params.iter().zip(other.params.iter()).all(
+            |((self_name, self_ty), (other_name, other_ty))| {
+                self_name == other_name && rust_types_equivalent(self_ty, other_ty)
+            },
+        );
+        params_match && rust_types_equivalent(&self.returns, &other.returns)
+    }
+}
+
+/// Compare two Rust type strings ignoring insignificant whitespace.
+///
+/// Falls back to trimmed string equality when either side fails to parse, so a
+/// malformed type still gets a consistent comparison. Schema validation rejects
+/// malformed types before this point in normal flows.
+fn rust_types_equivalent(left: &str, right: &str) -> bool {
+    match (
+        syn::parse_str::<syn::Type>(left.trim()),
+        syn::parse_str::<syn::Type>(right.trim()),
+    ) {
+        (Ok(left_ty), Ok(right_ty)) => {
+            use quote::ToTokens;
+            left_ty.to_token_stream().to_string() == right_ty.to_token_stream().to_string()
+        }
+        _ => left.trim() == right.trim(),
+    }
+}
+
+fn unit_return_type() -> String {
+    "()".to_owned()
+}
+
 // ── Evidence ────────────────────────────────────────────────────────
 
 /// Backend evidence configuration for a theorem.
@@ -294,4 +358,56 @@ pub enum KaniExpectation {
     /// The verification outcome is undetermined.
     #[serde(rename = "UNDETERMINED")]
     Undetermined,
+}
+
+#[cfg(test)]
+mod action_signature_tests {
+    use super::*;
+
+    fn signature(params: &[(&str, &str)], returns: &str) -> ActionSignature {
+        let mut map = IndexMap::new();
+        for (name, ty) in params {
+            map.insert((*name).to_owned(), (*ty).to_owned());
+        }
+        ActionSignature {
+            params: map,
+            returns: returns.to_owned(),
+        }
+    }
+
+    #[test]
+    fn whitespace_only_difference_is_equivalent() {
+        let a = signature(&[("v", "Vec<u8>")], "u64");
+        let b = signature(&[("v", "Vec <u8>")], "u64 ");
+        assert!(a.is_semantically_equivalent(&b));
+        assert!(b.is_semantically_equivalent(&a));
+    }
+
+    #[test]
+    fn parameter_name_drift_is_not_equivalent() {
+        let a = signature(&[("v", "u64")], "()");
+        let b = signature(&[("w", "u64")], "()");
+        assert!(!a.is_semantically_equivalent(&b));
+    }
+
+    #[test]
+    fn parameter_order_difference_is_not_equivalent() {
+        let a = signature(&[("a", "u64"), ("b", "u32")], "()");
+        let b = signature(&[("b", "u32"), ("a", "u64")], "()");
+        assert!(!a.is_semantically_equivalent(&b));
+    }
+
+    #[test]
+    fn return_type_difference_is_not_equivalent() {
+        let a = signature(&[("v", "u64")], "u64");
+        let b = signature(&[("v", "u64")], "u32");
+        assert!(!a.is_semantically_equivalent(&b));
+    }
+
+    #[test]
+    fn malformed_types_fall_back_to_trimmed_equality() {
+        let a = signature(&[("v", "::not a type::")], "()");
+        let b = signature(&[("v", "  ::not a type::  ")], "()");
+        assert!(a.is_semantically_equivalent(&b));
+    }
 }
