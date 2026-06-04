@@ -69,6 +69,10 @@
 
 - [Execution plans](execplans/) - Living implementation plans for roadmap
   tasks.
+  - [Code base audit findings from 2026-06-05](execplans/code-base-audit-2026-06-05.md)
+    - ExecPlan for addressing canonical action names, typed validation
+      diagnostics, schema serde boundaries, macro separation, reusable test
+      helpers, and documentation gaps.
   - [Step 1.1: `TheoremDoc` and subordinate schema types](execplans/1-1-1-theorem-doc-and-subordinate-schema-types.md)
     - ExecPlan for strict theorem document deserialization.
   - [Step 1.2.1: Validate required fields and non-empty constraints](execplans/1-2-1-validate-required-fields-and-non-empty-constraints.md)
