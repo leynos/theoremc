@@ -182,10 +182,9 @@ introduced by this plan):
 - `ArgValue` enum (4 variants: `Literal`, `Reference`, `RawSequence`,
   `RawMap`).
 - `LiteralValue` enum (4 variants: `Bool`, `Integer`, `Float`, `String`).
-- `decode_arg_value(param_name, TheoremValue) -> Result<ArgValue,
-  ArgDecodeError>` is the public entry point. It dispatches scalars to `Literal
-  `, sequences to `RawSequence`, and mappings to the private `decode_mapping
-  ` function.
+- `decode_arg_value(param_name, TheoremValue) -> Result<ArgValue, ArgDecodeError>`
+  is the public entry point. It dispatches scalars to `Literal`, sequences to
+  `RawSequence`, and mappings to the private `decode_mapping` function.
 - `decode_mapping(param_name, map)` is private. It checks `is_ref_wrapper` and
   either validates the ref target or returns `ArgValue::RawMap`.
 - `is_ref_wrapper(map)` is a private predicate checking
