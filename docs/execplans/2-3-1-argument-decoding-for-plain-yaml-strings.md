@@ -209,8 +209,8 @@ semantic interpretation — a string `"x"` and a map `{ ref: x }` are both just
 
 Key files and their approximate line counts:
 
-- `src/lib.rs` (15 lines) — crate root, declares `pub mod schema`, `pub mod
-  mangle`, `pub mod collision`.
+- `src/lib.rs` (15 lines) — crate root, declares `pub mod schema`,
+  `pub mod mangle`, `pub mod collision`.
 - `src/schema/mod.rs` (33 lines) — module root with public re-exports.
 - `src/schema/types.rs` (312 lines) — `TheoremDoc`, `ActionCall`, `Step`,
   `LetBinding`, and related types. `ActionCall` is at line 241.
