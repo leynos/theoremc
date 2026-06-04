@@ -31,9 +31,9 @@ Local experiments confirmed the practical boundary:
 
 - `let _: fn(_) -> _ = action;` compiles, but Rust infers the placeholders from
   the current action function, so the probe does not detect signature drift.
-- `let _: fn(graph: &mut Graph, node: NodeId) -> Result<(), AttachError> =`
-  `action;` compiles when the function matches and fails with `E0308` when a
-  parameter or return type drifts.
+- `let _: fn(graph: &mut Graph, node: NodeId) -> Result<(), AttachError> = action;`
+  compiles when the function matches and fails with `E0308` when a parameter
+  or return type drifts.
 
 The missing design decision is therefore not the probe mechanism. The missing
 decision is where the expected signature comes from.
@@ -102,13 +102,7 @@ Rules:
 - The action name key must satisfy the canonical action-name grammar already
   defined for `ActionCall.action`.
 - If the same action is declared more than once within one
-  `theorem_file!` expansion, all declarations must describe the same Rust
-  signature. Identical text is not required: the check compares the declared
-  parameter names in order together with the parsed `syn::Type`s, so `Vec<u8>`
-  and `Vec < u8>` do not conflict, while a renamed or reordered parameter does
-  even when its type is unchanged. The first declaration in document order is
-  the reference, and a rejection names both declaring theorems and both
-  signature summaries.
+  `theorem_file!` expansion, all declarations must be identical.
 - Different `.theorem` files may temporarily declare different expectations
   for the same action. Ordinary Rust type checking will then reject any file
   whose expected signature no longer matches the exported function.
@@ -123,10 +117,8 @@ function pointer type from the corresponding `Actions` declaration and assign
 the resolved action function to it:
 
 ```rust
-const _: fn(
-    graph: &mut crate::hnsw::Graph,
-    node: crate::hnsw::NodeId,
-) -> Result<(), crate::hnsw::AttachError> =
+const _: fn(graph: &mut crate::hnsw::Graph, node: crate::hnsw::NodeId)
+    -> Result<(), crate::hnsw::AttachError> =
     crate::theorem_actions::hnsw__attach_unode__h3f6b2a80c9d1;
 ```
 
