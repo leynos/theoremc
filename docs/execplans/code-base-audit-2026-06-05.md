@@ -386,8 +386,10 @@ intentional public API or documentation change.
   `make test`.
 - [x] 2026-06-05: Milestone 0 CodeRabbit review exited successfully with no
   findings in the command output.
-- [ ] Milestone 0 plan-only commit is pushed.
-- [ ] A draft pull request exists for the ExecPlan.
+- [x] 2026-06-05: Pushed the Milestone 0 plan-only commit to
+  `origin/code-base-audit-2026-06-05`.
+- [x] 2026-06-05: Opened draft pull request
+  [#52](https://github.com/leynos/theoremc/pull/52) for ExecPlan review.
 - [ ] User explicitly approves implementation.
 - [ ] Milestone 1 implementation is complete, validated, reviewed, and
   committed.
