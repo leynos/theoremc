@@ -21,7 +21,7 @@ fn can(name: &str) -> CanonicalActionName {
 #[case::invalid_keyword("account.fn")]
 fn parse_agrees_with_new_and_try_from(#[case] name: &str) {
     let parsed = name.parse::<CanonicalActionName>();
-    assert_eq!(parsed.is_ok(), can(name).is_ok());
+    assert_eq!(parsed.is_ok(), CanonicalActionName::new(name).is_ok());
     assert_eq!(
         parsed.as_ref().map(CanonicalActionName::as_str),
         CanonicalActionName::try_from(name)

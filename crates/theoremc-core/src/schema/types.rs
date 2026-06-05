@@ -11,6 +11,8 @@
 use indexmap::IndexMap;
 use serde::Deserialize;
 
+use crate::canonical_action_name::CanonicalActionName;
+
 use super::arg_value::ArgValue;
 use super::newtypes::{ForallVar, TheoremName};
 use super::value::TheoremValue;
@@ -68,7 +70,7 @@ pub struct TheoremDoc {
     pub forall: IndexMap<ForallVar, String>,
 
     /// Expected Rust signatures for referenced theorem actions.
-    pub actions: IndexMap<String, ActionSignature>,
+    pub actions: IndexMap<CanonicalActionName, ActionSignature>,
 
     /// Constraints on symbolic inputs.
     pub assume: Vec<Assumption>,
@@ -228,8 +230,8 @@ pub struct MaybeBlock {
 /// the explicit `{ ref: <name> }` wrapper (`TFS-5` section 5.2).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ActionCall {
-    /// Dot-separated action name (e.g., `hnsw.attach_node`).
-    pub action: String,
+    /// Dot-separated canonical action name (e.g., `hnsw.attach_node`).
+    pub action: CanonicalActionName,
     /// Semantically decoded arguments, keyed by parameter name.
     pub args: IndexMap<String, ArgValue>,
     /// Optional binding name for the action's return value.

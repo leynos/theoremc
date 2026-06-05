@@ -17,7 +17,7 @@ use super::value::TheoremValue;
 mod decode;
 
 pub(crate) use decode::RawDocDecodeError;
-use decode::{convert_let_bindings, convert_steps};
+use decode::{convert_actions, convert_let_bindings, convert_steps};
 
 /// Raw theorem document with location-carrying fields.
 #[derive(Debug, Clone, Deserialize)]
@@ -110,6 +110,7 @@ impl RawTheoremDoc {
     /// Returns [`RawDocDecodeError`] when an argument value fails
     /// decoding (e.g., an invalid `{ ref: ... }` target).
     pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, RawDocDecodeError> {
+        let actions = convert_actions(&self.actions)?;
         let let_bindings = convert_let_bindings(&self.let_bindings)?;
         let do_steps = convert_steps(&self.do_steps)?;
 
@@ -120,7 +121,7 @@ impl RawTheoremDoc {
             tags: self.tags.clone(),
             given: self.given.clone(),
             forall: self.forall.clone(),
-            actions: self.actions.clone(),
+            actions,
             assume: self
                 .assume
                 .iter()
@@ -283,3 +284,7 @@ where
 #[cfg(test)]
 #[path = "../raw_location_tests.rs"]
 mod location_tests;
+
+#[cfg(test)]
+#[path = "../raw_conversion_tests.rs"]
+mod conversion_tests;
