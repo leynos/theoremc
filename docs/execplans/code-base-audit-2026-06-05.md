@@ -403,7 +403,7 @@ intentional public API or documentation change.
   findings and rerunning `coderabbit review --agent`.
 - [x] 2026-06-05: Milestone 1 implementation committed as `a4ec375`
   (`Centralize fixture test helpers`).
-- [ ] 2026-06-05: Milestone 2 implementation drafted: added
+- [x] 2026-06-05: Milestone 2 implementation drafted: added
   `canonical_action_name.rs`, removed duplicate mangle validation, changed
   identifier-sensitive mangle APIs to checked/newtype entry points, and updated
   schema, collision, macro, unit, behavioural, and property tests.
@@ -416,8 +416,30 @@ intentional public API or documentation change.
   repository or worktree, so it was verified as not applicable.
 - [x] 2026-06-05: Milestone 2 implementation committed as `eb651e3`
   (`Share canonical action-name validation`).
-- [ ] Milestone 3 implementation is complete, validated, reviewed, and
-  committed.
+- [x] 2026-06-05: Milestone 2 progress ledger committed as `70bf0c9`
+  (`Record Milestone 2 completion`).
+- [x] 2026-06-05: Milestone 3 implementation drafted: changed
+  `TheoremDoc.actions` to `IndexMap<CanonicalActionName, ActionSignature>` and
+  `ActionCall.action` to `CanonicalActionName`; moved action-name validation
+  into raw-to-domain conversion; updated collision detection, referenced-action
+  traversal, and macro action probes to consume canonical newtypes; and removed
+  the now-duplicated schema action-name validator.
+- [x] 2026-06-05: Milestone 3 tests drafted: added raw conversion unit tests
+  for valid canonical action names, invalid `Actions` keys, and invalid
+  `ActionCall.action` values; updated action-name BDD expectations to the new
+  boundary diagnostic; and adjusted unit tests that previously constructed
+  invalid domain action calls.
+- [x] 2026-06-05: Milestone 3 focused validation passed with
+  `cargo test -p theoremc-core` after formatting. The core suite now runs 269
+  unit tests plus doctests.
+- [x] 2026-06-05: Milestone 3 validation gates passed: `make fmt`,
+  `make check-fmt`, `make markdownlint`, `make nixie`, `make lint`, and
+  `make test`. The test suite now runs 558 nextest tests plus doctests.
+- [x] 2026-06-05: Milestone 3 CodeRabbit review completed on rerun with zero
+  findings. The first invocation stalled during sandbox preparation and was
+  terminated after more than five minutes; the retry reached analysis and
+  completed successfully.
+- [ ] 2026-06-05: Milestone 3 implementation is committed.
 - [ ] Milestone 4 implementation is complete, validated, reviewed, and
   committed.
 - [ ] Milestone 5 implementation is complete, validated, reviewed, and
@@ -450,6 +472,14 @@ intentional public API or documentation change.
   existing property tests that generated Rust keyword segments such as `a.fn`
   and `if.a`. Those were invalid canonical names, so the properties now
   explicitly assume valid generated names before checking collision invariants.
+- 2026-06-05: Once `ActionCall.action` became a `CanonicalActionName`, the
+  remaining step-validation tests that expected blank or malformed action
+  values were no longer representable as domain values. Those cases now belong
+  at the raw conversion and loader boundary instead of `schema::step`.
+- 2026-06-05: `serde_saphyr` can report line or column zero for some empty or
+  blank scalar spans. Schema diagnostics promise one-indexed coordinates, so
+  `schema::diagnostic` now normalizes zero coordinates to `1` at the diagnostic
+  boundary.
 
 ## Decision Log
 
@@ -474,6 +504,14 @@ intentional public API or documentation change.
   `CanonicalActionNameInvalidReason` values back into existing
   `SchemaError::InvalidActionName` message text for Milestone 2. Milestone 4
   will replace validation diagnostics with typed paths and kinds.
+- 2026-06-05: Let action-signature map lookup accept string views by
+  implementing `Borrow<str>` for `CanonicalActionName`. This preserves
+  ergonomic read-only lookups such as `doc.actions.get("account.deposit")`
+  without allowing strings to be stored in public domain maps.
+- 2026-06-05: Delete `validate_action_call` instead of keeping it as a
+  structural no-op. Clippy correctly flagged the no-op `Result` as misleading;
+  `validate_step_list` still owns recursive `maybe` shape validation, while raw
+  conversion owns action-name validation.
 
 ## Outcomes & Retrospective
 

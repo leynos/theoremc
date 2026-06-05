@@ -11,7 +11,13 @@ fn ref_arg(value: TheoremValue) -> TheoremValue {
 
 fn action_with_arg(arg_name: &str, value: TheoremValue) -> RawActionCall {
     RawActionCall {
-        action: "account.deposit".to_owned(),
+        // These conversion tests do not depend on source locations, so the
+        // unknown sentinel keeps the fixture independent of the YAML parser.
+        action: Spanned::new(
+            "account.deposit".to_owned(),
+            Location::UNKNOWN,
+            Location::UNKNOWN,
+        ),
         args: IndexMap::from([(arg_name.to_owned(), value)]),
         as_binding: None,
     }
@@ -32,8 +38,10 @@ fn nested_maybe_do_decode_error_includes_step_prefix() {
 
     assert_that!(
         error,
-        eq(&ArgDecodeError::EmptyRefTarget {
-            param: "maybe.do step 1: account".to_owned(),
+        eq(&RawActionCallDecodeError::Arg {
+            source: ArgDecodeError::EmptyRefTarget {
+                param: "maybe.do step 1: account".to_owned(),
+            },
         }),
     );
     pretty_assertions::assert_eq!(

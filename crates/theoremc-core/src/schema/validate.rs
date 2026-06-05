@@ -28,7 +28,7 @@ use fields::{
     validate_about, validate_assertions, validate_assumptions, validate_prove_non_empty,
     validate_witnesses,
 };
-use steps::{validate_do_steps, validate_let_bindings};
+use steps::validate_do_steps;
 use types::validate_forall_types;
 
 type ValidationResult = Result<(), ValidationFailure>;
@@ -61,8 +61,8 @@ fn fail(
 ///   parse as `syn::Expr` and are not statement-like forms.
 /// - All `Forall` type strings parse as `syn::Type` and avoid free named
 ///   lifetime parameters.
-/// - All `Let` binding and `Do` step `ActionCall.action` fields are non-empty
-///   after trimming.
+/// - All `Let` binding and `Do` step `ActionCall` values remain structurally
+///   valid after raw-to-domain conversion.
 /// - All `MaybeBlock.because` fields are non-empty after trimming and
 ///   `MaybeBlock.do` lists are non-empty.
 /// - At least one evidence backend is specified.
@@ -84,7 +84,6 @@ pub(crate) fn validate_theorem_doc(doc: &TheoremDoc) -> ValidationResult {
     validate_expressions(doc)?;
     validate_action_signatures(doc)?;
     validate_forall_types(doc)?;
-    validate_let_bindings(doc)?;
     validate_do_steps(doc)?;
     validate_referenced_action_signatures(doc)?;
     validate_evidence(doc)?;

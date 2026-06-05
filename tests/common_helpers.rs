@@ -4,7 +4,7 @@
 //! `test-helpers` crate so that workspace unit tests and integration binaries
 //! share one implementation.
 
-use googletest::prelude::{contains_substring, eq, verify_that};
+use googletest::prelude::{contains_substring, eq, fail, verify_that};
 use rstest::rstest;
 use test_helpers::{
     ExpectedFragment, FixtureName, StrNewtype, assert_diagnostic_failure,
