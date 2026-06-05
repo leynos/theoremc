@@ -5,12 +5,11 @@
 //! The entry point is [`validate_theorem_doc`], called by the loader after
 //! successful YAML deserialization.
 
-use super::action_name::validate_canonical_action_name;
 use super::error::SchemaError;
 use super::expr;
 use super::identifier::validate_identifier;
 use super::step;
-use super::types::{KaniEvidence, LetBinding, TheoremDoc};
+use super::types::{KaniEvidence, TheoremDoc};
 use crate::collision::referenced_actions;
 
 #[path = "validate_reason_markers.rs"]
@@ -85,8 +84,8 @@ fn validate_collection_fields<T>(
 /// - All expression fields (`Assume.expr`, `Prove.assert`,
 ///   `Witness.cover`) parse as `syn::Expr` and are not statement-like
 ///   forms (`TFS-1` §1.2, §2.3, `DES-6` §6.2).
-/// - All `Let` binding and `Do` step `ActionCall.action` fields are
-///   non-empty after trimming (`TFS-4` §3.8, §3.9).
+/// - All `Let` binding and `Do` step `ActionCall` values remain structurally
+///   valid after raw conversion (`TFS-4` §3.8, §3.9).
 /// - All `MaybeBlock.because` fields are non-empty after trimming and
 ///   `MaybeBlock.do` lists are non-empty (`TFS-4` §4.2.3, `DES-4`).
 /// - At least one evidence backend is specified.
@@ -108,7 +107,6 @@ pub(crate) fn validate_theorem_doc(doc: &TheoremDoc) -> Result<(), SchemaError> 
     validate_witnesses(doc)?;
     validate_expressions(doc)?;
     validate_action_signatures(doc)?;
-    validate_let_bindings(doc)?;
     validate_do_steps(doc)?;
     validate_referenced_action_signatures(doc)?;
     validate_evidence(doc)?;
@@ -183,12 +181,11 @@ fn validate_expressions(doc: &TheoremDoc) -> Result<(), SchemaError> {
     Ok(())
 }
 
-/// Every declared action signature must have a canonical name, valid parameter
-/// identifiers, and Rust type strings that parse as `syn::Type`.
+/// Every declared action signature must have valid parameter identifiers and
+/// Rust type strings that parse as `syn::Type`.
 fn validate_action_signatures(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    for (action, signature) in &doc.actions {
-        validate_canonical_action_name(action)
-            .map_err(|r| fail(doc, format!("Actions entry '{action}': {r}")))?;
+    for (canonical_action, signature) in &doc.actions {
+        let action = canonical_action.as_str();
         for (param, ty) in &signature.params {
             validate_identifier(param)
                 .map_err(|r| fail(doc, format!("Actions entry '{action}': param {r}")))?;
@@ -215,20 +212,6 @@ fn validate_rust_type(
 }
 
 // ── Step and Let binding validation ──────────────────────────────
-
-/// Every `Let` binding's `ActionCall.action` must be non-empty
-/// (`TFS-4` §3.8, `DES-4` §4.4).
-fn validate_let_bindings(doc: &TheoremDoc) -> Result<(), SchemaError> {
-    for (name, binding) in &doc.let_bindings {
-        let ac = match binding {
-            LetBinding::Call(c) => &c.call,
-            LetBinding::Must(m) => &m.must,
-        };
-        step::validate_action_call(ac)
-            .map_err(|r| fail(doc, format!("Let binding '{name}': {r}")))?;
-    }
-    Ok(())
-}
 
 /// Every `Do` step must have valid shape (`TFS-4` §3.9, §4.2.3).
 fn validate_do_steps(doc: &TheoremDoc) -> Result<(), SchemaError> {

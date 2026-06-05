@@ -65,10 +65,14 @@ impl SchemaDiagnostic {
 }
 
 fn location_for_source(source: &SourceId, location: serde_saphyr::Location) -> SourceLocation {
-    let line = usize::try_from(location.line()).ok().unwrap_or(usize::MAX);
+    let line = usize::try_from(location.line())
+        .ok()
+        .unwrap_or(usize::MAX)
+        .max(1);
     let column = usize::try_from(location.column())
         .ok()
-        .unwrap_or(usize::MAX);
+        .unwrap_or(usize::MAX)
+        .max(1);
     SourceLocation {
         source: source.as_str().to_owned(),
         line,

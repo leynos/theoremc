@@ -128,7 +128,7 @@ pub fn load_theorem_docs_with_source(
                 reason,
                 diagnostic: None,
             };
-            attach_validation_diagnostic(error, source, raw_doc)
+            attach_decode_diagnostic(error, source, raw_doc, decode_err.location())
         })?;
         validate_theorem_doc(&doc)
             .map_err(|error| attach_validation_diagnostic(error, source, raw_doc))?;
@@ -262,6 +262,36 @@ fn format_duplicate_theorem_key_summary(
 
 fn render_duplicate_location(source: &SourceId, location: DuplicateTheoremLocation) -> String {
     format!("{}:{}:{}", source.as_str(), location.line, location.column,)
+}
+
+fn attach_decode_diagnostic(
+    error: SchemaError,
+    source: &SourceId,
+    raw_doc: &RawTheoremDoc,
+    decode_location: Option<serde_saphyr::Location>,
+) -> SchemaError {
+    match (error, decode_location) {
+        (
+            SchemaError::ValidationFailed {
+                theorem, reason, ..
+            },
+            Some(source_location),
+        ) => {
+            let diagnostic = create_diagnostic(
+                SchemaDiagnosticCode::ValidationFailure,
+                source,
+                reason.clone(),
+                source_location,
+            );
+            SchemaError::ValidationFailed {
+                theorem,
+                reason,
+                diagnostic: Some(diagnostic),
+            }
+        }
+        (validation_error, None) => attach_validation_diagnostic(validation_error, source, raw_doc),
+        (other, Some(_)) => other,
+    }
 }
 
 fn attach_validation_diagnostic(

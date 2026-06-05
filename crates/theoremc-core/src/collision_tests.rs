@@ -5,6 +5,7 @@ use super::test_helpers::{
     theorem_doc,
 };
 use super::*;
+use crate::canonical_action_name::CanonicalActionName;
 use crate::schema::{StepCall, StepMaybe, StepMust};
 use indexmap::IndexMap;
 use proptest::prelude::{Just, prop, prop_assert, prop_assume, proptest};
@@ -17,7 +18,7 @@ fn collect_from_let_bindings(boilerplate: DocBoilerplate) {
     let doc = doc_with_let_actions("T", &["account.deposit", "account.withdraw"], &boilerplate);
     let mut out = Vec::new();
     collect_doc_actions(&doc, &mut out);
-    let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
+    let names: Vec<&str> = out.iter().map(|o| o.canonical.as_str()).collect();
     assert_eq!(names, vec!["account.deposit", "account.withdraw"]);
 }
 
@@ -26,7 +27,7 @@ fn collect_from_do_steps(boilerplate: DocBoilerplate) {
     let doc = doc_with_do_actions("T", &["hnsw.attach_node", "hnsw.detach_node"], &boilerplate);
     let mut out = Vec::new();
     collect_doc_actions(&doc, &mut out);
-    let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
+    let names: Vec<&str> = out.iter().map(|o| o.canonical.as_str()).collect();
     assert_eq!(names, vec!["hnsw.attach_node", "hnsw.detach_node"]);
 }
 
@@ -44,7 +45,7 @@ fn collect_from_nested_maybe(boilerplate: DocBoilerplate) {
     let doc = theorem_doc("T", IndexMap::new(), vec![maybe], &boilerplate);
     let mut out = Vec::new();
     collect_doc_actions(&doc, &mut out);
-    let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
+    let names: Vec<&str> = out.iter().map(|o| o.canonical.as_str()).collect();
     assert_eq!(names, vec!["inner.action"]);
 }
 
@@ -63,7 +64,7 @@ fn collect_from_let_and_do_combined(boilerplate: DocBoilerplate) {
     let doc = theorem_doc("T", let_bindings, steps, &boilerplate);
     let mut out = Vec::new();
     collect_doc_actions(&doc, &mut out);
-    let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
+    let names: Vec<&str> = out.iter().map(|o| o.canonical.as_str()).collect();
     assert_eq!(names, vec!["account.deposit", "account.validate"]);
 }
 
@@ -195,16 +196,21 @@ fn group_by_canonical_behaviour(
     #[case] expected_theorem_count: usize,
     #[case] message: &str,
 ) {
+    let canonical =
+        CanonicalActionName::new("account.deposit").expect("test action name must be canonical");
     let occurrences: Vec<ActionOccurrence<'_>> = theorem_names
         .iter()
         .map(|&name| ActionOccurrence {
-            canonical: "account.deposit",
+            canonical: &canonical,
             theorem: name,
         })
         .collect();
     let grouped = group_by_canonical(&occurrences);
     assert_eq!(grouped.len(), 1);
-    let theorems = grouped.get("account.deposit").expect("key should exist");
+    let theorems = grouped
+        .iter()
+        .find_map(|(action, theorems)| (action.as_str() == "account.deposit").then_some(theorems))
+        .expect("key should exist");
     assert_eq!(theorems.len(), expected_theorem_count, "{message}");
 }
 

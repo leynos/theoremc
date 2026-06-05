@@ -5,6 +5,8 @@
 //! name mangling so invalid action names cannot cross domain boundaries
 //! unnoticed.
 
+use std::borrow::Borrow;
+
 /// Error returned when a string is not a valid canonical action name.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("invalid canonical action name '{name}': {reason}")]
@@ -114,6 +116,18 @@ impl CanonicalActionName {
 impl AsRef<str> for CanonicalActionName {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl Borrow<str> for CanonicalActionName {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl std::fmt::Display for CanonicalActionName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 

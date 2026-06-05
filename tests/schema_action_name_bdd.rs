@@ -30,7 +30,7 @@ fn then_loading_fails_for_malformed_action_names() -> Result<(), String> {
     assert_fixtures_fail_with_errors(&[
         (
             "invalid_action_missing_dot.theorem",
-            "dot-separated canonical",
+            "must contain at least two dot-separated segments",
         ),
         (
             "invalid_action_empty_segment.theorem",

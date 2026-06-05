@@ -267,13 +267,19 @@ fn given_statement_or_bad_syntax_in_expr_when_loaded_then_validation_fails(
     "invalid_maybe_empty_do.theorem",
     "maybe.do must contain at least one step"
 )]
-#[case::let_empty_action("invalid_let_empty_action.theorem", "action must be non-empty")]
-#[case::step_empty_action("invalid_step_empty_action.theorem", "action must be non-empty")]
-#[case::action_missing_dot("invalid_action_missing_dot.theorem", "dot-separated canonical name")]
-#[case::action_empty_segment(
-    "invalid_action_empty_segment.theorem",
-    "action segment 2 must be non-empty"
+#[case::let_empty_action(
+    "invalid_let_empty_action.theorem",
+    "invalid canonical action name '': must contain at least two dot-separated segments"
 )]
+#[case::step_empty_action(
+    "invalid_step_empty_action.theorem",
+    "invalid canonical action name '': must contain at least two dot-separated segments"
+)]
+#[case::action_missing_dot(
+    "invalid_action_missing_dot.theorem",
+    "must contain at least two dot-separated segments"
+)]
+#[case::action_empty_segment("invalid_action_empty_segment.theorem", "segment 2 must be non-empty")]
 #[case::action_keyword_segment("invalid_action_keyword_segment.theorem", "Rust reserved keyword")]
 #[case::let_action_keyword_segment(
     "invalid_let_action_keyword_segment.theorem",

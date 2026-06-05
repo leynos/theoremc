@@ -2,6 +2,7 @@
 
 use super::test_helpers::{DocBoilerplate, boilerplate, doc_with_do_actions, doc_with_let_actions};
 use super::*;
+use crate::canonical_action_name::CanonicalActionName;
 use rstest::rstest;
 
 #[rstest]
@@ -17,8 +18,13 @@ fn referenced_actions_deduplicate_in_first_seen_order(boilerplate: DocBoilerplat
         &boilerplate,
     );
 
+    let docs = [first, second];
+    let referenced: Vec<&str> = referenced_actions(&docs)
+        .into_iter()
+        .map(CanonicalActionName::as_str)
+        .collect();
     assert_eq!(
-        referenced_actions(&[first, second]),
+        referenced,
         vec!["account.params", "account.deposit", "account.validate"]
     );
 }

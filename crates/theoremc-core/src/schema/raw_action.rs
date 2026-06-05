@@ -9,6 +9,9 @@
 
 use indexmap::IndexMap;
 use serde::Deserialize;
+use serde_saphyr::{Location, Spanned};
+
+use crate::canonical_action_name::{CanonicalActionName, InvalidCanonicalActionName};
 
 use super::arg_value::{ArgDecodeError, decode_arg_value};
 use super::types::{
@@ -24,7 +27,7 @@ use super::value::TheoremValue;
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawActionCall {
     /// Dot-separated action name.
-    pub(crate) action: String,
+    pub(crate) action: Spanned<String>,
     /// Raw YAML argument values, not yet decoded.
     pub(crate) args: IndexMap<String, TheoremValue>,
     /// Optional binding name for the action's return value.
@@ -107,23 +110,69 @@ pub(crate) struct RawMaybeBlock {
 
 // ── Conversion functions ────────────────────────────────────────────
 
-/// Converts a [`RawActionCall`] into a public [`ActionCall`] by
-/// decoding each argument value.
-pub(crate) fn convert_action_call(raw: &RawActionCall) -> Result<ActionCall, ArgDecodeError> {
+/// Errors produced when converting a raw action call into a domain action call.
+#[derive(Debug, Clone, thiserror::Error)]
+pub(crate) enum RawActionCallDecodeError {
+    /// The action name did not satisfy the canonical action-name grammar.
+    #[error("action '{action}': {source}")]
+    InvalidActionName {
+        /// Rejected action-name string.
+        action: String,
+        /// Source location for the rejected action value.
+        location: Location,
+        /// Underlying typed validation error.
+        #[source]
+        source: InvalidCanonicalActionName,
+    },
+    /// One action argument failed semantic decoding.
+    #[error("{source}")]
+    Arg {
+        /// Underlying argument decoding failure.
+        #[source]
+        source: ArgDecodeError,
+    },
+}
+
+impl RawActionCallDecodeError {
+    /// Returns the source location most closely associated with this error.
+    #[must_use]
+    pub(crate) const fn location(&self) -> Option<Location> {
+        match self {
+            Self::InvalidActionName { location, .. } => Some(*location),
+            Self::Arg { .. } => None,
+        }
+    }
+}
+
+/// Converts a [`RawActionCall`] into a public [`ActionCall`] by validating the
+/// canonical action name and decoding each argument value.
+pub(crate) fn convert_action_call(
+    raw: &RawActionCall,
+) -> Result<ActionCall, RawActionCallDecodeError> {
     let mut args = IndexMap::with_capacity(raw.args.len());
     for (key, value) in &raw.args {
-        let decoded = decode_arg_value(key, value.clone())?;
+        let decoded = decode_arg_value(key, value.clone())
+            .map_err(|source| RawActionCallDecodeError::Arg { source })?;
         args.insert(key.clone(), decoded);
     }
+    let action = CanonicalActionName::new(&raw.action.value).map_err(|source| {
+        RawActionCallDecodeError::InvalidActionName {
+            action: raw.action.value.clone(),
+            location: raw.action.referenced,
+            source,
+        }
+    })?;
     Ok(ActionCall {
-        action: raw.action.clone(),
+        action,
         args,
         as_binding: raw.as_binding.clone(),
     })
 }
 
 /// Converts a [`RawLetBinding`] into a public [`LetBinding`].
-pub(crate) fn convert_let_binding(raw: &RawLetBinding) -> Result<LetBinding, ArgDecodeError> {
+pub(crate) fn convert_let_binding(
+    raw: &RawLetBinding,
+) -> Result<LetBinding, RawActionCallDecodeError> {
     match raw {
         RawLetBinding::Call(c) => {
             let call = convert_action_call(&c.call)?;
@@ -138,7 +187,7 @@ pub(crate) fn convert_let_binding(raw: &RawLetBinding) -> Result<LetBinding, Arg
 
 /// Converts a [`RawStep`] into a public [`Step`], recursively
 /// converting nested maybe blocks.
-pub(crate) fn convert_step(raw: &RawStep) -> Result<Step, ArgDecodeError> {
+pub(crate) fn convert_step(raw: &RawStep) -> Result<Step, RawActionCallDecodeError> {
     match raw {
         RawStep::Call(c) => {
             let call = convert_action_call(&c.call)?;
@@ -157,7 +206,7 @@ pub(crate) fn convert_step(raw: &RawStep) -> Result<Step, ArgDecodeError> {
 
 /// Converts a [`RawMaybeBlock`] into a public [`MaybeBlock`],
 /// recursively converting nested steps.
-fn convert_maybe_block(raw: &RawMaybeBlock) -> Result<MaybeBlock, ArgDecodeError> {
+fn convert_maybe_block(raw: &RawMaybeBlock) -> Result<MaybeBlock, RawActionCallDecodeError> {
     let mut do_steps = Vec::with_capacity(raw.do_steps.len());
     for (i, step) in raw.do_steps.iter().enumerate() {
         do_steps.push(convert_step(step).map_err(|e| {
@@ -174,7 +223,24 @@ fn convert_maybe_block(raw: &RawMaybeBlock) -> Result<MaybeBlock, ArgDecodeError
 
 /// Prepends a breadcrumb path prefix to an [`ArgDecodeError`]'s
 /// `param` field so nested decode failures identify their location.
-fn remap_with_prefix(error: ArgDecodeError, prefix: &str) -> ArgDecodeError {
+fn remap_with_prefix(error: RawActionCallDecodeError, prefix: &str) -> RawActionCallDecodeError {
+    match error {
+        RawActionCallDecodeError::InvalidActionName {
+            action,
+            location,
+            source,
+        } => RawActionCallDecodeError::InvalidActionName {
+            action,
+            location,
+            source,
+        },
+        RawActionCallDecodeError::Arg { source } => RawActionCallDecodeError::Arg {
+            source: remap_arg_with_prefix(source, prefix),
+        },
+    }
+}
+
+fn remap_arg_with_prefix(error: ArgDecodeError, prefix: &str) -> ArgDecodeError {
     match error {
         ArgDecodeError::EmptyRefTarget { param } => ArgDecodeError::EmptyRefTarget {
             param: format!("{prefix}: {param}"),
