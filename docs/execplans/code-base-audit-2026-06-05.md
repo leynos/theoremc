@@ -414,7 +414,8 @@ intentional public API or documentation change.
   found a real Rustdoc example issue, which was fixed and revalidated. The
   rerun reported `src/app/outbound_response.rs`, which does not exist in this
   repository or worktree, so it was verified as not applicable.
-- [ ] Milestone 2 implementation is committed.
+- [x] 2026-06-05: Milestone 2 implementation committed as `eb651e3`
+  (`Share canonical action-name validation`).
 - [ ] Milestone 3 implementation is complete, validated, reviewed, and
   committed.
 - [ ] Milestone 4 implementation is complete, validated, reviewed, and
