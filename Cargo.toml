@@ -26,12 +26,14 @@ cap-std = { version = "4.0.2", features = ["fs_utf8"] }
 thiserror = "2.0.18"
 
 [dev-dependencies]
+camino = "1.2.2"
+cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+googletest = "0.14.3"
+pretty_assertions = "1.4.1"
 rstest = "0.26.1"
 rstest-bdd = "0.5.0"
 rstest-bdd-macros = "0.5.0"
 tempfile = "3.15.0"
-camino = "1.2.2"
-cap-std = { version = "4.0.2", features = ["fs_utf8"] }
 
 [[test]]
 name = "action_mangle_bdd"

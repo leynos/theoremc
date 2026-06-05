@@ -2,20 +2,12 @@
 
 mod common;
 
-use common::load_fixture;
+use common::assert_fixture_loads;
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::collision::check_action_collisions;
 use theoremc::schema::load_theorem_docs;
 
 // ── Helpers ─────────────────────────────────────────────────────────
-
-fn assert_fixture_ok(fixture_name: &str) -> Result<(), String> {
-    let yaml =
-        load_fixture(fixture_name).map_err(|error| format!("failed to load fixture: {error}"))?;
-    load_theorem_docs(&yaml)
-        .map(|_| ())
-        .map_err(|error| format!("fixture should load: {error}"))
-}
 
 fn assert_yaml_ok(yaml: &str) -> Result<(), String> {
     load_theorem_docs(yaml)
@@ -30,11 +22,11 @@ fn given_multi_theorem_file_with_distinct_action_names() {}
 
 #[then("loading succeeds without collision errors")]
 fn then_loading_succeeds_without_collision_errors() -> Result<(), String> {
-    assert_fixture_ok("valid_full.theorem")?;
-    assert_fixture_ok("valid_multi.theorem")?;
+    assert_fixture_loads("valid_full.theorem")?;
+    assert_fixture_loads("valid_multi.theorem")?;
     // Multi-doc fixture with shared actions also passes because
     // identical canonical names do not collide.
-    assert_fixture_ok("valid_shared_action_across_theorems.theorem")
+    assert_fixture_loads("valid_shared_action_across_theorems.theorem")
 }
 
 // ── Scenario: Same action name reused within one theorem ─────────────

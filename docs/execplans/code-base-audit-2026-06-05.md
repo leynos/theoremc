@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
 ## Purpose / big picture
 
@@ -390,9 +390,18 @@ intentional public API or documentation change.
   `origin/code-base-audit-2026-06-05`.
 - [x] 2026-06-05: Opened draft pull request
   [#52](https://github.com/leynos/theoremc/pull/52) for ExecPlan review.
-- [ ] User explicitly approves implementation.
-- [ ] Milestone 1 implementation is complete, validated, reviewed, and
-  committed.
+- [x] 2026-06-05: User explicitly approved implementation and requested
+  milestone-by-milestone progress with frequent commits.
+- [x] 2026-06-05: Milestone 1 implementation drafted: added shared fixture
+  helpers in `tests/common`, added `googletest` and `pretty_assertions`,
+  updated duplicated BDD and schema fixture tests, and documented reusable test
+  patterns in `docs/developers-guide.md`.
+- [x] 2026-06-05: Milestone 1 validation gates passed: `make fmt`,
+  `make check-fmt`, `make markdownlint`, `make nixie`, `make lint`, and
+  `make test`. The test suite now runs 568 nextest tests plus doctests.
+- [x] Milestone 1 CodeRabbit review is clear after fixing its helper-test
+  findings and rerunning `coderabbit review --agent`.
+- [ ] Milestone 1 implementation is committed.
 - [ ] Milestone 2 implementation is complete, validated, reviewed, and
   committed.
 - [ ] Milestone 3 implementation is complete, validated, reviewed, and
@@ -416,6 +425,15 @@ intentional public API or documentation change.
 - 2026-06-05: The first `coderabbit review --agent` invocation stayed at
   sandbox preparation for more than five minutes. A bounded retry progressed
   through analysis and review, exited 0, and emitted no finding payload.
+- 2026-06-05: Integration tests include `tests/common/mod.rs` independently in
+  each test crate, so shared helper functions are unused in some crates even
+  though they are used by the suite as a whole. The common module needs a scoped
+  `dead_code` allowance with a reason unless the helper module is moved into a
+  separate support crate.
+- 2026-06-05: CodeRabbit caught that the helper regression tests should use
+  Result-returning `googletest` assertions instead of panicking or hiding
+  failures inside broad helper tests. The new `tests/common_helpers.rs` cases
+  now keep each helper behaviour independently attributable.
 
 ## Decision Log
 
@@ -429,6 +447,13 @@ intentional public API or documentation change.
   oversized schema modules, and macro conflict provenance as separate GitHub
   issues because they are related audit findings but not part of the direct
   concern list to implement here.
+- 2026-06-05: Keep `tests/common` as the owner of integration fixture helpers
+  for this milestone rather than introducing a new integration test support
+  crate. This matches the audit request and avoids changing the test crate
+  topology before the schema and macro refactors.
+- 2026-06-05: Use `googletest::Result` and `verify_that!` for new integration
+  helper regression tests. This satisfies the requested assertion style while
+  avoiding `panic_in_result_fn` and `expect_used` lint violations.
 
 ## Outcomes & Retrospective
 

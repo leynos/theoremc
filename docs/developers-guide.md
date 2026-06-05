@@ -232,6 +232,21 @@ set -o pipefail; make lint | tee /tmp/make-lint.log
 - Replace duplicated tests with `#[rstest(...)]` parameterized cases.
 - Behavioural tests use `rstest-bdd` v0.5.0 with `.feature` files under
   `tests/features/`.
+- Use `googletest` assertions when matcher-style checks make intent clearer,
+  especially for collection length, substring, and predicate assertions.
+- Use `pretty_assertions` for equality checks where a diff is more useful than
+  a boolean failure, such as full documents, generated output, and ordered
+  vectors.
+- Use `insta` snapshot tests when a multivariant textual output format needs
+  stable review, for example diagnostics or macro expansion output.
+- Use `proptest` for invariants over a generated input space, such as path,
+  name, or mangling rules. Keep generated cases focused on the invariant and
+  retain example-based tests for named edge cases.
+- Keep integration fixture helpers in `tests/common/mod.rs`. The common module
+  owns fixture loading, fixture source identifiers, successful fixture loading
+  assertions, and error-fragment assertions. BDD step functions should return
+  `Result` and delegate those reusable concerns to `tests/common` instead of
+  panicking locally.
 - Test files use `#[cfg(test)] #[path = "..._tests.rs"] mod tests;` to
   keep implementation files under 400 lines.
 - Integration tests under `tests/` are separate crates and inherit

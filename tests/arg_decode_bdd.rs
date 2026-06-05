@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::load_fixture;
+use common::{fixture_error_message, load_fixture_docs};
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::schema::{ArgValue, LiteralValue, load_theorem_docs};
 
@@ -10,17 +10,12 @@ use theoremc::schema::{ArgValue, LiteralValue, load_theorem_docs};
 
 /// Loads a fixture file and returns the decoded documents.
 fn load_ok(fixture: &str) -> Result<Vec<theoremc::schema::TheoremDoc>, String> {
-    let yaml = load_fixture(fixture).map_err(|e| format!("failed to load fixture: {e}"))?;
-    load_theorem_docs(&yaml).map_err(|e| format!("fixture should load: {e}"))
+    load_fixture_docs(fixture)
 }
 
 /// Loads a fixture file and returns the error string.
 fn load_err(fixture: &str) -> Result<String, String> {
-    let yaml = load_fixture(fixture).map_err(|e| format!("failed to load fixture: {e}"))?;
-    match load_theorem_docs(&yaml) {
-        Err(e) => Ok(e.to_string()),
-        Ok(_) => Err(format!("fixture {fixture} should fail")),
-    }
+    fixture_error_message(fixture)
 }
 
 /// Extracts the first action call's args from the first Let binding.

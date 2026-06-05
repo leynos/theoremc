@@ -6,27 +6,16 @@
 
 mod common;
 
-use common::load_fixture;
+use common::fixture_error_message;
 use rstest::rstest;
 use theoremc::schema::{KaniExpectation, load_theorem_docs};
-
-/// Helper to assert that loading a fixture fails.
-fn assert_fixture_fails(fixture_name: &str) -> String {
-    let yaml = load_fixture(fixture_name)
-        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
-    let result = load_theorem_docs(&yaml);
-    assert!(
-        result.is_err(),
-        "expected {fixture_name} to fail deserialization"
-    );
-    result.err().map(|e| e.to_string()).unwrap_or_default()
-}
 
 // ── Unhappy-path tests ──────────────────────────────────────────────
 
 #[test]
 fn rejects_unknown_top_level_key() {
-    let msg = assert_fixture_fails("invalid_unknown_key.theorem");
+    let msg = fixture_error_message("invalid_unknown_key.theorem")
+        .unwrap_or_else(|error| panic!("{error}"));
     assert!(
         msg.contains("unknown field"),
         "error should mention unknown field, got: {msg}"
@@ -35,32 +24,37 @@ fn rejects_unknown_top_level_key() {
 
 #[test]
 fn rejects_wrong_scalar_type_for_tags() {
-    assert_fixture_fails("invalid_wrong_type.theorem");
+    fixture_error_message("invalid_wrong_type.theorem").unwrap_or_else(|error| panic!("{error}"));
 }
 
 #[test]
 fn rejects_missing_theorem_field() {
-    assert_fixture_fails("invalid_missing_theorem.theorem");
+    fixture_error_message("invalid_missing_theorem.theorem")
+        .unwrap_or_else(|error| panic!("{error}"));
 }
 
 #[test]
 fn rejects_missing_about_field() {
-    assert_fixture_fails("invalid_missing_about.theorem");
+    fixture_error_message("invalid_missing_about.theorem")
+        .unwrap_or_else(|error| panic!("{error}"));
 }
 
 #[test]
 fn rejects_missing_prove_field() {
-    assert_fixture_fails("invalid_missing_prove.theorem");
+    fixture_error_message("invalid_missing_prove.theorem")
+        .unwrap_or_else(|error| panic!("{error}"));
 }
 
 #[test]
 fn rejects_missing_evidence_field() {
-    assert_fixture_fails("invalid_missing_evidence.theorem");
+    fixture_error_message("invalid_missing_evidence.theorem")
+        .unwrap_or_else(|error| panic!("{error}"));
 }
 
 #[test]
 fn rejects_rust_keyword_theorem_name() {
-    let msg = assert_fixture_fails("invalid_keyword_name.theorem");
+    let msg = fixture_error_message("invalid_keyword_name.theorem")
+        .unwrap_or_else(|error| panic!("{error}"));
     assert!(
         msg.contains("Rust reserved keyword"),
         "error should mention keyword, got: {msg}"
@@ -69,7 +63,8 @@ fn rejects_rust_keyword_theorem_name() {
 
 #[test]
 fn rejects_invalid_identifier_starting_with_digit() {
-    let msg = assert_fixture_fails("invalid_bad_identifier.theorem");
+    let msg = fixture_error_message("invalid_bad_identifier.theorem")
+        .unwrap_or_else(|error| panic!("{error}"));
     assert!(
         msg.contains("must match the pattern"),
         "error should mention pattern, got: {msg}"
@@ -78,7 +73,7 @@ fn rejects_invalid_identifier_starting_with_digit() {
 
 #[test]
 fn rejects_invalid_kani_expect_value() {
-    assert_fixture_fails("invalid_bad_expect.theorem");
+    fixture_error_message("invalid_bad_expect.theorem").unwrap_or_else(|error| panic!("{error}"));
 }
 
 // ── KaniExpectation enum coverage ───────────────────────────────────

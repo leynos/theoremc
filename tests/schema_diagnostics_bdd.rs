@@ -2,15 +2,15 @@
 
 mod common;
 
-use common::load_fixture;
+use common::{fixture_source, fixture_source_id, load_fixture};
 use rstest_bdd_macros::{given, scenario, then};
-use theoremc::schema::{SourceId, load_theorem_docs_with_source};
+use theoremc::schema::load_theorem_docs_with_source;
 
 fn assert_diagnostic_failure(fixture_name: &str, expected_code: &str) -> Result<(), String> {
-    let source = format!("tests/fixtures/{fixture_name}");
+    let source = fixture_source(fixture_name);
     let yaml = load_fixture(fixture_name)
         .map_err(|error| format!("failed to load fixture {fixture_name}: {error}"))?;
-    let error = load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
+    let error = load_theorem_docs_with_source(&fixture_source_id(fixture_name), &yaml)
         .err()
         .ok_or_else(|| format!("fixture should fail: {fixture_name}"))?;
     let diagnostic = error
@@ -64,9 +64,8 @@ fn given_valid_theorem_fixture_for_diagnostics() {}
 
 #[then("loading succeeds with explicit source")]
 fn then_loading_succeeds_with_explicit_source() -> Result<(), Box<dyn std::error::Error>> {
-    let source = "tests/fixtures/valid_aliases_and_must.theorem";
     let yaml = load_fixture("valid_aliases_and_must.theorem")?;
-    load_theorem_docs_with_source(&SourceId::new(source), &yaml)?;
+    load_theorem_docs_with_source(&fixture_source_id("valid_aliases_and_must.theorem"), &yaml)?;
 
     Ok(())
 }
