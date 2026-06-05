@@ -439,7 +439,8 @@ intentional public API or documentation change.
   findings. The first invocation stalled during sandbox preparation and was
   terminated after more than five minutes; the retry reached analysis and
   completed successfully.
-- [ ] 2026-06-05: Milestone 3 implementation is committed.
+- [x] 2026-06-05: Milestone 3 implementation committed as `cf5a568`
+  (`Carry canonical action names through schema domain`).
 - [ ] Milestone 4 implementation is complete, validated, reviewed, and
   committed.
 - [ ] Milestone 5 implementation is complete, validated, reviewed, and
