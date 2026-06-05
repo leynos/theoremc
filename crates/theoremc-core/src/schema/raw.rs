@@ -13,69 +13,8 @@ use crate::canonical_action_name::{CanonicalActionName, InvalidCanonicalActionNa
 use super::newtypes::{ForallVar, TheoremName};
 use super::raw_action::{self, RawActionCallDecodeError, RawLetBinding, RawStep};
 use super::types::{ActionSignature, Evidence, KaniEvidence, KaniExpectation, TheoremDoc};
-use super::validate::reason_markers;
+use super::validate::{ValidationField, ValidationPath};
 use super::value::TheoremValue;
-
-/// Semantic wrapper for validation failure reason strings.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct ValidationReason<'a>(&'a str);
-
-impl<'a> ValidationReason<'a> {
-    pub(crate) const fn new(reason: &'a str) -> Self {
-        Self(reason)
-    }
-
-    pub(crate) const fn as_str(&self) -> &'a str {
-        self.0
-    }
-
-    fn kind(self) -> Option<ValidationKind> {
-        let reason = self.as_str();
-        let is_because = reason.contains(reason_markers::BECAUSE_FIELD_FRAGMENT);
-
-        if reason.starts_with(reason_markers::ABOUT_NON_EMPTY) {
-            return Some(ValidationKind::AboutEmpty);
-        }
-
-        if let Some(index) = indexed_error_position(self, reason_markers::PROVE_ASSERTION) {
-            return Some(ValidationKind::Prove { index, is_because });
-        }
-
-        if let Some(index) = indexed_error_position(self, reason_markers::ASSUME_CONSTRAINT) {
-            return Some(ValidationKind::Assume { index, is_because });
-        }
-
-        if let Some(index) = indexed_error_position(self, reason_markers::WITNESS) {
-            return Some(ValidationKind::Witness { index, is_because });
-        }
-
-        if reason.starts_with(reason_markers::KANI_UNWIND_NON_ZERO) {
-            return Some(ValidationKind::KaniUnwind);
-        }
-
-        if reason.starts_with(reason_markers::KANI_VACUITY_REASON_REQUIRED) {
-            return Some(ValidationKind::KaniAllowVacuousRequired);
-        }
-
-        if reason.starts_with(reason_markers::KANI_VACUITY_REASON_NON_EMPTY) {
-            return Some(ValidationKind::KaniVacuityBecauseNonEmpty);
-        }
-
-        None
-    }
-}
-
-/// Classification of validation reason shapes used for location mapping.
-#[derive(Debug, Clone, Copy)]
-enum ValidationKind {
-    AboutEmpty,
-    Prove { index: usize, is_because: bool },
-    Assume { index: usize, is_because: bool },
-    Witness { index: usize, is_because: bool },
-    KaniUnwind,
-    KaniAllowVacuousRequired,
-    KaniVacuityBecauseNonEmpty,
-}
 
 /// Errors raised during the raw-to-public conversion in
 /// [`RawTheoremDoc::to_theorem_doc`].
@@ -268,59 +207,56 @@ impl RawTheoremDoc {
         self.theorem.referenced
     }
 
-    /// Returns the best-effort field location for a validation error reason.
+    /// Returns the best-effort field location for a typed validation path.
     #[must_use]
-    pub(crate) fn location_for_validation_reason(&self, reason: ValidationReason<'_>) -> Location {
-        self.location_for_reason(reason)
+    pub(crate) fn location_for_validation_path(&self, path: ValidationPath) -> Location {
+        self.location_for_path(path)
             .unwrap_or_else(|| self.theorem_location())
     }
 
-    fn location_for_reason(&self, reason: ValidationReason<'_>) -> Option<Location> {
-        match reason.kind()? {
-            ValidationKind::AboutEmpty => Some(self.about.referenced),
-            ValidationKind::Prove { index, is_because } => {
-                let prove = self.prove.get(index)?;
-                Some(if is_because {
-                    prove.because.referenced
-                } else {
-                    prove.assert_expr.referenced
+    fn location_for_path(&self, path: ValidationPath) -> Option<Location> {
+        match path {
+            ValidationPath::Theorem => Some(self.theorem_location()),
+            ValidationPath::About => Some(self.about.referenced),
+            ValidationPath::Prove { index, field } => {
+                let prove = self.prove.get(index.checked_sub(1)?)?;
+                Some(match field {
+                    ValidationField::Because => prove.because.referenced,
+                    ValidationField::Assert => prove.assert_expr.referenced,
+                    ValidationField::Expr | ValidationField::Cover => return None,
                 })
             }
-            ValidationKind::Assume { index, is_because } => {
-                let assume = self.assume.get(index)?;
-                Some(if is_because {
-                    assume.because.referenced
-                } else {
-                    assume.expr.referenced
+            ValidationPath::Assume { index, field } => {
+                let assume = self.assume.get(index.checked_sub(1)?)?;
+                Some(match field {
+                    ValidationField::Because => assume.because.referenced,
+                    ValidationField::Expr => assume.expr.referenced,
+                    ValidationField::Assert | ValidationField::Cover => return None,
                 })
             }
-            ValidationKind::Witness { index, is_because } => {
-                let witness = self.witness.get(index)?;
-                Some(if is_because {
-                    witness.because.referenced
-                } else {
-                    witness.cover.referenced
+            ValidationPath::Witness { index, field } => {
+                let witness = self.witness.get(index.checked_sub(1)?)?;
+                Some(match field {
+                    ValidationField::Because => witness.because.referenced,
+                    ValidationField::Cover => witness.cover.referenced,
+                    ValidationField::Assert | ValidationField::Expr => return None,
                 })
             }
-            ValidationKind::KaniUnwind => self
+            ValidationPath::KaniUnwind => self
                 .evidence
                 .kani
                 .as_ref()
                 .map(|kani| kani.unwind.referenced),
-            ValidationKind::KaniAllowVacuousRequired => {
-                self.evidence.kani.as_ref().and_then(|kani| {
-                    kani.allow_vacuous
-                        .as_ref()
-                        .map(|allow_vacuous| allow_vacuous.referenced)
-                })
-            }
-            ValidationKind::KaniVacuityBecauseNonEmpty => {
-                self.evidence.kani.as_ref().and_then(|kani| {
-                    kani.vacuity_because
-                        .as_ref()
-                        .map(|vacuity_because| vacuity_because.referenced)
-                })
-            }
+            ValidationPath::KaniAllowVacuous => self.evidence.kani.as_ref().and_then(|kani| {
+                kani.allow_vacuous
+                    .as_ref()
+                    .map(|allow_vacuous| allow_vacuous.referenced)
+            }),
+            ValidationPath::KaniVacuityBecause => self.evidence.kani.as_ref().and_then(|kani| {
+                kani.vacuity_because
+                    .as_ref()
+                    .map(|vacuity_because| vacuity_because.referenced)
+            }),
         }
     }
 }
@@ -402,15 +338,6 @@ fn convert_steps(raw: &[RawStep]) -> Result<Vec<super::types::Step>, RawDocDecod
     Ok(out)
 }
 
-/// Parses indexed validation reason prefixes like `Prove assertion 2: …`.
-fn indexed_error_position(reason: ValidationReason<'_>, prefix: &str) -> Option<usize> {
-    let prefixed_tail = reason.as_str().strip_prefix(prefix)?;
-    let indexed_tail = prefixed_tail.strip_prefix(' ')?;
-    let (raw_index, _) = indexed_tail.split_once(':')?;
-    let parsed = raw_index.trim().parse::<usize>().ok()?;
-    parsed.checked_sub(1)
-}
-
 /// Deserializes optional `allow_vacuous` values as `Option<Spanned<bool>>`.
 ///
 /// This helper is used with `#[serde(default)]`, so omitted fields deserialize
@@ -440,6 +367,7 @@ mod tests {
     use rstest::rstest;
 
     use super::{RawDocDecodeError, RawTheoremDoc};
+    use crate::schema::validate::{ValidationField, ValidationPath};
 
     const VALID_DOCUMENT: &str = r"
 Theorem: RawBoundary
@@ -527,6 +455,112 @@ Witness:
         assert_that!(
             error.to_string(),
             contains_substring("action 'deposit': invalid canonical action name")
+        );
+    }
+
+    #[rstest]
+    #[case::about(ValidationPath::About, |doc: &RawTheoremDoc| doc.about.referenced)]
+    #[case::prove_assert(
+        ValidationPath::Prove {
+            index: 1,
+            field: ValidationField::Assert,
+        },
+        |doc: &RawTheoremDoc| doc.prove[0].assert_expr.referenced
+    )]
+    #[case::prove_because(
+        ValidationPath::Prove {
+            index: 1,
+            field: ValidationField::Because,
+        },
+        |doc: &RawTheoremDoc| doc.prove[0].because.referenced
+    )]
+    #[case::assume_expr(
+        ValidationPath::Assume {
+            index: 1,
+            field: ValidationField::Expr,
+        },
+        |doc: &RawTheoremDoc| doc.assume[0].expr.referenced
+    )]
+    #[case::assume_because(
+        ValidationPath::Assume {
+            index: 1,
+            field: ValidationField::Because,
+        },
+        |doc: &RawTheoremDoc| doc.assume[0].because.referenced
+    )]
+    #[case::witness_cover(
+        ValidationPath::Witness {
+            index: 1,
+            field: ValidationField::Cover,
+        },
+        |doc: &RawTheoremDoc| doc.witness[0].cover.referenced
+    )]
+    #[case::witness_because(
+        ValidationPath::Witness {
+            index: 1,
+            field: ValidationField::Because,
+        },
+        |doc: &RawTheoremDoc| doc.witness[0].because.referenced
+    )]
+    #[case::kani_unwind(
+        ValidationPath::KaniUnwind,
+        |doc: &RawTheoremDoc| doc.evidence.kani.as_ref().expect("kani evidence").unwind.referenced
+    )]
+    #[case::kani_allow_vacuous(
+        ValidationPath::KaniAllowVacuous,
+        |doc: &RawTheoremDoc| {
+            doc.evidence
+                .kani
+                .as_ref()
+                .expect("kani evidence")
+                .allow_vacuous
+                .as_ref()
+                .expect("allow_vacuous")
+                .referenced
+        }
+    )]
+    #[case::kani_vacuity_because(
+        ValidationPath::KaniVacuityBecause,
+        |doc: &RawTheoremDoc| {
+            doc.evidence
+                .kani
+                .as_ref()
+                .expect("kani evidence")
+                .vacuity_because
+                .as_ref()
+                .expect("vacuity_because")
+                .referenced
+        }
+    )]
+    fn validation_path_maps_to_raw_field_location(
+        #[case] path: ValidationPath,
+        #[case] expected_location: fn(&RawTheoremDoc) -> serde_saphyr::Location,
+    ) {
+        let raw_doc = parse_one_raw_doc(
+            r"
+Theorem: RawBoundary
+About: Exercises raw conversion
+Assume:
+  - assume: 'balance > 0'
+    because: balance is positive
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+    allow_vacuous: true
+    vacuity_because: proof intentionally omits witnesses
+Witness:
+  - cover: 'true'
+    because: always reachable
+",
+        );
+
+        assert_that!(
+            raw_doc.location_for_validation_path(path),
+            eq(expected_location(&raw_doc))
         );
     }
 }

@@ -9,10 +9,10 @@ use std::collections::BTreeMap;
 
 use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, create_diagnostic, first_line};
 use super::error::SchemaError;
-use super::raw::{RawTheoremDoc, ValidationReason};
+use super::raw::RawTheoremDoc;
 use super::source_id::SourceId;
 use super::types::TheoremDoc;
-use super::validate::validate_theorem_doc;
+use super::validate::{ValidationError, validate_theorem_doc};
 
 /// Newtype representing a YAML field name extracted from error messages.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,7 +131,7 @@ pub fn load_theorem_docs_with_source(
             attach_decode_diagnostic(error, source, raw_doc, decode_err.location())
         })?;
         validate_theorem_doc(&doc)
-            .map_err(|error| attach_validation_diagnostic(error, source, raw_doc))?;
+            .map_err(|error| build_validation_error(source, raw_doc, &doc, &error))?;
         docs.push(doc);
     }
 
@@ -294,6 +294,27 @@ fn attach_decode_diagnostic(
     }
 }
 
+fn build_validation_error(
+    source: &SourceId,
+    raw_doc: &RawTheoremDoc,
+    doc: &TheoremDoc,
+    error: &ValidationError,
+) -> SchemaError {
+    let reason = error.reason();
+    let location = raw_doc.location_for_validation_path(error.path());
+    let diagnostic = create_diagnostic(
+        SchemaDiagnosticCode::ValidationFailure,
+        source,
+        reason.clone(),
+        location,
+    );
+    SchemaError::ValidationFailed {
+        theorem: doc.theorem.to_string(),
+        reason,
+        diagnostic: Some(diagnostic),
+    }
+}
+
 fn attach_validation_diagnostic(
     error: SchemaError,
     source: &SourceId,
@@ -303,12 +324,11 @@ fn attach_validation_diagnostic(
         SchemaError::ValidationFailed {
             theorem, reason, ..
         } => {
-            let location = raw_doc.location_for_validation_reason(ValidationReason::new(&reason));
             let diagnostic = create_diagnostic(
                 SchemaDiagnosticCode::ValidationFailure,
                 source,
                 reason.clone(),
-                location,
+                raw_doc.theorem_location(),
             );
             SchemaError::ValidationFailed {
                 theorem,

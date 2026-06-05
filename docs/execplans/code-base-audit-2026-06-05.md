@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: IN PROGRESS
+Status: BLOCKED
 
 ## Purpose / big picture
 
@@ -441,8 +441,24 @@ intentional public API or documentation change.
   completed successfully.
 - [x] 2026-06-05: Milestone 3 implementation committed as `cf5a568`
   (`Carry canonical action names through schema domain`).
+- [x] 2026-06-05: Milestone 3 progress ledger committed as `218ae2d`
+  (`Record Milestone 3 completion`) and pushed to
+  `origin/code-base-audit-2026-06-05`.
+- [x] 2026-06-05: Milestone 4 implementation drafted: `schema::validate`
+  now returns typed `ValidationError` values containing `ValidationPath` and
+  `ValidationKind`, the loader renders the public `SchemaError` at the
+  boundary, and `RawTheoremDoc` maps typed paths to source spans without
+  parsing reason strings.
+- [x] 2026-06-05: Milestone 4 tests drafted: added `rstest` path-to-location
+  coverage for `About`, `Prove`, `Assume`, `Witness`, and Kani fields, and
+  confirmed the focused `theoremc-core` suite passes with 276 unit tests plus
+  doctests.
+- [x] 2026-06-05: Milestone 4 deterministic gates passed: `make fmt`,
+  `make check-fmt`, `make markdownlint`, `make nixie`, `make lint`, and
+  `make test`. The full suite runs 568 nextest tests plus doctests.
 - [ ] Milestone 4 implementation is complete, validated, reviewed, and
-  committed.
+  committed. Implementation and deterministic validation are complete, but the
+  required CodeRabbit review is blocked by repeated sandbox-preparation stalls.
 - [ ] Milestone 5 implementation is complete, validated, reviewed, and
   committed.
 - [ ] Milestone 6 implementation is complete, validated, reviewed, and
@@ -481,6 +497,22 @@ intentional public API or documentation change.
   blank scalar spans. Schema diagnostics promise one-indexed coordinates, so
   `schema::diagnostic` now normalizes zero coordinates to `1` at the diagnostic
   boundary.
+- 2026-06-05: Typed validation paths make the previous reason-string parser in
+  `RawTheoremDoc` unnecessary. Some semantic failures, such as missing action
+  signatures or empty aggregate sections, still intentionally point at the
+  theorem name because the raw document does not carry a narrower source span
+  for an absent value.
+- 2026-06-05: Three Milestone 4 `coderabbit review --agent` invocations
+  remained in sandbox preparation for more than five minutes and had to be
+  stopped. This appears to be the same CodeRabbit service stall seen earlier on
+  this branch, not a deterministic project failure; all local gates passed
+  before review was requested. The next retry will use a longer backoff before
+  asking the service again.
+- 2026-06-05: The post-backoff Milestone 4 CodeRabbit retry also remained in
+  sandbox preparation for more than five minutes and had to be stopped. At this
+  point Milestone 4 is blocked on CodeRabbit service availability, because the
+  plan requires a successful CodeRabbit review before the milestone can be
+  committed or the next milestone can begin.
 
 ## Decision Log
 
@@ -513,6 +545,11 @@ intentional public API or documentation change.
   structural no-op. Clippy correctly flagged the no-op `Result` as misleading;
   `validate_step_list` still owns recursive `maybe` shape validation, while raw
   conversion owns action-name validation.
+- 2026-06-05: Keep public validation wording stable while replacing diagnostic
+  location lookup with typed paths. `ValidationError::reason()` renders the
+  existing user-facing strings, `ValidationPath` is the machine contract for
+  location lookup, and `RawTheoremDoc::location_for_validation_path()` owns the
+  source-span mapping.
 
 ## Outcomes & Retrospective
 
