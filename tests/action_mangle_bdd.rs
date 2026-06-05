@@ -2,7 +2,14 @@
 
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::mangle::golden::ACTION_GOLDEN_TRIPLES;
-use theoremc::mangle::{RESOLUTION_TARGET, hash12, mangle_action_name};
+use theoremc::mangle::{CanonicalActionName, RESOLUTION_TARGET, hash12, mangle_action_name};
+
+fn canonical_action_name(name: &str) -> CanonicalActionName {
+    match CanonicalActionName::new(name) {
+        Ok(canonical) => canonical,
+        Err(error) => panic!("static test input must be canonical: {error}"),
+    }
+}
 
 #[given("representative canonical action names")]
 fn given_representative_canonical_action_names() {}
@@ -10,7 +17,8 @@ fn given_representative_canonical_action_names() {}
 #[then("each name produces the expected mangled identifier")]
 fn then_each_name_produces_the_expected_mangled_identifier() {
     for (canonical, expected_slug, expected_hash) in ACTION_GOLDEN_TRIPLES {
-        let m = mangle_action_name(canonical);
+        let name = canonical_action_name(canonical);
+        let m = mangle_action_name(&name);
         assert_eq!(m.slug(), *expected_slug, "slug mismatch for {canonical}",);
         assert_eq!(m.hash(), *expected_hash, "hash mismatch for {canonical}",);
         let expected_ident = format!("{expected_slug}__h{expected_hash}");
@@ -30,8 +38,10 @@ fn then_their_mangled_identifiers_are_distinct() {
     // "a.b_c" and "a_b.c" differ only in where the underscore sits
     // relative to the dot separator. The escaping rule must keep them
     // distinct.
-    let m_a = mangle_action_name("a.b_c");
-    let m_b = mangle_action_name("a_b.c");
+    let a = canonical_action_name("a.b_c");
+    let b = canonical_action_name("a_b.c");
+    let m_a = mangle_action_name(&a);
+    let m_b = mangle_action_name(&b);
     assert_ne!(
         m_a.slug(),
         m_b.slug(),
@@ -60,7 +70,8 @@ fn then_the_resolution_path_begins_with_resolution_target() {
 
     let prefix = format!("{RESOLUTION_TARGET}::");
     for name in &names {
-        let m = mangle_action_name(name);
+        let canonical = canonical_action_name(name);
+        let m = mangle_action_name(&canonical);
         assert!(
             m.path().starts_with(&prefix),
             "path for {name} must start with resolution target: {}",

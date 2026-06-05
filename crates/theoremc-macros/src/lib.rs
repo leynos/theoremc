@@ -11,7 +11,7 @@ use theoremc_core::{
     TheoremFileLoadError,
     collision::{referenced_actions, referenced_types},
     load_theorem_file_from_manifest_dir,
-    mangle::{mangle_action_name, mangle_module_path, mangle_theorem_harness},
+    mangle::{mangle_module_path, mangle_theorem_harness, try_mangle_action_name},
     path_format::normalize_path_separators,
     schema::{ActionSignature, SchemaDiagnostic, TheoremDoc},
 };
@@ -255,7 +255,14 @@ fn action_probe(
     let return_type = parse_action_type(canonical, &signature.returns)?;
 
     Ok(GeneratedActionProbe {
-        ident: identifier(mangle_action_name(canonical).identifier()),
+        ident: identifier(
+            try_mangle_action_name(canonical)
+                .map_err(|source| MacroExpansionError::InvalidActionSignature {
+                    action: canonical.to_owned(),
+                    message: source.to_string(),
+                })?
+                .identifier(),
+        ),
         param_types,
         return_type,
     })

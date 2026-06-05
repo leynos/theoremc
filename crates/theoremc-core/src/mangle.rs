@@ -47,75 +47,7 @@
 //! hash is used as a disambiguator to reduce collision probability; safety is
 //! enforced by detection.
 
-// ── Domain newtypes ───────────────────────────────────────────────
-
-/// Error returned when a string is not a valid canonical action name.
-///
-/// A valid canonical action name has at least two dot-separated
-/// segments, each matching `^[A-Za-z_][A-Za-z0-9_]*$` and not a
-/// Rust reserved keyword.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("invalid canonical action name '{name}': {reason}")]
-pub struct InvalidCanonicalActionName {
-    pub(crate) name: String,
-    pub(crate) reason: String,
-}
-
-/// A validated canonical action name (e.g. `"account.deposit"`).
-///
-/// Construct via [`CanonicalActionName::new`] (fallible) or
-/// [`TryFrom`].
-///
-///     use theoremc_core::mangle::CanonicalActionName;
-///     let name = CanonicalActionName::new("account.deposit")
-///         .expect("valid canonical name");
-///     assert_eq!(name.as_str(), "account.deposit");
-///     assert!(CanonicalActionName::new("deposit").is_err());
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CanonicalActionName(String);
-
-impl CanonicalActionName {
-    /// Validates and wraps a canonical action name.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`InvalidCanonicalActionName`] when the input does
-    /// not satisfy the canonical grammar.
-    pub fn new(value: &str) -> Result<Self, InvalidCanonicalActionName> {
-        validate::validate_canonical(value)?;
-        Ok(Self(value.to_owned()))
-    }
-
-    /// Returns the inner string slice.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl AsRef<str> for CanonicalActionName {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-impl TryFrom<&str> for CanonicalActionName {
-    type Error = InvalidCanonicalActionName;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        Self::new(s)
-    }
-}
-
-impl TryFrom<String> for CanonicalActionName {
-    type Error = InvalidCanonicalActionName;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        validate::validate_canonical(&s)?;
-        Ok(Self(s))
-    }
-}
-
-#[path = "mangle_validate.rs"]
-mod validate;
+pub use crate::canonical_action_name::{CanonicalActionName, InvalidCanonicalActionName};
 
 /// Golden test constants for mangling — single source of truth for
 /// unit and integration tests.
@@ -139,10 +71,64 @@ pub(crate) use path::MODULE_PREFIX;
 mod prop_tests {
     //! Property-based tests for mangling determinism and uniqueness.
 
-    use super::{hash12, mangle_module_path, mangle_theorem_harness};
-    use proptest::prelude::{prop_assert_eq, prop_assert_ne, prop_assume, proptest};
+    use super::{
+        CanonicalActionName, hash12, mangle_action_name, mangle_module_path,
+        mangle_theorem_harness, try_action_slug, try_mangle_action_name,
+    };
+    use proptest::prelude::{
+        Strategy, prop_assert, prop_assert_eq, prop_assert_ne, prop_assume, proptest,
+    };
+
+    fn valid_segment_strategy() -> impl Strategy<Value = String> {
+        ("[A-Za-z_]", "[A-Za-z0-9_]{0,8}")
+            .prop_map(|(first, rest)| format!("{first}{rest}"))
+            .prop_filter("segment must not be a Rust keyword", |segment| {
+                !crate::canonical_action_name::is_rust_reserved_keyword(segment)
+            })
+    }
+
+    fn valid_canonical_action_name_strategy() -> impl Strategy<Value = String> {
+        (
+            valid_segment_strategy(),
+            valid_segment_strategy(),
+            proptest::collection::vec(valid_segment_strategy(), 0..4),
+        )
+            .prop_map(|(first, second, rest)| {
+                std::iter::once(first)
+                    .chain(std::iter::once(second))
+                    .chain(rest)
+                    .collect::<Vec<_>>()
+                    .join(".")
+            })
+    }
+
+    fn is_identifier_safe(identifier: &str) -> bool {
+        let mut chars = identifier.chars();
+        let Some(first) = chars.next() else {
+            return false;
+        };
+        (first.is_ascii_alphabetic() || first == '_')
+            && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+    }
 
     proptest! {
+        /// Valid generated canonical action names round-trip through the
+        /// checked mangle APIs and produce Rust-identifier-safe names.
+        #[test]
+        fn valid_canonical_names_round_trip_through_checked_mangling(
+            name in valid_canonical_action_name_strategy(),
+        ) {
+            let canonical = CanonicalActionName::new(&name)?;
+            let checked_slug = try_action_slug(&name)?;
+            let checked_mangle = try_mangle_action_name(&name)?;
+            let typed_mangle = mangle_action_name(&canonical);
+
+            prop_assert_eq!(canonical.as_str(), name);
+            prop_assert_eq!(checked_slug, typed_mangle.slug());
+            prop_assert!(is_identifier_safe(typed_mangle.identifier()));
+            prop_assert_eq!(checked_mangle, typed_mangle);
+        }
+
         /// `mangle_module_path` must be deterministic: same input always
         /// produces same output.
         #[test]
@@ -250,10 +236,12 @@ impl MangledAction {
 
 /// Escapes a single action-name segment by replacing `_` with `_u`.
 ///
-///     # use theoremc_core::mangle::action_slug;
+///     # use theoremc_core::mangle::{CanonicalActionName, action_slug};
 ///     // segment_escape("deposit") == "deposit"
 ///     // segment_escape("attach_node") == "attach_unode"
-///     assert_eq!(action_slug("ns.attach_node"), "ns__attach_unode");
+///     let name = CanonicalActionName::new("ns.attach_node")
+///         .expect("valid canonical action name");
+///     assert_eq!(action_slug(&name), "ns__attach_unode");
 #[must_use]
 pub(crate) fn segment_escape(segment: &str) -> String {
     let mut result = String::with_capacity(segment.len() + segment.matches('_').count());
@@ -269,18 +257,15 @@ pub(crate) fn segment_escape(segment: &str) -> String {
 
 /// Builds the escaped slug from a canonical action name.
 ///
-/// Splits on `.`, escapes underscores in each segment, and
-/// joins with `__`. Accepts `&str`, `String`, or
-/// `&CanonicalActionName`.
+/// Splits on `.`, escapes underscores in each segment, and joins with `__`.
 ///
 ///     use theoremc_core::mangle::{CanonicalActionName, action_slug};
-///     assert_eq!(action_slug("account.deposit"), "account__deposit");
 ///     let name = CanonicalActionName::new("account.deposit")
 ///         .expect("valid canonical name");
 ///     assert_eq!(action_slug(&name), "account__deposit");
 #[must_use]
-pub fn action_slug(canonical_name: impl AsRef<str>) -> String {
-    let s = canonical_name.as_ref();
+pub fn action_slug(canonical_name: &CanonicalActionName) -> String {
+    let s = canonical_name.as_str();
     let mut slug = String::with_capacity(s.len() * 2);
     let mut segments = s.split('.');
     if let Some(first) = segments.next() {
@@ -291,6 +276,17 @@ pub fn action_slug(canonical_name: impl AsRef<str>) -> String {
         slug.push_str(&segment_escape(segment));
     }
     slug
+}
+
+/// Validates and builds the escaped slug from a canonical action-name string.
+///
+/// # Errors
+///
+/// Returns [`InvalidCanonicalActionName`] when the input does not satisfy the
+/// canonical action-name grammar.
+pub fn try_action_slug(name: &str) -> Result<String, InvalidCanonicalActionName> {
+    let canonical_name = CanonicalActionName::new(name)?;
+    Ok(action_slug(&canonical_name))
 }
 
 /// Computes the first 12 lowercase hex characters of the blake3
@@ -306,15 +302,16 @@ pub fn hash12(value: &str) -> String {
 }
 
 /// Mangles a canonical action name into a [`MangledAction`].
-/// Accepts `&str`, `String`, or `&CanonicalActionName`.
 ///
-///     use theoremc_core::mangle::mangle_action_name;
-///     let m = mangle_action_name("account.deposit");
+///     use theoremc_core::mangle::{CanonicalActionName, mangle_action_name};
+///     let name = CanonicalActionName::new("account.deposit")
+///         .expect("valid canonical action name");
+///     let m = mangle_action_name(&name);
 ///     assert_eq!(m.identifier(), "account__deposit__h05158894bfb4");
 #[must_use]
-pub fn mangle_action_name(canonical_name: impl AsRef<str>) -> MangledAction {
-    let s = canonical_name.as_ref();
-    let slug = action_slug(s);
+pub fn mangle_action_name(canonical_name: &CanonicalActionName) -> MangledAction {
+    let s = canonical_name.as_str();
+    let slug = action_slug(canonical_name);
     let hash = hash12(s);
     let identifier = format!("{slug}__h{hash}");
     let path = format!("{RESOLUTION_TARGET}::{identifier}");
@@ -324,6 +321,18 @@ pub fn mangle_action_name(canonical_name: impl AsRef<str>) -> MangledAction {
         identifier,
         path,
     }
+}
+
+/// Validates and mangles a canonical action-name string into a
+/// [`MangledAction`].
+///
+/// # Errors
+///
+/// Returns [`InvalidCanonicalActionName`] when the input does not satisfy the
+/// canonical action-name grammar.
+pub fn try_mangle_action_name(name: &str) -> Result<MangledAction, InvalidCanonicalActionName> {
+    let canonical_name = CanonicalActionName::new(name)?;
+    Ok(mangle_action_name(&canonical_name))
 }
 
 #[cfg(test)]
