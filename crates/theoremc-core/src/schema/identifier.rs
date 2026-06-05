@@ -4,28 +4,11 @@
 //! and must not be a Rust reserved keyword. This keeps code generation
 //! deterministic and avoids symbol collisions.
 
-use super::error::SchemaError;
+pub(crate) use crate::canonical_action_name::{
+    is_rust_reserved_keyword, is_valid_ascii_identifier_pattern,
+};
 
-/// Rust reserved keywords from the language reference.
-///
-/// Includes strict keywords, reserved keywords, and weak keywords that
-/// cannot serve as raw identifiers. The list covers all keywords defined
-/// in the Rust Reference (2024 edition and later).
-#[rustfmt::skip]
-const RUST_KEYWORDS: &[&str] = &[
-    // Strict keywords
-    "as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern",
-    "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub",
-    "ref", "return", "self", "Self", "static", "struct", "super", "trait", "true", "type",
-    "unsafe", "use", "where", "while",
-    // Reserved keywords (no current syntax but reserved for future use)
-    "abstract", "become", "box", "do", "final", "macro", "override", "priv", "try", "typeof",
-    "unsized", "virtual", "yield",
-    // Edition 2024 reserved keyword
-    "gen",
-    // Weak keywords used in specific contexts
-    "union",
-];
+use super::error::SchemaError;
 
 /// Validates that a string is a legal theorem identifier.
 ///
@@ -79,25 +62,6 @@ pub fn validate_identifier(s: &str) -> Result<(), SchemaError> {
     }
 
     Ok(())
-}
-
-/// Returns `true` if the string matches `^[A-Za-z_][A-Za-z0-9_]*$`.
-#[must_use]
-pub(crate) fn is_valid_ascii_identifier_pattern(s: &str) -> bool {
-    let mut chars = s.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    if !first.is_ascii_alphabetic() && first != '_' {
-        return false;
-    }
-    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
-/// Returns `true` if the string is a Rust reserved keyword.
-#[must_use]
-pub(crate) fn is_rust_reserved_keyword(s: &str) -> bool {
-    RUST_KEYWORDS.contains(&s)
 }
 
 #[cfg(test)]

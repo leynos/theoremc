@@ -4,8 +4,9 @@
 //! follows the restricted ASCII identifier pattern and is not a Rust reserved
 //! keyword.
 
+use crate::canonical_action_name::validate_canonical_action_name as validate_shared_action_name;
+
 use super::error::SchemaError;
-use super::identifier::{is_rust_reserved_keyword, is_valid_ascii_identifier_pattern};
 
 const CANONICAL_ACTION_HINT: &str =
     "action must be a dot-separated canonical name with at least two segments";
@@ -19,56 +20,41 @@ const CANONICAL_ACTION_HINT: &str =
 /// - uses only segments matching `^[A-Za-z_][A-Za-z0-9_]*$`,
 /// - and has no Rust reserved-keyword segment.
 pub(crate) fn validate_canonical_action_name(name: &str) -> Result<(), SchemaError> {
-    if !name.contains('.') {
-        return Err(invalid_action_name_error(
-            name,
-            CANONICAL_ACTION_HINT.to_owned(),
-        ));
-    }
-
-    for (index, segment) in name.split('.').enumerate() {
-        validate_segment(name, segment, index + 1)?;
-    }
-
-    Ok(())
+    validate_shared_action_name(name).map_err(|error| SchemaError::InvalidActionName {
+        action: error.name().to_owned(),
+        reason: schema_reason(error.reason()),
+    })
 }
 
-fn validate_segment(name: &str, segment: &str, position: usize) -> Result<(), SchemaError> {
-    if segment.is_empty() {
-        return Err(invalid_action_name_error(
-            name,
-            format!("action segment {position} must be non-empty"),
-        ));
-    }
-
-    if !is_valid_ascii_identifier_pattern(segment) {
-        return Err(invalid_action_name_error(
-            name,
-            format!(
-                concat!(
-                    "action segment {position} ('{segment}') must match ",
-                    "identifier pattern ^[A-Za-z_][A-Za-z0-9_]*"
-                ),
-                position = position,
-                segment = segment,
+fn schema_reason(
+    reason: &crate::canonical_action_name::CanonicalActionNameInvalidReason,
+) -> String {
+    match reason {
+        crate::canonical_action_name::CanonicalActionNameInvalidReason::MissingSeparator => {
+            CANONICAL_ACTION_HINT.to_owned()
+        }
+        crate::canonical_action_name::CanonicalActionNameInvalidReason::EmptySegment {
+            position,
+        } => {
+            format!("action segment {position} must be non-empty")
+        }
+        crate::canonical_action_name::CanonicalActionNameInvalidReason::InvalidIdentifierPattern {
+            position,
+            segment,
+        } => format!(
+            concat!(
+                "action segment {position} ('{segment}') must match ",
+                "identifier pattern ^[A-Za-z_][A-Za-z0-9_]*"
             ),
-        ));
-    }
-
-    if is_rust_reserved_keyword(segment) {
-        return Err(invalid_action_name_error(
-            name,
-            format!("action segment {position} ('{segment}') must not be a Rust reserved keyword"),
-        ));
-    }
-
-    Ok(())
-}
-
-fn invalid_action_name_error(name: &str, reason: String) -> SchemaError {
-    SchemaError::InvalidActionName {
-        action: name.to_owned(),
-        reason,
+            position = position,
+            segment = segment,
+        ),
+        crate::canonical_action_name::CanonicalActionNameInvalidReason::ReservedKeyword {
+            position,
+            segment,
+        } => {
+            format!("action segment {position} ('{segment}') must not be a Rust reserved keyword")
+        }
     }
 }
 

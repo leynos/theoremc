@@ -403,8 +403,18 @@ intentional public API or documentation change.
   findings and rerunning `coderabbit review --agent`.
 - [x] 2026-06-05: Milestone 1 implementation committed as `a4ec375`
   (`Centralize fixture test helpers`).
-- [ ] Milestone 2 implementation is complete, validated, reviewed, and
-  committed.
+- [ ] 2026-06-05: Milestone 2 implementation drafted: added
+  `canonical_action_name.rs`, removed duplicate mangle validation, changed
+  identifier-sensitive mangle APIs to checked/newtype entry points, and updated
+  schema, collision, macro, unit, behavioural, and property tests.
+- [x] 2026-06-05: Milestone 2 validation gates passed: `make fmt`,
+  `make check-fmt`, `make markdownlint`, `make nixie`, `make lint`, and
+  `make test`. The test suite now runs 582 nextest tests plus doctests.
+- [x] 2026-06-05: Milestone 2 CodeRabbit review is clear. The first review
+  found a real Rustdoc example issue, which was fixed and revalidated. The
+  rerun reported `src/app/outbound_response.rs`, which does not exist in this
+  repository or worktree, so it was verified as not applicable.
+- [ ] Milestone 2 implementation is committed.
 - [ ] Milestone 3 implementation is complete, validated, reviewed, and
   committed.
 - [ ] Milestone 4 implementation is complete, validated, reviewed, and
@@ -435,6 +445,10 @@ intentional public API or documentation change.
   Result-returning `googletest` assertions instead of panicking or hiding
   failures inside broad helper tests. The new `tests/common_helpers.rs` cases
   now keep each helper behaviour independently attributable.
+- 2026-06-05: Moving collision detection onto checked mangle APIs exposed
+  existing property tests that generated Rust keyword segments such as `a.fn`
+  and `if.a`. Those were invalid canonical names, so the properties now
+  explicitly assume valid generated names before checking collision invariants.
 
 ## Decision Log
 
@@ -455,6 +469,10 @@ intentional public API or documentation change.
 - 2026-06-05: Use `googletest::Result` and `verify_that!` for new integration
   helper regression tests. This satisfies the requested assertion style while
   avoiding `panic_in_result_fn` and `expect_used` lint violations.
+- 2026-06-05: Keep schema-facing error wording stable by mapping typed
+  `CanonicalActionNameInvalidReason` values back into existing
+  `SchemaError::InvalidActionName` message text for Milestone 2. Milestone 4
+  will replace validation diagnostics with typed paths and kinds.
 
 ## Outcomes & Retrospective
 

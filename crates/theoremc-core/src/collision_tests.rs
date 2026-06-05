@@ -7,7 +7,7 @@ use super::test_helpers::{
 use super::*;
 use crate::schema::{StepCall, StepMaybe, StepMust};
 use indexmap::IndexMap;
-use proptest::prelude::{Just, prop, prop_assert, proptest};
+use proptest::prelude::{Just, prop, prop_assert, prop_assume, proptest};
 use rstest::rstest;
 
 // ── Collection tests ────────────────────────────────────────────────
@@ -113,7 +113,7 @@ fn find_mangled_collisions_with_distinct_names_returns_empty() {
     let names: BTreeSet<&str> = ["account.deposit", "hnsw.attach_node"]
         .into_iter()
         .collect();
-    let collisions = find_mangled_collisions(&names);
+    let collisions = find_mangled_collisions(&names).expect("valid canonical names");
     assert!(
         collisions.is_empty(),
         "distinct names should not collide: {collisions:?}",
@@ -154,7 +154,7 @@ fn crafted_collision_returns_mangled_identifier_collision_error(boilerplate: Doc
         doc_with_do_actions("Gamma", &["gamma.delta"], &boilerplate),
     ];
 
-    let always_collide = |_: &str| "colliding__identifier__h000000000000".to_owned();
+    let always_collide = |_: &str| Ok("colliding__identifier__h000000000000".to_owned());
     let result = check_action_collisions_with(&docs, always_collide);
 
     let error = result.expect_err("should return MangledIdentifierCollision");
@@ -214,8 +214,10 @@ mod prop_tests {
 
     use std::collections::BTreeSet;
 
+    use crate::canonical_action_name::CanonicalActionName;
+
     use super::super::find_mangled_collisions;
-    use super::{Just, prop, prop_assert, proptest};
+    use super::{Just, prop, prop_assert, prop_assume, proptest};
 
     proptest! {
         /// The collision detector must report no collisions for a single
@@ -224,8 +226,9 @@ mod prop_tests {
         fn single_canonical_name_never_collides(
             name in "[a-z][a-z0-9]{0,8}\\.[a-z][a-z0-9]{0,8}",
         ) {
+            prop_assume!(CanonicalActionName::new(&name).is_ok());
             let names: BTreeSet<&str> = std::iter::once(name.as_str()).collect();
-            let collisions = find_mangled_collisions(&names);
+            let collisions = find_mangled_collisions(&names)?;
             prop_assert!(
                 collisions.is_empty(),
                 "single name '{name}' should not self-collide; got: {collisions:?}",
@@ -239,7 +242,7 @@ mod prop_tests {
             _unused in Just(()),
         ) {
             let names: BTreeSet<&str> = BTreeSet::new();
-            prop_assert!(find_mangled_collisions(&names).is_empty());
+            prop_assert!(find_mangled_collisions(&names)?.is_empty());
         }
 
         /// Two identical canonical names must not be reported as a collision
@@ -249,10 +252,11 @@ mod prop_tests {
         fn identical_names_do_not_collide(
             name in "[a-z][a-z0-9]{0,8}\\.[a-z][a-z0-9]{0,8}",
         ) {
+            prop_assume!(CanonicalActionName::new(&name).is_ok());
             // `BTreeSet` deduplicates, so this is equivalent to a single-name set.
             let mut names: BTreeSet<&str> = BTreeSet::new();
             names.insert(name.as_str());
-            let collisions = find_mangled_collisions(&names);
+            let collisions = find_mangled_collisions(&names)?;
             prop_assert!(collisions.is_empty());
         }
 
@@ -263,10 +267,11 @@ mod prop_tests {
         fn duplicate_insertion_of_same_name_is_not_a_collision(
             name in "[a-z][a-z0-9]{0,8}\\.[a-z][a-z0-9]{0,8}",
         ) {
+            prop_assume!(CanonicalActionName::new(&name).is_ok());
             let mut names: BTreeSet<&str> = BTreeSet::new();
             names.insert(name.as_str());
             names.insert(name.as_str());
-            prop_assert!(find_mangled_collisions(&names).is_empty());
+            prop_assert!(find_mangled_collisions(&names)?.is_empty());
         }
 
         /// The number of collision groups reported is never greater than
@@ -279,9 +284,14 @@ mod prop_tests {
                 0..=8_usize,
             ),
         ) {
+            prop_assume!(
+                names
+                    .iter()
+                    .all(|name| CanonicalActionName::new(name).is_ok())
+            );
             let name_refs: BTreeSet<&str> = names.iter().map(String::as_str).collect();
             let n = name_refs.len();
-            let collisions = find_mangled_collisions(&name_refs);
+            let collisions = find_mangled_collisions(&name_refs)?;
             prop_assert!(
                 collisions.len() <= n / 2,
                 "expected at most {} collision groups for {} names, got {}",
@@ -300,8 +310,13 @@ mod prop_tests {
                 0..=8_usize,
             ),
         ) {
+            prop_assume!(
+                names
+                    .iter()
+                    .all(|name| CanonicalActionName::new(name).is_ok())
+            );
             let name_refs: BTreeSet<&str> = names.iter().map(String::as_str).collect();
-            let collisions = find_mangled_collisions(&name_refs);
+            let collisions = find_mangled_collisions(&name_refs)?;
             for (_identifier, colliding_names) in &collisions {
                 for colliding_name in colliding_names {
                     prop_assert!(

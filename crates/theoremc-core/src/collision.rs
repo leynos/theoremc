@@ -17,12 +17,17 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::mangle::mangle_action_name;
+use crate::mangle::try_mangle_action_name;
 use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc};
 
 /// Mangles a canonical action name string and returns the identifier.
-fn mangle_to_identifier(name: &str) -> String {
-    mangle_action_name(name).identifier().to_owned()
+fn mangle_to_identifier(name: &str) -> Result<String, SchemaError> {
+    try_mangle_action_name(name)
+        .map(|mangled| mangled.identifier().to_owned())
+        .map_err(|error| SchemaError::InvalidActionName {
+            action: error.name().to_owned(),
+            reason: error.reason().to_string(),
+        })
 }
 
 // ── Public entry point ──────────────────────────────────────────────
@@ -70,12 +75,12 @@ pub fn check_action_collisions(docs: &[TheoremDoc]) -> Result<(), SchemaError> {
 /// that force collisions.
 fn check_action_collisions_with(
     docs: &[TheoremDoc],
-    mangler: impl Fn(&str) -> String,
+    mangler: impl Fn(&str) -> Result<String, SchemaError>,
 ) -> Result<(), SchemaError> {
     let occurrences = collect_all_occurrences(docs);
     let by_canonical = group_by_canonical(&occurrences);
     let unique_names = unique_canonical_names(&by_canonical);
-    let mangled_collisions = find_mangled_collisions_with(&unique_names, mangler);
+    let mangled_collisions = find_mangled_collisions_with(&unique_names, mangler)?;
 
     if mangled_collisions.is_empty() {
         return Ok(());
@@ -201,7 +206,9 @@ fn unique_canonical_names<'a>(
 /// groups by mangled identifier. Returns only groups where two or more
 /// different canonical names produce the same mangled identifier.
 #[cfg(test)]
-fn find_mangled_collisions(canonical_names: &BTreeSet<&str>) -> BTreeMap<String, BTreeSet<String>> {
+fn find_mangled_collisions(
+    canonical_names: &BTreeSet<&str>,
+) -> Result<BTreeMap<String, BTreeSet<String>>, SchemaError> {
     find_mangled_collisions_with(canonical_names, mangle_to_identifier)
 }
 
@@ -209,17 +216,17 @@ fn find_mangled_collisions(canonical_names: &BTreeSet<&str>) -> BTreeMap<String,
 /// returning only groups where two or more names collide.
 fn find_mangled_collisions_with(
     canonical_names: &BTreeSet<&str>,
-    mangler: impl Fn(&str) -> String,
-) -> BTreeMap<String, BTreeSet<String>> {
+    mangler: impl Fn(&str) -> Result<String, SchemaError>,
+) -> Result<BTreeMap<String, BTreeSet<String>>, SchemaError> {
     let mut by_identifier: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for &name in canonical_names {
         by_identifier
-            .entry(mangler(name))
+            .entry(mangler(name)?)
             .or_default()
             .insert(name.to_owned());
     }
     by_identifier.retain(|_, names| names.len() > 1);
-    by_identifier
+    Ok(by_identifier)
 }
 
 /// Formats mangled-identifier collisions into a human-readable error

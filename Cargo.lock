@@ -1510,6 +1510,7 @@ dependencies = [
  "blake3",
  "camino",
  "cap-std 4.0.2",
+ "googletest",
  "indexmap",
  "proc-macro2",
  "proptest",
