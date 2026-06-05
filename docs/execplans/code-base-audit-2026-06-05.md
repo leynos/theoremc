@@ -401,7 +401,8 @@ intentional public API or documentation change.
   `make test`. The test suite now runs 568 nextest tests plus doctests.
 - [x] Milestone 1 CodeRabbit review is clear after fixing its helper-test
   findings and rerunning `coderabbit review --agent`.
-- [ ] Milestone 1 implementation is committed.
+- [x] 2026-06-05: Milestone 1 implementation committed as `a4ec375`
+  (`Centralize fixture test helpers`).
 - [ ] Milestone 2 implementation is complete, validated, reviewed, and
   committed.
 - [ ] Milestone 3 implementation is complete, validated, reviewed, and
