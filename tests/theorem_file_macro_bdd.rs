@@ -10,11 +10,19 @@ mod cargo_runner;
 /// Temporary crate builder that lets these BDD scenarios compile real macros.
 #[path = "theorem_file_macro_bdd/fixture_crate.rs"]
 mod fixture_crate;
+/// Fixture inputs for referenced-type macro scenarios.
+#[path = "theorem_file_macro_bdd/referenced_type_fixtures.rs"]
+mod referenced_type_fixtures;
 
 use cargo_runner::CargoGuard;
 use fixture_crate::{
-    FIXTURE_BUILD_DEPENDENCIES, FIXTURE_LIB_RS, FixtureCrate, TheoremFixtureSpec,
-    build_fixture_and_list_kani_harnesses, fixture_cargo_toml_for, run_valid_fixture_build,
+    FIXTURE_LIB_RS, FixtureCrate, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses,
+    run_valid_fixture_build,
+};
+use referenced_type_fixtures::{
+    EMPTY_TYPES_LIB_RS, ExpectedBuildFailure, MISSING_FORALL_TYPE_THEOREM,
+    MOVED_ACTION_TYPE_LIB_RS, MOVED_ACTION_TYPE_THEOREM, REFERENCED_TYPES_LIB_RS,
+    REFERENCED_TYPES_THEOREM,
 };
 
 const VALID_SINGLE_THEOREM: &str = concat!(
@@ -112,126 +120,6 @@ const PARTIAL_KANI_EVIDENCE_THEOREM: &str = concat!(
     "    because: \"trivial\"\n",
     "Evidence:\n",
     "  verus: \"future backend\"\n",
-);
-
-const REFERENCED_TYPES_THEOREM: &str = concat!(
-    "Theorem: ReferencedTypeSmoke\n",
-    "About: Referenced type probe coverage\n",
-    "Forall:\n",
-    "  account: crate::Account\n",
-    "Actions:\n",
-    "  account.deposit:\n",
-    "    params:\n",
-    "      command: crate::DepositCommand\n",
-    "    returns: crate::DepositOutcome\n",
-    "Do:\n",
-    "  - call:\n",
-    "      action: account.deposit\n",
-    "      args:\n",
-    "        command:\n",
-    "          amount: 10\n",
-    "Witness:\n",
-    "  - cover: \"true\"\n",
-    "    because: \"reachable\"\n",
-    "Prove:\n",
-    "  - assert: \"true\"\n",
-    "    because: \"trivial\"\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 1\n",
-    "    expect: SUCCESS\n",
-);
-
-const MISSING_FORALL_TYPE_THEOREM: &str = concat!(
-    "Theorem: MissingForallType\n",
-    "About: Missing Forall type probe coverage\n",
-    "Forall:\n",
-    "  account: crate::MissingAccount\n",
-    "Witness:\n",
-    "  - cover: \"true\"\n",
-    "    because: \"reachable\"\n",
-    "Prove:\n",
-    "  - assert: \"true\"\n",
-    "    because: \"trivial\"\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 1\n",
-    "    expect: SUCCESS\n",
-);
-
-const MOVED_ACTION_TYPE_THEOREM: &str = concat!(
-    "Theorem: MovedActionType\n",
-    "About: Moved Actions type probe coverage\n",
-    "Actions:\n",
-    "  account.deposit:\n",
-    "    params:\n",
-    "      command: crate::old::DepositCommand\n",
-    "    returns: crate::DepositOutcome\n",
-    "Witness:\n",
-    "  - cover: \"true\"\n",
-    "    because: \"reachable\"\n",
-    "Prove:\n",
-    "  - assert: \"true\"\n",
-    "    because: \"trivial\"\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 1\n",
-    "    expect: SUCCESS\n",
-);
-
-const REFERENCED_TYPES_LIB_RS: &str = concat!(
-    "//! Fixture crate for referenced-type behavioural tests.\n\n",
-    "pub struct Account;\n",
-    "pub struct DepositCommand {\n",
-    "    pub amount: u64,\n",
-    "}\n",
-    "pub struct DepositOutcome;\n\n",
-    "pub mod theorem_actions {\n",
-    "    #[allow(non_snake_case)]\n",
-    "    pub fn account__deposit__h05158894bfb4(\n",
-    "        _command: crate::DepositCommand,\n",
-    "    ) -> crate::DepositOutcome {\n",
-    "        crate::DepositOutcome\n",
-    "    }\n",
-    "}\n\n",
-    "#[doc(hidden)]\n",
-    "mod __theoremc_generated_suite {\n",
-    "    #[cfg(theoremc_has_theorems)]\n",
-    "    use theoremc::theorem_file;\n",
-    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
-    "}\n",
-);
-
-struct ExpectedBuildFailure<'a> {
-    lib_rs: &'a str,
-    theorem_path: &'a str,
-    theorem_content: &'a str,
-    unexpected_success_msg: &'a str,
-    expected_fragments: &'a [&'a str],
-}
-
-const EMPTY_TYPES_LIB_RS: &str = concat!(
-    "//! Fixture crate with no theorem-owned type definitions.\n\n",
-    "#[doc(hidden)]\n",
-    "mod __theoremc_generated_suite {\n",
-    "    #[cfg(theoremc_has_theorems)]\n",
-    "    use theoremc::theorem_file;\n",
-    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
-    "}\n",
-);
-
-const MOVED_ACTION_TYPE_LIB_RS: &str = concat!(
-    "//! Fixture crate where an action type moved modules.\n\n",
-    "pub mod new {\n",
-    "    pub struct DepositCommand;\n",
-    "}\n",
-    "pub struct DepositOutcome;\n\n",
-    "#[doc(hidden)]\n",
-    "mod __theoremc_generated_suite {\n",
-    "    #[cfg(theoremc_has_theorems)]\n",
-    "    use theoremc::theorem_file;\n",
-    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
-    "}\n",
 );
 
 #[given("a fixture crate with one valid theorem file")]
@@ -505,38 +393,4 @@ fn a_multi_document_theorem_file_with_partial_kani_evidence_fails_macro_expansio
 fn fixture_cargo_lock_acquires_without_poisoning() {
     let guard = CargoGuard::acquire();
     drop(guard);
-}
-
-#[test]
-fn fixture_cargo_toml_normalizes_windows_paths() {
-    // Simulate a Windows-style `CARGO_MANIFEST_DIR` with backslash separators.
-    // `fixture_cargo_toml` reads `ROOT_MANIFEST_DIR`, which is set at compile
-    // time, but the normalization logic is what this test needs to verify.
-    let windows_path = r"C:\Users\user\projects\theoremc";
-    let toml = fixture_cargo_toml_for(windows_path);
-
-    // Forward slashes must appear in the TOML; no backslashes.
-    assert!(
-        !toml.contains('\\'),
-        "TOML must not contain backslashes after normalization; got:\n{toml}",
-    );
-
-    // The path must appear as a TOML basic string after normalization.
-    assert!(
-        toml.contains("\"C:/Users/user/projects/theoremc\""),
-        "expected normalized forward-slash path in TOML; got:\n{toml}",
-    );
-    assert!(toml.contains(FIXTURE_BUILD_DEPENDENCIES));
-}
-
-#[test]
-fn fixture_cargo_toml_escapes_basic_string_paths() {
-    let checkout_path = "/home/user/project's/\"theoremc\"";
-    let toml = fixture_cargo_toml_for(checkout_path);
-
-    assert!(
-        toml.contains("path = \"/home/user/project's/\\\"theoremc\\\"\""),
-        "expected escaped TOML basic string path, got:\n{toml}",
-    );
-    assert!(toml.contains(FIXTURE_BUILD_DEPENDENCIES));
 }

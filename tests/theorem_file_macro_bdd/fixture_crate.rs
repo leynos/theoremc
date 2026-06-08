@@ -103,3 +103,39 @@ pub(crate) fn build_fixture_and_list_kani_harnesses(
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
     fixture.cargo_kani_list(&guard)
 }
+
+mod tests {
+    use super::{FIXTURE_BUILD_DEPENDENCIES, fixture_cargo_toml_for};
+
+    #[test]
+    fn fixture_cargo_toml_normalizes_windows_paths() {
+        // Simulate a Windows-style `CARGO_MANIFEST_DIR` with backslash
+        // separators. `fixture_cargo_toml` reads `ROOT_MANIFEST_DIR`, which is
+        // set at compile time, but this test only needs the normalization
+        // logic.
+        let windows_path = r"C:\Users\user\projects\theoremc";
+        let toml = fixture_cargo_toml_for(windows_path);
+
+        assert!(
+            !toml.contains('\\'),
+            "TOML must not contain backslashes after normalization; got:\n{toml}",
+        );
+        assert!(
+            toml.contains("\"C:/Users/user/projects/theoremc\""),
+            "expected normalized forward-slash path in TOML; got:\n{toml}",
+        );
+        assert!(toml.contains(FIXTURE_BUILD_DEPENDENCIES));
+    }
+
+    #[test]
+    fn fixture_cargo_toml_escapes_basic_string_paths() {
+        let checkout_path = "/home/user/project's/\"theoremc\"";
+        let toml = fixture_cargo_toml_for(checkout_path);
+
+        assert!(
+            toml.contains("path = \"/home/user/project's/\\\"theoremc\\\"\""),
+            "expected escaped TOML basic string path, got:\n{toml}",
+        );
+        assert!(toml.contains(FIXTURE_BUILD_DEPENDENCIES));
+    }
+}
