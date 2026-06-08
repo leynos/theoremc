@@ -17,6 +17,7 @@ mod loader_message;
 mod newtypes;
 mod raw;
 mod raw_action;
+pub(crate) mod rust_type;
 mod source_id;
 mod step;
 mod types;

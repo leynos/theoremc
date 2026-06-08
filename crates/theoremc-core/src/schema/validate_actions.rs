@@ -6,6 +6,8 @@ use crate::schema::action_name::validate_canonical_action_name;
 use crate::schema::identifier::validate_identifier;
 use crate::schema::types::TheoremDoc;
 
+use super::types::validate_type_without_free_named_lifetime;
+
 /// Every declared action signature must have a canonical name, valid
 /// parameter identifiers, and Rust type strings that parse as `syn::Type`.
 pub(super) fn validate_action_signatures(doc: &TheoremDoc) -> ValidationResult {
@@ -15,21 +17,18 @@ pub(super) fn validate_action_signatures(doc: &TheoremDoc) -> ValidationResult {
         for (param, ty) in &signature.params {
             validate_identifier(param)
                 .map_err(|r| fail(doc, format!("Actions entry '{action}': param {r}"), None))?;
-            validate_rust_type(doc, action, param, ty)?;
+            validate_type_without_free_named_lifetime(
+                doc,
+                ty,
+                &format!("Actions entry '{action}': {param} type"),
+            )?;
         }
-        validate_rust_type(doc, action, "returns", &signature.returns)?;
-    }
-    Ok(())
-}
-
-fn validate_rust_type(doc: &TheoremDoc, action: &str, field: &str, ty: &str) -> ValidationResult {
-    syn::parse_str::<syn::Type>(ty.trim()).map_err(|error| {
-        fail(
+        validate_type_without_free_named_lifetime(
             doc,
-            format!("Actions entry '{action}': {field} type is not a valid Rust type: {error}"),
-            None,
-        )
-    })?;
+            &signature.returns,
+            &format!("Actions entry '{action}': returns type"),
+        )?;
+    }
     Ok(())
 }
 

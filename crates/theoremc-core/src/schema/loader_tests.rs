@@ -61,6 +61,80 @@ fn load_single_minimal_document() {
     assert_eq!(docs.first().map(|d| d.theorem.as_str()), Some("Minimal"));
 }
 
+fn invalid_forall_type_is_rejected() {
+    let yaml = r"
+Theorem: InvalidForallType
+About: Declares an invalid Forall type
+Forall:
+  account: 'not a type %'
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+";
+
+    assert_parse_error_contains(
+        yaml,
+        "Forall entry 'account': type is not a valid Rust type",
+    );
+}
+
+fn free_named_lifetime_in_forall_type_is_rejected() {
+    let yaml = r#"
+Theorem: InvalidForallLifetime
+About: Declares an unbound Forall lifetime
+Forall:
+  account: "&'a crate::Account"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+"#;
+
+    assert_parse_error_contains(
+        yaml,
+        "Forall entry 'account': type contains a free named lifetime parameter 'a'",
+    );
+}
+
+fn free_named_lifetime_in_action_signature_type_is_rejected() {
+    let yaml = r#"
+Theorem: InvalidActionLifetime
+About: Declares an unbound action lifetime
+Actions:
+  account.deposit:
+    params:
+      account: "&'a crate::Account"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+"#;
+
+    assert_parse_error_contains(
+        yaml,
+        "Actions entry 'account.deposit': account type contains a free named lifetime parameter 'a'",
+    );
+}
+
 #[rstest]
 fn load_multi_document_file() {
     let yaml = r"

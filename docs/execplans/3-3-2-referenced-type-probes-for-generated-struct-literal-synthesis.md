@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: IN PROGRESS
 
 ## Purpose / big picture
 
@@ -652,11 +652,11 @@ and documentation.
 
 ## Progress
 
-- [ ] Receive explicit user approval to proceed with implementation.
-- [ ] Milestone 0: probe-shape confirmation and red tests.
-- [ ] Milestone 1: `theoremc-core` `referenced_types` helper and `Forall`
+- [x] Receive explicit user approval to proceed with implementation.
+- [x] Milestone 0: probe-shape confirmation and red tests.
+- [x] Milestone 1: `theoremc-core` `referenced_types` helper and `Forall`
   type validation.
-- [ ] Milestone 2: emit referenced-type probes in `theorem_file!` and update
+- [x] Milestone 2: emit referenced-type probes in `theorem_file!` and update
   trybuild snapshots.
 - [ ] Milestone 3: behavioural compile checks for missing and moved
   referenced types.
@@ -666,13 +666,49 @@ and documentation.
 
 ## Surprises & Discoveries
 
-- (none yet — populated during implementation)
+- 2026-06-08: `docs/contents.md` references `docs/repository-layout.md`, but
+  that file is absent from the working tree. Orientation proceeded with
+  `docs/contents.md`, `leta files`, and the existing source layout instead.
+- 2026-06-08: The Milestone 0 red test command
+  `cargo nextest run -p theoremc-macros` produced the expected failures:
+  21 tests passed and the three new referenced-type probe assertions failed
+  because `__theoremc_assert_referenced` is not emitted yet. The output is in
+  `/tmp/test-theoremc-3-3-2-macro-red.out`.
+- 2026-06-08: Milestone 1 focused validation passed with
+  `cargo nextest run -p theoremc-core`; 281 tests passed. The output is in
+  `/tmp/test-theoremc-3-3-2-core.out`.
+- 2026-06-08: Milestone 2 focused validation passed with
+  `cargo nextest run -p theoremc-macros`; 24 tests passed, including the
+  formerly red referenced-type probe tests. The output is in
+  `/tmp/test-theoremc-3-3-2-macros.out`.
+- 2026-06-08: `make check-fmt` and `make lint` passed after Milestones 1 and
+  2. Logs are in `/tmp/check-fmt-theoremc-3-3-2-m1-m2.out` and
+  `/tmp/lint-theoremc-3-3-2-m1-m2.out`.
+- 2026-06-08: `make test` passed after Milestones 1 and 2: 569 nextest tests
+  passed, followed by passing workspace doctests. The output is in
+  `/tmp/test-theoremc-3-3-2-m1-m2.out`.
+- 2026-06-08: `coderabbit review --agent` completed for Milestones 1 and 2
+  with zero findings. The output is in
+  `/tmp/coderabbit-theoremc-3-3-2-m1-m2.out`.
 
 ## Decision Log
 
 - 2026-06-02: Keep this ExecPlan in `DRAFT` and do not mark the roadmap item
   done. Rationale: the user explicitly requires approval before
   implementation.
+- 2026-06-08: Move this ExecPlan from `DRAFT` to `IN PROGRESS`.
+  Rationale: the user explicitly requested implementation of this approved
+  plan in this session.
+- 2026-06-08: Defer the Milestone 0 commit and CodeRabbit review until the
+  referenced-type implementation makes the red tests green. Rationale: the
+  repository instruction says commits and CodeRabbit reviews must be gated by
+  deterministic checks; committing intentionally failing tests would violate
+  that stronger quality gate.
+- 2026-06-08: Emit the referenced-type probe block without the planned marker
+  comment. Rationale: Rust comments are not represented in procedural macro
+  `TokenStream` output, so `quote!` cannot reliably preserve such a marker;
+  the deterministic helper name `__theoremc_assert_referenced` remains the
+  stable diagnostic and `cargo expand` anchor.
 - 2026-06-02: Treat top-level type-path resolution as the bar for "missing
   and moved" type detection, leaving struct field correctness and nested
   generic argument decomposition to Phase 4 harness compilation and to

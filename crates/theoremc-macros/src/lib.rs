@@ -12,7 +12,7 @@ use quote::quote;
 use syn::{LitStr, parse_macro_input};
 use theoremc_core::{
     TheoremFileLoadError,
-    collision::referenced_actions,
+    collision::{referenced_actions, referenced_types},
     load_theorem_file_from_manifest_dir,
     mangle::{mangle_action_name, mangle_module_path, mangle_theorem_harness},
     path_format::normalize_path_separators,
@@ -153,6 +153,8 @@ fn render_expansion(
     let harnesses = generated_harnesses(theorem_path, theorem_docs)?;
     let action_probes = generated_action_probes(theorem_docs)?;
     let action_probe_tokens = render_action_probes(&action_probes);
+    let type_probes = generated_referenced_type_probes(theorem_docs)?;
+    let type_probe_tokens = render_referenced_type_probes(&type_probes);
     let harness_idents: Vec<&Ident> = harnesses.iter().map(|harness| &harness.ident).collect();
     let unwind_literals: Vec<&syn::LitInt> = harnesses
         .iter()
@@ -170,6 +172,7 @@ fn render_expansion(
                 include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", #path_literal));
 
             #action_probe_tokens
+            #type_probe_tokens
 
             #[cfg(kani)]
             pub(super) mod kani {
@@ -186,6 +189,21 @@ fn render_expansion(
     })
 }
 
+fn generated_referenced_type_probes(
+    theorem_docs: &[theoremc_core::schema::TheoremDoc],
+) -> Result<Vec<syn::Type>, MacroExpansionError> {
+    referenced_types(theorem_docs)
+        .into_iter()
+        .map(parse_referenced_type)
+        .collect()
+}
+
+fn parse_referenced_type(ty: &str) -> Result<syn::Type, MacroExpansionError> {
+    syn::parse_str(ty).map_err(|source| MacroExpansionError::InvalidReferencedType {
+        ty: ty.to_owned(),
+        message: source.to_string(),
+    })
+}
 fn generated_harnesses(
     theorem_path: &str,
     theorem_docs: &[theoremc_core::schema::TheoremDoc],
@@ -324,6 +342,20 @@ fn render_action_probes(action_probes: &[GeneratedActionProbe]) -> TokenStream2 
     }
 }
 
+fn render_referenced_type_probes(type_probes: &[syn::Type]) -> TokenStream2 {
+    if type_probes.is_empty() {
+        return TokenStream2::new();
+    }
+
+    quote! {
+        const _: () = {
+            fn __theoremc_assert_referenced<T: ?Sized>() {}
+            #(
+                let _ = __theoremc_assert_referenced::<#type_probes>;
+            )*
+        };
+    }
+}
 fn identifier(name: &str) -> Ident {
     Ident::new(name, Span::call_site())
 }
@@ -351,6 +383,8 @@ enum MacroExpansionError {
     ConflictingActionSignature { action: String },
     #[error("referenced action `{action}` has an invalid Actions signature: {message}")]
     InvalidActionSignature { action: String, message: String },
+    #[error("referenced type `{ty}` is invalid: {message}")]
+    InvalidReferencedType { ty: String, message: String },
     #[error("{0}")]
     LoadTheoremFile(String),
 }
@@ -384,3 +418,4 @@ mod tests;
 #[cfg(test)]
 #[path = "action_probe_tests.rs"]
 mod action_probe_tests;
+mod type_probe_tests;
