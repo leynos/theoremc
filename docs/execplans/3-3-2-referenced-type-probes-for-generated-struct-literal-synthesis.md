@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -646,7 +646,7 @@ and documentation.
 - [x] Milestone 3: behavioural compile checks for missing and moved
   referenced types.
 - [x] Milestone 4: documentation and roadmap update.
-- [ ] Milestone 5: full quality gate, final CodeRabbit review, mark
+- [x] Milestone 5: full quality gate, final CodeRabbit review, mark
   complete.
 
 ## Surprises & Discoveries
@@ -705,6 +705,17 @@ and documentation.
   `/tmp/nixie-theoremc-3-3-2-docs.out`.
 - 2026-06-08: `coderabbit review --agent` completed for Milestone 4 with
   zero findings. The output is in `/tmp/coderabbit-theoremc-3-3-2-docs.out`.
+- 2026-06-08: Final full repository gates passed. `make check-fmt` passed;
+  `make lint` passed; `make test` passed with 572 nextest tests, followed by
+  passing workspace doctests. Logs are in
+  `/tmp/check-fmt-theoremc-3-3-2-final.out`,
+  `/tmp/lint-theoremc-3-3-2-final.out`, and
+  `/tmp/test-theoremc-3-3-2-final.out`.
+- 2026-06-08: The first final `coderabbit review --agent` attempt hit a
+  recoverable rate limit. The required `vsleep $(shuf -i 60-90 -n 1)m` backoff
+  selected 61 minutes; the retry then completed with zero findings. Logs are in
+  `/tmp/coderabbit-theoremc-3-3-2-final.out` and
+  `/tmp/coderabbit-theoremc-3-3-2-final-retry.out`.
 
 ## Decision Log
 
@@ -789,7 +800,21 @@ and documentation.
 
 ## Outcomes & Retrospective
 
-(populated at completion)
+Step 3.3.2 is implemented. The theorem-file macro now emits compile-time
+referenced-type probes for the distinct Rust types declared in `Forall` and
+`Actions` signatures, so missing or moved owner-crate type paths fail ordinary
+Rust compilation before Phase 4 struct-literal synthesis relies on them.
+
+The implementation also centralizes Rust type parsing, validation, and
+canonical token rendering in `schema::rust_type`, reuses that path for action
+signature equivalence, rejects free named lifetimes in schema-declared types,
+and exposes `collision::referenced_types` as the ordered traversal helper for
+macro emission.
+
+Coverage now includes core traversal and validation tests, macro token-shape
+tests, and theorem-owner BDD fixture builds for present, missing, and moved
+referenced types. Documentation was updated in the design, theorem-file
+specification, users' guide, developers' guide, roadmap, and this ExecPlan.
 
 ## Revision note
 
