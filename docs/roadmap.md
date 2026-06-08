@@ -299,7 +299,7 @@ Out of scope: runtime reflection.
   referenced action to force signature compatibility at compile time.
   Acceptance: signature drift causes compile failure in the theorem owner
   crate. Signposts: `DES-7`, `DES-5`, `NMR-1`.
-- [ ] Emit referenced-type probes for generated struct literal synthesis and
+- [x] Emit referenced-type probes for generated struct literal synthesis and
   step bindings to surface missing-type and moved-type breakages early.
   Acceptance: compile-fail tests validate predictable drift diagnostics.
   Signposts: `DES-7`, `DES-5`.

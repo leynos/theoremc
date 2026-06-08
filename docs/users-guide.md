@@ -114,6 +114,8 @@ The function:
 - Rejects unknown keys (any key not defined in the schema causes an error).
 - Validates theorem identifiers and `Forall` keys against the identifier
   rules (see below).
+- Validates `Forall` and `Actions` type strings as Rust types, rejecting free
+  named lifetimes such as `&'a T`.
 - Enforces non-empty constraints on string fields (see below).
 - Returns `Err(SchemaError)` with an actionable message on failure.
 
@@ -513,6 +515,27 @@ const _: fn(&mut crate::account::Account, u64) -> Result<(), crate::account::Dep
 
 If the `crate::theorem_actions` export is missing, renamed, or has a different
 signature, the theorem owner crate fails to compile.
+
+The macro also emits referenced-type probes for every distinct type named by
+`Forall`, `Actions.params`, and `Actions.returns`. These probes are ordinary
+Rust items outside the Kani-only module, so missing or moved type paths fail in
+normal `cargo build`:
+
+```yaml
+Forall:
+  account: crate::account::Account
+Actions:
+  account.deposit:
+    params:
+      command: crate::account::DepositCommand
+    returns: crate::account::DepositOutcome
+```
+
+If `crate::account::DepositCommand` is renamed or moved, compilation fails
+while expanding `theorem_file!`. Referenced-type probes only check that Rust
+can resolve the declared type path. Typed action probes separately check that
+the mangled `crate::theorem_actions::*` function exists and has the declared
+signature.
 
 ## Action name mangling
 

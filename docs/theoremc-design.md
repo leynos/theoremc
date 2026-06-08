@@ -1421,8 +1421,26 @@ diagnostics against the generated probe. Placeholder probes such as
 `fn(_) -> _` are forbidden because Rust infers those placeholders from the
 current function item and therefore cannot detect signature drift.
 
-Referenced-type probes are separate from action probes. For referenced types,
-emit phantom usages in Step 3.3.2.
+Referenced-type probes are separate from action probes. For every distinct Rust
+type mentioned by `Forall`, `Actions.params`, or `Actions.returns`,
+`theorem_file!` emits one anonymous const block in the per-file module:
+
+```rust
+const _: () = {
+    fn __theoremc_assert_referenced<T: ?Sized>() {}
+    let _ = __theoremc_assert_referenced::<crate::account::Account>;
+    let _ = __theoremc_assert_referenced::<crate::account::DepositCommand>;
+};
+```
+
+The helper is declared once per theorem file and accepts `T: ?Sized`, so
+reference-bearing and unsized-compatible type forms do not need separate probe
+shapes. Types are deduplicated by the canonical token stream of `syn::Type`,
+which treats insignificant whitespace differences such as `Vec<u8>` and
+`Vec <u8>` as the same type. The probe only resolves the top-level type path as
+Rust sees it in the theorem owner crate. It does not inspect struct fields,
+decompose generic arguments for field-level checks, or synthesize struct
+literals; Phase 4 harness emission owns those behaviours.
 
 This ensures that renames, signature drift, or missing re-exports fail
 compilation immediately, not “later when running theoremd”.

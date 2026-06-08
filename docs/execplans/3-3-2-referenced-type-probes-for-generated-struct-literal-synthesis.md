@@ -13,15 +13,14 @@ every Rust type referenced by a `.theorem` document participate in ordinary
 Rust type-checking before Phase 4 Kani harness emission lands.
 
 A referenced type is any Rust type appearing in a theorem document outside an
-expression body: each `Forall` symbolic input type, each `Actions.params`
-type, and each `Actions.returns` type. After this change, `theorem_file!`
-continues to emit the per-file module produced by Step 3.2 and the typed
-action probes produced by Step 3.3.1, and additionally emits one
-deterministic compile-time existence probe per distinct referenced type.
-The probes are wrapped in a single anonymous `const _` block per file with
-one shared `?Sized`-relaxed assertion helper, so types containing references,
-higher-rank lifetimes, and unsized inner types do not require per-shape
-switches:
+expression body: each `Forall` symbolic input type, each `Actions.params` type,
+and each `Actions.returns` type. After this change, `theorem_file!` continues
+to emit the per-file module produced by Step 3.2 and the typed action probes
+produced by Step 3.3.1, and additionally emits one deterministic compile-time
+existence probe per distinct referenced type. The probes are wrapped in a
+single anonymous `const _` block per file with one shared `?Sized`-relaxed
+assertion helper, so types containing references, higher-rank lifetimes, and
+unsized inner types do not require per-shape switches:
 
 ```rust
 const _: () = {
@@ -36,8 +35,8 @@ This step delivers the type-resolution backstop only. Wiring struct-literal
 synthesis into proc-macro expansion (so `T { field: value }` literals are
 emitted from YAML maps) is a Phase 4 concern that depends on these probes
 having already locked the target type-name path in place. The roadmap label
-"for generated struct-literal synthesis and step bindings" describes what
-the probes *guard*, not what this plan emits.
+"for generated struct-literal synthesis and step bindings" describes what the
+probes *guard*, not what this plan emits.
 
 The observable result is that renaming a `Forall` type, moving an action
 parameter type to a different module, or deleting a struct used in a theorem
@@ -68,8 +67,8 @@ Observable success:
    special-casing and do not produce false positives or Clippy noise.
 7. Reference-bearing types with elided lifetimes (`&mut crate::Account`,
    `Vec<&'static str>`) compile through the probe. Types with free named
-   lifetime parameters (`&'a Foo`) are rejected at schema validation time
-   with a deterministic diagnostic; they never reach probe emission.
+   lifetime parameters (`&'a Foo`) are rejected at schema validation time with
+   a deterministic diagnostic; they never reach probe emission.
 8. A theorem with no `Forall` entries and an empty `Actions` mapping emits
    no probe block, matching the Step 3.3.1 contract for action probes.
 9. Existing schema validation, action probes, duplicate action collision
@@ -109,9 +108,9 @@ Observable success:
   referenced-type probe is an additional, separate item per distinct type.
 - Preserve the Step 3.2 generated module layout: each theorem file expands
   into the same stable private module, keeps the source `include_str!`, and
-  keeps Kani harnesses under `#[cfg(kani)]`. Referenced-type probes live in
-  the per-file module body alongside action probes, not inside the
-  `#[cfg(kani)]` submodule, so drift fails in ordinary builds.
+  keeps Kani harnesses under `#[cfg(kani)]`. Referenced-type probes live in the
+  per-file module body alongside action probes, not inside the `#[cfg(kani)]`
+  submodule, so drift fails in ordinary builds.
 - Preserve ADR-003 schema layering: type traversal lives in `theoremc-core`
   next to `collision::referenced_actions`; `theoremc-macros` only renders
   tokens. `schema/` and `mangle/` boundaries are not crossed.
@@ -133,8 +132,8 @@ Observable success:
 - Run code quality gates sequentially and capture long output with `tee` into
   `/tmp` logs. Do not run format checks, lints, or tests in parallel.
 - Run `coderabbit review --agent` after each major implementation milestone,
-  clear all concerns before moving to the next milestone, and record the
-  result in this plan.
+  clear all concerns before moving to the next milestone, and record the result
+  in this plan.
 - Commit after each logical change that passes its gates. Use file-based
   commit messages with `git commit -F`, never `git commit -m`.
 - Documentation and comments must use en-GB Oxford spelling and grammar.
@@ -150,71 +149,68 @@ Observable success:
   document the failure and stop after one alternative attempt. Do not silence
   lints to make the chosen shape work.
 - Scope: if implementation requires changing `.theorem` syntax, build-suite
-  generation, Step 3.2 Kani harness layout, Step 3.3.1 action probe layout,
-  or any Phase 4 harness body, stop and ask for direction.
+  generation, Step 3.2 Kani harness layout, Step 3.3.1 action probe layout, or
+  any Phase 4 harness body, stop and ask for direction.
 - Type decomposition: this plan probes top-level types only. If a milestone
   appears to require recursing into generic arguments or struct fields, stop
   and reassess; that is a separate roadmap step.
 - Source scanning: if probing the existence of any referenced type appears to
-  require parsing or resolving Rust modules outside the consuming crate's
-  type universe, stop. That is larger than Step 3.3.2.
+  require parsing or resolving Rust modules outside the consuming crate's type
+  universe, stop. That is larger than Step 3.3.2.
 - Public API: if the new `theoremc-core` referenced-type helper cannot be
   added without exposing incidental traversal internals, stop and present API
   options.
 - Dependencies: if a new crates.io dependency appears necessary, make one
   prototype and stop for approval before adding it.
 - Diagnostics: if compile-fail `*.stderr` snapshots become unstable across
-  local and CI Rust versions after two attempts to narrow the asserted
-  output, switch to BDD fixture-build assertions on stable fragments such as
-  `cannot find type`, the type name, and the generated probe path, and
-  document the trade-off.
+  local and CI Rust versions after two attempts to narrow the asserted output,
+  switch to BDD fixture-build assertions on stable fragments such as
+  `cannot find type`, the type name, and the generated probe path, and document
+  the trade-off.
 - Code size: if implementation grows beyond roughly eight changed code files
-  or 500 net Rust lines before documentation updates, stop and reassess
-  whether the task should be split.
+  or 500 net Rust lines before documentation updates, stop and reassess whether
+  the task should be split.
 - Validation: if any of `make check-fmt`, `make lint`, or `make test` still
-  fails after five focused fix attempts, stop with captured logs and
-  summarize the remaining failure.
+  fails after five focused fix attempts, stop with captured logs and summarize
+  the remaining failure.
 - CodeRabbit: if `coderabbit review --agent` is unavailable in the local
-  environment, record that fact and continue only after the ordinary
-  repository gates pass. If it reports actionable concerns, address them
-  before continuing or document why the concern is out of scope and seek
-  direction.
+  environment, record that fact and continue only after the ordinary repository
+  gates pass. If it reports actionable concerns, address them before continuing
+  or document why the concern is out of scope and seek direction.
 
 ## Risks
 
-- Risk: the chosen probe shape (`const _: () = { fn _assert<T: ?Sized>() {}
-  let _ = _assert_referenced::<T>; };`) accepts unsized and reference-bearing
-  types but produces a slightly less obvious diagnostic anchor than the
-  function-pointer coercion used for action probes. Severity: medium.
-  Likelihood: medium. Mitigation: prefer concise, deterministic probe
+- Risk: the chosen anonymous-const generic assertion probe accepts unsized and
+  reference-bearing types but produces a slightly less obvious diagnostic
+  anchor than the function-pointer coercion used for action probes. Severity:
+  medium. Likelihood: medium. Mitigation: prefer concise, deterministic probe
   identifiers (`__theoremc_assert_referenced`) and confirm with trybuild that
   the diagnostic still references the probe location.
 
 - Risk: redundant Rust type strings can produce many duplicate probes (for
   example, the same `crate::Account` appearing in three actions). Severity:
-  low. Likelihood: high. Mitigation: deduplicate by canonical `syn::Type`
-  token stream using the same equivalence helper as
+  low. Likelihood: high. Mitigation: deduplicate by canonical `syn::Type` token
+  stream using the same equivalence helper as
   `ActionSignature::is_semantically_equivalent` so `Vec<u8>` and `Vec <u8>`
   fold together.
 
 - Risk: parsing `Forall` type strings as `syn::Type` introduces a new schema
   validation point and can reject documents that previously loaded. Severity:
-  medium. Likelihood: medium. Mitigation: keep the diagnostic close in shape
-  to the existing `validate_rust_type` Actions diagnostic, migrate any
-  affected fixtures atomically, and document the new validation in the user
-  guide.
+  medium. Likelihood: medium. Mitigation: keep the diagnostic close in shape to
+  the existing `validate_rust_type` Actions diagnostic, migrate any affected
+  fixtures atomically, and document the new validation in the user guide.
 
 - Risk: trybuild `*.stderr` snapshots drift across rustc versions when the
   diagnostic includes Rust's note-tracking. Severity: medium. Likelihood:
   medium. Mitigation: trybuild remains the right tool for the macro-side
-  fixtures, but rely on BDD fixture build assertions on stable substrings
-  for the theorem-author workflow scenarios.
+  fixtures, but rely on BDD fixture build assertions on stable substrings for
+  the theorem-author workflow scenarios.
 
 - Risk: emitting probes for primitive types like `u64` and `()` could trigger
   Clippy lints around redundant generic instantiation. Severity: low.
   Likelihood: low. Mitigation: confirm the probe shape passes
-  `cargo clippy --workspace --all-targets --all-features -- -D warnings` on
-  a representative fixture before declaring the milestone complete.
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings` on a
+  representative fixture before declaring the milestone complete.
 
 - Risk: this task is adjacent to nested map lowering and struct field
   introspection, so it may be tempting to broaden scope to probe individual
@@ -226,10 +222,9 @@ Observable success:
 - Risk: probes that wrap `Vec<&'a str>` in a function-pointer with elided
   lifetime succeed, but probes for raw `&'a Foo` written by a theorem author
   with an explicit lifetime cannot succeed because Rust will not bind `'a`.
-  Severity: low. Likelihood: low. Mitigation: documented `RustType`
-  convention disallows free lifetime parameters; emit a deterministic schema
-  diagnostic if such a string appears, rather than producing a confusing
-  rustc error.
+  Severity: low. Likelihood: low. Mitigation: documented `RustType` convention
+  disallows free lifetime parameters; emit a deterministic schema diagnostic if
+  such a string appears, rather than producing a confusing rustc error.
 
 ## Signposts and required references
 
@@ -251,9 +246,9 @@ Observable success:
   action signature declarations and the rationale for treating types as
   theorem-owned contracts.
 - Companion ExecPlan:
-  `docs/execplans/3-3-1-emit-typed-action-probes.md`, which sets the
-  precedent for probe rendering, trybuild fixtures, BDD fixture-crate
-  patterns, and signature-equivalence checks.
+  `docs/execplans/3-3-1-emit-typed-action-probes.md`, which sets the precedent
+  for probe rendering, trybuild fixtures, BDD fixture-crate patterns, and
+  signature-equivalence checks.
 - `docs/rust-testing-with-rstest-fixtures.md`, `rstest` style guide.
 - `docs/reliable-testing-in-rust-via-dependency-injection.md`, fixture
   isolation and external process boundaries.
@@ -291,30 +286,30 @@ Observable success:
 Begin by creating failing tests that describe the behaviour before production
 code changes. The chosen probe shape is the generic-assertion form wrapped in
 an anonymous `const _` block, with one shared `?Sized`-relaxed helper and one
-`let _ = ...;` statement per distinct referenced type. This shape admits
-sized, unsized, and reference-bearing types without per-shape switches and
-stays anonymous so dead-code lints do not require `#[allow]` attributes.
+`let _ = ...;` statement per distinct referenced type. This shape admits sized,
+unsized, and reference-bearing types without per-shape switches and stays
+anonymous so dead-code lints do not require `#[allow]` attributes.
 `PhantomData<T>` would also work but requires an item-level binding for each
 probe, whereas the chosen form keeps everything inside one anonymous block.
 
-The red tests at this milestone are **unit tests on
-`render_expansion`'s token output**, not trybuild fixtures. trybuild fixtures
-that intentionally reference a missing type would already fail to compile
-(because the type really is missing in the fixture crate's universe) without
-proving the probe was emitted. Trybuild fixtures are added during Milestone 2
-once probes exist and the `*.stderr` snapshot anchors are stable.
+The red tests at this milestone are **unit tests on `render_expansion`'s token
+output**, not trybuild fixtures. trybuild fixtures that intentionally reference
+a missing type would already fail to compile (because the type really is
+missing in the fixture crate's universe) without proving the probe was emitted.
+Trybuild fixtures are added during Milestone 2 once probes exist and the
+`*.stderr` snapshot anchors are stable.
 
 Add an `rstest`-driven unit test in `crates/theoremc-macros/src/` (in a new
-sibling module `type_probe_tests.rs` next to `action_probe_tests.rs`,
-mirroring the established structure of `crates/theoremc-macros/src/lib.rs`).
-The red tests must assert that the token stream produced by
-`render_expansion` for the following inputs does **not** contain the
-substring `__theoremc_assert_referenced` before implementation, and that
-each test will flip to assert the expected probe block in Milestone 2:
+sibling module `type_probe_tests.rs` next to `action_probe_tests.rs`, mirroring
+the established structure of `crates/theoremc-macros/src/lib.rs`). The red
+tests must assert that the token stream produced by `render_expansion` for the
+following inputs does **not** contain the substring
+`__theoremc_assert_referenced` before implementation, and that each test will
+flip to assert the expected probe block in Milestone 2:
 
 - a theorem with one `Forall` variable of a custom type and one referenced
-  action whose `Actions.params` and `Actions.returns` mention distinct
-  custom types,
+  action whose `Actions.params` and `Actions.returns` mention distinct custom
+  types,
 - a theorem with primitive types only (`Forall: n: "u64"`, action with
   `params: { flag: "bool" }` and `returns: "()"`),
 - a theorem with two action signatures that share a parameter type via
@@ -322,20 +317,20 @@ each test will flip to assert the expected probe block in Milestone 2:
 - a theorem with no `Forall` entries and an empty `Actions` map (degenerate
   case — no probe block expected before *or* after).
 
-Do not proceed to Milestone 1 until the red tests fail for the expected
-reason: the macro understands the theorem but does not yet emit referenced-
-type probes. Run:
+Do not proceed to Milestone 1 until the red tests fail for the expected reason:
+the macro understands the theorem but does not yet emit referenced- type
+probes. Run:
 
 ```sh
 cargo nextest run -p theoremc-macros 2>&1 \
     | tee /tmp/test-theoremc-3-3-2-macro-red.out
 ```
 
-Expected result before implementation: the new tests fail because the
-expansion does not yet emit referenced-type probes.
+Expected result before implementation: the new tests fail because the expansion
+does not yet emit referenced-type probes.
 
-Run `coderabbit review --agent` after the red-test commit. Address any
-concern that affects the planned contract before continuing.
+Run `coderabbit review --agent` after the red-test commit. Address any concern
+that affects the planned contract before continuing.
 
 ### Milestone 1: extend schema validation and expose distinct referenced types
 
@@ -344,45 +339,43 @@ that owns Rust type parsing and canonicalisation for the whole crate. It
 exposes:
 
 - `pub(crate) fn parse(ty: &str) -> Result<syn::Type, syn::Error>` — the
-  thin `syn::parse_str` wrapper, trimming whitespace before parsing so
-  callers do not duplicate that step;
+  thin `syn::parse_str` wrapper, trimming whitespace before parsing so callers
+  do not duplicate that step;
 - `pub(crate) fn canonical_token_stream(ty: &str) -> Option<String>` — the
-  `quote::ToTokens` round-trip used as the canonical dedup and equivalence
-  key. Returns `None` when parsing fails, in which case callers fall back
-  to trimmed string equality;
-- `pub(crate) fn validate(ty: &str, context: impl FnOnce(syn::Error) ->
-  SchemaError) -> Result<(), SchemaError>` — drives validation with a
-  caller-supplied diagnostic context closure so each call site keeps its
+  `quote::ToTokens` round-trip used as the canonical dedup and equivalence key.
+  Returns `None` when parsing fails, in which case callers fall back to trimmed
+  string equality;
+- `pub(crate) fn validate(...) -> Result<(), SchemaError>` — drives validation
+  with a caller-supplied diagnostic context closure so each call site keeps its
   own deterministic error string shape.
 
 Re-point the existing `validate_action_signatures` validator
 (`crates/theoremc-core/src/schema/validate.rs:188-215`) at
-`rust_type::validate` so the existing diagnostic text remains stable.
-Re-point `ActionSignature::is_semantically_equivalent`
+`rust_type::validate` so the existing diagnostic text remains stable. Re-point
+`ActionSignature::is_semantically_equivalent`
 (`crates/theoremc-core/src/schema/types.rs:265-294`) at
 `rust_type::canonical_token_stream` so probe dedup and signature equivalence
 share one canonical comparison.
 
-Add a new `validate_forall_types` step inserted into the
-`validate_theorem_doc` pipeline immediately after
-`validate_action_signatures`. Use `rust_type::validate` with a
+Add a new `validate_forall_types` step inserted into the `validate_theorem_doc`
+pipeline immediately after `validate_action_signatures`. Use
+`rust_type::validate` with a
 `Forall entry 'x': type is not a valid Rust type: <syn error>` shape, matching
 the established Actions pattern. Reject types containing free named lifetime
-parameters at this stage so the probe never emits a binding that rustc
-cannot bind (for example, `&'a Foo` written by a theorem author). The
-rejection diagnostic shape is
-`Forall entry 'x': type contains a free named lifetime parameter
-'<name>'; use an owned type or an elided lifetime`. Apply the same check
-inside `validate_action_signatures` for `Actions.params` and
-`Actions.returns` to keep the two validators symmetric.
+parameters at this stage so the probe never emits a binding that rustc cannot
+bind (for example, `&'a Foo` written by a theorem author). The rejection
+diagnostic shape is the rejection diagnostic says that the `Forall` entry type
+contains a free named lifetime parameter and recommends an owned type or an
+elided lifetime. Apply the same check inside `validate_action_signatures` for
+`Actions.params` and `Actions.returns` to keep the two validators symmetric.
 
 Next, add a narrow helper alongside `referenced_actions` in
-`crates/theoremc-core/src/collision.rs` that returns distinct referenced
-types in deterministic first-seen order. Bias toward keeping the helper in
+`crates/theoremc-core/src/collision.rs` that returns distinct referenced types
+in deterministic first-seen order. Bias toward keeping the helper in
 `collision.rs` because its job — "what does this document refer to outside
 itself" — sits squarely in the collision module's remit. Only migrate both
-helpers into a sibling `references.rs` module if `collision.rs` exceeds
-350 lines after the addition. The helper signature is:
+helpers into a sibling `references.rs` module if `collision.rs` exceeds 350
+lines after the addition. The helper signature is:
 
 ```rust
 pub fn referenced_types(docs: &[TheoremDoc]) -> Vec<&str>;
@@ -429,11 +422,11 @@ the core helper plus schema validation as a single change.
 ### Milestone 2: emit referenced-type probes in `theorem_file!`
 
 Update `crates/theoremc-macros/src/lib.rs` so `render_expansion` asks
-`theoremc-core` for distinct referenced types and emits a single
-deterministic probe block alongside the existing action probes inside the
-per-file module body. The canonical emitted form is one shared helper
-declaration plus one `let _ = ...;` statement per distinct referenced type,
-wrapped in a single anonymous `const _` block:
+`theoremc-core` for distinct referenced types and emits a single deterministic
+probe block alongside the existing action probes inside the per-file module
+body. The canonical emitted form is one shared helper declaration plus one
+`let _ = ...;` statement per distinct referenced type, wrapped in a single
+anonymous `const _` block:
 
 ```rust
 // theoremc: compile-time referenced-type probe (3.3.2)
@@ -450,32 +443,30 @@ Implementation notes:
 - Always declare `__theoremc_assert_referenced` exactly once per per-file
   module, even when many types are probed; the renderer must not emit one
   helper per probe statement.
-- Emit a leading marker comment `// theoremc: compile-time referenced-type
-  probe (3.3.2)` on the generated block so a theorem author running
-  `cargo expand` immediately sees why the block exists. The marker uses the
-  same `quote::quote!` raw-string approach available to proc-macro output;
-  if rustfmt strips the comment, fall back to including the marker inside
-  the helper function name via a doc-equivalent identifier choice and
-  record the decision in the Decision Log.
+- Emit a leading marker comment
+  `// theoremc: compile-time referenced-type probe (3.3.2)` on the generated
+  block so a theorem author running `cargo expand` immediately sees why the
+  block exists. The marker uses the same `quote::quote!` raw-string approach
+  available to proc-macro output; if rustfmt strips the comment, fall back to
+  including the marker inside the helper function name via a doc-equivalent
+  identifier choice and record the decision in the Decision Log.
 - Probes live outside the `#[cfg(kani)]` backend module so ordinary builds
   detect drift. They must not introduce any `kani::` references.
 - A theorem with no `Forall` entries and an empty `Actions` map emits no
   probe block, matching the Step 3.3.1 contract for action probes.
 - The error type `MacroExpansionError` gains a new variant
-  `InvalidReferencedType { ty: String, message: String }` whose
-  `thiserror` message reads
-  `referenced type ``{ty}`` is invalid: {message}`,
-  mirroring the `InvalidActionSignature` shape from Step 3.3.1. The
-  renderer invokes this when
-  `syn::parse_str::<syn::Type>` fails on a string the schema accepted; in
-  the normal flow Milestone 1 validation makes that unreachable, so the
-  variant is defensive rather than expected, but it must not panic.
+  `InvalidReferencedType { ty: String, message: String }` whose `thiserror`
+  message reads `referenced type ``{ty}`` is invalid: {message}`, mirroring the
+  `InvalidActionSignature` shape from Step 3.3.1. The renderer invokes this when
+  `syn::parse_str::<syn::Type>` fails on a string the schema accepted; in the
+  normal flow Milestone 1 validation makes that unreachable, so the variant is
+  defensive rather than expected, but it must not panic.
 - Clippy gate: the block must compile cleanly under
-  `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
-  Prefer `let _ = expr;` over bare `expr;` to avoid `path_statements`, and
-  spot-check `clippy::let_underscore_untyped` on the fixture crate; if it
-  fires, add `let _: fn() = __theoremc_assert_referenced::<T>;` to ascribe
-  a function-pointer type without leaking lifetimes.
+  `cargo clippy --workspace --all-targets --all-features -- -D warnings`. Prefer
+  `let _ = expr;` over bare `expr;` to avoid `path_statements`, and spot-check
+  `clippy::let_underscore_untyped` on the fixture crate; if it fires, add
+  `let _: fn() = __theoremc_assert_referenced::<T>;` to ascribe a
+  function-pointer type without leaking lifetimes.
 
 Update macro unit tests and snapshots to prove:
 
@@ -489,20 +480,19 @@ Update macro unit tests and snapshots to prove:
 - `Forall`, `Actions.params`, and `Actions.returns` types are all included
   in the pinned traversal order, and
 - reference-bearing types (`&mut crate::Account`,
-  `Vec<&'static str>`), generic types (`Vec<u8>`), and primitive types
-  (`u64`, `bool`, `()`) all survive the probe round trip without spurious
-  diagnostics.
+  `Vec<&'static str>`), generic types (`Vec<u8>`), and primitive types (`u64`,
+  `bool`, `()`) all survive the probe round trip without spurious diagnostics.
 
 Add the trybuild compile-fail fixtures now that probes exist:
 
 - `referenced_type_missing.rs`, `referenced_type_missing.theorem`, and a
   matching fixture `theorem_actions` module covering a `Forall` variable
-  declared as `crate::Missing` with no matching type in the consuming
-  fixture crate;
+  declared as `crate::Missing` with no matching type in the consuming fixture
+  crate;
 - `referenced_type_moved.rs`, `referenced_type_moved.theorem`, and a
-  matching fixture `theorem_actions` module covering an `Actions.params`
-  type renamed under the consuming crate so the typed action probe still
-  finds the function path but the referenced-type probe fails to resolve.
+  matching fixture `theorem_actions` module covering an `Actions.params` type
+  renamed under the consuming crate so the typed action probe still finds the
+  function path but the referenced-type probe fails to resolve.
 
 Keep the trybuild `*.stderr` snapshots narrow: assert on the probe-pointing
 source line and the missing-type fragment (`cannot find type` and the type
@@ -510,8 +500,8 @@ name), avoiding the longer rustc notes that drift across versions. The BDD
 substring assertions added in Milestone 3 remain the authoritative
 diagnostic-stability check.
 
-Regenerate the trybuild `*.stderr` snapshots once probes are wired in and
-the diagnostic anchors point at the generated probe block.
+Regenerate the trybuild `*.stderr` snapshots once probes are wired in and the
+diagnostic anchors point at the generated probe block.
 
 Run:
 
@@ -526,8 +516,8 @@ cargo nextest run -p theoremc-macros --test expand 2>&1 \
     | tee /tmp/test-theoremc-3-3-2-trybuild.out
 ```
 
-Run `coderabbit review --agent`, clear concerns, update this plan, and
-commit the macro expansion change.
+Run `coderabbit review --agent`, clear concerns, update this plan, and commit
+the macro expansion change.
 
 ### Milestone 3: add behavioural compile checks
 
@@ -542,8 +532,8 @@ module. Add `rstest-bdd` scenarios for:
 - a theorem owner crate whose `Forall` type was removed from the consuming
   crate fails with a `cannot find type` diagnostic referencing the probe;
 - a theorem owner crate whose `Actions.params` type was renamed in the
-  consuming crate fails with the same diagnostic shape, even though the
-  typed action probe coercion still finds the function path.
+  consuming crate fails with the same diagnostic shape, even though the typed
+  action probe coercion still finds the function path.
 
 Reuse the existing `assert_fixture_build_fails_with` helper and assert on
 stable substrings (the type name, `cannot find type`, the probe block
@@ -563,34 +553,31 @@ the behavioural tests.
 
 Update `docs/theoremc-design.md` §7.3 with the concrete generated
 referenced-type probe shape, the chosen probe construction (one anonymous
-`const _` block per file with a single shared `fn _assert<T: ?Sized>()`
-helper and one `let _ = ...;` statement per distinct referenced type), the
-deduplication rule based on `syn::Type` canonical token streams, the
-emitted `// theoremc: compile-time referenced-type probe (3.3.2)` marker
-comment that aids `cargo expand` inspection, and the explicit non-goal of
-probing struct field names or decomposing generic arguments. Note the
-double-underscore-prefixed helper name (`__theoremc_assert_referenced`) is
-chosen so rustfmt and rustc consistently leave it alone. Cross-reference
-Step 3.3.1 typed action probes and the Phase 4 struct-literal synthesis
-wiring so the reader sees the layered coverage.
+`const _` block per file with a single shared `fn _assert<T: ?Sized>()` helper
+and one `let _ = ...;` statement per distinct referenced type), the
+deduplication rule based on `syn::Type` canonical token streams, and the
+explicit non-goal of probing struct field names or decomposing generic
+arguments. Note the double-underscore-prefixed helper name
+(`__theoremc_assert_referenced`) is the stable `cargo expand` and diagnostic
+anchor because procedural macro `TokenStream` output cannot reliably preserve a
+marker comment. Cross-reference Step 3.3.1 typed action probes and the Phase 4
+struct-literal synthesis wiring so the reader sees the layered coverage.
 
 Update `docs/theorem-file-specification.md` §3.6 (Forall) to note that type
 strings are validated as `syn::Type` at schema load time, mirroring §3.9.1
-(`Actions`). Add a small example showing the resulting compile-time
-behaviour.
+(`Actions`). Add a small example showing the resulting compile-time behaviour.
 
-Update `docs/users-guide.md` to explain the user-visible behaviour: missing
-or moved types in `Forall` and `Actions` declarations fail ordinary Rust
+Update `docs/users-guide.md` to explain the user-visible behaviour: missing or
+moved types in `Forall` and `Actions` declarations fail ordinary Rust
 compilation in the theorem owner crate, with diagnostics pointing at the
 generated probe block. Add a paragraph distinguishing referenced-type probes
 from typed action probes.
 
 Update `docs/developers-guide.md` §2.1 (or add §2.1.2) to list the new
-`theoremc-core` internal helpers: `collision::referenced_types`, plus the
-shared `schema::rust_type::{parse, canonical_token_stream, validate}`
-trio. Reference the probe emission testing convention (unit-level red
-tests; trybuild fixtures only after probes exist; BDD substring assertions
-for the user workflow).
+`theoremc-core` internal helpers: `collision::referenced_types`, plus the shared
+`schema::rust_type::{parse, canonical_token_stream, validate}` trio. Reference
+the probe emission testing convention (unit-level red tests; trybuild fixtures
+only after probes exist; BDD substring assertions for the user workflow).
 
 Update `docs/roadmap.md` by marking only the Step 3.3.2 checkbox done. Leave
 later Phase 3 and Phase 4 items unchecked.
@@ -618,33 +605,31 @@ make test 2>&1 | tee /tmp/test-theoremc-3-3-2.out
 
 Run a final `coderabbit review --agent`. Clear every actionable concern or
 record a user-approved reason for leaving it unresolved. Update
-`Outcomes & Retrospective`, set this ExecPlan status to `COMPLETE`, commit
-the final plan update, push the branch, and update the pull request.
+`Outcomes & Retrospective`, set this ExecPlan status to `COMPLETE`, commit the
+final plan update, push the branch, and update the pull request.
 
 ## Validation strategy
 
-The validation strategy is intentionally layered to keep diagnostics
-stable and fast feedback for theorem authors high.
+The validation strategy is intentionally layered to keep diagnostics stable and
+fast feedback for theorem authors high.
 
-Use `rstest` unit tests for pure traversal, deduplication, and token
-rendering because those tests are fast, deterministic, and directly exercise
-the internal contract. Cover ordering, semantic equivalence, and edge cases
-like empty `Forall` maps and single-document versus multi-document theorem
-files.
+Use `rstest` unit tests for pure traversal, deduplication, and token rendering
+because those tests are fast, deterministic, and directly exercise the internal
+contract. Cover ordering, semantic equivalence, and edge cases like empty
+`Forall` maps and single-document versus multi-document theorem files.
 
 Use `trybuild` compile-fail tests for procedural macro diagnostics where the
 generated Rust must fail compilation in a predictable way. Snapshots may be
-narrow on the probe-pointing line and broad elsewhere; rely on the
-`*.stderr` snapshot as the ground truth and regenerate with
-`TRYBUILD=overwrite` whenever the diagnostic anchor or rustc note tracking
-genuinely changes.
+narrow on the probe-pointing line and broad elsewhere; rely on the `*.stderr`
+snapshot as the ground truth and regenerate with `TRYBUILD=overwrite` whenever
+the diagnostic anchor or rustc note tracking genuinely changes.
 
-Use `rstest-bdd` behavioural tests for end-to-end theorem-owner workflows.
-The existing `tests/theorem_file_macro_bdd.rs` suite already builds temporary
+Use `rstest-bdd` behavioural tests for end-to-end theorem-owner workflows. The
+existing `tests/theorem_file_macro_bdd.rs` suite already builds temporary
 fixture crates, serialises Cargo invocations, and optionally checks Kani
 harness discovery when `cargo-kani` is installed. Extend it with the
-referenced-type scenarios so the user workflow is covered with stable
-substring assertions and not fragile full-snapshot stderr matching.
+referenced-type scenarios so the user workflow is covered with stable substring
+assertions and not fragile full-snapshot stderr matching.
 
 Use the full repository gates at the end because this change crosses
 `theoremc-core`, the proc-macro crate, generated Rust shape, fixture crates,
@@ -660,7 +645,7 @@ and documentation.
   trybuild snapshots.
 - [x] Milestone 3: behavioural compile checks for missing and moved
   referenced types.
-- [ ] Milestone 4: documentation and roadmap update.
+- [x] Milestone 4: documentation and roadmap update.
 - [ ] Milestone 5: full quality gate, final CodeRabbit review, mark
   complete.
 
@@ -670,9 +655,9 @@ and documentation.
   that file is absent from the working tree. Orientation proceeded with
   `docs/contents.md`, `leta files`, and the existing source layout instead.
 - 2026-06-08: The Milestone 0 red test command
-  `cargo nextest run -p theoremc-macros` produced the expected failures:
-  21 tests passed and the three new referenced-type probe assertions failed
-  because `__theoremc_assert_referenced` is not emitted yet. The output is in
+  `cargo nextest run -p theoremc-macros` produced the expected failures: 21
+  tests passed and the three new referenced-type probe assertions failed because
+  `__theoremc_assert_referenced` is not emitted yet. The output is in
   `/tmp/test-theoremc-3-3-2-macro-red.out`.
 - 2026-06-08: Milestone 1 focused validation passed with
   `cargo nextest run -p theoremc-core`; 281 tests passed. The output is in
@@ -682,7 +667,7 @@ and documentation.
   formerly red referenced-type probe tests. The output is in
   `/tmp/test-theoremc-3-3-2-macros.out`.
 - 2026-06-08: `make check-fmt` and `make lint` passed after Milestones 1 and
-  2. Logs are in `/tmp/check-fmt-theoremc-3-3-2-m1-m2.out` and
+  1. Logs are in `/tmp/check-fmt-theoremc-3-3-2-m1-m2.out` and
   `/tmp/lint-theoremc-3-3-2-m1-m2.out`.
 - 2026-06-08: `make test` passed after Milestones 1 and 2: 569 nextest tests
   passed, followed by passing workspace doctests. The output is in
@@ -696,20 +681,38 @@ and documentation.
 - 2026-06-08: `make check-fmt`, `make lint`, and `make test` passed after
   Milestone 3. The full test gate reported 572 nextest tests passed, followed
   by passing workspace doctests. Logs are in
-  `/tmp/check-fmt-theoremc-3-3-2-m3.out`,
-  `/tmp/lint-theoremc-3-3-2-m3.out`, and
+  `/tmp/check-fmt-theoremc-3-3-2-m3.out`, `/tmp/lint-theoremc-3-3-2-m3.out`, and
   `/tmp/test-theoremc-3-3-2-m3.out`.
 - 2026-06-08: `coderabbit review --agent` completed for Milestone 3 with
   zero findings. The output is in `/tmp/coderabbit-theoremc-3-3-2-m3.out`.
+- 2026-06-08: Milestone 3 post-commit refactor split the referenced-type BDD
+  fixture strings into
+  `tests/theorem_file_macro_bdd/referenced_type_fixtures.rs` and moved
+  `fixture_cargo_toml` unit checks beside the fixture builder, bringing
+  `tests/theorem_file_macro_bdd.rs` down to 395 lines. Focused validation
+  passed with `cargo nextest run --test theorem_file_macro_bdd`;
+  `make check-fmt` and `make lint` also passed. Logs are in
+  `/tmp/test-theoremc-3-3-2-bdd-refactor.out`,
+  `/tmp/check-fmt-theoremc-3-3-2-bdd-refactor.out`, and
+  `/tmp/lint-theoremc-3-3-2-bdd-refactor.out`.
+- 2026-06-08: `coderabbit review --agent` completed for the Milestone 3
+  refactor with zero findings. The output is in
+  `/tmp/coderabbit-theoremc-3-3-2-bdd-refactor.out`.
+- 2026-06-08: Milestone 4 documentation validation passed with `make fmt`,
+  `make markdownlint`, and `make nixie`. Logs are in
+  `/tmp/fmt-theoremc-3-3-2-docs.out`,
+  `/tmp/markdownlint-theoremc-3-3-2-docs.out`, and
+  `/tmp/nixie-theoremc-3-3-2-docs.out`.
+- 2026-06-08: `coderabbit review --agent` completed for Milestone 4 with
+  zero findings. The output is in `/tmp/coderabbit-theoremc-3-3-2-docs.out`.
 
 ## Decision Log
 
 - 2026-06-02: Keep this ExecPlan in `DRAFT` and do not mark the roadmap item
-  done. Rationale: the user explicitly requires approval before
-  implementation.
+  done. Rationale: the user explicitly requires approval before implementation.
 - 2026-06-08: Move this ExecPlan from `DRAFT` to `IN PROGRESS`.
-  Rationale: the user explicitly requested implementation of this approved
-  plan in this session.
+  Rationale: the user explicitly requested implementation of this approved plan
+  in this session.
 - 2026-06-08: Defer the Milestone 0 commit and CodeRabbit review until the
   referenced-type implementation makes the red tests green. Rationale: the
   repository instruction says commits and CodeRabbit reviews must be gated by
@@ -717,68 +720,72 @@ and documentation.
   that stronger quality gate.
 - 2026-06-08: Emit the referenced-type probe block without the planned marker
   comment. Rationale: Rust comments are not represented in procedural macro
-  `TokenStream` output, so `quote!` cannot reliably preserve such a marker;
-  the deterministic helper name `__theoremc_assert_referenced` remains the
-  stable diagnostic and `cargo expand` anchor.
+  `TokenStream` output, so `quote!` cannot reliably preserve such a marker; the
+  deterministic helper name `__theoremc_assert_referenced` remains the stable
+  diagnostic and `cargo expand` anchor.
 - 2026-06-08: Narrow BDD failure assertions to the stable rustc fragments
   available in ordinary fixture builds: `cannot find type`, the missing type,
   and the missing module path. Rationale: without nightly macro backtraces,
   rustc points diagnostics at the generated `theorem_file!` invocation in
   `OUT_DIR/theorem_suite.rs` and does not include the generated helper
   identifier in stderr.
+- 2026-06-08: Split referenced-type fixture strings and fixture Cargo.toml
+  unit tests out of the main theorem-file BDD scenario file after Milestone 3.
+  Rationale: the functional BDD change pushed `tests/theorem_file_macro_bdd.rs`
+  over the repository's 400-line file-size limit, and the split keeps scenario
+  wiring separate from fixture source material.
 - 2026-06-02: Treat top-level type-path resolution as the bar for "missing
   and moved" type detection, leaving struct field correctness and nested
-  generic argument decomposition to Phase 4 harness compilation and to
-  future struct-literal field probes. Rationale: the acceptance criterion is
+  generic argument decomposition to Phase 4 harness compilation and to future
+  struct-literal field probes. Rationale: the acceptance criterion is
   "missing-type and moved-type breakages"; structural recursion would expand
   scope without changing the diagnostic the theorem author sees first.
 - 2026-06-02: Choose the generic-assertion probe shape
-  (`const _: () = { fn _assert<T: ?Sized>() {} let _ = _assert::<T>; };`)
-  over `PhantomData<T>` and `fn(T) -> T` coercions. Rationale: it accepts
-  unsized and reference-bearing types without per-shape switches and stays
-  anonymous so dead-code lints do not require `#[allow]` attributes.
+  (`const _: () = { fn _assert<T: ?Sized>() {} let _ = _assert::<T>; };`) over
+  `PhantomData<T>` and `fn(T) -> T` coercions. Rationale: it accepts unsized
+  and reference-bearing types without per-shape switches and stays anonymous so
+  dead-code lints do not require `#[allow]` attributes.
 - 2026-06-02: Place the `referenced_types` helper in
-  `crates/theoremc-core/src/collision.rs` next to `referenced_actions`,
-  with an explicit option to migrate both helpers into a `references.rs`
-  module if `collision.rs` exceeds 350 lines. Rationale: ADR-003 keeps
-  document traversal inside core; mirroring the action-probe precedent
-  preserves layering and reuses the established testing approach.
+  `crates/theoremc-core/src/collision.rs` next to `referenced_actions`, with an
+  explicit option to migrate both helpers into a `references.rs` module if
+  `collision.rs` exceeds 350 lines. Rationale: ADR-003 keeps document traversal
+  inside core; mirroring the action-probe precedent preserves layering and
+  reuses the established testing approach.
 - 2026-06-02: Introduce a single new `crate::schema::rust_type` module that
-  owns both the `syn::Type` parsing helper and the canonical
-  `quote::ToTokens` round-trip used for equivalence. Re-point
-  `validate_action_signatures` and `ActionSignature::is_semantically_
-  equivalent` at the new module, and use it from the new
-  `validate_forall_types`. Rationale: avoids divergence between probe
-  dedup, signature equivalence, and Forall validation, and concentrates
-  Rust-type concerns in one place rather than the two-path choice
-  considered during plan drafting.
+  owns both the `syn::Type` parsing helper and the canonical `quote::ToTokens`
+  round-trip used for equivalence. Re-point `validate_action_signatures` and
+  `ActionSignature::is_semantically_ equivalent` at the new module, and use it
+  from the new `validate_forall_types`. Rationale: avoids divergence between
+  probe dedup, signature equivalence, and Forall validation, and concentrates
+  Rust-type concerns in one place rather than the two-path choice considered
+  during plan drafting.
 - 2026-06-02: Validate `Forall` type strings as `syn::Type` at schema load
-  time, and reject types with free named lifetime parameters in both
-  `Forall` and `Actions` validators. Rationale: surfaces typos and
-  unbindable lifetimes as schema diagnostics instead of confusing rustc
-  errors emitted from the generated probe.
+  time, and reject types with free named lifetime parameters in both `Forall`
+  and `Actions` validators. Rationale: surfaces typos and unbindable lifetimes
+  as schema diagnostics instead of confusing rustc errors emitted from the
+  generated probe.
 - 2026-06-02: Make Milestone 0 red tests assert on `render_expansion` token
   output, not on trybuild fixtures. Rationale: a trybuild fixture that
-  references a missing type already fails to compile without proving the
-  probe was emitted; the unit-level red test is the only thing that proves
-  the absence of probe emission before Milestone 2 lands.
+  references a missing type already fails to compile without proving the probe
+  was emitted; the unit-level red test is the only thing that proves the
+  absence of probe emission before Milestone 2 lands.
 - 2026-06-02: Pin the probe traversal axis: per document, `Forall` first,
-  then `Actions.params` per entry, then `Actions.returns` per entry.
-  Rationale: removes ambiguity about probe ordering and lets dedup behaviour
-  be checked by a small ordered fixture.
-- 2026-06-02: Emit a `// theoremc: compile-time referenced-type probe
-  (3.3.2)` marker comment on the generated block, and use the
+  then `Actions.params` per entry, then `Actions.returns` per entry. Rationale:
+  removes ambiguity about probe ordering and lets dedup behaviour be checked by
+  a small ordered fixture.
+- 2026-06-02: Emit a `// theoremc: compile-time referenced-type probe (3.3.2)`
+  marker comment on the generated block, and use the
   `__theoremc_assert_referenced` helper name. Rationale: `cargo expand`
-  legibility; the double-underscore prefix keeps the identifier outside
-  rustfmt rewrites and inside the conventional reserved-prefix space.
+  legibility; the double-underscore prefix keeps the identifier outside rustfmt
+  rewrites and inside the conventional reserved-prefix space.
 - 2026-06-02: Keep struct-literal synthesis wiring into the proc-macro
-  expansion out of scope for this step. Rationale: struct-literal synthesis
-  is currently invoked only by the standalone lowering tests; Phase 4 will
-  wire it into harness emission, and forcing it here would couple this step
-  to incomplete Kani semantics. The plan title retains the roadmap phrase
-  ("for generated struct literal synthesis") for traceability, with an
-  explicit scope clarifier in `Purpose / big picture` that this plan
-  delivers the type-resolution backstop only.
+  expansion out of scope for this step. Rationale: struct-literal synthesis is
+  currently invoked only by the standalone lowering tests; Phase 4 will wire it
+  into harness emission, and forcing it here would couple this step to
+  incomplete Kani semantics. The plan title retains the roadmap phrase ("for
+  generated struct literal synthesis") for traceability, with an explicit scope
+  clarifier in `Purpose / big picture` that this plan delivers the
+  type-resolution backstop only.
 
 ## Outcomes & Retrospective
 
@@ -787,5 +794,5 @@ and documentation.
 ## Revision note
 
 - 2026-06-02: initial draft prepared with `leta` for code orientation,
-  background agent help for prior-art research (`firecrawl`) and
-  architecture guidance, and the `execplans` skill for the plan envelope.
+  background agent help for prior-art research (`firecrawl`) and architecture
+  guidance, and the `execplans` skill for the plan envelope.
