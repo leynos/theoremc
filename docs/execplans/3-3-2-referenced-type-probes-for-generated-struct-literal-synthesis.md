@@ -658,7 +658,7 @@ and documentation.
   type validation.
 - [x] Milestone 2: emit referenced-type probes in `theorem_file!` and update
   trybuild snapshots.
-- [ ] Milestone 3: behavioural compile checks for missing and moved
+- [x] Milestone 3: behavioural compile checks for missing and moved
   referenced types.
 - [ ] Milestone 4: documentation and roadmap update.
 - [ ] Milestone 5: full quality gate, final CodeRabbit review, mark
@@ -690,6 +690,17 @@ and documentation.
 - 2026-06-08: `coderabbit review --agent` completed for Milestones 1 and 2
   with zero findings. The output is in
   `/tmp/coderabbit-theoremc-3-3-2-m1-m2.out`.
+- 2026-06-08: Milestone 3 focused validation passed with
+  `cargo nextest run --test theorem_file_macro_bdd`; 13 tests passed. The
+  output is in `/tmp/test-theoremc-3-3-2-bdd.out`.
+- 2026-06-08: `make check-fmt`, `make lint`, and `make test` passed after
+  Milestone 3. The full test gate reported 572 nextest tests passed, followed
+  by passing workspace doctests. Logs are in
+  `/tmp/check-fmt-theoremc-3-3-2-m3.out`,
+  `/tmp/lint-theoremc-3-3-2-m3.out`, and
+  `/tmp/test-theoremc-3-3-2-m3.out`.
+- 2026-06-08: `coderabbit review --agent` completed for Milestone 3 with
+  zero findings. The output is in `/tmp/coderabbit-theoremc-3-3-2-m3.out`.
 
 ## Decision Log
 
@@ -709,6 +720,12 @@ and documentation.
   `TokenStream` output, so `quote!` cannot reliably preserve such a marker;
   the deterministic helper name `__theoremc_assert_referenced` remains the
   stable diagnostic and `cargo expand` anchor.
+- 2026-06-08: Narrow BDD failure assertions to the stable rustc fragments
+  available in ordinary fixture builds: `cannot find type`, the missing type,
+  and the missing module path. Rationale: without nightly macro backtraces,
+  rustc points diagnostics at the generated `theorem_file!` invocation in
+  `OUT_DIR/theorem_suite.rs` and does not include the generated helper
+  identifier in stderr.
 - 2026-06-02: Treat top-level type-path resolution as the bar for "missing
   and moved" type detection, leaving struct field correctness and nested
   generic argument decomposition to Phase 4 harness compilation and to

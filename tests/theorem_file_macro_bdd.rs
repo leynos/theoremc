@@ -114,6 +114,126 @@ const PARTIAL_KANI_EVIDENCE_THEOREM: &str = concat!(
     "  verus: \"future backend\"\n",
 );
 
+const REFERENCED_TYPES_THEOREM: &str = concat!(
+    "Theorem: ReferencedTypeSmoke\n",
+    "About: Referenced type probe coverage\n",
+    "Forall:\n",
+    "  account: crate::Account\n",
+    "Actions:\n",
+    "  account.deposit:\n",
+    "    params:\n",
+    "      command: crate::DepositCommand\n",
+    "    returns: crate::DepositOutcome\n",
+    "Do:\n",
+    "  - call:\n",
+    "      action: account.deposit\n",
+    "      args:\n",
+    "        command:\n",
+    "          amount: 10\n",
+    "Witness:\n",
+    "  - cover: \"true\"\n",
+    "    because: \"reachable\"\n",
+    "Prove:\n",
+    "  - assert: \"true\"\n",
+    "    because: \"trivial\"\n",
+    "Evidence:\n",
+    "  kani:\n",
+    "    unwind: 1\n",
+    "    expect: SUCCESS\n",
+);
+
+const MISSING_FORALL_TYPE_THEOREM: &str = concat!(
+    "Theorem: MissingForallType\n",
+    "About: Missing Forall type probe coverage\n",
+    "Forall:\n",
+    "  account: crate::MissingAccount\n",
+    "Witness:\n",
+    "  - cover: \"true\"\n",
+    "    because: \"reachable\"\n",
+    "Prove:\n",
+    "  - assert: \"true\"\n",
+    "    because: \"trivial\"\n",
+    "Evidence:\n",
+    "  kani:\n",
+    "    unwind: 1\n",
+    "    expect: SUCCESS\n",
+);
+
+const MOVED_ACTION_TYPE_THEOREM: &str = concat!(
+    "Theorem: MovedActionType\n",
+    "About: Moved Actions type probe coverage\n",
+    "Actions:\n",
+    "  account.deposit:\n",
+    "    params:\n",
+    "      command: crate::old::DepositCommand\n",
+    "    returns: crate::DepositOutcome\n",
+    "Witness:\n",
+    "  - cover: \"true\"\n",
+    "    because: \"reachable\"\n",
+    "Prove:\n",
+    "  - assert: \"true\"\n",
+    "    because: \"trivial\"\n",
+    "Evidence:\n",
+    "  kani:\n",
+    "    unwind: 1\n",
+    "    expect: SUCCESS\n",
+);
+
+const REFERENCED_TYPES_LIB_RS: &str = concat!(
+    "//! Fixture crate for referenced-type behavioural tests.\n\n",
+    "pub struct Account;\n",
+    "pub struct DepositCommand {\n",
+    "    pub amount: u64,\n",
+    "}\n",
+    "pub struct DepositOutcome;\n\n",
+    "pub mod theorem_actions {\n",
+    "    #[allow(non_snake_case)]\n",
+    "    pub fn account__deposit__h05158894bfb4(\n",
+    "        _command: crate::DepositCommand,\n",
+    "    ) -> crate::DepositOutcome {\n",
+    "        crate::DepositOutcome\n",
+    "    }\n",
+    "}\n\n",
+    "#[doc(hidden)]\n",
+    "mod __theoremc_generated_suite {\n",
+    "    #[cfg(theoremc_has_theorems)]\n",
+    "    use theoremc::theorem_file;\n",
+    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
+    "}\n",
+);
+
+struct ExpectedBuildFailure<'a> {
+    lib_rs: &'a str,
+    theorem_path: &'a str,
+    theorem_content: &'a str,
+    unexpected_success_msg: &'a str,
+    expected_fragments: &'a [&'a str],
+}
+
+const EMPTY_TYPES_LIB_RS: &str = concat!(
+    "//! Fixture crate with no theorem-owned type definitions.\n\n",
+    "#[doc(hidden)]\n",
+    "mod __theoremc_generated_suite {\n",
+    "    #[cfg(theoremc_has_theorems)]\n",
+    "    use theoremc::theorem_file;\n",
+    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
+    "}\n",
+);
+
+const MOVED_ACTION_TYPE_LIB_RS: &str = concat!(
+    "//! Fixture crate where an action type moved modules.\n\n",
+    "pub mod new {\n",
+    "    pub struct DepositCommand;\n",
+    "}\n",
+    "pub struct DepositOutcome;\n\n",
+    "#[doc(hidden)]\n",
+    "mod __theoremc_generated_suite {\n",
+    "    #[cfg(theoremc_has_theorems)]\n",
+    "    use theoremc::theorem_file;\n",
+    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
+    "}\n",
+);
+
 #[given("a fixture crate with one valid theorem file")]
 fn given_a_fixture_crate_with_one_valid_theorem_file() {}
 
@@ -195,6 +315,54 @@ fn given_a_fixture_crate_with_one_theorem_file_missing_kani_evidence() {}
 #[given("a fixture crate with a multi-document theorem file missing one Kani evidence block")]
 fn given_a_fixture_crate_with_a_multi_document_theorem_file_missing_one_kani_evidence_block() {}
 
+#[given("a fixture crate with declared theorem types")]
+fn given_a_fixture_crate_with_declared_theorem_types() {}
+
+#[then("the fixture crate builds referenced type probes without a Kani dependency")]
+fn then_the_fixture_crate_builds_referenced_type_probes_without_a_kani_dependency()
+-> Result<(), String> {
+    run_fixture_build(
+        REFERENCED_TYPES_LIB_RS,
+        &TheoremFixtureSpec {
+            path: "theorems/referenced-types.theorem",
+            content: REFERENCED_TYPES_THEOREM,
+        },
+    )
+}
+
+#[given("a fixture crate with a missing Forall type")]
+fn given_a_fixture_crate_with_a_missing_forall_type() {}
+
+#[then("compiling the fixture crate fails with a missing Forall type diagnostic")]
+fn then_compiling_the_fixture_crate_fails_with_a_missing_forall_type_diagnostic()
+-> Result<(), String> {
+    assert_fixture_build_fails_with_lib(&ExpectedBuildFailure {
+        lib_rs: EMPTY_TYPES_LIB_RS,
+        theorem_path: "theorems/missing-forall-type.theorem",
+        theorem_content: MISSING_FORALL_TYPE_THEOREM,
+        unexpected_success_msg: "theorem with missing Forall type unexpectedly compiled",
+        expected_fragments: &[
+            "cannot find type `MissingAccount` in the crate root",
+            "MissingAccount",
+        ],
+    })
+}
+
+#[given("a fixture crate with a moved Actions type")]
+fn given_a_fixture_crate_with_a_moved_actions_type() {}
+
+#[then("compiling the fixture crate fails with a moved Actions type diagnostic")]
+fn then_compiling_the_fixture_crate_fails_with_a_moved_actions_type_diagnostic()
+-> Result<(), String> {
+    assert_fixture_build_fails_with_lib(&ExpectedBuildFailure {
+        lib_rs: MOVED_ACTION_TYPE_LIB_RS,
+        theorem_path: "theorems/moved-action-type.theorem",
+        theorem_content: MOVED_ACTION_TYPE_THEOREM,
+        unexpected_success_msg: "theorem with moved Actions type unexpectedly compiled",
+        expected_fragments: &["could not find `old` in the crate root", "old"],
+    })
+}
+
 /// Asserts that a fixture build using the given theorem file fails and that the
 /// build error contains every string in `expected_fragments`.
 fn assert_fixture_build_fails_with(
@@ -203,14 +371,27 @@ fn assert_fixture_build_fails_with(
     unexpected_success_msg: &str,
     expected_fragments: &[&str],
 ) -> Result<(), String> {
+    assert_fixture_build_fails_with_lib(&ExpectedBuildFailure {
+        lib_rs: FIXTURE_LIB_RS,
+        theorem_path,
+        theorem_content,
+        unexpected_success_msg,
+        expected_fragments,
+    })
+}
+
+fn assert_fixture_build_fails_with_lib(expected: &ExpectedBuildFailure<'_>) -> Result<(), String> {
     let guard = CargoGuard::acquire();
-    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
-    fixture.write(Utf8Path::new(theorem_path), theorem_content)?;
+    let fixture = FixtureCrate::new(expected.lib_rs)?;
+    fixture.write(
+        Utf8Path::new(expected.theorem_path),
+        expected.theorem_content,
+    )?;
     let build_error = fixture
         .cargo_build(&guard)
         .err()
-        .ok_or_else(|| unexpected_success_msg.to_owned())?;
-    for fragment in expected_fragments {
+        .ok_or_else(|| expected.unexpected_success_msg.to_owned())?;
+    for fragment in expected.expected_fragments {
         if !build_error.contains(fragment) {
             return Err(format!(
                 "expected build failure to contain {fragment:?}, got:\n{build_error}"
@@ -218,6 +399,13 @@ fn assert_fixture_build_fails_with(
         }
     }
     Ok(())
+}
+
+fn run_fixture_build(lib_rs: &str, spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
+    let guard = CargoGuard::acquire();
+    let fixture = FixtureCrate::new(lib_rs)?;
+    fixture.write(Utf8Path::new(spec.path), spec.content)?;
+    fixture.cargo_build(&guard)
 }
 
 #[then("compiling the fixture crate fails with an actionable theorem diagnostic")]
@@ -276,6 +464,24 @@ fn a_valid_theorem_file_exposes_a_kani_proof_harness() {}
     name = "A multi-document theorem file compiles without Kani installed"
 )]
 fn a_multi_document_theorem_file_compiles_without_kani_installed() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "Referenced Forall and Actions types are checked during ordinary builds"
+)]
+fn referenced_forall_and_actions_types_are_checked_during_ordinary_builds() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "A missing Forall type fails ordinary compilation"
+)]
+fn a_missing_forall_type_fails_ordinary_compilation() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "A moved Actions type fails ordinary compilation"
+)]
+fn a_moved_actions_type_fails_ordinary_compilation() {}
 
 #[scenario(
     path = "tests/features/theorem_file_macro.feature",
