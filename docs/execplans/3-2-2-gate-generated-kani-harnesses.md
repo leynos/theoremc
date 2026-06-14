@@ -183,12 +183,11 @@ Observable success:
   ExecPlan updates.
 - [x] 2026-05-11: re-read the ExecPlan, checked the branch state, and confirmed
   the worktree was clean before implementation.
-- [x] 2026-05-11: Milestone 0 red tests added. `cargo test -p
-  theoremc-macros
-  ` failed as expected because generated expansions do not yet contain `#[
-  cfg(kani)]`, `#[kani::proof]`, or evidence-derived `#[kani::unwind(n)]
-  `; the new `unwind: 0
-  ` macro-boundary case already passes through existing schema validation.
+- [x] 2026-05-11: Milestone 0 red tests added. `cargo test -p theoremc-macros`
+      failed as expected because generated expansions do not yet contain
+      `#[ cfg(kani)]`, `#[kani::proof]`, or evidence-derived
+      `#[kani::unwind(n)]`; the new `unwind: 0` macro-boundary case already
+      passes through existing schema validation.
 - [x] Milestone 0: add or adjust failing tests that describe the exact desired
   Kani-gated expansion shape.
 - [x] 2026-05-11: Milestone 1 implemented. `cargo test -p theoremc-macros`
@@ -245,10 +244,10 @@ Observable success:
   scopes an allow for that lint. The allow must be on the generated per-file
   module, not only on the individual cfg-gated items, to suppress the warning
   at the macro callsite.
-- 2026-05-11: `cargo kani` is installed in this environment (`cargo-kani
-  0.67.0`), so behavioural coverage can run `cargo kani list` against a
-  fixture crate instead of relying only on token-shape assertions for Kani
-  discovery.
+- 2026-05-11: `cargo kani` is installed in this environment
+  (`cargo-kani 0.67.0`), so behavioural coverage can run `cargo kani list`
+  against a fixture crate instead of relying only on token-shape assertions for
+  Kani discovery.
 
 ## Decision Log
 

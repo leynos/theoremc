@@ -64,3 +64,6 @@
   - [Step 2.1.1: Canonical action-name
     validation](execplans/2-1-1-canonical-action-name-validation.md)
     - ExecPlan for dot-separated action-name grammar and keyword validation.
+  - [Resolve the 2026-06-14 codebase audit](execplans/codebase-audit-2026-06-14.md)
+    - ExecPlan for resolving audit findings across diagnostics, validation,
+      tests, documentation, and dependency policy.

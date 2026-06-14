@@ -31,9 +31,9 @@ Local experiments confirmed the practical boundary:
 
 - `let _: fn(_) -> _ = action;` compiles, but Rust infers the placeholders from
   the current action function, so the probe does not detect signature drift.
-- `let _: fn(graph: &mut Graph, node: NodeId) -> Result<(), AttachError> =
-  action;` compiles when the function matches and fails with `E0308
-  ` when a parameter or return type drifts.
+- `let _: fn(graph: &mut Graph, node: NodeId) -> Result<(), AttachError> = action;`
+  compiles when the function matches and fails with `E0308` when a parameter or
+  return type drifts.
 
 The missing design decision is therefore not the probe mechanism. The missing
 decision is where the expected signature comes from.

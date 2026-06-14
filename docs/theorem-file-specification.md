@@ -753,8 +753,8 @@ This is not “extra design”; it is the schema expressed in the shape actually
 deserialized into.
 
 This can be implemented with `serde` derives and deserialized using
-`serde-saphyr` (e.g., `serde_saphyr::from_str`, or multi-doc APIs), as required.
-[^1]
+`serde-saphyr` (e.g., `serde_saphyr::from_str`, or multi-doc APIs), as
+required.[^1]
 
 ```rust
 // Pseudocode-level skeleton; fields omitted for brevity.
