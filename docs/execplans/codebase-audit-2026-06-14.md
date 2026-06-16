@@ -412,7 +412,13 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `make markdownlint`, and `make nixie` passed with logs under `/tmp`.
   CodeRabbit was attempted after deterministic gates but stalled at
   `preparing_sandbox`; see `Surprises & Discoveries`.
-- [ ] Milestone 2: split and simplify schema validation.
+- [x] 2026-06-16: Milestone 2 split schema validation into action, evidence,
+  expression, field, and step modules while keeping `validate_theorem_doc` as
+  the orchestration entrypoint. The focused core validation test, `make fmt`,
+  `make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
+  `make nixie` passed with logs under `/tmp`. CodeRabbit was attempted after
+  deterministic gates but timed out at `preparing_sandbox`; see
+  `Surprises & Discoveries`.
 - [ ] Milestone 3: centralize argument decode error remapping.
 - [ ] Milestone 4: precompute macro action signatures.
 - [ ] Milestone 5: consolidate fixture crate and schema BDD support.
@@ -443,6 +449,15 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   bounded 300-second retry also produced only setup output through
   `preparing_sandbox`, with no findings or completion summary in
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out`.
+- 2026-06-16: Milestone 2 did not require new behavioural fixtures because the
+  split preserved validation order and rendered error messages. Existing
+  `rstest` cases in `validate_tests.rs`, BDD schema suites, and full nextest
+  coverage remain the behavioural safety net.
+- 2026-06-16: CodeRabbit again did not report a rate limit for Milestone 2. A
+  bounded 300-second invocation after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
 
 ## Decision Log
 
@@ -468,6 +483,15 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   Milestone 1 under the plan tolerance. The milestone is allowed to proceed
   because deterministic repository gates passed after the final code change and
   CodeRabbit produced no actionable findings to clear.
+- 2026-06-16: Keep Milestone 2 as a pure module split rather than introducing
+  new validator abstractions. The descriptor helper introduced in Milestone 1
+  already removed the immediate string-control coupling, so this milestone
+  should only isolate responsibilities and leave deeper validator API changes
+  to later findings if needed.
+- 2026-06-16: No property, Kani, or Verus check is required for Milestone 2.
+  The change is a responsibility split that preserves validation ordering and
+  message semantics instead of introducing a new invariant over generated input
+  ranges or contractual business logic.
 
 ## Outcomes & Retrospective
 
