@@ -9,38 +9,12 @@ use std::collections::BTreeMap;
 
 use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, create_diagnostic, first_line};
 use super::error::SchemaError;
-use super::raw::{RawTheoremDoc, ValidationReason};
+use super::loader_message::{ErrorMessage, FieldName};
+use super::raw::RawTheoremDoc;
 use super::source_id::SourceId;
 use super::types::TheoremDoc;
 use super::validate::validate_theorem_doc;
-
-/// Newtype representing a YAML field name extracted from error messages.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct FieldName<'a>(&'a str);
-
-impl<'a> FieldName<'a> {
-    const fn new(name: &'a str) -> Self {
-        Self(name)
-    }
-
-    const fn as_str(self) -> &'a str {
-        self.0
-    }
-}
-
-/// Newtype representing an error message from deserialization failures.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ErrorMessage<'a>(&'a str);
-
-impl<'a> ErrorMessage<'a> {
-    const fn new(message: &'a str) -> Self {
-        Self(message)
-    }
-
-    const fn as_str(self) -> &'a str {
-        self.0
-    }
-}
+use super::validation_reason::ValidationFailure;
 
 /// Synthetic source identifier used by [`load_theorem_docs`].
 const INLINE_SOURCE: &str = "<inline>";
@@ -128,10 +102,10 @@ pub fn load_theorem_docs_with_source(
                 reason,
                 diagnostic: None,
             };
-            attach_validation_diagnostic(error, source, raw_doc)
+            attach_theorem_validation_diagnostic(error, source, raw_doc)
         })?;
         validate_theorem_doc(&doc)
-            .map_err(|error| attach_validation_diagnostic(error, source, raw_doc))?;
+            .map_err(|failure| attach_validation_failure_diagnostic(failure, source, raw_doc))?;
         docs.push(doc);
     }
 
@@ -264,7 +238,7 @@ fn render_duplicate_location(source: &SourceId, location: DuplicateTheoremLocati
     format!("{}:{}:{}", source.as_str(), location.line, location.column,)
 }
 
-fn attach_validation_diagnostic(
+fn attach_theorem_validation_diagnostic(
     error: SchemaError,
     source: &SourceId,
     raw_doc: &RawTheoremDoc,
@@ -273,12 +247,11 @@ fn attach_validation_diagnostic(
         SchemaError::ValidationFailed {
             theorem, reason, ..
         } => {
-            let location = raw_doc.location_for_validation_reason(ValidationReason::new(&reason));
             let diagnostic = create_diagnostic(
                 SchemaDiagnosticCode::ValidationFailure,
                 source,
                 reason.clone(),
-                location,
+                raw_doc.theorem_location(),
             );
             SchemaError::ValidationFailed {
                 theorem,
@@ -288,6 +261,24 @@ fn attach_validation_diagnostic(
         }
         other => other,
     }
+}
+
+fn attach_validation_failure_diagnostic(
+    failure: ValidationFailure,
+    source: &SourceId,
+    raw_doc: &RawTheoremDoc,
+) -> SchemaError {
+    let location = failure.reason_kind().map_or_else(
+        || raw_doc.theorem_location(),
+        |reason| raw_doc.location_for_validation_reason(reason),
+    );
+    let diagnostic = create_diagnostic(
+        SchemaDiagnosticCode::ValidationFailure,
+        source,
+        failure.reason().to_owned(),
+        location,
+    );
+    failure.into_schema_error(Some(diagnostic))
 }
 
 fn build_parse_diagnostic(

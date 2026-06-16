@@ -12,69 +12,8 @@ use super::arg_value::ArgDecodeError;
 use super::newtypes::{ForallVar, TheoremName};
 use super::raw_action::{self, RawLetBinding, RawStep};
 use super::types::{Evidence, KaniEvidence, KaniExpectation, TheoremDoc};
-use super::validate::reason_markers;
+use super::validation_reason::{IndexedValidationField, ValidationReasonKind};
 use super::value::TheoremValue;
-
-/// Semantic wrapper for validation failure reason strings.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct ValidationReason<'a>(&'a str);
-
-impl<'a> ValidationReason<'a> {
-    pub(crate) const fn new(reason: &'a str) -> Self {
-        Self(reason)
-    }
-
-    pub(crate) const fn as_str(&self) -> &'a str {
-        self.0
-    }
-
-    fn kind(self) -> Option<ValidationKind> {
-        let reason = self.as_str();
-        let is_because = reason.contains(reason_markers::BECAUSE_FIELD_FRAGMENT);
-
-        if reason.starts_with(reason_markers::ABOUT_NON_EMPTY) {
-            return Some(ValidationKind::AboutEmpty);
-        }
-
-        if let Some(index) = indexed_error_position(self, reason_markers::PROVE_ASSERTION) {
-            return Some(ValidationKind::Prove { index, is_because });
-        }
-
-        if let Some(index) = indexed_error_position(self, reason_markers::ASSUME_CONSTRAINT) {
-            return Some(ValidationKind::Assume { index, is_because });
-        }
-
-        if let Some(index) = indexed_error_position(self, reason_markers::WITNESS) {
-            return Some(ValidationKind::Witness { index, is_because });
-        }
-
-        if reason.starts_with(reason_markers::KANI_UNWIND_NON_ZERO) {
-            return Some(ValidationKind::KaniUnwind);
-        }
-
-        if reason.starts_with(reason_markers::KANI_VACUITY_REASON_REQUIRED) {
-            return Some(ValidationKind::KaniAllowVacuousRequired);
-        }
-
-        if reason.starts_with(reason_markers::KANI_VACUITY_REASON_NON_EMPTY) {
-            return Some(ValidationKind::KaniVacuityBecauseNonEmpty);
-        }
-
-        None
-    }
-}
-
-/// Classification of validation reason shapes used for location mapping.
-#[derive(Debug, Clone, Copy)]
-enum ValidationKind {
-    AboutEmpty,
-    Prove { index: usize, is_because: bool },
-    Assume { index: usize, is_because: bool },
-    Witness { index: usize, is_because: bool },
-    KaniUnwind,
-    KaniAllowVacuousRequired,
-    KaniVacuityBecauseNonEmpty,
-}
 
 /// Errors raised during the raw-to-public conversion in
 /// [`RawTheoremDoc::to_theorem_doc`].
@@ -247,58 +186,76 @@ impl RawTheoremDoc {
 
     /// Returns the best-effort field location for a validation error reason.
     #[must_use]
-    pub(crate) fn location_for_validation_reason(&self, reason: ValidationReason<'_>) -> Location {
+    pub(crate) fn location_for_validation_reason(&self, reason: ValidationReasonKind) -> Location {
         self.location_for_reason(reason)
             .unwrap_or_else(|| self.theorem_location())
     }
 
-    fn location_for_reason(&self, reason: ValidationReason<'_>) -> Option<Location> {
-        match reason.kind()? {
-            ValidationKind::AboutEmpty => Some(self.about.referenced),
-            ValidationKind::Prove { index, is_because } => {
+    fn location_for_reason(&self, reason: ValidationReasonKind) -> Option<Location> {
+        match reason {
+            ValidationReasonKind::AboutEmpty => Some(self.about.referenced),
+            ValidationReasonKind::Prove { index, field } => {
                 let prove = self.prove.get(index)?;
-                Some(if is_because {
-                    prove.because.referenced
-                } else {
-                    prove.assert_expr.referenced
-                })
+                Some(location_for_indexed_field(
+                    field,
+                    prove.assert_expr.referenced,
+                    prove.because.referenced,
+                ))
             }
-            ValidationKind::Assume { index, is_because } => {
+            ValidationReasonKind::Assume { index, field } => {
                 let assume = self.assume.get(index)?;
-                Some(if is_because {
-                    assume.because.referenced
-                } else {
-                    assume.expr.referenced
-                })
+                Some(location_for_indexed_field(
+                    field,
+                    assume.expr.referenced,
+                    assume.because.referenced,
+                ))
             }
-            ValidationKind::Witness { index, is_because } => {
+            ValidationReasonKind::Witness { index, field } => {
                 let witness = self.witness.get(index)?;
-                Some(if is_because {
-                    witness.because.referenced
-                } else {
-                    witness.cover.referenced
-                })
+                Some(location_for_indexed_field(
+                    field,
+                    witness.cover.referenced,
+                    witness.because.referenced,
+                ))
             }
-            ValidationKind::KaniUnwind => self
+            ValidationReasonKind::KaniUnwind => self
                 .evidence
                 .kani
                 .as_ref()
                 .map(|kani| kani.unwind.referenced),
-            ValidationKind::KaniAllowVacuousRequired => {
+            ValidationReasonKind::KaniAllowVacuousRequired => {
                 self.evidence.kani.as_ref().and_then(|kani| {
                     kani.allow_vacuous
                         .as_ref()
                         .map(|allow_vacuous| allow_vacuous.referenced)
                 })
             }
-            ValidationKind::KaniVacuityBecauseNonEmpty => {
+            ValidationReasonKind::KaniVacuityBecauseNonEmpty => {
                 self.evidence.kani.as_ref().and_then(|kani| {
                     kani.vacuity_because
                         .as_ref()
                         .map(|vacuity_because| vacuity_because.referenced)
                 })
             }
+            ValidationReasonKind::KaniWitnessRequired => {
+                self.evidence.kani.as_ref().and_then(|kani| {
+                    kani.allow_vacuous
+                        .as_ref()
+                        .map(|allow_vacuous| allow_vacuous.referenced)
+                })
+            }
         }
+    }
+}
+
+const fn location_for_indexed_field(
+    field: IndexedValidationField,
+    value: Location,
+    because: Location,
+) -> Location {
+    match field {
+        IndexedValidationField::Value => value,
+        IndexedValidationField::Because => because,
     }
 }
 
@@ -362,15 +319,6 @@ fn convert_steps(raw: &[RawStep]) -> Result<Vec<super::types::Step>, RawDocDecod
     Ok(out)
 }
 
-/// Parses indexed validation reason prefixes like `Prove assertion 2: …`.
-fn indexed_error_position(reason: ValidationReason<'_>, prefix: &str) -> Option<usize> {
-    let prefixed_tail = reason.as_str().strip_prefix(prefix)?;
-    let indexed_tail = prefixed_tail.strip_prefix(' ')?;
-    let (raw_index, _) = indexed_tail.split_once(':')?;
-    let parsed = raw_index.trim().parse::<usize>().ok()?;
-    parsed.checked_sub(1)
-}
-
 /// Deserializes optional `allow_vacuous` values as `Option<Spanned<bool>>`.
 ///
 /// This helper is used with `#[serde(default)]`, so omitted fields deserialize
@@ -391,3 +339,7 @@ where
         |value| Ok(Some(value)),
     )
 }
+
+#[cfg(test)]
+#[path = "raw_location_tests.rs"]
+mod location_tests;

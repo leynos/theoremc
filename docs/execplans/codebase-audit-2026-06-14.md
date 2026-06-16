@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: DRAFT
+Status: ACTIVE
 
 ## Purpose / big picture
 
@@ -25,7 +25,7 @@ concerns, and the work is committed as a small logical unit.
 
 ## Constraints
 
-- This plan must not be implemented until the user explicitly approves it.
+- This plan was approved for implementation by the user on 2026-06-16.
 - Address the findings in the order listed under `Milestones`. Do not skip a
   finding because it looks optional; the audit findings are requirements unless
   the user approves a deferral.
@@ -174,9 +174,10 @@ decision log records an approved wording change.
 
 Update `crates/theoremc-core/src/schema/raw.rs`,
 `crates/theoremc-core/src/schema/validate.rs`,
-`crates/theoremc-core/src/schema/validate_reason_markers.rs`, and associated
-tests. Remove marker parsing once the typed path is complete. Use snapshot
-tests where rendered diagnostic variants need stable formatting.
+`crates/theoremc-core/src/schema/validation_reason.rs`, and associated tests.
+Remove `crates/theoremc-core/src/schema/validate_reason_markers.rs` once the
+typed path is complete. Use snapshot tests where rendered diagnostic variants
+need stable formatting.
 
 Validation for this milestone:
 
@@ -191,11 +192,14 @@ coderabbit review --agent 2>&1 | tee /tmp/coderabbit-theoremc-codebase-audit-202
 
 ### Milestone 2: split and simplify schema validation
 
-Reduce `crates/theoremc-core/src/schema/validate.rs` below the 400-line limit
-by moving coherent responsibilities into smaller modules. The target split is:
-field presence and non-blank text, expression parsing checks, action signature
-checks, step shape checks, and evidence/Kani policy. Keep
-`validate_theorem_doc` as the orchestration entrypoint.
+Split `crates/theoremc-core/src/schema/validate.rs` into coherent
+responsibilities. Milestone 1 moved the existing unit tests into
+`crates/theoremc-core/src/schema/validate_tests.rs`, which brought the file
+below the 400-line limit, but this milestone still needs the production
+responsibility split. The target split is: field presence and non-blank text,
+expression parsing checks, action signature checks, step shape checks, and
+evidence/Kani policy. Keep `validate_theorem_doc` as the orchestration
+entrypoint.
 
 Replace repeated non-empty and expression loops with small descriptor-driven
 helpers. The helper API should make the field label, section name, index, and
@@ -399,7 +403,15 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
 ## Progress
 
 - [x] 2026-06-14: Drafted this ExecPlan from the 2026-06-14 audit findings.
-- [ ] Milestone 1: establish the diagnostic reason model.
+- [x] 2026-06-16: User approved implementation and requested work proceed
+  through the planned milestones in order.
+- [x] 2026-06-16: Milestone 1 established the diagnostic reason model. Added
+  `ValidationReasonKind` and `ValidationFailure`, switched the loader to use
+  typed validation locations, deleted marker-string parsing, and added focused
+  typed-location unit tests. `make check-fmt`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie` passed with logs under `/tmp`.
+  CodeRabbit was attempted after deterministic gates but stalled at
+  `preparing_sandbox`; see `Surprises & Discoveries`.
 - [ ] Milestone 2: split and simplify schema validation.
 - [ ] Milestone 3: centralize argument decode error remapping.
 - [ ] Milestone 4: precompute macro action signatures.
@@ -416,6 +428,21 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
 
 - The audit branch was renamed from `feat/refactorauditwithleta` to
   `codebase-audit-2026-06-14` before this plan was drafted.
+- 2026-06-16: `crates/theoremc-core/src/schema/validate.rs` was already above
+  the 400-line file limit before Milestone 1 code edits. Because Milestone 1
+  had to touch the file, the existing validation unit tests were moved to
+  `crates/theoremc-core/src/schema/validate_tests.rs` during this milestone
+  rather than waiting for the broader production split in Milestone 2.
+- 2026-06-16: `crates/theoremc-core/src/schema/loader.rs` also crossed the
+  400-line limit after Milestone 1 edits. A small
+  `crates/theoremc-core/src/schema/loader_message.rs` module now owns
+  `FieldName` and `ErrorMessage`, bringing the touched loader file down to 375
+  lines.
+- 2026-06-16: CodeRabbit did not report a rate limit. One normal invocation
+  stalled at `preparing_sandbox` and was terminated after no progress. A
+  bounded 300-second retry also produced only setup output through
+  `preparing_sandbox`, with no findings or completion summary in
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out`.
 
 ## Decision Log
 
@@ -425,8 +452,24 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
 - 2026-06-14: Treat the audit findings as ordered implementation milestones.
   This keeps each fix reviewable, gives CodeRabbit and deterministic gates a
   clear boundary, and provides rollback points through frequent commits.
+- 2026-06-16: Move the plan from DRAFT to ACTIVE after explicit user approval
+  to proceed. The approval satisfies the ExecPlan implementation gate, so work
+  now proceeds milestone-by-milestone within the stated tolerances.
+- 2026-06-16: Preserve the public `SchemaError::ValidationFailed` variant
+  shape for Milestone 1. The typed reason travels in a private
+  `ValidationFailure` until the loader attaches diagnostics and converts back to
+  `SchemaError`, avoiding a public API break while removing string-coupled
+  source-location selection.
+- 2026-06-16: No property, Kani, or Verus check is required for Milestone 1.
+  The new reason model is finite dispatch over explicit validation classes, so
+  focused `rstest` unit cases cover each supported variant without introducing
+  a generated input invariant.
+- 2026-06-16: Treat the CodeRabbit sandbox stall as tool unavailability for
+  Milestone 1 under the plan tolerance. The milestone is allowed to proceed
+  because deterministic repository gates passed after the final code change and
+  CodeRabbit produced no actionable findings to clear.
 
 ## Outcomes & Retrospective
 
-This section is intentionally empty while the plan is in DRAFT. Populate it as
-milestones are implemented and validated.
+This section is intentionally empty while implementation is in progress.
+Populate it as milestones are implemented and validated.
