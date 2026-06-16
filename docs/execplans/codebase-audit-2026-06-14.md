@@ -419,7 +419,14 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `make nixie` passed with logs under `/tmp`. CodeRabbit was attempted after
   deterministic gates but timed out at `preparing_sandbox`; see
   `Surprises & Discoveries`.
-- [ ] Milestone 3: centralize argument decode error remapping.
+- [x] 2026-06-16: Milestone 3 centralized argument decode error breadcrumb
+  prefixing on `ArgDecodeError`. Added focused `rstest` cases covering every
+  current decode error variant, a nested raw action conversion regression, and
+  `googletest` plus `pretty_assertions` dev-dependencies for the canonical
+  helper tests. `make fmt`, `make check-fmt`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie` passed with logs under `/tmp`.
+  CodeRabbit was attempted after deterministic gates but timed out at
+  `preparing_sandbox`; see `Surprises & Discoveries`.
 - [ ] Milestone 4: precompute macro action signatures.
 - [ ] Milestone 5: consolidate fixture crate and schema BDD support.
 - [ ] Milestone 6: remove duplicated manual TOML section parsing.
@@ -458,6 +465,11 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `preparing_sandbox` until `timeout` exited with code 124. The log at
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
   output only and no actionable findings.
+- 2026-06-16: CodeRabbit again did not report a rate limit for Milestone 3. A
+  bounded 300-second invocation after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
 
 ## Decision Log
 
@@ -492,6 +504,14 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   The change is a responsibility split that preserves validation ordering and
   message semantics instead of introducing a new invariant over generated input
   ranges or contractual business logic.
+- 2026-06-16: Move argument-decode breadcrumb prefixing onto
+  `ArgDecodeError` for Milestone 3. The error enum owns the `param` field on
+  every variant, so centralizing the match there prevents raw action conversion
+  from needing updates whenever a new decode error variant is added.
+- 2026-06-16: No property, Kani, or Verus check is required for Milestone 3.
+  The canonical implementation is finite variant remapping over a closed set of
+  current `ArgDecodeError` forms, validated by exhaustive `rstest` cases rather
+  than a generated input invariant or contractual proof obligation.
 
 ## Outcomes & Retrospective
 

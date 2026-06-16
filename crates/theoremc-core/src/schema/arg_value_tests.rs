@@ -1,5 +1,6 @@
 //! Unit tests for argument value decoding.
 
+use googletest::prelude::*;
 use indexmap::IndexMap;
 use rstest::rstest;
 
@@ -231,5 +232,76 @@ fn literal_error_message_includes_param_name() {
     assert!(
         msg.contains("my_label"),
         "expected display to mention 'my_label', got: {msg}"
+    );
+}
+
+// ── Error breadcrumb prefixing ──────────────────────────────────────
+
+#[rstest]
+#[case::empty_ref(
+    ArgDecodeError::EmptyRefTarget {
+        param: "name".into(),
+    },
+    ArgDecodeError::EmptyRefTarget {
+        param: "maybe.do step 2: name".into(),
+    },
+)]
+#[case::invalid_identifier(
+    ArgDecodeError::InvalidIdentifier {
+        param: "name".into(),
+        name: "not-valid".into(),
+    },
+    ArgDecodeError::InvalidIdentifier {
+        param: "maybe.do step 2: name".into(),
+        name: "not-valid".into(),
+    },
+)]
+#[case::reserved_keyword(
+    ArgDecodeError::ReservedKeyword {
+        param: "name".into(),
+        name: "fn".into(),
+    },
+    ArgDecodeError::ReservedKeyword {
+        param: "maybe.do step 2: name".into(),
+        name: "fn".into(),
+    },
+)]
+#[case::non_string_ref(
+    ArgDecodeError::NonStringRefTarget {
+        param: "name".into(),
+        kind: "an integer",
+    },
+    ArgDecodeError::NonStringRefTarget {
+        param: "maybe.do step 2: name".into(),
+        kind: "an integer",
+    },
+)]
+#[case::non_string_literal(
+    ArgDecodeError::NonStringLiteralValue {
+        param: "name".into(),
+        kind: "a boolean",
+    },
+    ArgDecodeError::NonStringLiteralValue {
+        param: "maybe.do step 2: name".into(),
+        kind: "a boolean",
+    },
+)]
+fn with_param_prefix_updates_every_error_variant(
+    #[case] error: ArgDecodeError,
+    #[case] expected: ArgDecodeError,
+) {
+    assert_that!(error.with_param_prefix("maybe.do step 2"), eq(&expected));
+}
+
+#[test]
+fn with_param_prefix_keeps_display_message_stable() {
+    let error = ArgDecodeError::NonStringLiteralValue {
+        param: "label".into(),
+        kind: "an integer",
+    };
+
+    pretty_assertions::assert_eq!(
+        error.with_param_prefix("maybe.do step 1").to_string(),
+        "argument 'maybe.do step 1: label': literal value must be a string, not an integer",
     );
 }

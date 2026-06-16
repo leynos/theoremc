@@ -90,6 +90,56 @@ pub enum ArgDecodeError {
     },
 }
 
+impl ArgDecodeError {
+    /// Returns this error with `prefix` prepended to its parameter breadcrumb.
+    ///
+    /// This is used when argument decoding happens inside nested structures,
+    /// such as a `maybe.do` step, so diagnostics identify the failing argument
+    /// and its enclosing path.
+    ///
+    /// # Examples
+    ///
+    ///     use theoremc_core::schema::ArgDecodeError;
+    ///
+    ///     let error = ArgDecodeError::EmptyRefTarget {
+    ///         param: "name".into(),
+    ///     }
+    ///     .with_param_prefix("maybe.do step 1");
+    ///
+    ///     assert_eq!(
+    ///         error.to_string(),
+    ///         "argument 'maybe.do step 1: name': ref value must not be empty"
+    ///     );
+    #[must_use]
+    pub fn with_param_prefix(self, prefix: &str) -> Self {
+        match self {
+            Self::EmptyRefTarget { param } => Self::EmptyRefTarget {
+                param: prefixed_param(prefix, &param),
+            },
+            Self::InvalidIdentifier { param, name } => Self::InvalidIdentifier {
+                param: prefixed_param(prefix, &param),
+                name,
+            },
+            Self::ReservedKeyword { param, name } => Self::ReservedKeyword {
+                param: prefixed_param(prefix, &param),
+                name,
+            },
+            Self::NonStringRefTarget { param, kind } => Self::NonStringRefTarget {
+                param: prefixed_param(prefix, &param),
+                kind,
+            },
+            Self::NonStringLiteralValue { param, kind } => Self::NonStringLiteralValue {
+                param: prefixed_param(prefix, &param),
+                kind,
+            },
+        }
+    }
+}
+
+fn prefixed_param(prefix: &str, param: &str) -> String {
+    format!("{prefix}: {param}")
+}
+
 /// A semantically decoded action-call argument value.
 ///
 /// After YAML deserialization, each [`TheoremValue`] in an action
