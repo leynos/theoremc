@@ -1528,7 +1528,9 @@ version = "0.1.0"
 dependencies = [
  "camino",
  "cap-std 4.0.2",
+ "googletest",
  "insta",
+ "pretty_assertions",
  "prettyplease",
  "proc-macro2",
  "proptest",

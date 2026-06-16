@@ -16,12 +16,14 @@ theoremc-core = { version = "0.1.0", path = "../theoremc-core" }
 thiserror = "2.0.18"
 
 [dev-dependencies]
-tempfile = "3.15.0"
 cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+googletest = "0.14.3"
 insta = "1"
 prettyplease = "0.2"
+pretty_assertions = "1.4.1"
 proptest = "1"
 rstest = "0.26.1"
+tempfile = "3.15.0"
 test-helpers = { version = "0.1.0", path = "../test-helpers" }
 trybuild = { version = "1", features = ["diff"] }
 

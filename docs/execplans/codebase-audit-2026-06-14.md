@@ -427,7 +427,15 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `make markdownlint`, and `make nixie` passed with logs under `/tmp`.
   CodeRabbit was attempted after deterministic gates but timed out at
   `preparing_sandbox`; see `Surprises & Discoveries`.
-- [ ] Milestone 4: precompute macro action signatures.
+- [x] 2026-06-16: Milestone 4 precomputed macro action signatures through an
+  `ActionSignatureIndex` built once for the referenced actions. Added focused
+  `rstest` unit cases for one action, equivalent repeated signatures,
+  conflicting signatures, and missing selected signatures, using `googletest`
+  and `pretty_assertions` in the canonical index tests. `make fmt`,
+  `make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
+  `make nixie` passed with logs under `/tmp`. CodeRabbit was attempted after
+  deterministic gates but timed out at `preparing_sandbox`; see
+  `Surprises & Discoveries`.
 - [ ] Milestone 5: consolidate fixture crate and schema BDD support.
 - [ ] Milestone 6: remove duplicated manual TOML section parsing.
 - [ ] Milestone 7: unify path normalization and path policy.
@@ -466,6 +474,11 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
   output only and no actionable findings.
 - 2026-06-16: CodeRabbit again did not report a rate limit for Milestone 3. A
+  bounded 300-second invocation after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
+- 2026-06-16: CodeRabbit again did not report a rate limit for Milestone 4. A
   bounded 300-second invocation after deterministic gates remained at
   `preparing_sandbox` until `timeout` exited with code 124. The log at
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
@@ -512,6 +525,15 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   The canonical implementation is finite variant remapping over a closed set of
   current `ArgDecodeError` forms, validated by exhaustive `rstest` cases rather
   than a generated input invariant or contractual proof obligation.
+- 2026-06-16: Build the Milestone 4 action signature index only for referenced
+  actions. This preserves current macro behaviour: conflicts are reported for
+  referenced shared actions, while unused declarations do not become new macro
+  expansion failures.
+- 2026-06-16: No property, Kani, or Verus check is required for Milestone 4.
+  The index is built from parsed theorem documents but does not own probe
+  ordering; existing `referenced_actions` still supplies deterministic order,
+  and focused cases cover the finite lookup, equivalence, conflict, and
+  missing-signature behaviours.
 
 ## Outcomes & Retrospective
 
