@@ -371,5 +371,9 @@ fn is_mapping_key_for_field(line: &str, field: FieldName<'_>) -> bool {
 mod tests;
 
 #[cfg(test)]
+#[path = "loader_action_tests.rs"]
+mod action_tests;
+
+#[cfg(test)]
 #[path = "loader_duplicate_tests.rs"]
 mod duplicate_theorem_key_tests;

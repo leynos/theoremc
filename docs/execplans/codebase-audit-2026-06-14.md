@@ -531,7 +531,19 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `make test`, `make markdownlint`, and `make nixie` passed with logs under
   `/tmp`. CodeRabbit was attempted after deterministic gates but timed out at
   `preparing_sandbox`; see `Surprises & Discoveries`.
-- [ ] Milestone 12: final reconciliation.
+- [x] 2026-06-17: Milestone 12 completed final reconciliation. Final file-size
+  reconciliation found `crates/theoremc-core/src/schema/loader_tests.rs` and
+  `crates/theoremc-core/src/schema/types.rs` over the 400-line Rust source
+  limit. Moved action-signature loader tests into
+  `crates/theoremc-core/src/schema/loader_action_tests.rs` and type semantic
+  equivalence tests into `crates/theoremc-core/src/schema/types_tests.rs`.
+  Focused `theoremc-core` test filters for both moved modules passed, and the
+  repository-wide Rust file-size check now reports no files over 400 lines. A
+  local relative Markdown link check reported no missing `.md` targets.
+  `make fmt`, `make check-fmt`, `make markdownlint`, `make nixie`, `make lint`,
+  and `make test` passed with logs under `/tmp`. CodeRabbit was attempted after
+  deterministic gates but timed out at `preparing_sandbox`; see
+  `Surprises & Discoveries`.
 
 ## Surprises & Discoveries
 
@@ -719,8 +731,33 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `preparing_sandbox` until `timeout` exited with code 124. The log at
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
   output only and no actionable findings.
+- 2026-06-17: Milestone 12 final reconciliation found two remaining Rust
+  source files over 400 lines. Both were test-heavy files, so the smallest safe
+  fix was to split existing tests into sibling `#[path = "..."]` modules
+  without changing production behaviour.
+- 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 12. A
+  bounded 300-second invocation after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
 
 ## Outcomes & Retrospective
 
-This section is intentionally empty while implementation is in progress.
-Populate it as milestones are implemented and validated.
+All findings in the 2026-06-14 audit plan have been addressed in order. The
+branch now has typed validation reasons, split schema validation modules,
+centralized argument decode error prefixing, precomputed macro action
+signatures, shared integration-test support, shared TOML section extraction,
+shared theorem path formatting and path policy, deterministic build-discovery
+BDD invalidation, test-gated argument lowering, reconciled current-state
+documentation, explicit dependency version floors, and a final file-size
+cleanup.
+
+The final observable state is:
+
+- all Rust source files are at or below the 400-line repository limit,
+- local relative Markdown links to `.md` files resolve,
+- `make fmt`, `make check-fmt`, `make markdownlint`, `make nixie`,
+  `make lint`, and `make test` pass, and
+- CodeRabbit was attempted after each milestone's deterministic gates. The
+  service repeatedly stalled at `preparing_sandbox`, produced no actionable
+  findings, and never reported a rate limit.
