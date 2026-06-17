@@ -1,6 +1,6 @@
 //! Snapshot tests for structured parser and validator diagnostics.
 
-mod common;
+pub mod common;
 
 use common::load_fixture;
 use rstest::rstest;

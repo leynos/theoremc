@@ -4,7 +4,7 @@
 //! errors, cover `KaniExpectation` variants, and exercise inline edge cases
 //! for unknown keys in subordinate structures.
 
-mod common;
+pub mod common;
 
 use common::load_fixture;
 use rstest::rstest;

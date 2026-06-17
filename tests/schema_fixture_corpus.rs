@@ -1,6 +1,6 @@
 //! Regression corpus tests for parser and validator fixtures.
 
-mod common;
+pub mod common;
 
 use common::load_fixture;
 use rstest::rstest;

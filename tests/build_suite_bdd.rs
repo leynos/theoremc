@@ -3,15 +3,12 @@
 //! These tests prove that the generated theorem suite compiles correctly
 //! for empty, single-file, and multi-file theorem trees.
 
-use std::process::Command;
+pub mod common;
 
-use camino::{Utf8Path, Utf8PathBuf};
-use cap_std::{ambient_authority, fs_utf8::Dir};
+use camino::Utf8Path;
+use common::{FixtureCrate, TRIVIAL_THEOREM};
 use rstest_bdd_macros::{given, scenario, then};
 
-const BUILD_SCRIPT_SOURCE: &str = include_str!("../build.rs");
-const BUILD_DISCOVERY_SOURCE: &str = include_str!("../src/build_discovery.rs");
-const BUILD_SUITE_SOURCE: &str = include_str!("../src/build_suite.rs");
 const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
 
 /// Fixture lib.rs that includes the generated suite wiring.
@@ -31,86 +28,6 @@ const FIXTURE_LIB_RS: &str = concat!(
     "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
     "}\n",
 );
-
-const TRIVIAL_THEOREM: &str = concat!(
-    "Theorem: Smoke\n",
-    "About: Smoke theorem\n",
-    "Witness:\n",
-    "  - cover: \"true\"\n",
-    "    because: \"reachable\"\n",
-    "Prove:\n",
-    "  - assert: \"true\"\n",
-    "    because: \"trivial\"\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 1\n",
-    "    expect: SUCCESS\n",
-);
-
-struct FixtureCrate {
-    _temp_dir: tempfile::TempDir,
-    manifest_dir: Utf8PathBuf,
-    dir: Dir,
-}
-
-impl FixtureCrate {
-    fn new() -> Result<Self, String> {
-        let temp_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
-        let manifest_dir = Utf8Path::from_path(temp_dir.path())
-            .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
-            .to_path_buf();
-        let dir = Dir::open_ambient_dir(&manifest_dir, ambient_authority())
-            .map_err(|error| error.to_string())?;
-        let fixture = Self {
-            _temp_dir: temp_dir,
-            manifest_dir,
-            dir,
-        };
-
-        fixture.write(Utf8Path::new("Cargo.toml"), &fixture_cargo_toml()?)?;
-        fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
-        fixture.write(Utf8Path::new("src/lib.rs"), FIXTURE_LIB_RS)?;
-        fixture.write(
-            Utf8Path::new("src/build_discovery.rs"),
-            BUILD_DISCOVERY_SOURCE,
-        )?;
-        fixture.write(Utf8Path::new("src/build_suite.rs"), BUILD_SUITE_SOURCE)?;
-
-        Ok(fixture)
-    }
-
-    fn write(&self, path: &Utf8Path, contents: &str) -> Result<(), String> {
-        if let Some(parent) = path.parent() {
-            if !parent.as_str().is_empty() {
-                self.dir
-                    .create_dir_all(parent)
-                    .map_err(|error| error.to_string())?;
-            }
-        }
-        self.dir
-            .write(path.as_str(), contents)
-            .map_err(|error| error.to_string())
-    }
-
-    fn build(&self) -> Result<(), String> {
-        let output = Command::new("cargo")
-            .current_dir(&self.manifest_dir)
-            .args(["build", "-vv", "--color", "never"])
-            .output()
-            .map_err(|error| error.to_string())?;
-
-        if output.status.success() {
-            Ok(())
-        } else {
-            let log = format!(
-                "{}{}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr),
-            );
-            Err(log)
-        }
-    }
-}
 
 fn fixture_cargo_toml() -> Result<String, String> {
     let build_dependencies = toml_section(ROOT_CARGO_TOML, "build-dependencies")
@@ -156,10 +73,9 @@ fn given_a_crate_without_a_theorems_directory() {}
 
 #[then("the crate compiles successfully with the generated suite")]
 fn then_the_crate_compiles_successfully_with_the_generated_suite() -> Result<(), String> {
-    let fixture = FixtureCrate::new()?;
+    let fixture = FixtureCrate::new(&fixture_cargo_toml()?, FIXTURE_LIB_RS)?;
     // No theorems directory created - testing empty suite case
-    // build() returns Ok only if the build succeeded
-    fixture.build()?;
+    fixture.cargo_build()?;
     Ok(())
 }
 
@@ -170,11 +86,10 @@ fn given_a_crate_with_one_theorem_file() {}
 #[then("the single theorem is included automatically and the crate compiles")]
 fn then_the_single_theorem_is_included_automatically_and_the_crate_compiles() -> Result<(), String>
 {
-    let fixture = FixtureCrate::new()?;
+    let fixture = FixtureCrate::new(&fixture_cargo_toml()?, FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new("theorems/single.theorem"), TRIVIAL_THEOREM)?;
 
-    // build() returns Ok only if the build succeeded
-    fixture.build()?;
+    fixture.cargo_build()?;
     Ok(())
 }
 
@@ -184,14 +99,13 @@ fn given_a_crate_with_multiple_theorem_files_created_in_non_sorted_order() {}
 
 #[then("all theorems compile in deterministic suite order")]
 fn then_all_theorems_compile_in_deterministic_suite_order() -> Result<(), String> {
-    let fixture = FixtureCrate::new()?;
+    let fixture = FixtureCrate::new(&fixture_cargo_toml()?, FIXTURE_LIB_RS)?;
     // Create theorems in non-sorted order (z, a, m)
     fixture.write(Utf8Path::new("theorems/z.theorem"), TRIVIAL_THEOREM)?;
     fixture.write(Utf8Path::new("theorems/a.theorem"), TRIVIAL_THEOREM)?;
     fixture.write(Utf8Path::new("theorems/m.theorem"), TRIVIAL_THEOREM)?;
 
-    // build() returns Ok only if the build succeeded
-    fixture.build()?;
+    fixture.cargo_build()?;
     Ok(())
 }
 

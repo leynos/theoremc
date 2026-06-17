@@ -6,14 +6,11 @@
 //! for serialized Cargo execution, keeping fixture layout separate from
 //! process orchestration.
 
-use camino::{Utf8Path, Utf8PathBuf};
-use cap_std::{ambient_authority, fs_utf8::Dir};
+use camino::Utf8Path;
 
 use super::cargo_runner::{CargoGuard, CargoSubcommand, cargo_run, cargo_run_output};
+use crate::common::FixtureCrate as CommonFixtureCrate;
 
-const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
-const BUILD_DISCOVERY_SOURCE: &str = include_str!("../../src/build_discovery.rs");
-const BUILD_SUITE_SOURCE: &str = include_str!("../../src/build_suite.rs");
 const ROOT_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 pub(crate) const FIXTURE_BUILD_DEPENDENCIES: &str = concat!(
     "camino = \"1.2.2\"\n",
@@ -27,48 +24,19 @@ pub(crate) struct TheoremFixtureSpec<'a> {
 }
 
 pub(crate) struct FixtureCrate {
-    _temp_dir: tempfile::TempDir,
-    manifest_dir: Utf8PathBuf,
-    dir: Dir,
+    inner: CommonFixtureCrate,
 }
 
 impl FixtureCrate {
     pub(crate) fn new(lib_rs: &str) -> Result<Self, String> {
-        let temp_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
-        let manifest_dir = Utf8Path::from_path(temp_dir.path())
-            .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
-            .to_path_buf();
-        let dir = Dir::open_ambient_dir(&manifest_dir, ambient_authority())
-            .map_err(|error| error.to_string())?;
-        let fixture = Self {
-            _temp_dir: temp_dir,
-            manifest_dir,
-            dir,
-        };
-
-        fixture.write(Utf8Path::new("Cargo.toml"), &fixture_cargo_toml())?;
-        fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
-        fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
-        fixture.write(
-            Utf8Path::new("src/build_discovery.rs"),
-            BUILD_DISCOVERY_SOURCE,
-        )?;
-        fixture.write(Utf8Path::new("src/build_suite.rs"), BUILD_SUITE_SOURCE)?;
-
-        Ok(fixture)
+        let cargo_toml = fixture_cargo_toml();
+        Ok(Self {
+            inner: CommonFixtureCrate::new(&cargo_toml, lib_rs)?,
+        })
     }
 
     pub(crate) fn write(&self, path: &Utf8Path, contents: &str) -> Result<(), String> {
-        if let Some(parent) = path.parent()
-            && !parent.as_str().is_empty()
-        {
-            self.dir
-                .create_dir_all(parent)
-                .map_err(|error| error.to_string())?;
-        }
-        self.dir
-            .write(path.as_str(), contents)
-            .map_err(|error| error.to_string())
+        self.inner.write(path, contents)
     }
 
     pub(crate) fn cargo_build(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
@@ -76,11 +44,11 @@ impl FixtureCrate {
     }
 
     pub(crate) fn cargo_kani_list(&self, guard: &CargoGuard<'_>) -> Result<String, String> {
-        cargo_run_output(&self.manifest_dir, CargoSubcommand::KaniList, guard)
+        cargo_run_output(self.inner.manifest_dir(), CargoSubcommand::KaniList, guard)
     }
 
     fn cargo_run(&self, subcommand: CargoSubcommand, guard: &CargoGuard<'_>) -> Result<(), String> {
-        cargo_run(&self.manifest_dir, subcommand, guard)
+        cargo_run(self.inner.manifest_dir(), subcommand, guard)
     }
 }
 

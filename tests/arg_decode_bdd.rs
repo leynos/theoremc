@@ -1,6 +1,6 @@
 //! Behavioural tests for argument value decoding.
 
-mod common;
+pub mod common;
 
 use common::load_fixture;
 use rstest_bdd_macros::{given, scenario, then};

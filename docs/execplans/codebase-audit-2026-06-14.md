@@ -436,7 +436,22 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `make nixie` passed with logs under `/tmp`. CodeRabbit was attempted after
   deterministic gates but timed out at `preparing_sandbox`; see
   `Surprises & Discoveries`.
-- [ ] Milestone 5: consolidate fixture crate and schema BDD support.
+- [x] 2026-06-17: Milestone 5 consolidated fixture crate and schema BDD test
+  support. Fixture crate construction now lives in `tests/common/mod.rs` and is
+  reused by `tests/build_discovery_bdd.rs`, `tests/build_suite_bdd.rs`, and
+  `tests/theorem_file_macro_bdd/fixture_crate.rs`. Schema BDD suites now share
+  fallible fixture-loading, error-message, and typed diagnostic assertion
+  helpers. Focused runs of `cargo test --test schema_bdd`,
+  `cargo test --test schema_action_name_bdd`,
+  `cargo test --test schema_vacuity_bdd`,
+  `cargo test --test schema_diagnostics_bdd`,
+  `cargo test --test build_discovery_bdd`, `cargo test --test build_suite_bdd`,
+  and `cargo test --test theorem_file_macro_bdd` passed. `make fmt`,
+  `make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
+  `make nixie` passed with logs under `/tmp`. CodeRabbit was attempted after
+  deterministic gates but timed out at `preparing_sandbox`; see
+  `Surprises & Discoveries`.
+- [x] Milestone 5: consolidate fixture crate and schema BDD support.
 - [ ] Milestone 6: remove duplicated manual TOML section parsing.
 - [ ] Milestone 7: unify path normalization and path policy.
 - [ ] Milestone 8: remove timing-dependent BDD sleep.
@@ -479,6 +494,22 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
   output only and no actionable findings.
 - 2026-06-16: CodeRabbit again did not report a rate limit for Milestone 4. A
+  bounded 300-second invocation after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
+- 2026-06-17: Consolidating integration-test helpers exposed a Rust
+  integration-test quirk: `tests/common/mod.rs` is compiled into each test
+  target that declares it, so shared helper items unused by one target can
+  produce `dead_code` warnings. Declaring the helper module as public in each
+  integration test avoids false dead-code warnings without suppressing lints,
+  but it also requires Rustdoc on the shared helper API because the repository
+  denies missing docs.
+- 2026-06-17: Milestone 5 Clippy caught two useful test-support issues before
+  review: public query helpers in `tests/common/mod.rs` needed `#[must_use]`,
+  and one `Result`-returning test still used `assert_eq!`. Both were fixed
+  before the final `make lint` and `make test` gates passed.
+- 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 5. A
   bounded 300-second invocation after deterministic gates remained at
   `preparing_sandbox` until `timeout` exited with code 124. The log at
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
@@ -534,6 +565,14 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   ordering; existing `referenced_actions` still supplies deterministic order,
   and focused cases cover the finite lookup, equivalence, conflict, and
   missing-signature behaviours.
+- 2026-06-17: Keep build-fixture TOML dependency extraction local to the build
+  BDD suites for Milestone 5. The current milestone consolidates fixture crate
+  filesystem setup and build-log assertions; duplicated `toml_section` scanning
+  remains intentionally in scope for Milestone 6.
+- 2026-06-17: No property, Kani, or Verus check is required for Milestone 5.
+  The change extracts test support and preserves externally observable BDD
+  behaviour rather than introducing a canonical production invariant over
+  generated inputs, state transitions, or contractual business logic.
 
 ## Outcomes & Retrospective
 

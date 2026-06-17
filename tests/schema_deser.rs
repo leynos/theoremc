@@ -4,7 +4,7 @@
 //! documents deserialize correctly. Unhappy-path tests live in
 //! `schema_deser_reject.rs`.
 
-mod common;
+pub mod common;
 
 use common::load_fixture;
 use rstest::rstest;
