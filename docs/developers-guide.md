@@ -126,7 +126,7 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 | Mangle        | `theoremc-core`   | `mangle*.rs`                                       | Deterministic identifier generation                                           |
 | Cross-cutting | `theoremc-core`   | `collision.rs`                                     | Collision detection across schema and mangle                                  |
 | Proc-macro    | `theoremc-macros` | `lib.rs`                                           | Proc-macro entry points, theorem-file loading delegation, and code generation |
-| Lowering      | `theoremc`        | `arg_lowering.rs`                                  | Conversion of semantic values to Rust token trees                             |
+| Lowering      | `theoremc`        | `arg_lowering.rs`                                  | Test-gated prototype for converting semantic values to Rust token trees       |
 | Build         | `theoremc`        | `build_discovery.rs`, `build_suite.rs`, `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking           |
 
 The schema layer must not import from `mangle`, and vice versa. The `collision`

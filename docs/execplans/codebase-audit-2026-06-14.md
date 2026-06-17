@@ -493,7 +493,20 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   logs under `/tmp`. CodeRabbit was attempted after deterministic gates but
   timed out at `preparing_sandbox`; see `Surprises & Discoveries`.
 - [x] Milestone 8: remove timing-dependent BDD sleep.
-- [ ] Milestone 9: retire broad dead-code suppressions in argument lowering.
+- [x] 2026-06-17: Milestone 9 retired broad dead-code suppressions in argument
+  lowering. Reference checks showed `src/arg_lowering.rs` is exercised by its
+  own unit and compile-fail tests but is not yet called by production code
+  generation, so `src/lib.rs` now compiles the lowering prototype only under
+  `#[cfg(test)]`. The item-level `dead_code` suppressions and the module-level
+  `clippy::allow_attributes` suppression were removed. The root package moved
+  lowering-only support crates from normal dependencies to `dev-dependencies`,
+  leaving production `theoremc` consumers with only the core and macro crates
+  in the normal dependency tree. Focused runs of `cargo check -p theoremc` and
+  `cargo test arg_lowering` passed. `make fmt`, `make check-fmt`, `make lint`,
+  `make test`, `make markdownlint`, and `make nixie` passed with logs under
+  `/tmp`. CodeRabbit was attempted after deterministic gates but timed out at
+  `preparing_sandbox`; see `Surprises & Discoveries`.
+- [x] Milestone 9: retire broad dead-code suppressions in argument lowering.
 - [ ] Milestone 10: fix documentation and API drift.
 - [ ] Milestone 11: tighten dependency version requirements.
 - [ ] Milestone 12: final reconciliation.
@@ -647,6 +660,21 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   it can mark both watched files and watched directories dirty for Cargo's
   `rerun-if-changed` checks.
 - 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 8. A
+  bounded 300-second invocation after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
+- 2026-06-17: Milestone 9 reference checks found no production callers for
+  `src/arg_lowering.rs`; only its own unit and compile-fail tests use the
+  lowering entrypoint and helpers. This makes `#[cfg(test)]` on the module
+  boundary a better fit than retaining `#[allow(dead_code)]` on the enum and
+  every helper.
+- 2026-06-17: Move the lowering prototype's support crates from normal
+  dependencies to `dev-dependencies` in the root package. The build script
+  still receives its own `thiserror` build-dependency, and production
+  `theoremc` consumers now see only the core and macro crates needed by the
+  facade.
+- 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 9. A
   bounded 300-second invocation after deterministic gates remained at
   `preparing_sandbox` until `timeout` exited with code 124. The log at
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
