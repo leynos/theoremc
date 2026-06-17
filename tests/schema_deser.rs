@@ -68,6 +68,36 @@ fn valid_minimal_has_kani_evidence(fixture_loader: impl Fn(&str) -> String) {
 }
 
 #[rstest]
+#[case::omitted("", None)]
+#[case::explicit("Schema: 1\n", Some(1))]
+fn schema_field_preserves_omitted_and_explicit_values(
+    #[case] schema_line: &str,
+    #[case] expected: Option<u32>,
+) {
+    let yaml = format!(
+        "{schema_line}{}",
+        concat!(
+            "Theorem: SchemaExample\n",
+            "About: Schema behaviour example\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivially true\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable path\"\n",
+        )
+    );
+
+    let docs = load_theorem_docs(&yaml).expect("schema example should parse");
+
+    assert_eq!(docs.first().map(|doc| doc.schema), Some(expected));
+}
+
+#[rstest]
 fn valid_full_populates_all_sections(fixture_loader: impl Fn(&str) -> String) {
     let yaml = fixture_loader("valid_full.theorem");
     let docs = load_theorem_docs(&yaml).expect("should parse valid_full");

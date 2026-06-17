@@ -29,8 +29,9 @@ This guide covers the build system, internal architecture, contributor
 workflows, and extension points for the theoremc crate. For user-facing
 behaviour and public API documentation, see the [user's guide](users-guide.md).
 For high-level design rationale, see the
-[design specification](theoremc-design.md). Normative references listed in the
-design specification take precedence if wording diverges.
+[design specification](theoremc-design.md). For file and directory ownership,
+see the [repository layout](repository-layout.md). Normative references listed
+in the design specification take precedence if wording diverges.
 
 ## 1. Build system overview
 

@@ -38,7 +38,17 @@ let docs = load_theorem_file_from_manifest_dir(
 )?;
 ```
 
-See [`docs/users-guide.md`](docs/users-guide.md) for full API documentation.
+## Documentation map
+
+- [`docs/contents.md`](docs/contents.md) indexes the full documentation set.
+- [`docs/users-guide.md`](docs/users-guide.md) covers public API and
+  theorem-file behaviour.
+- [`docs/repository-layout.md`](docs/repository-layout.md) explains where code,
+  tests, and durable documentation live.
+- [`docs/developers-guide.md`](docs/developers-guide.md) covers maintainer
+  workflows and internal conventions.
+- [`docs/theoremc-design.md`](docs/theoremc-design.md) records architecture
+  rationale and planned evolution.
 
 ## Workspace split (since Step 3.2.1)
 

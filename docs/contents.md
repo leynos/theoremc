@@ -29,6 +29,8 @@
 - [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)
   - Patterns for testable Rust design using dependency injection to avoid
   global-state coupling.
+- [Repository layout](repository-layout.md) - Map of top-level files,
+  workspace crates, test directories, and documentation ownership.
 - [A systematic guide to effective, ergonomic, and "don't repeat yourself" (DRY) doctests in Rust](rust-doctest-dry-guide.md)
   - Detailed reference for writing maintainable Rust doctests with minimal
   duplication.

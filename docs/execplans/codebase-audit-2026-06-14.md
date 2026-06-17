@@ -506,8 +506,22 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `make test`, `make markdownlint`, and `make nixie` passed with logs under
   `/tmp`. CodeRabbit was attempted after deterministic gates but timed out at
   `preparing_sandbox`; see `Surprises & Discoveries`.
-- [x] Milestone 9: retire broad dead-code suppressions in argument lowering.
-- [ ] Milestone 10: fix documentation and API drift.
+- [x] 2026-06-17: Milestone 10 fixed documentation and API drift. The
+  implemented and user-guide documented `Schema` behaviour is
+  compatibility-preserving: omitted `Schema` remains `None` rather than
+  materializing `Some(1)`. Added focused `rstest` coverage in
+  `tests/schema_deser.rs` for omitted and explicit schema fields;
+  `cargo test --test schema_deser schema_field_preserves_omitted_and_explicit_values`
+  passed after fixing the inline YAML indentation in the new test fixture.
+  Added `docs/repository-layout.md`, indexed it from `docs/contents.md`, and
+  linked it from `README.md` and `docs/developers-guide.md`. Updated
+  `docs/theorem-file-specification.md` for omitted `Schema` semantics and the
+  `ActionCall.as_binding` Rust field name. Updated `docs/theoremc-design.md` to
+  distinguish current workspace members from planned backend, reporter, and
+  lint crates. `make fmt`, `make check-fmt`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie` passed with logs under `/tmp`.
+  CodeRabbit was attempted after deterministic gates but timed out at
+  `preparing_sandbox`; see `Surprises & Discoveries`.
 - [ ] Milestone 11: tighten dependency version requirements.
 - [ ] Milestone 12: final reconciliation.
 
@@ -675,6 +689,15 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `theoremc` consumers now see only the core and macro crates needed by the
   facade.
 - 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 9. A
+  bounded 300-second invocation after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
+- 2026-06-17: For Milestone 10, keep omitted `Schema` as `None` instead of
+  materializing `Some(1)`. This preserves the current public API, matches the
+  users' guide, and still allows future loaders to distinguish an omitted
+  schema field from an explicit version declaration.
+- 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 10. A
   bounded 300-second invocation after deterministic gates remained at
   `preparing_sandbox` until `timeout` exited with code 124. The log at
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup

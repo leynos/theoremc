@@ -83,16 +83,20 @@ ______________________________________________________________________
 
 ## 3. High-level architecture
 
-`theoremc` is a Cargo workspace composed of:
+`theoremc` is currently a Cargo workspace composed of:
 
-- a core library (`theoremc-core`) containing the schema, parsing, validation,
-  resolution, diagnostic modelling, localization contracts, and
-  backend-agnostic IR,
+- a root facade package (`theoremc`) that re-exports public APIs and owns Cargo
+  build integration,
+- a core library (`theoremc-core`) containing schema loading, validation,
+  diagnostics, name mangling, collision checks, and theorem-file IO,
 - a proc-macro crate (`theoremc-macros`) that embeds theorem compilation into
-  normal Rust builds,
-- backend emitter crates (MVP: Kani),
-- a reporter CLI (`theoremd`) to run verification and produce human/CI reports,
-- optional enforcement lints (`theoremc-dylint`) to discourage bypassing.
+  normal Rust builds, and
+- a small shared test-support crate (`test-helpers`).
+
+Planned components remain in this design as target architecture, not current
+workspace members: backend emitter crates, a reporter CLI (`theoremd`) to run
+verification and produce human/CI reports, and optional enforcement lints
+(`theoremc-dylint`) to discourage bypassing.
 
 The “compile-time theorem loader” pattern uses proc-macro expansion each build
 to generate harness code. Kani harnesses are functions annotated with
@@ -116,8 +120,8 @@ flowchart TD
   subgraph Core["theoremc-core"]
     P["Parse YAML via serde-saphyr"]
     V["Validate schema + expressions (syn)"]
-    R["Resolve action paths + arg shaping"]
-    IR["Backend-agnostic IR"]
+    R["Resolve action paths + arg shaping (planned)"]
+    IR["Backend-agnostic IR (planned)"]
   end
 
   subgraph Emit["Backend emitters"]
@@ -133,7 +137,7 @@ flowchart TD
 
   subgraph Run["Verification"]
     CK["cargo kani ..."]
-    REP["theoremd report (Markdown/HTML/JUnit/Cucumber JSON)"]
+    REP["theoremd report (planned)"]
   end
 
   T --> BS --> INC --> PM
@@ -512,7 +516,7 @@ pub fn attach_node(/*...*/) -> Result<(), AttachError> { /*...*/ }
 Purposes:
 
 - produce compile-time checks that the string name matches the mangled export,
-- emit metadata for reporting (theoremd),
+- emit metadata for future reporting (`theoremd`),
 - enable future tooling (docs, coverage, cross-ref navigation).
 
 For metadata collection, `inventory` is appropriate: it provides typed
@@ -764,8 +768,8 @@ deserialization (Step 1.1 of the roadmap):
   for the `UPPERCASE` string forms, catching invalid values at deserialization
   time.
 - Schema types live in `src/schema/` (not `src/parser/`) because Step 1.1
-  is purely deserialization. The eventual `parser/` module in the workspace
-  layout will encompass the full parsing and validation pipeline.
+  is purely deserialization. A future parser component in the target
+  architecture may encompass the full parsing and validation pipeline.
 - The `ActionCall.as` field uses Rust field name `as_binding` with
   `#[serde(rename = "as", default)]`.
 - `src/lib.rs` is added alongside `src/main.rs` so schema types are testable
@@ -1139,7 +1143,7 @@ sequenceDiagram
 ### 6.10 Diagnostic and localization class model
 
 Figure 2. Class-level model for diagnostic payloads, localization contracts,
-and report-entry population in theoremc and theoremd.
+and future report-entry population in theoremc and `theoremd`.
 
 ```mermaid
 classDiagram
@@ -1436,9 +1440,9 @@ For each theorem:
 
 Kani documents that `UNREACHABLE` means a check is unreachable and the property
 holds vacuously, and it reports reachability for assertion macros.[^4]
-Therefore:
+Therefore, the planned reporting flow is:
 
-- theoremd treats `UNREACHABLE` as failure unless explicitly expected,
+- `theoremd` treats `UNREACHABLE` as failure unless explicitly expected,
 - and requires nontriviality witnesses unless vacuity is explicitly justified.
 
 ### 8.4 Nontriviality witnesses (required by default)
@@ -1456,15 +1460,16 @@ This is a direct response to the vacuity risk described above.[^4]
 
 Kani’s usage supports concrete playback generation (replaying counterexamples
 as concrete tests), which turns a model-checker failure into a reproducible
-unit test for humans.[^8] `theoremd` integrates this by re-running failed
-harnesses with the relevant Kani flags and attaching the produced playback to
-reports (MVP: `print`; later: `inplace` workflows).
+unit test for humans.[^8] Planned `theoremd` reporting integrates this by
+re-running failed harnesses with the relevant Kani flags and attaching the
+produced playback to reports (MVP: `print`; later: `inplace` workflows).
 
 ______________________________________________________________________
 
 ## 9. Reporting (`theoremd`)
 
-`theoremd` runs theorem suites and generates artefacts:
+`theoremd` is a planned reporter CLI. It will run theorem suites and generate
+artefacts:
 
 - Human-friendly report (Markdown/HTML).
 - CI formats (JUnit XML, Cucumber JSON) to integrate with existing “test
@@ -1526,8 +1531,8 @@ This section focuses on enforcement tooling and rollout.
 | Dylint custom lints                      | Catch forbidden layer-edge imports that visibility alone cannot express     | Medium   |
 | `cargo-deny` policy checks               | Enforce architecture-sensitive dependency policy                            | Low      |
 
-`theoremc-dylint` provides lints using Dylint, which runs Rust lints from
-dynamic libraries.[^10]
+`theoremc-dylint` is a planned lint crate. It will provide lints using Dylint,
+which runs Rust lints from dynamic libraries.[^10]
 
 ### 10.3 Minimal CI architecture gate
 
@@ -1556,35 +1561,47 @@ ______________________________________________________________________
 
 ## 11. Repository layout (workspace)
 
-The layout below follows the attached exploration’s successful separation of
-concerns, but updates parsing to `serde-saphyr` and corrects the
-action-resolution story to match the compile-time binding rules.
+The canonical path map is maintained in
+[repository layout](repository-layout.md). The current workspace contains the
+root facade package, `crates/theoremc-core`, `crates/theoremc-macros`, and
+`crates/test-helpers`. Planned components such as backend crates, `theoremd`,
+and `theoremc-dylint` are part of the target architecture but are not current
+workspace members.
 
 ```plaintext
 /
 ├── Cargo.toml
+├── build.rs
+├── src/
+│   ├── lib.rs                 # public facade and generated-suite include
+│   ├── main.rs                # placeholder binary entrypoint
+│   ├── build_discovery.rs     # theorem discovery for build.rs
+│   ├── build_suite.rs         # generated-suite rendering for build.rs
+│   └── arg_lowering.rs        # test-gated argument lowering prototype
 ├── crates/
+│   ├── test-helpers/
+│   │   └── src/
+│   │       └── lib.rs         # reusable integration-test helpers
 │   ├── theoremc-core/
 │   │   └── src/
-│   │       ├── parser/        # serde-saphyr schema + validation
-│   │       ├── resolver/      # action path resolution + arg shaping
-│   │       ├── ir/            # backend-agnostic IR
-│   │       └── backends/      # backend-agnostic interfaces
+│   │       ├── schema/        # serde-saphyr schema, validation, diagnostics
+│   │       ├── mangle*.rs     # stable generated identifier rules
+│   │       ├── collision.rs   # cross-document collision checks
+│   │       └── theorem_file.rs # crate-relative theorem file loading
 │   ├── theoremc-macros/
-│   │   └── src/               # theorem_file! proc macro, #[theorem_action]
-│   ├── theoremc-backends/
-│   │   └── src/
-│   │       └── kani/          # MVP emitter + runner helpers (optional)
-│   ├── theoremd/
-│   │   └── src/               # runner + report formats
-│   └── theoremc-dylint/
-│       └── src/               # optional enforcement lints
-├── examples/
-│   ├── account/
-│   └── hnsw/
+│   │   ├── src/               # theorem_file! proc macro implementation
+│   │   └── tests/             # proc-macro compile fixtures
+├── tests/
+│   ├── features/              # rstest-bdd feature files
+│   ├── fixtures/              # .theorem fixture corpus
+│   └── common/                # shared integration-test support
 └── docs/
-    ├── reference/theorem-schema.md
-    └── guides/writing-theorems.md
+    ├── contents.md
+    ├── repository-layout.md
+    ├── users-guide.md
+    ├── developers-guide.md
+    ├── theorem-file-specification.md
+    └── theoremc-design.md
 ```
 
 ______________________________________________________________________
