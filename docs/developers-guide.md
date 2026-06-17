@@ -248,7 +248,16 @@ No single code file may exceed 400 lines. When a module and its tests grow
 beyond this limit, extract tests into a sibling `*_tests.rs` file using the
 `#[path = ...]` attribute.
 
-### 3.4 Extending the build system
+### 3.4 Dependency requirements
+
+Use Cargo's default caret-compatible version requirements for third-party
+crates, but spell the lower bound as an explicit patch version such as
+`1.11.0`, not a broad major-only or minor-only floor such as `1` or `0.2`. When
+tightening a manifest requirement to match this policy, prefer the version
+already resolved in `Cargo.lock` and avoid `cargo update` unless Cargo requires
+the lockfile to change.
+
+### 3.5 Extending the build system
 
 To add new build-time discovery or generation:
 

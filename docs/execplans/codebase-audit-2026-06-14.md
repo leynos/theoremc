@@ -522,7 +522,15 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `make markdownlint`, and `make nixie` passed with logs under `/tmp`.
   CodeRabbit was attempted after deterministic gates but timed out at
   `preparing_sandbox`; see `Surprises & Discoveries`.
-- [ ] Milestone 11: tighten dependency version requirements.
+- [x] 2026-06-17: Milestone 11 tightened dependency version requirements.
+  Broad dependency floors in the core and macro crate manifests were replaced
+  with the versions already resolved in `Cargo.lock`, and
+  `docs/developers-guide.md` now documents the explicit patch-level floor
+  convention. `cargo metadata --locked --no-deps` passed, so no lockfile update
+  or `cargo update` run was required. `make fmt`, `make check-fmt`, `make lint`,
+  `make test`, `make markdownlint`, and `make nixie` passed with logs under
+  `/tmp`. CodeRabbit was attempted after deterministic gates but timed out at
+  `preparing_sandbox`; see `Surprises & Discoveries`.
 - [ ] Milestone 12: final reconciliation.
 
 ## Surprises & Discoveries
@@ -698,6 +706,15 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   users' guide, and still allows future loaders to distinguish an omitted
   schema field from an explicit version declaration.
 - 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 10. A
+  bounded 300-second invocation after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
+- 2026-06-17: For Milestone 11, use the versions already resolved in
+  `Cargo.lock` as the explicit dependency floors. This preserves Cargo's
+  default caret-compatible semantics, satisfies the repository policy against
+  broad or open-ended requirements, and avoids unrelated lockfile churn.
+- 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 11. A
   bounded 300-second invocation after deterministic gates remained at
   `preparing_sandbox` until `timeout` exited with code 124. The log at
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
