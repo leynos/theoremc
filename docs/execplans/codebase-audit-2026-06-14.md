@@ -464,7 +464,24 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   logs under `/tmp`. CodeRabbit was attempted after deterministic gates but
   timed out at `preparing_sandbox`; see `Surprises & Discoveries`.
 - [x] Milestone 6: remove duplicated manual TOML section parsing.
-- [ ] Milestone 7: unify path normalization and path policy.
+- [x] 2026-06-17: Milestone 7 unified path normalization and path policy.
+  `theoremc_core::path_format` now owns string-level path separator
+  normalization and TOML basic string escaping for proc-macro expansion and
+  fixture Cargo manifests. Theorem-file path validation now uses a named
+  violation classifier for root-anchored, drive-prefixed, and parent-traversal
+  paths while preserving the public `InvalidTheoremPath` error text. The
+  theorem-file unit and property tests now live in
+  `crates/theoremc-core/src/theorem_file_tests.rs`, keeping the touched
+  production module under the 400-line file-size limit. Focused runs of
+  `cargo test -p theoremc-core path_format`,
+  `cargo test -p theoremc-core theorem_path_violation`,
+  `cargo test -p theoremc-core theorem_file`, `cargo test -p theoremc-macros`,
+  and `cargo test --test theorem_file_macro_bdd` passed. `make fmt`,
+  `make check-fmt`, `make lint`, `make test`, `make markdownlint`, and
+  `make nixie` passed with logs under `/tmp`. CodeRabbit was attempted after
+  deterministic gates but timed out at `preparing_sandbox`; see
+  `Surprises & Discoveries`.
+- [x] Milestone 7: unify path normalization and path policy.
 - [ ] Milestone 8: remove timing-dependent BDD sleep.
 - [ ] Milestone 9: retire broad dead-code suppressions in argument lowering.
 - [ ] Milestone 10: fix documentation and API drift.
@@ -598,6 +615,17 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   The helper is bounded test-support parsing over a known fixture manifest
   shape. Focused `rstest` examples cover the required edge cases without
   introducing a production invariant or proof obligation.
+- 2026-06-17: Use `proptest` for Milestone 7 path separator normalization. The
+  helper claims an invariant over arbitrary strings: every backslash is
+  replaced with `/`, and every other character is preserved. Focused examples
+  cover named fixtures, and the property test covers the generated input range.
+- 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 7.
+  Three bounded 300-second invocations after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124, including the retry
+  after splitting theorem-file tests into `theorem_file_tests.rs` and the final
+  retry after strengthening the path-format property-test oracle. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
 
 ## Outcomes & Retrospective
 

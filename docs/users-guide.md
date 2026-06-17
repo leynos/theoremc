@@ -57,6 +57,9 @@ Theorem paths passed to `theorem_file!` must satisfy all of the following:
 - The path must not contain `..` components.
 - The path is resolved relative to the consuming crate's `CARGO_MANIFEST_DIR`.
 
+The macro normalizes backslash separators (`\`) to forward slashes (`/`) before
+loading the theorem file and deriving generated module or harness names.
+
 Paths that violate any rule cause a compile-time error at the macro call site.
 
 ### Error variants

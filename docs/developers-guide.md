@@ -322,6 +322,14 @@ Discovered theorem paths are normalized to forward-slash crate-relative form
 normalization is important because downstream name mangling rules assume stable
 path identity.
 
+String-level path formatting that feeds proc-macro expansion or fixture Cargo
+manifests belongs in `theoremc_core::path_format`. Use
+`normalize_path_separators` instead of open-coded `replace('\\', "/")`, and use
+`toml_basic_string_value` when writing a normalized path into a TOML basic
+string. Keep filesystem validation in `theorem_file.rs` behind the named path
+violation classifier so tests can assert the rejected path class rather than a
+single opaque invalid-path boolean.
+
 ## 5. Lint and error handling policy
 
 - Clippy warnings are denied (`-D warnings`).

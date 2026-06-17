@@ -7,6 +7,7 @@
 //! process orchestration.
 
 use camino::Utf8Path;
+use theoremc_core::path_format::{normalize_path_separators, toml_basic_string_value};
 
 use super::cargo_runner::{CargoGuard, CargoSubcommand, cargo_run, cargo_run_output};
 use crate::common::FixtureCrate as CommonFixtureCrate;
@@ -53,12 +54,11 @@ impl FixtureCrate {
 }
 
 pub(crate) fn fixture_cargo_toml() -> String {
-    let root_manifest_dir = ROOT_MANIFEST_DIR.replace('\\', "/");
-    fixture_cargo_toml_for(&root_manifest_dir)
+    fixture_cargo_toml_for(ROOT_MANIFEST_DIR)
 }
 
 pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
-    let normalized_root_manifest_dir = root_manifest_dir.replace('\\', "/");
+    let normalized_root_manifest_dir = normalize_path_separators(root_manifest_dir);
     let escaped_root_manifest_dir = toml_basic_string_value(&normalized_root_manifest_dir);
     format!(
         concat!(
@@ -76,10 +76,6 @@ pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
         root_manifest_dir = escaped_root_manifest_dir,
         build_dependencies = FIXTURE_BUILD_DEPENDENCIES
     )
-}
-
-fn toml_basic_string_value(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 pub(crate) const FIXTURE_LIB_RS: &str = concat!(

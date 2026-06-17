@@ -15,6 +15,7 @@ use theoremc_core::{
     collision::referenced_actions,
     load_theorem_file_from_manifest_dir,
     mangle::{mangle_action_name, mangle_module_path, mangle_theorem_harness},
+    path_format::normalize_path_separators,
     schema::{ActionSignature, SchemaDiagnostic},
 };
 
@@ -133,7 +134,8 @@ fn expand_theorem_file_at(
     manifest_dir: &Utf8Path,
     path_literal: &LitStr,
 ) -> Result<TokenStream2, MacroExpansionError> {
-    let canonical_path = path_literal.value().replace('\\', "/");
+    let path_value = path_literal.value();
+    let canonical_path = normalize_path_separators(&path_value);
     let canonical_path_literal = LitStr::new(&canonical_path, path_literal.span());
     let theorem_path = Utf8PathBuf::from(&canonical_path);
     let theorem_docs = load_theorem_file_from_manifest_dir(manifest_dir, &theorem_path)

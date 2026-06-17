@@ -9,6 +9,9 @@ pub mod collision;
 /// Action name mangling for deterministic, injective resolution.
 pub mod mangle;
 
+/// Path formatting helpers shared by compile-time tooling.
+pub mod path_format;
+
 /// Schema types for `.theorem` document deserialization and validation.
 pub mod schema;
 
