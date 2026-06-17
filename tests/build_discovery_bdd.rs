@@ -5,7 +5,7 @@ use std::time::Duration;
 pub mod common;
 
 use camino::Utf8Path;
-use common::{FixtureCrate, TRIVIAL_THEOREM};
+use common::{FixtureCrate, TRIVIAL_THEOREM, toml_section};
 use rstest_bdd_macros::{given, scenario, then};
 
 const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
@@ -26,27 +26,6 @@ fn fixture_cargo_toml() -> Result<String, String> {
         ),
         build_dependencies = build_dependencies
     ))
-}
-
-fn toml_section(document: &str, section_name: &str) -> Option<String> {
-    let header_line = format!("[{section_name}]");
-    let mut in_section = false;
-    let mut body_lines = Vec::new();
-
-    for line in document.lines() {
-        if !in_section {
-            in_section = line == header_line;
-            continue;
-        }
-
-        if line.starts_with('[') {
-            break;
-        }
-
-        body_lines.push(line);
-    }
-
-    in_section.then(|| format!("{}\n", body_lines.join("\n")))
 }
 
 /// Pauses until at least one full second has elapsed, ensuring filesystem

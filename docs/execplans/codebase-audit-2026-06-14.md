@@ -452,7 +452,18 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   deterministic gates but timed out at `preparing_sandbox`; see
   `Surprises & Discoveries`.
 - [x] Milestone 5: consolidate fixture crate and schema BDD support.
-- [ ] Milestone 6: remove duplicated manual TOML section parsing.
+- [x] 2026-06-17: Milestone 6 removed duplicated manual TOML section parsing.
+  The duplicated `toml_section` scanners in `tests/build_discovery_bdd.rs` and
+  `tests/build_suite_bdd.rs` were replaced with a documented shared
+  `tests/common/mod.rs::toml_section` helper. A focused
+  `tests/common_support.rs` suite covers comment preservation, neighbouring
+  sections, and missing sections. Focused runs of
+  `cargo test --test common_support`, `cargo test --test build_discovery_bdd`,
+  and `cargo test --test build_suite_bdd` passed. `make fmt`, `make check-fmt`,
+  `make lint`, `make test`, `make markdownlint`, and `make nixie` passed with
+  logs under `/tmp`. CodeRabbit was attempted after deterministic gates but
+  timed out at `preparing_sandbox`; see `Surprises & Discoveries`.
+- [x] Milestone 6: remove duplicated manual TOML section parsing.
 - [ ] Milestone 7: unify path normalization and path policy.
 - [ ] Milestone 8: remove timing-dependent BDD sleep.
 - [ ] Milestone 9: retire broad dead-code suppressions in argument lowering.
@@ -510,6 +521,11 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   and one `Result`-returning test still used `assert_eq!`. Both were fixed
   before the final `make lint` and `make test` gates passed.
 - 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 5. A
+  bounded 300-second invocation after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
+- 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 6. A
   bounded 300-second invocation after deterministic gates remained at
   `preparing_sandbox` until `timeout` exited with code 124. The log at
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
@@ -573,6 +589,15 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   The change extracts test support and preserves externally observable BDD
   behaviour rather than introducing a canonical production invariant over
   generated inputs, state transitions, or contractual business logic.
+- 2026-06-17: Do not add a TOML parser dependency for Milestone 6. The root
+  crate has no direct TOML parser dependency, and the plan tolerance requires
+  stopping before adding a new dependency. A small shared line scanner is
+  adequate because it only copies a known top-level section from the repository
+  manifest for test fixture manifests.
+- 2026-06-17: No property, Kani, or Verus check is required for Milestone 6.
+  The helper is bounded test-support parsing over a known fixture manifest
+  shape. Focused `rstest` examples cover the required edge cases without
+  introducing a production invariant or proof obligation.
 
 ## Outcomes & Retrospective
 
