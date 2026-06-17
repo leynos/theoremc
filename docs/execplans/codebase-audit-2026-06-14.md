@@ -482,7 +482,17 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   deterministic gates but timed out at `preparing_sandbox`; see
   `Surprises & Discoveries`.
 - [x] Milestone 7: unify path normalization and path policy.
-- [ ] Milestone 8: remove timing-dependent BDD sleep.
+- [x] 2026-06-17: Milestone 8 removed the timing-dependent BDD sleep.
+  `tests/build_discovery_bdd.rs` no longer sleeps for timestamp ticks. The
+  build-discovery scenarios now use explicit fixture helpers that write or
+  overwrite files and then advance the watched file and parent directory mtimes
+  before the next `cargo build`. Focused runs of
+  `cargo test --test common_support` and
+  `cargo test --test build_discovery_bdd` passed. `make fmt`, `make check-fmt`,
+  `make lint`, `make test`, `make markdownlint`, and `make nixie` passed with
+  logs under `/tmp`. CodeRabbit was attempted after deterministic gates but
+  timed out at `preparing_sandbox`; see `Surprises & Discoveries`.
+- [x] Milestone 8: remove timing-dependent BDD sleep.
 - [ ] Milestone 9: retire broad dead-code suppressions in argument lowering.
 - [ ] Milestone 10: fix documentation and API drift.
 - [ ] Milestone 11: tighten dependency version requirements.
@@ -624,6 +634,21 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   `preparing_sandbox` until `timeout` exited with code 124, including the retry
   after splitting theorem-file tests into `theorem_file_tests.rs` and the final
   retry after strengthening the path-format property-test oracle. The log at
+  `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
+  output only and no actionable findings.
+- 2026-06-17: Milestone 8 requested a wyvern agent team, but both attempted
+  wyvern sub-agents failed immediately because the configured
+  `gpt-5.3-codex-spark` quota is exhausted until June 19, 2026 at 00:35. Work
+  continued locally rather than blocking the milestone on unavailable
+  delegation.
+- 2026-06-17: Use explicit fixture mtime advancement for Milestone 8 rather
+  than wall-clock sleeps or a new dependency. `std::fs::File::set_modified` is
+  stable from Rust 1.75, which is below this workspace's Rust 1.85 floor, and
+  it can mark both watched files and watched directories dirty for Cargo's
+  `rerun-if-changed` checks.
+- 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 8. A
+  bounded 300-second invocation after deterministic gates remained at
+  `preparing_sandbox` until `timeout` exited with code 124. The log at
   `/tmp/coderabbit-theoremc-codebase-audit-2026-06-14.out` contains setup
   output only and no actionable findings.
 

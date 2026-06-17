@@ -1,6 +1,4 @@
 //! Behavioural tests for Cargo build discovery of theorem files.
-use std::thread;
-use std::time::Duration;
 
 pub mod common;
 
@@ -26,22 +24,6 @@ fn fixture_cargo_toml() -> Result<String, String> {
         ),
         build_dependencies = build_dependencies
     ))
-}
-
-/// Pauses until at least one full second has elapsed, ensuring filesystem
-/// modification times (mtime) advance enough for Cargo to detect file changes
-/// between successive builds in tests that rely on mtime comparisons.
-fn pause_for_timestamp_tick() {
-    use std::time::Instant;
-
-    let tick = Duration::from_secs(1);
-    let start = Instant::now();
-
-    while start.elapsed() <= tick {
-        let remaining = tick.saturating_sub(start.elapsed());
-        let sleep_for = remaining.min(Duration::from_millis(50));
-        thread::sleep(sleep_for);
-    }
 }
 
 /// Precondition stub; the nested theorem fixture is created in the `then` step.
@@ -76,8 +58,7 @@ fn then_building_twice_stays_fresh_and_editing_a_theorem_reruns_the_build_script
         ));
     }
 
-    pause_for_timestamp_tick();
-    fixture.overwrite_in_place(
+    fixture.overwrite_in_place_with_advanced_mtime(
         Utf8Path::new("theorems/nested/alpha.theorem"),
         &format!("{TRIVIAL_THEOREM}\n# edited\n"),
     )?;
@@ -132,8 +113,7 @@ fn then_creating_theorems_later_reruns_the_build_script_without_manual_seeding()
     }
     first_build.contains("cargo::rerun-if-changed=theorems")?;
 
-    pause_for_timestamp_tick();
-    fixture.write(Utf8Path::new("theorems/first.theorem"), TRIVIAL_THEOREM)?;
+    fixture.write_with_advanced_mtime(Utf8Path::new("theorems/first.theorem"), TRIVIAL_THEOREM)?;
 
     let second_build = fixture.cargo_build_log()?;
     if !second_build.ran() {

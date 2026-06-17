@@ -234,6 +234,9 @@ set -o pipefail; make lint | tee /tmp/make-lint.log
   `tests/features/`.
 - Test files use `#[cfg(test)] #[path = "..._tests.rs"] mod tests;` to
   keep implementation files under 400 lines.
+- Cargo build-script rerun tests must use explicit fixture mtime helpers such
+  as `FixtureCrate::write_with_advanced_mtime()` after an initial build rather
+  than sleeping for a filesystem timestamp tick.
 - Integration tests under `tests/` are separate crates and inherit
   package lint policy. Note that `expect_used = "deny"` fires in integration
   tests but not in `#[cfg(test)]` modules.

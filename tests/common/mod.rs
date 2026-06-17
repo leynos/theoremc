@@ -1,6 +1,7 @@
 //! Shared test helpers for integration tests.
 
 use std::process::Command;
+use std::time::{Duration, SystemTime};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
@@ -91,6 +92,23 @@ impl FixtureCrate {
             .map_err(|error| error.to_string())
     }
 
+    /// Writes `contents` and advances the target and parent mtimes.
+    ///
+    /// This is intended for writes performed after a fixture crate has already
+    /// been built. Cargo uses modification times to decide whether
+    /// `rerun-if-changed` inputs are dirty, so tests can make that dirtiness
+    /// explicit instead of sleeping for the filesystem timestamp tick.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target file cannot be written or when its
+    /// modification time cannot be updated.
+    pub fn write_with_advanced_mtime(&self, path: &Utf8Path, contents: &str) -> Result<(), String> {
+        self.write(path, contents)?;
+        self.advance_mtime(path)?;
+        self.advance_parent_mtime(path)
+    }
+
     /// Overwrites an existing fixture file through the ambient filesystem.
     ///
     /// # Errors
@@ -98,6 +116,25 @@ impl FixtureCrate {
     /// Returns an error when the target file cannot be written.
     pub fn overwrite_in_place(&self, path: &Utf8Path, contents: &str) -> Result<(), String> {
         std::fs::write(self.manifest_dir.join(path), contents).map_err(|error| error.to_string())
+    }
+
+    /// Overwrites an existing fixture file and advances its mtime.
+    ///
+    /// This is intended for after-build edits in Cargo rerun tests where the
+    /// edited file is already listed by `cargo::rerun-if-changed`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the target file cannot be written or when its
+    /// modification time cannot be updated.
+    pub fn overwrite_in_place_with_advanced_mtime(
+        &self,
+        path: &Utf8Path,
+        contents: &str,
+    ) -> Result<(), String> {
+        self.overwrite_in_place(path, contents)?;
+        self.advance_mtime(path)?;
+        self.advance_parent_mtime(path)
     }
 
     /// Returns the fixture crate manifest directory.
@@ -139,6 +176,23 @@ impl FixtureCrate {
         } else {
             Err(log)
         }
+    }
+
+    fn advance_parent_mtime(&self, path: &Utf8Path) -> Result<(), String> {
+        if let Some(parent) = path.parent().filter(|parent| !parent.as_str().is_empty()) {
+            self.advance_mtime(parent)?;
+        }
+        Ok(())
+    }
+
+    fn advance_mtime(&self, path: &Utf8Path) -> Result<(), String> {
+        let absolute_path = self.manifest_dir.join(path);
+        let file = std::fs::File::open(&absolute_path).map_err(|error| error.to_string())?;
+        let advanced_mtime = SystemTime::now()
+            .checked_add(Duration::from_secs(2))
+            .ok_or_else(|| "advanced modification time overflowed".to_owned())?;
+        file.set_modified(advanced_mtime)
+            .map_err(|error| error.to_string())
     }
 }
 
