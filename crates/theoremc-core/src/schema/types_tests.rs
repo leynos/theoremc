@@ -45,8 +45,8 @@ fn return_type_difference_is_not_equivalent() {
 }
 
 #[test]
-fn malformed_types_fall_back_to_trimmed_equality() {
+fn malformed_types_are_not_semantically_equivalent() {
     let a = signature(&[("v", "::not a type::")], "()");
     let b = signature(&[("v", "  ::not a type::  ")], "()");
-    assert!(a.is_semantically_equivalent(&b));
+    assert!(!a.is_semantically_equivalent(&b));
 }

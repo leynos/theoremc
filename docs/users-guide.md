@@ -435,8 +435,9 @@ string. Non-string values are rejected:
 - `InvalidIdentifier { identifier, reason }` — identifier validation failure.
 - `InvalidActionName { action, reason }` — action name grammar or keyword
   validation failure.
-- `ValidationFailed { theorem, reason, diagnostic }` — structural constraint
-  violation (e.g., empty `Prove` section or no Evidence backend).
+- `ValidationFailed { theorem, reason, diagnostic, source }` — structural
+  constraint violation (e.g., empty `Prove` section or no Evidence backend), or
+  a raw-to-public decode failure with its original source error preserved.
 - `MangledIdentifierCollision { message }` — two or more different canonical
   action names produce the same mangled Rust identifier.
 - `DuplicateTheoremKey { theorem_key, collisions, diagnostic }` — two theorem

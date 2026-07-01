@@ -116,7 +116,9 @@ impl FixtureCrate {
     ///
     /// Returns an error when the target file cannot be written.
     pub fn overwrite_in_place(&self, path: &Utf8Path, contents: &str) -> Result<(), String> {
-        std::fs::write(self.manifest_dir.join(path), contents).map_err(|error| error.to_string())
+        self.dir
+            .write(path.as_str(), contents)
+            .map_err(|error| error.to_string())
     }
 
     /// Overwrites an existing fixture file and advances its mtime.

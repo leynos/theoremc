@@ -153,19 +153,22 @@ enum TheoremPathViolation {
 }
 
 fn theorem_path_violation(path: &Utf8Path) -> Option<TheoremPathViolation> {
-    if has_windows_drive_prefix(path) {
+    let normalized_path = crate::path_format::normalize_path_separators(path.as_str());
+    let candidate_path = Utf8Path::new(&normalized_path);
+
+    if has_windows_drive_prefix(candidate_path) {
         return Some(TheoremPathViolation::DrivePrefixed);
     }
 
-    if path.is_absolute()
-        || path
+    if candidate_path.is_absolute()
+        || candidate_path
             .components()
             .any(|component| matches!(component, Utf8Component::Prefix(_) | Utf8Component::RootDir))
     {
         return Some(TheoremPathViolation::RootAnchored);
     }
 
-    if path
+    if candidate_path
         .components()
         .any(|component| matches!(component, Utf8Component::ParentDir))
     {

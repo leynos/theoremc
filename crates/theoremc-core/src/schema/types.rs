@@ -275,11 +275,6 @@ impl ActionSignature {
     }
 }
 
-/// Compare two Rust type strings ignoring insignificant whitespace.
-///
-/// Falls back to trimmed string equality when either side fails to parse, so a
-/// malformed type still gets a consistent comparison. Schema validation rejects
-/// malformed types before this point in normal flows.
 fn rust_types_equivalent(left: &str, right: &str) -> bool {
     match (
         syn::parse_str::<syn::Type>(left.trim()),
@@ -289,7 +284,7 @@ fn rust_types_equivalent(left: &str, right: &str) -> bool {
             use quote::ToTokens;
             left_ty.to_token_stream().to_string() == right_ty.to_token_stream().to_string()
         }
-        _ => left.trim() == right.trim(),
+        _ => false,
     }
 }
 

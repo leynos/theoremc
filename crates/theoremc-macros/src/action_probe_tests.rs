@@ -285,11 +285,10 @@ fn action_signature_index_rejects_conflicting_signatures() -> Result<(), Box<dyn
 
     let error = ActionSignatureIndex::for_actions(&docs, &selected)
         .expect_err("conflicting selected signatures should fail");
-    let message = error.to_string();
 
     assert_that!(
-        message.as_str(),
-        contains_substring("conflicting Actions signatures")
+        error,
+        matches_pattern!(MacroExpansionError::ConflictingActionSignature { .. })
     );
     Ok(())
 }

@@ -1,5 +1,7 @@
 //! Unit tests for schema document loading.
 
+use std::error::Error;
+
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use rstest::*;
 
@@ -377,4 +379,41 @@ Witness:
     );
     assert!(diagnostic.location.line > 0);
     assert!(diagnostic.location.column > 0);
+}
+
+#[rstest]
+fn decode_failures_preserve_source_error() {
+    let yaml = r"
+Theorem: InvalidRef
+About: Invalid ref target
+Let:
+  x:
+    call:
+      action: account.deposit
+      args:
+        target:
+          ref: 'not valid'
+Prove:
+  - assert: 'true'
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: reachable
+";
+    let error = load_theorem_docs_with_source(
+        &SourceId::new("tests/fixtures/invalid_ref_target.theorem"),
+        yaml,
+    )
+    .expect_err("invalid ref target should fail decoding");
+
+    let source = error.source().expect("decode failure should be preserved");
+
+    assert!(
+        source.to_string().contains("Let binding 'x'"),
+        "unexpected source error: {source}"
+    );
 }

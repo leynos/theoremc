@@ -46,6 +46,40 @@ fn fixture_cargo_toml() -> Result<String, String> {
     ))
 }
 
+fn generated_suite_contents(fixture: &FixtureCrate) -> Result<String, String> {
+    let build_dir = fixture.manifest_dir().join("target/debug/build");
+    for build_entry_result in std::fs::read_dir(build_dir).map_err(|error| error.to_string())? {
+        let build_entry = build_entry_result.map_err(|error| error.to_string())?;
+        let suite_path = build_entry.path().join("out/theorem_suite.rs");
+        match std::fs::read_to_string(&suite_path) {
+            Ok(contents) => return Ok(contents),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Err("generated theorem_suite.rs was not found".to_owned())
+}
+
+fn assert_sorted_suite_order(contents: &str) -> Result<(), String> {
+    let a = contents
+        .find("theorems/a.theorem")
+        .ok_or_else(|| "generated suite missing theorems/a.theorem".to_owned())?;
+    let m = contents
+        .find("theorems/m.theorem")
+        .ok_or_else(|| "generated suite missing theorems/m.theorem".to_owned())?;
+    let z = contents
+        .find("theorems/z.theorem")
+        .ok_or_else(|| "generated suite missing theorems/z.theorem".to_owned())?;
+
+    if a < m && m < z {
+        Ok(())
+    } else {
+        Err(format!(
+            "generated suite order was not sorted a, m, z:\n{contents}"
+        ))
+    }
+}
+
 /// Precondition stub; the empty crate scenario is created in the `then` step.
 #[given("a crate without a theorems directory")]
 fn given_a_crate_without_a_theorems_directory() {}
@@ -85,6 +119,7 @@ fn then_all_theorems_compile_in_deterministic_suite_order() -> Result<(), String
     fixture.write(Utf8Path::new("theorems/m.theorem"), TRIVIAL_THEOREM)?;
 
     fixture.cargo_build()?;
+    assert_sorted_suite_order(&generated_suite_contents(&fixture)?)?;
     Ok(())
 }
 

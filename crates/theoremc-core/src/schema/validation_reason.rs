@@ -119,7 +119,8 @@ impl ValidationFailure {
         SchemaError::ValidationFailed {
             theorem: self.theorem,
             reason: self.reason,
-            diagnostic,
+            diagnostic: diagnostic.map(Box::new),
+            source: None,
         }
     }
 }

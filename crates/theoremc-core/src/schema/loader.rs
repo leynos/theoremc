@@ -96,11 +96,11 @@ pub fn load_theorem_docs_with_source(
     let mut docs = Vec::with_capacity(raw_docs.len());
     for raw_doc in &raw_docs {
         let doc = raw_doc.to_theorem_doc().map_err(|decode_err| {
-            let reason = decode_err.to_string();
             let error = SchemaError::ValidationFailed {
                 theorem: raw_doc.theorem.value.to_string(),
-                reason,
+                reason: decode_err.to_string(),
                 diagnostic: None,
+                source: Some(Box::new(decode_err)),
             };
             attach_theorem_validation_diagnostic(error, source, raw_doc)
         })?;
@@ -245,7 +245,10 @@ fn attach_theorem_validation_diagnostic(
 ) -> SchemaError {
     match error {
         SchemaError::ValidationFailed {
-            theorem, reason, ..
+            theorem,
+            reason,
+            source: source_error,
+            ..
         } => {
             let diagnostic = create_diagnostic(
                 SchemaDiagnosticCode::ValidationFailure,
@@ -256,7 +259,8 @@ fn attach_theorem_validation_diagnostic(
             SchemaError::ValidationFailed {
                 theorem,
                 reason,
-                diagnostic: Some(diagnostic),
+                diagnostic: Some(Box::new(diagnostic)),
+                source: source_error,
             }
         }
         other => other,

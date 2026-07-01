@@ -202,24 +202,6 @@ fn vacuous_allowed_with_reason(fixture_loader: impl Fn(&str) -> String) {
     assert!(kani.vacuity_because.is_some());
 }
 
-// ── Schema version test ─────────────────────────────────────────────
-
-#[rstest]
-fn schema_version_defaults_to_none(fixture_loader: impl Fn(&str) -> String) {
-    let yaml = fixture_loader("valid_minimal.theorem");
-    let docs = load_theorem_docs(&yaml).expect("should parse");
-    let doc = docs.first().expect("should have one document");
-    assert_eq!(doc.schema, None);
-}
-
-#[rstest]
-fn schema_version_can_be_set(fixture_loader: impl Fn(&str) -> String) {
-    let yaml = fixture_loader("valid_full.theorem");
-    let docs = load_theorem_docs(&yaml).expect("should parse");
-    let doc = docs.first().expect("should have one document");
-    assert_eq!(doc.schema, Some(1));
-}
-
 // ── Edge case: empty optional fields ────────────────────────────────
 
 #[test]

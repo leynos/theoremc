@@ -9,16 +9,17 @@ in the [developer's guide](developers-guide.md).
 
 **Table:** Repository root responsibilities
 
-| Path                  | Responsibility                                                                        |
-| --------------------- | ------------------------------------------------------------------------------------- |
-| `Cargo.toml`          | Workspace membership, root package metadata, feature flags, and workspace lint policy |
-| `Cargo.lock`          | Locked dependency graph for reproducible workspace builds                             |
-| `Makefile`            | Canonical local quality gates and formatting commands                                 |
-| `build.rs`            | Root package build script that discovers theorem files and writes the generated suite |
-| `src/lib.rs`          | Public facade that re-exports `theoremc-core` and `theoremc-macros` APIs              |
-| `src/main.rs`         | Placeholder command entrypoint for the root package binary                            |
-| `src/build_*.rs`      | Build-script discovery and generated-suite rendering logic                            |
-| `src/arg_lowering.rs` | Test-gated prototype for future argument-expression lowering                          |
+| Path                     | Responsibility                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| `Cargo.toml`             | Workspace membership, root package metadata, feature flags, and workspace lint policy |
+| `Cargo.lock`             | Locked dependency graph for reproducible workspace builds                             |
+| `Makefile`               | Canonical local quality gates and formatting commands                                 |
+| `build.rs`               | Root package build script that discovers theorem files and writes the generated suite |
+| `src/lib.rs`             | Public facade that re-exports `theoremc-core` and `theoremc-macros` APIs              |
+| `src/main.rs`            | Placeholder command entrypoint for the root package binary                            |
+| `src/build_discovery.rs` | Theorem file discovery used by the root build script                                  |
+| `src/build_suite.rs`     | Generated-suite rendering for build-script output                                     |
+| `src/arg_lowering.rs`    | Test-gated prototype for future argument-expression lowering                          |
 
 ## Workspace crates
 

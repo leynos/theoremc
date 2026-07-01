@@ -101,6 +101,18 @@ fn overwrite_in_place_with_advanced_mtime_marks_file_newer() -> Result<(), Strin
     Ok(())
 }
 
+#[test]
+fn overwrite_in_place_rejects_missing_files() -> Result<(), String> {
+    let fixture = FixtureCrate::new(MINIMAL_CARGO_TOML, "//! fixture\n")?;
+
+    let result = fixture.overwrite_in_place(Utf8Path::new("theorems/missing.theorem"), "after");
+
+    match result {
+        Ok(()) => Err("missing fixture file was created".to_owned()),
+        Err(_) => Ok(()),
+    }
+}
+
 fn modified_time(path: camino::Utf8PathBuf) -> Result<SystemTime, String> {
     std::fs::metadata(path)
         .and_then(|metadata| metadata.modified())

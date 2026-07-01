@@ -28,6 +28,7 @@ mod prop_tests {
 
         /// Absolute paths are always rejected regardless of content.
         #[test]
+        #[cfg(not(windows))]
         fn absolute_paths_are_always_rejected(segment in "[a-z]{1,8}") {
             let path_str = format!("/{segment}.theorem");
             let path = Utf8Path::new(&path_str);

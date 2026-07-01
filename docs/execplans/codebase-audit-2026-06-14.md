@@ -120,7 +120,7 @@ concerns, and the work is committed as a small logical unit.
 
 - Milestone 1 addresses roadmap Step 1.3 and Step 7.1 by replacing
   string-parsed validator diagnostics with structured reasons. It satisfies
-  `DES-6`, `DES-6.5`, ADR 002 decision 2, and `TFS-1`.
+  `DES-6`, Step 1.3, Step 7.1, and `TFS-1`.
 - Milestone 2 addresses roadmap Step 1.2 and Step 6.2 by separating validator
   responsibilities along the schema-layer boundary. It satisfies `DES-3.2`,
   `DES-6`, ADR 003 decision 1, `TFS-1`, `TFS-4`, and `TFS-6`.
@@ -331,12 +331,10 @@ Resolve the missing `docs/repository-layout.md` finding by adding the file and
 indexing it in `docs/contents.md`. Update the documentation style guide only if
 the canonical filename changes, which is not expected.
 
-Resolve `Schema` default drift by choosing one behaviour: either materialize
-the default schema value `1` during loading or update the specification and
-user guide to say the field remains unspecified when omitted. Because this is
-user-visible file-format behaviour, record the decision in
-`docs/theoremc-design.md` or an ADR if the choice has compatibility impact. Add
-tests for omitted and explicit schema values.
+Resolve `Schema` default drift by recording the compatibility decision to keep
+omitted `Schema` as `None` (already reflected in the `Decision Log` and the
+final `Schema` documentation updates), not by materializing a default value of
+`1`. Add tests for omitted and explicit schema values.
 
 Fix the stale `ActionCall.as_` example in `docs/theorem-file-specification.md`
 so it matches `as_binding`. Scan the docs for related stale field names.

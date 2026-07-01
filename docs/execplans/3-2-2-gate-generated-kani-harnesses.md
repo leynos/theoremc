@@ -185,9 +185,9 @@ Observable success:
   the worktree was clean before implementation.
 - [x] 2026-05-11: Milestone 0 red tests added. `cargo test -p theoremc-macros`
       failed as expected because generated expansions do not yet contain
-      `#[ cfg(kani)]`, `#[kani::proof]`, or evidence-derived
-      `#[kani::unwind(n)]`; the new `unwind: 0` macro-boundary case already
-      passes through existing schema validation.
+      `#[cfg(kani)]`, `#[kani::proof]`, or evidence-derived
+      `#[kani::unwind(n)]`; the new `unwind: 0` macro-boundary case is rejected
+      by existing schema validation before token generation.
 - [x] Milestone 0: add or adjust failing tests that describe the exact desired
   Kani-gated expansion shape.
 - [x] 2026-05-11: Milestone 1 implemented. `cargo test -p theoremc-macros`
