@@ -86,11 +86,18 @@ fn overwrite_in_place_with_advanced_mtime_marks_file_newer() -> Result<(), Strin
     let theorem_path = Utf8Path::new("theorems/existing.theorem");
     fixture.write(theorem_path, "before")?;
     let previous_mtime = modified_time(fixture.manifest_dir().join(theorem_path))?;
+    let previous_parent_mtime = modified_time(fixture.manifest_dir().join("theorems"))?;
 
     fixture.overwrite_in_place_with_advanced_mtime(theorem_path, "after")?;
 
     let advanced_mtime = modified_time(fixture.manifest_dir().join(theorem_path))?;
+    let advanced_parent_mtime = modified_time(fixture.manifest_dir().join("theorems"))?;
     ensure_later(advanced_mtime, previous_mtime, "overwritten theorem file")?;
+    ensure_later(
+        advanced_parent_mtime,
+        previous_parent_mtime,
+        "overwritten theorem parent directory",
+    )?;
     Ok(())
 }
 

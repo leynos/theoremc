@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
+use filetime::FileTime;
 use theoremc::schema::{
     SchemaDiagnosticCode, SourceId, TheoremDoc, load_theorem_docs, load_theorem_docs_with_source,
 };
@@ -189,11 +190,10 @@ impl FixtureCrate {
 
     fn advance_mtime(&self, path: &Utf8Path) -> Result<(), String> {
         let absolute_path = self.manifest_dir.join(path);
-        let file = std::fs::File::open(&absolute_path).map_err(|error| error.to_string())?;
         let advanced_mtime = SystemTime::now()
             .checked_add(Duration::from_secs(2))
             .ok_or_else(|| "advanced modification time overflowed".to_owned())?;
-        file.set_modified(advanced_mtime)
+        filetime::set_file_mtime(&absolute_path, FileTime::from_system_time(advanced_mtime))
             .map_err(|error| error.to_string())
     }
 }
