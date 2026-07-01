@@ -3,4 +3,5 @@ target/
 *.swp
 *.rlib
 .grepai/
+.memdb/
 *:Zone.Identifier
