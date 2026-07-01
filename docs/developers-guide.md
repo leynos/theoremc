@@ -191,7 +191,14 @@ Accessors return iterators over `&Utf8Path`:
 
 ## 3. Contributor workflows
 
-### 3.1 Quality gates
+### 3.1 Rust toolchain policy
+
+The workspace minimum supported Rust version (MSRV) is Rust 1.88, declared via
+the root `Cargo.toml` `rust-version` field. This floor permits the use of let
+chains in conditionals while keeping the compiler requirement explicit for
+contributors and downstream automation.
+
+### 3.2 Quality gates
 
 Before committing any change, run the following gates. Use the Makefile targets
 where available, and run the direct Cargo invocations for specialized checks:
@@ -227,7 +234,7 @@ losing truncated results:
 set -o pipefail; make lint | tee /tmp/make-lint.log
 ```
 
-### 3.2 Test conventions
+### 3.3 Test conventions
 
 - Use `rstest` fixtures for shared setup.
 - Replace duplicated tests with `#[rstest(...)]` parameterized cases.
@@ -242,13 +249,13 @@ set -o pipefail; make lint | tee /tmp/make-lint.log
   package lint policy. Note that `expect_used = "deny"` fires in integration
   tests but not in `#[cfg(test)]` modules.
 
-### 3.3 File size limits
+### 3.4 File size limits
 
 No single code file may exceed 400 lines. When a module and its tests grow
 beyond this limit, extract tests into a sibling `*_tests.rs` file using the
 `#[path = ...]` attribute.
 
-### 3.4 Dependency requirements
+### 3.5 Dependency requirements
 
 Use Cargo's default caret-compatible version requirements for third-party
 crates, but spell the lower bound as an explicit patch version such as
@@ -257,7 +264,7 @@ tightening a manifest requirement to match this policy, prefer the version
 already resolved in `Cargo.lock` and avoid `cargo update` unless Cargo requires
 the lockfile to change.
 
-### 3.5 Extending the build system
+### 3.6 Extending the build system
 
 To add new build-time discovery or generation:
 
