@@ -91,9 +91,8 @@ fn write_fixture(
     contents: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let fixture_root = Utf8Dir::open_ambient_dir(manifest_dir, ambient_authority())?;
-    if let Some(parent) = theorem_path
-        .parent()
-        .filter(|parent| !parent.as_str().is_empty())
+    if let Some(parent) = theorem_path.parent()
+        && !parent.as_str().is_empty()
     {
         fixture_root.create_dir_all(parent)?;
     }

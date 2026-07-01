@@ -295,13 +295,13 @@ fn build_parse_diagnostic(
         location,
     );
 
-    if should_reanchor_unknown_field(&diagnostic) {
-        // `serde_saphyr` may report unknown-field deserialization failures at
-        // document-start (1:1). Re-anchor to the offending key when possible.
-        if let Some((line, column)) = locate_unknown_field(input, message) {
-            diagnostic.location.line = line;
-            diagnostic.location.column = column;
-        }
+    // `serde_saphyr` may report unknown-field deserialization failures at
+    // document-start (1:1). Re-anchor to the offending key when possible.
+    if should_reanchor_unknown_field(&diagnostic)
+        && let Some((line, column)) = locate_unknown_field(input, message)
+    {
+        diagnostic.location.line = line;
+        diagnostic.location.column = column;
     }
 
     Some(diagnostic)

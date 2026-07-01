@@ -179,7 +179,9 @@ impl FixtureCrate {
     }
 
     fn advance_parent_mtime(&self, path: &Utf8Path) -> Result<(), String> {
-        if let Some(parent) = path.parent().filter(|parent| !parent.as_str().is_empty()) {
+        if let Some(parent) = path.parent()
+            && !parent.as_str().is_empty()
+        {
             self.advance_mtime(parent)?;
         }
         Ok(())

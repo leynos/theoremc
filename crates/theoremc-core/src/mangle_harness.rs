@@ -171,11 +171,11 @@ pub fn theorem_slug(theorem: impl AsRef<str>) -> String {
     let mut slug = String::with_capacity(chars.len() + 4);
 
     for (index, current) in chars.iter().copied().enumerate() {
-        if let Some(previous) = index.checked_sub(1).and_then(|idx| chars.get(idx).copied()) {
-            let next = chars.get(index + 1).copied();
-            if should_insert_slug_separator(previous, current, next) && !slug.ends_with('_') {
-                slug.push('_');
-            }
+        if let Some(previous) = index.checked_sub(1).and_then(|idx| chars.get(idx).copied())
+            && should_insert_slug_separator(previous, current, chars.get(index + 1).copied())
+            && !slug.ends_with('_')
+        {
+            slug.push('_');
         }
 
         slug.push(current.to_ascii_lowercase());
