@@ -1,6 +1,8 @@
 //! Behavioural tests for mangled-identifier collision detection.
 
-pub mod common;
+mod common {
+    pub(crate) use test_helpers::load_fixture;
+}
 
 use common::load_fixture;
 use rstest_bdd_macros::{given, scenario, then};

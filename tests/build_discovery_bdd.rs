@@ -1,6 +1,8 @@
 //! Behavioural tests for Cargo build discovery of theorem files.
 
-pub mod common;
+mod common {
+    pub(crate) use test_helpers::{FixtureCrate, TRIVIAL_THEOREM, toml_section};
+}
 
 use camino::Utf8Path;
 use common::{FixtureCrate, TRIVIAL_THEOREM, toml_section};

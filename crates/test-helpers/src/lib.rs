@@ -1,8 +1,18 @@
-//! Shared helpers for tests that mutate process-global state.
+//! Shared helpers for integration and macro tests.
 
 use std::env;
 use std::ffi::OsString;
 use std::sync::{Mutex, MutexGuard, PoisonError};
+
+#[path = "../../../tests/common/mod.rs"]
+mod integration;
+
+pub use integration::{
+    BUILD_DISCOVERY_SOURCE, BUILD_SCRIPT_SOURCE, BUILD_SUITE_SOURCE, BuildLog, FixtureCrate,
+    TRIVIAL_THEOREM, assert_diagnostic_failure, assert_fixture_error_contains,
+    assert_fixture_fails, assert_fixture_loads, fixture_error_message, load_fixture,
+    load_fixture_docs, load_fixture_text, toml_section,
+};
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 
@@ -39,7 +49,6 @@ impl Drop for EnvGuard {
 ///
 /// Passing [`None`] removes the variable until the guard is dropped. Dropping
 /// the guard restores the previous value, if any.
-#[must_use]
 pub fn set_cargo_manifest_dir_for_test(value: Option<&str>) -> EnvGuard {
     set_env_var_for_test("CARGO_MANIFEST_DIR", value)
 }
@@ -51,7 +60,7 @@ fn set_env_var_for_test(variable: &'static str, value: Option<&str>) -> EnvGuard
     // this helper is serialized across tests that use it.
     unsafe {
         match value {
-            Some(value) => env::set_var(variable, value),
+            Some(new_value) => env::set_var(variable, new_value),
             None => env::remove_var(variable),
         }
     }

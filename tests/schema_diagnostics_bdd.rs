@@ -1,6 +1,8 @@
 //! Behavioural tests for structured diagnostics using `rstest-bdd`.
 
-pub mod common;
+mod common {
+    pub(crate) use test_helpers::{assert_diagnostic_failure, load_fixture_text};
+}
 
 use common::{assert_diagnostic_failure, load_fixture_text};
 use rstest_bdd_macros::{given, scenario, then};

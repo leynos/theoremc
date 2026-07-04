@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime};
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use filetime::FileTime;
-use theoremc::schema::{
+use theoremc_core::schema::{
     SchemaDiagnosticCode, SourceId, TheoremDoc, load_theorem_docs, load_theorem_docs_with_source,
 };
 

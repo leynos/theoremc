@@ -1,6 +1,8 @@
 //! Snapshot tests for structured parser and validator diagnostics.
 
-pub mod common;
+mod common {
+    pub(crate) use test_helpers::load_fixture;
+}
 
 use common::load_fixture;
 use rstest::rstest;

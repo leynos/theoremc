@@ -1,6 +1,8 @@
 //! Behavioural tests for canonical action-name validation.
 
-pub mod common;
+mod common {
+    pub(crate) use test_helpers::{assert_fixture_error_contains, assert_fixture_loads};
+}
 
 use common::{assert_fixture_error_contains, assert_fixture_loads};
 use rstest_bdd_macros::{given, scenario, then};

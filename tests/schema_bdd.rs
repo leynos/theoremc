@@ -4,7 +4,12 @@
 //! These tests use `rstest` parameterization to express Given/When/Then
 //! acceptance criteria for the schema validation rules.
 
-pub mod common;
+mod common {
+    pub(crate) use test_helpers::{
+        assert_fixture_error_contains, assert_fixture_fails, assert_fixture_loads,
+        load_fixture_docs,
+    };
+}
 
 use common::{
     assert_fixture_error_contains, assert_fixture_fails, assert_fixture_loads, load_fixture_docs,

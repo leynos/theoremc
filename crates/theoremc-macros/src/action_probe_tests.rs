@@ -119,11 +119,75 @@ fn expansion_rejects_conflicting_signatures_for_shared_action(
 
     let expansion = expand_fixture(Utf8Path::new("theorems/conflicting.theorem"), &theorem)
         .expect_err("conflicting shared action signatures should fail expansion");
-    assert!(
-        expansion
-            .to_string()
-            .contains("conflicting Actions signatures"),
-        "expected conflicting signature error, got: {expansion}"
+    let error = expansion
+        .downcast_ref::<MacroExpansionError>()
+        .ok_or_else(|| std::io::Error::other("expected macro expansion error"))?;
+
+    assert_that!(
+        error,
+        matches_pattern!(MacroExpansionError::ConflictingActionSignature { .. })
+    );
+    Ok(())
+}
+
+#[test]
+fn expansion_rejects_stale_unreferenced_conflicting_action_signature()
+-> Result<(), Box<dyn std::error::Error>> {
+    let theorem = TheoremFixture(
+        concat!(
+            "Theorem: ReferencedActionProbe\n",
+            "About: Referenced action with stale declaration\n",
+            "Actions:\n",
+            "  account.deposit:\n",
+            "    params:\n",
+            "      account: u64\n",
+            "    returns: bool\n",
+            "Do:\n",
+            "  - call:\n",
+            "      action: account.deposit\n",
+            "      args:\n",
+            "        account: 1\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+            "---\n",
+            "Theorem: StaleActionDeclaration\n",
+            "About: Stale conflicting declaration\n",
+            "Actions:\n",
+            "  account.deposit:\n",
+            "    params:\n",
+            "      account: u32\n",
+            "    returns: bool\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+        )
+        .to_owned(),
+    );
+
+    let expansion = expand_fixture(Utf8Path::new("theorems/stale-conflict.theorem"), &theorem)
+        .expect_err("stale conflicting action signature should fail expansion");
+    let error = expansion
+        .downcast_ref::<MacroExpansionError>()
+        .ok_or_else(|| std::io::Error::other("expected macro expansion error"))?;
+
+    assert_that!(
+        error,
+        matches_pattern!(MacroExpansionError::ConflictingActionSignature { .. })
     );
     Ok(())
 }

@@ -1,6 +1,8 @@
 //! Unit tests for shared integration-test support helpers.
 
-pub mod common;
+mod common {
+    pub(crate) use test_helpers::{FixtureCrate, toml_section};
+}
 
 use std::time::SystemTime;
 
