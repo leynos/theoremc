@@ -233,18 +233,19 @@ impl<'a> ActionSignatureIndex<'a> {
         canonical_actions: &[&str],
     ) -> Result<Self, MacroExpansionError> {
         let selected = canonical_actions.iter().copied().collect::<BTreeSet<_>>();
-        let mut signatures: BTreeMap<&'a str, &'a ActionSignature> = BTreeMap::new();
+        let mut declared_signatures: BTreeMap<&'a str, &'a ActionSignature> = BTreeMap::new();
 
         for doc in theorem_docs {
-            let selected_signatures = doc
-                .actions
-                .iter()
-                .filter(|(action, _)| selected.contains(action.as_str()));
-            for (action, signature) in selected_signatures {
+            for (action, signature) in &doc.actions {
                 let canonical = action.as_str();
-                Self::insert_signature(&mut signatures, canonical, signature)?;
+                Self::insert_signature(&mut declared_signatures, canonical, signature)?;
             }
         }
+
+        let signatures = declared_signatures
+            .into_iter()
+            .filter(|(action, _)| selected.contains(action))
+            .collect();
 
         Ok(Self { signatures })
     }

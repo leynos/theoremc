@@ -12,6 +12,7 @@ mod error;
 mod expr;
 mod identifier;
 mod loader;
+mod loader_decode_location;
 mod loader_message;
 mod newtypes;
 mod raw;

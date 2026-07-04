@@ -46,6 +46,34 @@ pub(crate) enum RawDocDecodeError {
     },
 }
 
+impl RawDocDecodeError {
+    /// Returns the argument breadcrumb associated with the decode failure.
+    #[must_use]
+    pub(crate) fn param(&self) -> &str {
+        match self {
+            Self::LetBinding { source, .. } | Self::DoStep { source, .. } => source.param(),
+        }
+    }
+
+    /// Returns the `Let` binding name when this failure came from `Let`.
+    #[must_use]
+    pub(crate) fn let_binding_name(&self) -> Option<&str> {
+        match self {
+            Self::LetBinding { name, .. } => Some(name),
+            Self::DoStep { .. } => None,
+        }
+    }
+
+    /// Returns the one-based top-level `Do` step index for `Do` failures.
+    #[must_use]
+    pub(crate) const fn do_step_index(&self) -> Option<usize> {
+        match self {
+            Self::LetBinding { .. } => None,
+            Self::DoStep { index, .. } => Some(*index),
+        }
+    }
+}
+
 /// Raw theorem document with location-carrying fields.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]

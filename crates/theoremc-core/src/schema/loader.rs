@@ -9,8 +9,9 @@ use std::collections::BTreeMap;
 
 use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, create_diagnostic, first_line};
 use super::error::SchemaError;
+use super::loader_decode_location::locate_decode_failure;
 use super::loader_message::{ErrorMessage, FieldName};
-use super::raw::RawTheoremDoc;
+use super::raw::{RawDocDecodeError, RawTheoremDoc};
 use super::source_id::SourceId;
 use super::types::TheoremDoc;
 use super::validate::validate_theorem_doc;
@@ -96,13 +97,7 @@ pub fn load_theorem_docs_with_source(
     let mut docs = Vec::with_capacity(raw_docs.len());
     for raw_doc in &raw_docs {
         let doc = raw_doc.to_theorem_doc().map_err(|decode_err| {
-            let error = SchemaError::ValidationFailed {
-                theorem: raw_doc.theorem.value.to_string(),
-                reason: decode_err.to_string(),
-                diagnostic: None,
-                source: Some(Box::new(decode_err)),
-            };
-            attach_theorem_validation_diagnostic(error, source, raw_doc)
+            attach_decode_failure_diagnostic(decode_err, source, input, raw_doc)
         })?;
         validate_theorem_doc(&doc)
             .map_err(|failure| attach_validation_failure_diagnostic(failure, source, raw_doc))?;
@@ -238,32 +233,29 @@ fn render_duplicate_location(source: &SourceId, location: DuplicateTheoremLocati
     format!("{}:{}:{}", source.as_str(), location.line, location.column,)
 }
 
-fn attach_theorem_validation_diagnostic(
-    error: SchemaError,
+fn attach_decode_failure_diagnostic(
+    error: RawDocDecodeError,
     source: &SourceId,
+    input: &str,
     raw_doc: &RawTheoremDoc,
 ) -> SchemaError {
-    match error {
-        SchemaError::ValidationFailed {
-            theorem,
-            reason,
-            source: source_error,
-            ..
-        } => {
-            let diagnostic = create_diagnostic(
-                SchemaDiagnosticCode::ValidationFailure,
-                source,
-                reason.clone(),
-                raw_doc.theorem_location(),
-            );
-            SchemaError::ValidationFailed {
-                theorem,
-                reason,
-                diagnostic: Some(Box::new(diagnostic)),
-                source: source_error,
-            }
-        }
-        other => other,
+    let reason = error.to_string();
+    let mut diagnostic = create_diagnostic(
+        SchemaDiagnosticCode::ValidationFailure,
+        source,
+        reason.clone(),
+        raw_doc.theorem_location(),
+    );
+    if let Some((line, column)) = locate_decode_failure(input, raw_doc, &error) {
+        diagnostic.location.line = line;
+        diagnostic.location.column = column;
+    }
+
+    SchemaError::ValidationFailed {
+        theorem: raw_doc.theorem.value.to_string(),
+        reason,
+        diagnostic: Some(Box::new(diagnostic)),
+        source: Some(Box::new(error)),
     }
 }
 

@@ -91,6 +91,18 @@ pub enum ArgDecodeError {
 }
 
 impl ArgDecodeError {
+    /// Returns the argument breadcrumb associated with this decode failure.
+    #[must_use]
+    pub(crate) fn param(&self) -> &str {
+        match self {
+            Self::EmptyRefTarget { param }
+            | Self::InvalidIdentifier { param, .. }
+            | Self::ReservedKeyword { param, .. }
+            | Self::NonStringRefTarget { param, .. }
+            | Self::NonStringLiteralValue { param, .. } => param,
+        }
+    }
+
     /// Returns this error with `prefix` prepended to its parameter breadcrumb.
     ///
     /// This is used when argument decoding happens inside nested structures,

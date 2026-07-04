@@ -289,7 +289,7 @@ The live workspace split is:
 - `crates/theoremc-macros` for proc-macro expansion, and
 - the root `theoremc` crate for the public API plus build integration.
 
-#### 3.4.1 `theoremc-core` and proc-macro boundary
+#### 3.6.1 `theoremc-core` and proc-macro boundary
 
 The following items are exported from `theoremc-core` and form the stable
 internal interface between the core library and the proc-macro crate:

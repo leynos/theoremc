@@ -193,6 +193,75 @@ fn expansion_rejects_stale_unreferenced_conflicting_action_signature()
 }
 
 #[test]
+fn expansion_rejects_conflicting_unreferenced_action_signature()
+-> Result<(), Box<dyn std::error::Error>> {
+    let theorem = TheoremFixture(
+        concat!(
+            "Theorem: ReferencedActionProbe\n",
+            "About: Referenced action with stale unreferenced declaration\n",
+            "Actions:\n",
+            "  account.deposit:\n",
+            "    params:\n",
+            "      account: u64\n",
+            "    returns: bool\n",
+            "  inventory.reserve:\n",
+            "    params:\n",
+            "      sku: u64\n",
+            "    returns: bool\n",
+            "Do:\n",
+            "  - call:\n",
+            "      action: account.deposit\n",
+            "      args:\n",
+            "        account: 1\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+            "---\n",
+            "Theorem: StaleUnreferencedActionDeclaration\n",
+            "About: Stale unreferenced conflicting declaration\n",
+            "Actions:\n",
+            "  inventory.reserve:\n",
+            "    params:\n",
+            "      sku: String\n",
+            "    returns: bool\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+        )
+        .to_owned(),
+    );
+
+    let expansion = expand_fixture(
+        Utf8Path::new("theorems/unreferenced-conflict.theorem"),
+        &theorem,
+    )
+    .expect_err("unreferenced conflicting action signature should fail expansion");
+    let error = expansion
+        .downcast_ref::<MacroExpansionError>()
+        .ok_or_else(|| std::io::Error::other("expected macro expansion error"))?;
+
+    assert_that!(
+        error,
+        matches_pattern!(MacroExpansionError::ConflictingActionSignature { .. })
+    );
+    Ok(())
+}
+
+#[test]
 fn whitespace_only_signature_drift_does_not_conflict() -> Result<(), Box<dyn std::error::Error>> {
     // Two theorems declaring the same action with whitespace-only differences
     // (e.g. `Vec<u8>` vs `Vec <u8>`) describe the same Rust signature and must

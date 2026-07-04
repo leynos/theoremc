@@ -387,6 +387,11 @@ fn decode_failures_preserve_source_error() {
 Theorem: InvalidRef
 About: Invalid ref target
 Let:
+  y:
+    call:
+      action: account.deposit
+      args:
+        target: 1
   x:
     call:
       action: account.deposit
@@ -411,9 +416,19 @@ Witness:
     .expect_err("invalid ref target should fail decoding");
 
     let source = error.source().expect("decode failure should be preserved");
+    let diagnostic = error.diagnostic().expect("diagnostic expected");
 
     assert!(
         source.to_string().contains("Let binding 'x'"),
         "unexpected source error: {source}"
+    );
+    assert_eq!(
+        diagnostic.location.source,
+        "tests/fixtures/invalid_ref_target.theorem"
+    );
+    assert!(
+        diagnostic.location.line > 11,
+        "decode diagnostics should point to the failing binding, got line {}",
+        diagnostic.location.line
     );
 }
