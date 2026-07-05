@@ -443,13 +443,10 @@ Implementation notes:
 - Always declare `__theoremc_assert_referenced` exactly once per per-file
   module, even when many types are probed; the renderer must not emit one
   helper per probe statement.
-- Emit a leading marker comment
-  `// theoremc: compile-time referenced-type probe (3.3.2)` on the generated
-  block so a theorem author running `cargo expand` immediately sees why the
-  block exists. The marker uses the same `quote::quote!` raw-string approach
-  available to proc-macro output; if rustfmt strips the comment, fall back to
-  including the marker inside the helper function name via a doc-equivalent
-  identifier choice and record the decision in the Decision Log.
+- Treat `__theoremc_assert_referenced` as the stable renderer anchor for the
+  generated block so a theorem author running `cargo expand` can recognise the
+  probe immediately. The helper name must remain stable if proc-macro output
+  formatting changes; record any future anchor change in the Decision Log.
 - Probes live outside the `#[cfg(kani)]` backend module so ordinary builds
   detect drift. They must not introduce any `kani::` references.
 - A theorem with no `Forall` entries and an empty `Actions` map emits no
@@ -784,9 +781,8 @@ and documentation.
   then `Actions.params` per entry, then `Actions.returns` per entry. Rationale:
   removes ambiguity about probe ordering and lets dedup behaviour be checked by
   a small ordered fixture.
-- 2026-06-02: Emit a `// theoremc: compile-time referenced-type probe (3.3.2)`
-  marker comment on the generated block, and use the
-  `__theoremc_assert_referenced` helper name. Rationale: `cargo expand`
+- 2026-06-02: Use `__theoremc_assert_referenced` as the stable renderer anchor
+  for the generated referenced-type probe block. Rationale: `cargo expand`
   legibility; the double-underscore prefix keeps the identifier outside rustfmt
   rewrites and inside the conventional reserved-prefix space.
 - 2026-06-02: Keep struct-literal synthesis wiring into the proc-macro

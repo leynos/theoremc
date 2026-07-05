@@ -158,8 +158,9 @@ Keep these conventions when extending probe generation:
   compilation, not only under `cargo kani`.
 
 Referenced-type probes use the same layering.
-`theoremc_core::collision:: referenced_types` walks `Forall`, `Actions.params`,
-and `Actions.returns` in deterministic first-seen order, deduplicating through
+`theoremc_core::collision::referenced_types` walks each theorem document in
+deterministic first-seen order, visiting `Forall` first, then
+`Actions.params`, then `Actions.returns`, and deduplicating through
 `schema::rust_type::canonical_token_stream`.
 `schema::rust_type::{parse, canonical_token_stream, validate}` owns Rust type
 parsing and comparison so schema validation, action signature equivalence, and
@@ -277,6 +278,117 @@ The live workspace split is:
 - `crates/theoremc-macros` for proc-macro expansion, and
 - the root `theoremc` crate for the public API plus build integration.
 
+
+#### 3.6.1 `theoremc-core` and proc-macro boundary
+
+The following items are exported from `theoremc-core` and form the stable
+internal interface between the core library and the proc-macro crate:
+
+**Table:** `theoremc-core` stable internal API
+
+| Symbol                                | Kind   | Purpose                                                                                                                                             |
+| ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `load_theorem_file_from_manifest_dir` | `fn`   | Opens a crate-relative `.theorem` file via `cap_std`, validates it through the shared schema loader, and returns one `TheoremDoc` per YAML document |
+| `TheoremFileLoadError`                | `enum` | Typed error covering all failure modes: `OpenManifestDir`, `InvalidTheoremPath`, `ReadTheoremFile`, `EmptyTheoremFile`, `InvalidTheoremFile`        |
+| `collision::referenced_types`         | `fn`   | Returns distinct Rust type strings referenced by `Forall` and `Actions` declarations in deterministic first-seen order                              |
+| `schema::rust_type`                   | module | Shared Rust type parsing, canonical token comparison, validation, and free named lifetime detection                                                 |
+
+The proc-macro crate exposes the companion expansion boundary:
+
+**Table:** `theoremc-macros` stable internal API
+
+| Symbol          | Kind         | Purpose                                                    |
+| --------------- | ------------ | ---------------------------------------------------------- |
+| `theorem_file!` | `proc macro` | Expands validated theorem documents into generated modules |
+
+`theorem_file!` must fail macro expansion with the diagnostic rendered from the
+shared loader error when the path is invalid, the file cannot be read, the file
+is empty, or schema validation fails. It must call
+`load_theorem_file_from_manifest_dir` for IO, path validation, and schema
+diagnostics rather than re-implementing those behaviours locally.
+
+If a theorem document omits `Evidence.kani`, the macro fails expansion with
+`MissingKaniEvidence` for that theorem rather than generating a harness stub.
+The generated Kani module remains behind `#[cfg(kani)]`, and each harness gets
+its `#[kani::proof]` and `#[kani::unwind(n)]` attributes from the validated
+Kani evidence for that theorem document.
+
+The mutual invariant is that `TheoremFileLoadError` variants are the canonical
+error types at the macro/runtime boundary. The proc macro may render those
+errors into compile diagnostics, but it must not introduce a parallel taxonomy
+for theorem-file loading failures.
+
+When theorem expansion behaviour changes, prefer testing it in two layers:
+
+1. direct proc-macro unit tests in `crates/theoremc-macros`, and
+2. fixture-crate behavioural tests in `tests/theorem_file_macro_bdd.rs`.
+
+### 3.2 Quality gates
+
+Before committing any change, run the following gates. Use the Makefile targets
+where available, and run the direct Cargo invocations for specialized checks:
+
+**Table:** Quality gates and their commands
+
+| Gate                 | Command                                                                                            | What it checks                                                     |
+| -------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Formatting           | `make check-fmt`                                                                                   | `cargo fmt --all -- --check`                                       |
+| Linting              | `make lint`                                                                                        | Clippy with `-D warnings` plus rustdoc                             |
+| Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                           |
+| Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit           |
+| Architecture linting | `cargo dylint theoremc_arch_lint --all -- -D warnings`                                             | Flags schema layer boundary and other architecture rule violations |
+| Tests                | `make test`                                                                                        | nextest test binaries plus Cargo doctests                          |
+| Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                               |
+| Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                               |
+| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all` plus mdformat                                    |
+
+When documentation changes are in scope, `make fmt`, `make markdownlint`, and
+`make nixie` must also pass.
+
+`make test` is intentionally nextest-backed for test binaries, followed by a
+Cargo doctest pass for Rustdoc examples. It runs
+`cargo nextest run --workspace --all-targets --all-features`, then
+`cargo test --workspace --all-features --doc`. Override `NEXTEST_FLAGS` only
+with options supported by cargo-nextest, and use `DOCTEST_FLAGS` for doctest
+scope.
+
+Capture long command output through `tee` with `set -o pipefail` to avoid
+losing truncated results:
+
+```sh
+set -o pipefail; make lint | tee /tmp/make-lint.log
+```
+
+### 3.4 File size limits
+
+No single code file may exceed 400 lines. When a module and its tests grow
+beyond this limit, extract tests into a sibling `*_tests.rs` file using the
+`#[path = ...]` attribute.
+
+### 3.6 Extending the build system
+
+To add new build-time discovery or generation:
+
+1. Add the logic to `src/build_discovery.rs` (or a new sibling module)
+   and keep it testable without spawning Cargo.
+2. Wire the new logic into `build.rs` via the shared `#[path = ...]`
+   inclusion.
+3. Add direct unit tests covering edge cases (missing directories,
+   permission errors, deterministic ordering).
+4. Add behavioural tests in `tests/` using temporary fixture crates when
+   the feature interacts with Cargo's build-script protocol.
+5. Update `docs/theoremc-design.md` §7 and this guide.
+
+Step 3.1.2 extends this pattern by adding suite generation (`build_suite.rs`)
+to the build script. Step 3.2.1 keeps that generated `theorem_file!("...")`
+callsite unchanged, but the hidden `__theoremc_generated_suite` module in
+`src/lib.rs` now imports the real proc macro re-exported by the root facade.
+
+The live workspace split is:
+
+- `crates/theoremc-core` for shared schema, mangling, and collision logic,
+- `crates/theoremc-macros` for proc-macro expansion, and
+- the root `theoremc` crate for the public API plus build integration.
 
 #### 3.6.1 `theoremc-core` and proc-macro boundary
 

@@ -1437,10 +1437,11 @@ The helper is declared once per theorem file and accepts `T: ?Sized`, so
 reference-bearing and unsized-compatible type forms do not need separate probe
 shapes. Types are deduplicated by the canonical token stream of `syn::Type`,
 which treats insignificant whitespace differences such as `Vec<u8>` and
-`Vec <u8>` as the same type. The probe only resolves the top-level type path as
-Rust sees it in the theorem owner crate. It does not inspect struct fields,
-decompose generic arguments for field-level checks, or synthesize struct
-literals; Phase 4 harness emission owns those behaviours.
+`Vec <u8>` as the same type. The probe resolves and type-checks the full
+declared `syn::Type` expression, including nested generic arguments and
+references, as Rust sees it in the theorem owner crate. It does not inspect
+struct fields, decompose generic arguments for field-level checks, or
+synthesise struct literals; Phase 4 harness emission owns those behaviours.
 
 This ensures that renames, signature drift, or missing re-exports fail
 compilation immediately, not “later when running theoremd”.
