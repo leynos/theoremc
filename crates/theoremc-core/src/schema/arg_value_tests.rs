@@ -203,42 +203,42 @@ fn multi_key_map_with_literal_is_raw_map() {
 
 // ── Error message includes parameter name ───────────────────────────
 
-#[test]
-fn error_message_includes_param_name() {
-    let map = IndexMap::from([("ref".to_owned(), TheoremValue::String("fn".into()))]);
-    let err = decode_arg_value(ParamName::new("graph_ref"), TheoremValue::Mapping(map))
+#[rstest]
+#[case::reserved_keyword(
+    "ref",
+    TheoremValue::String("fn".into()),
+    "graph_ref",
+    ArgDecodeError::ReservedKeyword {
+        param: "graph_ref".into(),
+        name: "fn".into(),
+    },
+    "graph_ref"
+)]
+#[case::non_string_literal(
+    "literal",
+    TheoremValue::Integer(7),
+    "my_label",
+    ArgDecodeError::NonStringLiteralValue {
+        param: "my_label".into(),
+        kind: "an integer",
+    },
+    "my_label"
+)]
+fn error_message_includes_param_name(
+    #[case] key: &str,
+    #[case] value: TheoremValue,
+    #[case] param_name: &str,
+    #[case] expected: ArgDecodeError,
+    #[case] expected_fragment: &str,
+) {
+    let map = IndexMap::from([(key.to_owned(), value)]);
+    let err = decode_arg_value(ParamName::new(param_name), TheoremValue::Mapping(map))
         .expect_err("should fail");
-    assert_eq!(
-        err,
-        ArgDecodeError::ReservedKeyword {
-            param: "graph_ref".into(),
-            name: "fn".into(),
-        }
-    );
-    // Display format also includes the parameter name.
+    assert_eq!(err, expected);
     let msg = err.to_string();
     assert!(
-        msg.contains("graph_ref"),
-        "expected display to mention 'graph_ref', got: {msg}"
-    );
-}
-
-#[test]
-fn literal_error_message_includes_param_name() {
-    let map = IndexMap::from([("literal".to_owned(), TheoremValue::Integer(7))]);
-    let err = decode_arg_value(ParamName::new("my_label"), TheoremValue::Mapping(map))
-        .expect_err("should fail");
-    assert_eq!(
-        err,
-        ArgDecodeError::NonStringLiteralValue {
-            param: "my_label".into(),
-            kind: "an integer",
-        }
-    );
-    let msg = err.to_string();
-    assert!(
-        msg.contains("my_label"),
-        "expected display to mention 'my_label', got: {msg}"
+        msg.contains(expected_fragment),
+        "expected display to mention '{expected_fragment}', got: {msg}"
     );
 }
 
