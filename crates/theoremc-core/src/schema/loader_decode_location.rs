@@ -45,6 +45,28 @@ pub(crate) fn locate_decode_failure(
     None
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BindingLineOutcome {
+    Found(usize, usize),
+    ExitScope,
+    Continue,
+}
+
+fn scan_binding_line(
+    index: usize,
+    line: &str,
+    indent: usize,
+    argument_name: &str,
+) -> BindingLineOutcome {
+    if exits_scope(line, indent) {
+        return BindingLineOutcome::ExitScope;
+    }
+    match locate_argument_line(index, line, argument_name) {
+        Some((row, column)) => BindingLineOutcome::Found(row, column),
+        None => BindingLineOutcome::Continue,
+    }
+}
+
 fn locate_let_binding_argument(
     input: &str,
     start_index: usize,
@@ -63,18 +85,17 @@ fn locate_let_binding_argument(
             break;
         }
 
-        if let Some(indent) = binding_indent {
-            if exits_scope(line, indent) {
-                break;
+        match binding_indent {
+            Some(indent) => match scan_binding_line(index, line, indent, argument_name.as_str()) {
+                BindingLineOutcome::Found(row, column) => return Some((row, column)),
+                BindingLineOutcome::ExitScope => break,
+                BindingLineOutcome::Continue => {}
+            },
+            None => {
+                if mapping_key_line(line, binding_name.as_str()) {
+                    binding_indent = Some(indent_width(line));
+                }
             }
-            if let Some(location) = locate_argument_line(index, line, argument_name.as_str()) {
-                return Some(location);
-            }
-            continue;
-        }
-
-        if mapping_key_line(line, binding_name.as_str()) {
-            binding_indent = Some(indent_width(line));
         }
     }
 
