@@ -126,13 +126,14 @@ fn locate_do_step_argument(
             break;
         }
 
-        if let Some(indent) = step_indent {
-            if scope != StepScope::SelectedStart && exits_scope(line, indent) {
-                break;
-            }
-            if let Some(location) = locate_argument_line(index, line, argument_name.as_str()) {
-                return Some(location);
-            }
+        let Some(indent) = step_indent else {
+            continue;
+        };
+        if scope != StepScope::SelectedStart && exits_scope(line, indent) {
+            break;
+        }
+        if let Some(location) = locate_argument_line(index, line, argument_name.as_str()) {
+            return Some(location);
         }
     }
 
