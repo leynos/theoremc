@@ -204,6 +204,39 @@ fn theorem_file_load_errors_are_reported_consistently(
 }
 
 #[test]
+fn backslash_relative_paths_load_after_normalization() -> Result<(), Box<dyn std::error::Error>> {
+    let temp_manifest_dir = temp_manifest_dir()?;
+    let normalized_path = Utf8Path::new("theorems/nested/valid.theorem");
+    write_fixture(
+        &temp_manifest_dir.manifest_dir,
+        normalized_path,
+        concat!(
+            "Theorem: BackslashPath\n",
+            "About: Loads normalized paths\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: reachable\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+        ),
+    )?;
+
+    let docs = load_theorem_file_from_manifest_dir(
+        &temp_manifest_dir.manifest_dir,
+        Utf8Path::new(r"theorems\nested\valid.theorem"),
+    )?;
+
+    assert_eq!(docs.len(), 1);
+    assert_eq!(docs[0].theorem, "BackslashPath");
+    Ok(())
+}
+
+#[test]
 fn io_error_display_uses_stable_error_codes() {
     let open_error = TheoremFileLoadError::OpenManifestDir {
         path: Utf8PathBuf::from("/missing"),

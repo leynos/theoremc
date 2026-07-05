@@ -106,6 +106,8 @@ fn overwrite_in_place_with_advanced_mtime_marks_file_newer() -> Result<(), Strin
 #[test]
 fn overwrite_in_place_rejects_missing_files() -> Result<(), String> {
     let fixture = FixtureCrate::new(MINIMAL_CARGO_TOML, "//! fixture\n")?;
+    std::fs::create_dir(fixture.manifest_dir().join("theorems"))
+        .map_err(|error| error.to_string())?;
 
     let result = fixture.overwrite_in_place(Utf8Path::new("theorems/missing.theorem"), "after");
 

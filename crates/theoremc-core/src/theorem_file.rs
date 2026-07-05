@@ -7,6 +7,7 @@
 use camino::{Utf8Component, Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir as Utf8Dir};
 
+use crate::path_format::normalize_path_separators;
 use crate::schema::{SchemaError, SourceId, TheoremDoc, load_theorem_docs_with_source};
 
 /// Errors raised while loading a crate-relative `.theorem` file.
@@ -103,9 +104,11 @@ pub fn load_theorem_file_from_manifest_dir(
     manifest_dir: &Utf8Path,
     theorem_path: &Utf8Path,
 ) -> Result<Vec<TheoremDoc>, TheoremFileLoadError> {
-    if is_invalid_theorem_path(theorem_path) {
+    let normalized_theorem_path =
+        Utf8PathBuf::from(normalize_path_separators(theorem_path.as_str()));
+    if is_invalid_theorem_path(&normalized_theorem_path) {
         return Err(TheoremFileLoadError::InvalidTheoremPath {
-            path: theorem_path.to_path_buf(),
+            path: normalized_theorem_path.to_path_buf(),
         });
     }
 
@@ -117,21 +120,23 @@ pub fn load_theorem_file_from_manifest_dir(
             }
         })?;
     let theorem_source = manifest_root
-        .read_to_string(theorem_path)
+        .read_to_string(&normalized_theorem_path)
         .map_err(|source| TheoremFileLoadError::ReadTheoremFile {
-            path: theorem_path.to_path_buf(),
+            path: normalized_theorem_path.to_path_buf(),
             source,
         })?;
-    let theorem_docs =
-        load_theorem_docs_with_source(&SourceId::new(theorem_path.as_str()), &theorem_source)
-            .map_err(|source| TheoremFileLoadError::InvalidTheoremFile {
-                path: theorem_path.to_path_buf(),
-                source: Box::new(source),
-            })?;
+    let theorem_docs = load_theorem_docs_with_source(
+        &SourceId::new(normalized_theorem_path.as_str()),
+        &theorem_source,
+    )
+    .map_err(|source| TheoremFileLoadError::InvalidTheoremFile {
+        path: normalized_theorem_path.to_path_buf(),
+        source: Box::new(source),
+    })?;
 
     if theorem_docs.is_empty() {
         return Err(TheoremFileLoadError::EmptyTheoremFile {
-            path: theorem_path.to_path_buf(),
+            path: normalized_theorem_path.to_path_buf(),
         });
     }
 

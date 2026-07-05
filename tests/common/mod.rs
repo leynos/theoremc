@@ -114,8 +114,12 @@ impl FixtureCrate {
     ///
     /// # Errors
     ///
-    /// Returns an error when the target file cannot be written.
+    /// Returns an error when the target file does not exist or cannot be
+    /// written.
     pub fn overwrite_in_place(&self, path: &Utf8Path, contents: &str) -> Result<(), String> {
+        self.dir
+            .metadata(path.as_str())
+            .map_err(|error| error.to_string())?;
         self.dir
             .write(path.as_str(), contents)
             .map_err(|error| error.to_string())
