@@ -5,16 +5,16 @@
 //! for unknown keys in subordinate structures.
 
 mod common {
-    pub(crate) use test_helpers::load_fixture;
+    pub(crate) use test_helpers::{FixtureName, load_fixture};
 }
 
-use common::load_fixture;
+use common::{FixtureName, load_fixture};
 use rstest::rstest;
 use theoremc::schema::{KaniExpectation, load_theorem_docs};
 
 /// Helper to assert that loading a fixture fails.
 fn assert_fixture_fails(fixture_name: &str) -> String {
-    let yaml = load_fixture(fixture_name)
+    let yaml = load_fixture(FixtureName::new(fixture_name))
         .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
     let result = load_theorem_docs(&yaml);
     assert!(

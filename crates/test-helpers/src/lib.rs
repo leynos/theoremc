@@ -8,10 +8,10 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 mod integration;
 
 pub use integration::{
-    BUILD_DISCOVERY_SOURCE, BUILD_SCRIPT_SOURCE, BUILD_SUITE_SOURCE, BuildLog, FixtureCrate,
-    TRIVIAL_THEOREM, assert_diagnostic_failure, assert_fixture_error_contains,
-    assert_fixture_fails, assert_fixture_loads, fixture_error_message, load_fixture,
-    load_fixture_docs, load_fixture_text, toml_section,
+    BUILD_DISCOVERY_SOURCE, BUILD_SCRIPT_SOURCE, BUILD_SUITE_SOURCE, BuildLog, ExpectedFragment,
+    FixtureCrate, FixtureName, TRIVIAL_THEOREM, assert_diagnostic_failure,
+    assert_fixture_error_contains, assert_fixture_fails, assert_fixture_loads,
+    fixture_error_message, load_fixture, load_fixture_docs, load_fixture_text, toml_section,
 };
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());

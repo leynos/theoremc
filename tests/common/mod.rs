@@ -10,6 +10,42 @@ use theoremc_core::schema::{
     SchemaDiagnosticCode, SourceId, TheoremDoc, load_theorem_docs, load_theorem_docs_with_source,
 };
 
+/// Identifies a fixture file under `tests/fixtures/`.
+#[derive(Debug, Clone, Copy)]
+pub struct FixtureName<'a>(&'a str);
+
+impl<'a> FixtureName<'a> {
+    /// Creates a fixture-name wrapper.
+    #[must_use]
+    pub const fn new(name: &'a str) -> Self {
+        Self(name)
+    }
+
+    /// Returns the wrapped fixture name.
+    #[must_use]
+    pub const fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
+/// Identifies an expected substring in fixture diagnostics or build logs.
+#[derive(Debug, Clone, Copy)]
+pub struct ExpectedFragment<'a>(&'a str);
+
+impl<'a> ExpectedFragment<'a> {
+    /// Creates an expected-fragment wrapper.
+    #[must_use]
+    pub const fn new(fragment: &'a str) -> Self {
+        Self(fragment)
+    }
+
+    /// Returns the wrapped expected fragment.
+    #[must_use]
+    pub const fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
 /// Source for the repository build script copied into fixture crates.
 pub const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
 
@@ -220,7 +256,7 @@ impl BuildLog {
     /// # Errors
     ///
     /// Returns an actionable diff-style message when `needle` is missing.
-    pub fn contains(&self, needle: &str) -> Result<(), String> {
+    pub fn contains(&self, needle: ExpectedFragment<'_>) -> Result<(), String> {
         self.check(true, needle)
     }
 
@@ -229,7 +265,7 @@ impl BuildLog {
     /// # Errors
     ///
     /// Returns an actionable diff-style message when `needle` is present.
-    pub fn omits(&self, needle: &str) -> Result<(), String> {
+    pub fn omits(&self, needle: ExpectedFragment<'_>) -> Result<(), String> {
         self.check(false, needle)
     }
 
@@ -239,14 +275,15 @@ impl BuildLog {
         &self.0
     }
 
-    fn check(&self, expect_present: bool, needle: &str) -> Result<(), String> {
-        let found = self.0.contains(needle);
+    fn check(&self, expect_present: bool, needle: ExpectedFragment<'_>) -> Result<(), String> {
+        let found = self.0.contains(needle.as_str());
         if found == expect_present {
             Ok(())
         } else {
             let verb = if expect_present { "contain" } else { "omit" };
             Err(format!(
-                "expected build log to {verb} '{needle}', got:\n{}",
+                "expected build log to {verb} '{}', got:\n{}",
+                needle.as_str(),
                 self.0
             ))
         }
@@ -286,8 +323,8 @@ pub fn toml_section(document: &str, section_name: &str) -> Option<String> {
 /// # Errors
 ///
 /// Returns an I/O error when the fixture cannot be read.
-pub fn load_fixture(name: &str) -> std::io::Result<String> {
-    Dir::open_ambient_dir("tests/fixtures", ambient_authority())?.read_to_string(name)
+pub fn load_fixture(name: FixtureName<'_>) -> std::io::Result<String> {
+    Dir::open_ambient_dir("tests/fixtures", ambient_authority())?.read_to_string(name.as_str())
 }
 
 /// Loads a fixture file and formats I/O failures as test-friendly strings.
@@ -295,8 +332,8 @@ pub fn load_fixture(name: &str) -> std::io::Result<String> {
 /// # Errors
 ///
 /// Returns an error when the fixture cannot be read.
-pub fn load_fixture_text(name: &str) -> Result<String, String> {
-    load_fixture(name).map_err(|error| format!("failed to load fixture {name}: {error}"))
+pub fn load_fixture_text(name: FixtureName<'_>) -> Result<String, String> {
+    load_fixture(name).map_err(|error| format!("failed to load fixture {}: {error}", name.as_str()))
 }
 
 /// Loads and parses a theorem fixture.
@@ -304,7 +341,7 @@ pub fn load_fixture_text(name: &str) -> Result<String, String> {
 /// # Errors
 ///
 /// Returns an error when the fixture cannot be read or parsed as theorem YAML.
-pub fn load_fixture_docs(name: &str) -> Result<Vec<TheoremDoc>, String> {
+pub fn load_fixture_docs(name: FixtureName<'_>) -> Result<Vec<TheoremDoc>, String> {
     let yaml = load_fixture_text(name)?;
     load_theorem_docs(&yaml).map_err(|error| error.to_string())
 }
@@ -314,7 +351,7 @@ pub fn load_fixture_docs(name: &str) -> Result<Vec<TheoremDoc>, String> {
 /// # Errors
 ///
 /// Returns the parser or validation error when loading fails.
-pub fn assert_fixture_loads(name: &str) -> Result<(), String> {
+pub fn assert_fixture_loads(name: FixtureName<'_>) -> Result<(), String> {
     load_fixture_docs(name).map(|_| ())
 }
 
@@ -323,12 +360,12 @@ pub fn assert_fixture_loads(name: &str) -> Result<(), String> {
 /// # Errors
 ///
 /// Returns an error when the fixture cannot be read or unexpectedly succeeds.
-pub fn fixture_error_message(name: &str) -> Result<String, String> {
+pub fn fixture_error_message(name: FixtureName<'_>) -> Result<String, String> {
     let yaml = load_fixture_text(name)?;
     load_theorem_docs(&yaml)
         .err()
         .map(|error| error.to_string())
-        .ok_or_else(|| format!("fixture should fail: {name}"))
+        .ok_or_else(|| format!("fixture should fail: {}", name.as_str()))
 }
 
 /// Asserts that a theorem fixture fails to load.
@@ -336,7 +373,7 @@ pub fn fixture_error_message(name: &str) -> Result<String, String> {
 /// # Errors
 ///
 /// Returns an error when the fixture cannot be read or unexpectedly succeeds.
-pub fn assert_fixture_fails(name: &str) -> Result<(), String> {
+pub fn assert_fixture_fails(name: FixtureName<'_>) -> Result<(), String> {
     fixture_error_message(name).map(|_| ())
 }
 
@@ -346,13 +383,18 @@ pub fn assert_fixture_fails(name: &str) -> Result<(), String> {
 ///
 /// Returns an error when the fixture cannot be read, unexpectedly succeeds, or
 /// fails with a different message.
-pub fn assert_fixture_error_contains(name: &str, expected_fragment: &str) -> Result<(), String> {
+pub fn assert_fixture_error_contains(
+    name: FixtureName<'_>,
+    expected_fragment: ExpectedFragment<'_>,
+) -> Result<(), String> {
     let message = fixture_error_message(name)?;
-    if message.contains(expected_fragment) {
+    if message.contains(expected_fragment.as_str()) {
         Ok(())
     } else {
         Err(format!(
-            "expected '{expected_fragment}' in error for {name}, got: {message}"
+            "expected '{}' in error for {}, got: {message}",
+            expected_fragment.as_str(),
+            name.as_str()
         ))
     }
 }
@@ -364,14 +406,14 @@ pub fn assert_fixture_error_contains(name: &str, expected_fragment: &str) -> Res
 /// Returns an error when the fixture cannot be read, unexpectedly succeeds, or
 /// reports a diagnostic without the expected code and source location.
 pub fn assert_diagnostic_failure(
-    fixture_name: &str,
+    fixture_name: FixtureName<'_>,
     expected_code: SchemaDiagnosticCode,
 ) -> Result<(), String> {
-    let source = format!("tests/fixtures/{fixture_name}");
+    let source = format!("tests/fixtures/{}", fixture_name.as_str());
     let yaml = load_fixture_text(fixture_name)?;
     let error = load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
         .err()
-        .ok_or_else(|| format!("fixture should fail: {fixture_name}"))?;
+        .ok_or_else(|| format!("fixture should fail: {}", fixture_name.as_str()))?;
     let diagnostic = error
         .diagnostic()
         .ok_or_else(|| String::from("diagnostic should be present"))?;

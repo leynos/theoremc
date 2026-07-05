@@ -1,16 +1,21 @@
 //! Behavioural tests for canonical action-name validation.
 
 mod common {
-    pub(crate) use test_helpers::{assert_fixture_error_contains, assert_fixture_loads};
+    pub(crate) use test_helpers::{
+        ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_loads,
+    };
 }
 
-use common::{assert_fixture_error_contains, assert_fixture_loads};
+use common::{ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_loads};
 use rstest_bdd_macros::{given, scenario, then};
 
 /// Helper to assert multiple fixtures fail with expected error messages.
 fn assert_fixtures_fail_with_errors(test_cases: &[(&str, &str)]) -> Result<(), String> {
     for (fixture_name, expected) in test_cases {
-        assert_fixture_error_contains(fixture_name, expected)?;
+        assert_fixture_error_contains(
+            FixtureName::new(fixture_name),
+            ExpectedFragment::new(expected),
+        )?;
     }
     Ok(())
 }
@@ -20,8 +25,8 @@ fn given_theorem_fixture_with_canonical_action_names() {}
 
 #[then("loading succeeds for canonical action names")]
 fn then_loading_succeeds_for_canonical_action_names() -> Result<(), String> {
-    assert_fixture_loads("valid_full.theorem")?;
-    assert_fixture_loads("valid_nested_maybe.theorem")
+    assert_fixture_loads(FixtureName::new("valid_full.theorem"))?;
+    assert_fixture_loads(FixtureName::new("valid_nested_maybe.theorem"))
 }
 
 #[given("a theorem fixture with malformed action names")]

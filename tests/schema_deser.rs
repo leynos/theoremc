@@ -5,17 +5,18 @@
 //! `schema_deser_reject.rs`.
 
 mod common {
-    pub(crate) use test_helpers::load_fixture;
+    pub(crate) use test_helpers::{FixtureName, load_fixture};
 }
 
-use common::load_fixture;
+use common::{FixtureName, load_fixture};
 use rstest::rstest;
 use theoremc::schema::{LetBinding, Step, load_theorem_docs};
 
 #[rstest::fixture]
 fn fixture_loader() -> impl Fn(&str) -> String {
     |fixture_name| {
-        load_fixture(fixture_name).unwrap_or_else(|error| panic!("failed to load fixture: {error}"))
+        load_fixture(FixtureName::new(fixture_name))
+            .unwrap_or_else(|error| panic!("failed to load fixture: {error}"))
     }
 }
 

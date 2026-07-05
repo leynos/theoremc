@@ -6,13 +6,14 @@
 
 mod common {
     pub(crate) use test_helpers::{
-        assert_fixture_error_contains, assert_fixture_fails, assert_fixture_loads,
-        load_fixture_docs,
+        ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_fails,
+        assert_fixture_loads, load_fixture_docs,
     };
 }
 
 use common::{
-    assert_fixture_error_contains, assert_fixture_fails, assert_fixture_loads, load_fixture_docs,
+    ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_fails,
+    assert_fixture_loads, load_fixture_docs,
 };
 use rstest::rstest;
 use theoremc::schema::load_theorem_docs;
@@ -28,7 +29,7 @@ use theoremc::schema::load_theorem_docs;
 fn given_a_valid_theorem_file_when_loaded_then_it_succeeds(
     #[case] fixture: &str,
 ) -> Result<(), String> {
-    assert_fixture_loads(fixture)
+    assert_fixture_loads(FixtureName::new(fixture))
 }
 
 // ── Given an unknown key, deserialization fails ─────────────────────
@@ -40,7 +41,10 @@ fn given_a_structurally_invalid_file_when_loaded_then_error_is_actionable(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
 ) -> Result<(), String> {
-    assert_fixture_error_contains(fixture, expected_fragment)
+    assert_fixture_error_contains(
+        FixtureName::new(fixture),
+        ExpectedFragment::new(expected_fragment),
+    )
 }
 
 // ── Given a missing required field, deserialization fails ────────────
@@ -53,7 +57,7 @@ fn given_a_structurally_invalid_file_when_loaded_then_error_is_actionable(
 fn given_a_missing_required_field_when_loaded_then_it_fails(
     #[case] fixture: &str,
 ) -> Result<(), String> {
-    assert_fixture_fails(fixture)
+    assert_fixture_fails(FixtureName::new(fixture))
 }
 
 // ── Given an invalid identifier, validation fails ───────────────────
@@ -65,7 +69,10 @@ fn given_an_invalid_theorem_name_when_loaded_then_error_mentions_reason(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
 ) -> Result<(), String> {
-    assert_fixture_error_contains(fixture, expected_fragment)
+    assert_fixture_error_contains(
+        FixtureName::new(fixture),
+        ExpectedFragment::new(expected_fragment),
+    )
 }
 
 // ── Given a wrong scalar type, deserialization fails ────────────────
@@ -73,7 +80,7 @@ fn given_an_invalid_theorem_name_when_loaded_then_error_mentions_reason(
 #[rstest]
 #[case::tags_as_string("invalid_wrong_type.theorem")]
 fn given_wrong_scalar_type_when_loaded_then_it_fails(#[case] fixture: &str) -> Result<(), String> {
-    assert_fixture_fails(fixture)
+    assert_fixture_fails(FixtureName::new(fixture))
 }
 
 // ── Given multi-document YAML, document order is preserved ──────────
@@ -83,7 +90,7 @@ fn given_wrong_scalar_type_when_loaded_then_it_fails(#[case] fixture: &str) -> R
 fn given_multi_doc_yaml_when_loaded_then_order_is_preserved(
     #[case] fixture: &str,
 ) -> Result<(), String> {
-    let docs = load_fixture_docs(fixture)?;
+    let docs = load_fixture_docs(FixtureName::new(fixture))?;
     let names: Vec<&str> = docs.iter().map(|d| d.theorem.as_str()).collect();
     let expected = vec!["FirstTheorem", "SecondTheorem", "ThirdTheorem"];
     if names == expected {
@@ -224,7 +231,10 @@ fn given_empty_or_blank_fields_when_loaded_then_validation_fails(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
 ) -> Result<(), String> {
-    assert_fixture_error_contains(fixture, expected_fragment)
+    assert_fixture_error_contains(
+        FixtureName::new(fixture),
+        ExpectedFragment::new(expected_fragment),
+    )
 }
 
 // ── Given statement blocks or invalid syntax in expression fields,
@@ -259,7 +269,10 @@ fn given_statement_or_bad_syntax_in_expr_when_loaded_then_validation_fails(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
 ) -> Result<(), String> {
-    assert_fixture_error_contains(fixture, expected_fragment)
+    assert_fixture_error_contains(
+        FixtureName::new(fixture),
+        ExpectedFragment::new(expected_fragment),
+    )
 }
 
 // ── Given invalid Step or LetBinding shapes, validation fails ─────
@@ -293,5 +306,8 @@ fn given_invalid_step_or_let_shape_when_loaded_then_validation_fails(
     #[case] fixture: &str,
     #[case] expected_fragment: &str,
 ) -> Result<(), String> {
-    assert_fixture_error_contains(fixture, expected_fragment)
+    assert_fixture_error_contains(
+        FixtureName::new(fixture),
+        ExpectedFragment::new(expected_fragment),
+    )
 }

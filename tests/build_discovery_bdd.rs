@@ -1,11 +1,11 @@
 //! Behavioural tests for Cargo build discovery of theorem files.
 
 mod common {
-    pub(crate) use test_helpers::{FixtureCrate, TRIVIAL_THEOREM, toml_section};
+    pub(crate) use test_helpers::{ExpectedFragment, FixtureCrate, TRIVIAL_THEOREM, toml_section};
 }
 
 use camino::Utf8Path;
-use common::{FixtureCrate, TRIVIAL_THEOREM, toml_section};
+use common::{ExpectedFragment, FixtureCrate, TRIVIAL_THEOREM, toml_section};
 use rstest_bdd_macros::{given, scenario, then};
 
 const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
@@ -49,8 +49,12 @@ fn then_building_twice_stays_fresh_and_editing_a_theorem_reruns_the_build_script
             first_build.as_str()
         ));
     }
-    first_build.contains("cargo::rerun-if-changed=theorems/nested/alpha.theorem")?;
-    first_build.contains("cargo::rerun-if-changed=theorems/nested")?;
+    first_build.contains(ExpectedFragment::new(
+        "cargo::rerun-if-changed=theorems/nested/alpha.theorem",
+    ))?;
+    first_build.contains(ExpectedFragment::new(
+        "cargo::rerun-if-changed=theorems/nested",
+    ))?;
 
     let second_build = fixture.cargo_build_log()?;
     if second_build.ran() {
@@ -92,8 +96,12 @@ fn then_the_build_script_emits_only_theorem_inputs() -> Result<(), String> {
             first_build.as_str()
         ));
     }
-    first_build.omits("cargo::rerun-if-changed=theorems/ignored.txt")?;
-    first_build.contains("cargo::rerun-if-changed=theorems/kept.theorem")?;
+    first_build.omits(ExpectedFragment::new(
+        "cargo::rerun-if-changed=theorems/ignored.txt",
+    ))?;
+    first_build.contains(ExpectedFragment::new(
+        "cargo::rerun-if-changed=theorems/kept.theorem",
+    ))?;
     Ok(())
 }
 
@@ -113,7 +121,7 @@ fn then_creating_theorems_later_reruns_the_build_script_without_manual_seeding()
             first_build.as_str()
         ));
     }
-    first_build.contains("cargo::rerun-if-changed=theorems")?;
+    first_build.contains(ExpectedFragment::new("cargo::rerun-if-changed=theorems"))?;
 
     fixture.write_with_advanced_mtime(Utf8Path::new("theorems/first.theorem"), TRIVIAL_THEOREM)?;
 
@@ -124,7 +132,9 @@ fn then_creating_theorems_later_reruns_the_build_script_without_manual_seeding()
             second_build.as_str()
         ));
     }
-    second_build.contains("cargo::rerun-if-changed=theorems/first.theorem")?;
+    second_build.contains(ExpectedFragment::new(
+        "cargo::rerun-if-changed=theorems/first.theorem",
+    ))?;
     Ok(())
 }
 

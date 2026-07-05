@@ -1,10 +1,10 @@
 //! Regression corpus tests for parser and validator fixtures.
 
 mod common {
-    pub(crate) use test_helpers::load_fixture;
+    pub(crate) use test_helpers::{FixtureName, load_fixture};
 }
 
-use common::load_fixture;
+use common::{FixtureName, load_fixture};
 use rstest::rstest;
 use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 
@@ -14,7 +14,7 @@ fn fixture_source(fixture_name: &str) -> String {
 
 fn load_from_fixture(fixture_name: &str) -> Result<(), String> {
     let source = fixture_source(fixture_name);
-    let yaml = load_fixture(fixture_name).map_err(|error| error.to_string())?;
+    let yaml = load_fixture(FixtureName::new(fixture_name)).map_err(|error| error.to_string())?;
     load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
         .map(|_| ())
         .map_err(|error| error.to_string())
@@ -42,7 +42,7 @@ fn valid_fixture_corpus_parses(#[case] fixture_name: &str) {
 #[case::missing_witness_default("invalid_missing_witness_default.theorem")]
 fn invalid_fixture_corpus_fails_with_diagnostic_source(#[case] fixture_name: &str) {
     let source = fixture_source(fixture_name);
-    let yaml = load_fixture(fixture_name).expect("failed to load fixture");
+    let yaml = load_fixture(FixtureName::new(fixture_name)).expect("failed to load fixture");
     let result = load_theorem_docs_with_source(&SourceId::new(&source), &yaml);
     let error = result.expect_err("expected fixture to fail");
     let diagnostic = error.diagnostic().expect("diagnostic should be present");

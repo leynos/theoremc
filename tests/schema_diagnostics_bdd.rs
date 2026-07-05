@@ -1,10 +1,10 @@
 //! Behavioural tests for structured diagnostics using `rstest-bdd`.
 
 mod common {
-    pub(crate) use test_helpers::{assert_diagnostic_failure, load_fixture_text};
+    pub(crate) use test_helpers::{FixtureName, assert_diagnostic_failure, load_fixture_text};
 }
 
-use common::{assert_diagnostic_failure, load_fixture_text};
+use common::{FixtureName, assert_diagnostic_failure, load_fixture_text};
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::schema::{SchemaDiagnosticCode, SourceId, load_theorem_docs_with_source};
 
@@ -14,7 +14,7 @@ fn given_parser_invalid_theorem_fixture() {}
 #[then("loading fails with source-located parser diagnostics")]
 fn then_loading_fails_with_source_located_parser_diagnostics() -> Result<(), String> {
     assert_diagnostic_failure(
-        "invalid_unknown_key.theorem",
+        FixtureName::new("invalid_unknown_key.theorem"),
         SchemaDiagnosticCode::ParseFailure,
     )?;
 
@@ -27,7 +27,7 @@ fn given_validator_invalid_theorem_fixture() {}
 #[then("loading fails with source-located validator diagnostics")]
 fn then_loading_fails_with_source_located_validator_diagnostics() -> Result<(), String> {
     assert_diagnostic_failure(
-        "invalid_empty_about.theorem",
+        FixtureName::new("invalid_empty_about.theorem"),
         SchemaDiagnosticCode::ValidationFailure,
     )?;
 
@@ -40,7 +40,7 @@ fn given_valid_theorem_fixture_for_diagnostics() {}
 #[then("loading succeeds with explicit source")]
 fn then_loading_succeeds_with_explicit_source() -> Result<(), String> {
     let source = "tests/fixtures/valid_aliases_and_must.theorem";
-    let yaml = load_fixture_text("valid_aliases_and_must.theorem")?;
+    let yaml = load_fixture_text(FixtureName::new("valid_aliases_and_must.theorem"))?;
     load_theorem_docs_with_source(&SourceId::new(source), &yaml)
         .map_err(|error| error.to_string())?;
 
