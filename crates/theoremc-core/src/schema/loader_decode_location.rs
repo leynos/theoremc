@@ -26,7 +26,7 @@ pub(crate) fn locate_decode_failure(
     raw_doc: &RawTheoremDoc,
     error: &RawDocDecodeError,
 ) -> Option<(usize, usize)> {
-    let argument_name = YamlKey::new(terminal_argument_name(error.param()));
+    let argument_name = terminal_argument_name(YamlKey::new(error.param()));
     let start_line = usize::try_from(raw_doc.theorem_location().line()).ok()?;
     let start_index = start_line.saturating_sub(1);
 
@@ -56,7 +56,7 @@ fn scan_binding_line(
     index: usize,
     line: &str,
     indent: usize,
-    argument_name: &str,
+    argument_name: YamlKey<'_>,
 ) -> BindingLineOutcome {
     if exits_scope(line, indent) {
         return BindingLineOutcome::ExitScope;
@@ -78,7 +78,7 @@ fn locate_let_binding_argument(
 
     for (index, line) in document_lines(input, start_index) {
         if !is_in_let {
-            is_in_let = section_line(line, "Let");
+            is_in_let = section_line(line, YamlKey::new("Let"));
             continue;
         }
         if is_top_level_section(line) {
@@ -86,13 +86,13 @@ fn locate_let_binding_argument(
         }
 
         match binding_indent {
-            Some(indent) => match scan_binding_line(index, line, indent, argument_name.as_str()) {
+            Some(indent) => match scan_binding_line(index, line, indent, argument_name) {
                 BindingLineOutcome::Found(row, column) => return Some((row, column)),
                 BindingLineOutcome::ExitScope => break,
                 BindingLineOutcome::Continue => {}
             },
             None => {
-                if mapping_key_line(line, binding_name.as_str()) {
+                if mapping_key_line(line, binding_name) {
                     binding_indent = Some(indent_width(line));
                 }
             }
@@ -114,7 +114,7 @@ fn locate_do_step_argument(
 
     for (index, line) in document_lines(input, start_index) {
         if !is_in_do {
-            is_in_do = section_line(line, "Do");
+            is_in_do = section_line(line, YamlKey::new("Do"));
             continue;
         }
         if is_top_level_section(line) {
@@ -132,7 +132,7 @@ fn locate_do_step_argument(
         if scope != StepScope::SelectedStart && exits_scope(line, indent) {
             break;
         }
-        if let Some(location) = locate_argument_line(index, line, argument_name.as_str()) {
+        if let Some(location) = locate_argument_line(index, line, argument_name) {
             return Some(location);
         }
     }
@@ -177,15 +177,19 @@ fn document_lines(input: &str, start_index: usize) -> impl Iterator<Item = (usiz
         .take_while(move |(index, line)| *index == start_index || !is_theorem_header(line))
 }
 
-fn terminal_argument_name(param: &str) -> &str {
-    param
-        .rsplit_once(": ")
-        .map_or(param, |(_, argument_name)| argument_name)
+fn terminal_argument_name(param: YamlKey<'_>) -> YamlKey<'_> {
+    let raw = param.as_str();
+    let terminal = raw.rsplit_once(": ").map_or(raw, |(_, name)| name);
+    YamlKey::new(terminal)
 }
 
-fn locate_argument_line(index: usize, line: &str, argument_name: &str) -> Option<(usize, usize)> {
+fn locate_argument_line(
+    index: usize,
+    line: &str,
+    argument_name: YamlKey<'_>,
+) -> Option<(usize, usize)> {
     let trimmed = line.trim_start();
-    let suffix = trimmed.strip_prefix(argument_name)?;
+    let suffix = trimmed.strip_prefix(argument_name.as_str())?;
     if !suffix.starts_with(':') {
         return None;
     }
@@ -193,8 +197,8 @@ fn locate_argument_line(index: usize, line: &str, argument_name: &str) -> Option
     Some((index + 1, column))
 }
 
-fn section_line(line: &str, section: &str) -> bool {
-    line.trim_start() == format!("{section}:")
+fn section_line(line: &str, section: YamlKey<'_>) -> bool {
+    line.trim_start() == format!("{}:", section.as_str())
 }
 
 fn is_top_level_section(line: &str) -> bool {
@@ -205,10 +209,10 @@ fn is_theorem_header(line: &str) -> bool {
     matches!(line.trim_start(), "Theorem:" | "theorem:")
 }
 
-fn mapping_key_line(line: &str, key: &str) -> bool {
+fn mapping_key_line(line: &str, key: YamlKey<'_>) -> bool {
     let trimmed = line.trim_start();
     trimmed
-        .strip_prefix(key)
+        .strip_prefix(key.as_str())
         .is_some_and(|suffix| suffix.starts_with(':'))
 }
 
