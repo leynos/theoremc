@@ -5,6 +5,20 @@
 //! the original YAML text so loader diagnostics can point at the failing
 //! argument field instead of the theorem header.
 
+/// Newtype representing a YAML key used for decode-location matching.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct YamlKey<'a>(&'a str);
+
+impl<'a> YamlKey<'a> {
+    pub(crate) const fn new(key: &'a str) -> Self {
+        Self(key)
+    }
+
+    pub(crate) const fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
 use super::raw::{RawDocDecodeError, RawTheoremDoc};
 
 pub(crate) fn locate_decode_failure(
@@ -12,12 +26,17 @@ pub(crate) fn locate_decode_failure(
     raw_doc: &RawTheoremDoc,
     error: &RawDocDecodeError,
 ) -> Option<(usize, usize)> {
-    let argument_name = terminal_argument_name(error.param());
+    let argument_name = YamlKey::new(terminal_argument_name(error.param()));
     let start_line = usize::try_from(raw_doc.theorem_location().line()).ok()?;
     let start_index = start_line.saturating_sub(1);
 
     if let Some(binding_name) = error.let_binding_name() {
-        return locate_let_binding_argument(input, start_index, binding_name, argument_name);
+        return locate_let_binding_argument(
+            input,
+            start_index,
+            YamlKey::new(binding_name),
+            argument_name,
+        );
     }
     if let Some(step_index) = error.do_step_index() {
         return locate_do_step_argument(input, start_index, step_index, argument_name);
@@ -29,8 +48,8 @@ pub(crate) fn locate_decode_failure(
 fn locate_let_binding_argument(
     input: &str,
     start_index: usize,
-    binding_name: &str,
-    argument_name: &str,
+    binding_name: YamlKey<'_>,
+    argument_name: YamlKey<'_>,
 ) -> Option<(usize, usize)> {
     let mut is_in_let = false;
     let mut binding_indent = None;
@@ -48,13 +67,13 @@ fn locate_let_binding_argument(
             if exits_scope(line, indent) {
                 break;
             }
-            if let Some(location) = locate_argument_line(index, line, argument_name) {
+            if let Some(location) = locate_argument_line(index, line, argument_name.as_str()) {
                 return Some(location);
             }
             continue;
         }
 
-        if mapping_key_line(line, binding_name) {
+        if mapping_key_line(line, binding_name.as_str()) {
             binding_indent = Some(indent_width(line));
         }
     }
@@ -66,7 +85,7 @@ fn locate_do_step_argument(
     input: &str,
     start_index: usize,
     step_index: usize,
-    argument_name: &str,
+    argument_name: YamlKey<'_>,
 ) -> Option<(usize, usize)> {
     let mut is_in_do = false;
     let mut current_step = 0;
@@ -90,7 +109,7 @@ fn locate_do_step_argument(
             if scope != StepScope::SelectedStart && exits_scope(line, indent) {
                 break;
             }
-            if let Some(location) = locate_argument_line(index, line, argument_name) {
+            if let Some(location) = locate_argument_line(index, line, argument_name.as_str()) {
                 return Some(location);
             }
         }
