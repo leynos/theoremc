@@ -73,7 +73,7 @@ pub(crate) const REFERENCED_TYPES_LIB_RS: &str = concat!(
     "}\n",
     "pub struct DepositOutcome;\n\n",
     "pub mod theorem_actions {\n",
-    "    #[allow(non_snake_case)]\n",
+    "    #[expect(non_snake_case, reason = \"theorem action exports use mangled identifiers\")]\n",
     "    pub fn account__deposit__h05158894bfb4(\n",
     "        _command: crate::DepositCommand,\n",
     "    ) -> crate::DepositOutcome {\n",

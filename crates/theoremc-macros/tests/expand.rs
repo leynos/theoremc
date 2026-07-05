@@ -38,6 +38,8 @@ fn compile_errors() -> Result<(), Box<dyn std::error::Error>> {
     stage_fixture("conflicting_action_signatures.theorem")?;
     stage_fixture("equivalent_action_signatures.theorem")?;
     stage_fixture("signature_drift.theorem")?;
+    stage_fixture("missing_referenced_type.theorem")?;
+    stage_fixture("moved_referenced_type.theorem")?;
     stage_fixture("typed_action_probe.theorem")?;
     stage_fixture("valid_theorem.theorem")?;
     stage_fixture("zero_unwind.theorem")?;
@@ -49,7 +51,9 @@ fn compile_errors() -> Result<(), Box<dyn std::error::Error>> {
     t.compile_fail("tests/expand/invalid_theorem.rs");
     t.compile_fail("tests/expand/missing_action_export.rs");
     t.compile_fail("tests/expand/missing_kani_evidence.rs");
+    t.compile_fail("tests/expand/missing_referenced_type.rs");
     t.compile_fail("tests/expand/missing_theorem.rs");
+    t.compile_fail("tests/expand/moved_referenced_type.rs");
     t.compile_fail("tests/expand/signature_drift.rs");
     t.compile_fail("tests/expand/zero_unwind.rs");
     Ok(())

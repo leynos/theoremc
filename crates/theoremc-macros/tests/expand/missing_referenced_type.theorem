@@ -1,0 +1,26 @@
+Schema: 1
+Theorem: MissingReferencedType
+About: Compile-fail missing referenced type fixture
+Forall:
+  account: crate::MissingAccount
+Actions:
+  account.deposit:
+    params:
+      command: crate::DepositCommand
+    returns: crate::DepositOutcome
+Do:
+  - call:
+      action: account.deposit
+      args:
+        command:
+          amount: 10
+Witness:
+  - cover: "true"
+    because: reachable
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS

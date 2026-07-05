@@ -16,6 +16,8 @@ fn expansion_emits_referenced_type_probes_for_forall_and_actions()
             "  account.deposit:\n",
             "    params:\n",
             "      command: crate::DepositCommand\n",
+            "      account: \"&mut crate::Account\"\n",
+            "      profile: \"&crate::Profile\"\n",
             "    returns: crate::DepositOutcome\n",
             "Do:\n",
             "  - call:\n",
@@ -50,6 +52,14 @@ fn expansion_emits_referenced_type_probes_for_forall_and_actions()
     assert!(
         expanded.contains("let_=__theoremc_assert_referenced::<crate::DepositCommand>;"),
         "expected action parameter type probe in expansion, got: {expanded}",
+    );
+    assert!(
+        expanded.contains("let_=__theoremc_assert_referenced::<&mutcrate::Account>;"),
+        "expected mutable reference action parameter type probe in expansion, got: {expanded}",
+    );
+    assert!(
+        expanded.contains("let_=__theoremc_assert_referenced::<&crate::Profile>;"),
+        "expected shared reference action parameter type probe in expansion, got: {expanded}",
     );
     assert!(
         expanded.contains("let_=__theoremc_assert_referenced::<crate::DepositOutcome>;"),

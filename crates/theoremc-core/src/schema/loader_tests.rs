@@ -95,6 +95,24 @@ Witness:
     because: always reachable
 "#;
 
+const FREE_LIFETIME_ACTION_RETURN_YAML: &str = r#"
+Theorem: InvalidActionReturnLifetime
+About: Declares an unbound action return lifetime
+Actions:
+  account.deposit:
+    returns: "&'a crate::DepositOutcome"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+"#;
+
 #[rstest]
 #[case(
     INVALID_FORALL_TYPE_YAML,
