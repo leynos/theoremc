@@ -28,7 +28,7 @@ use crate::schema::value::TheoremValue;
     ArgValue::Literal(LiteralValue::Float(99.5))
 )]
 fn scalar_values_decode_as_literals(#[case] input: TheoremValue, #[case] expected: ArgValue) {
-    let result = decode_arg_value("param", input);
+    let result = decode_arg_value(ParamName::new("param"), input);
     assert_eq!(result.expect("should decode"), expected);
 }
 
@@ -41,7 +41,7 @@ fn scalar_values_decode_as_literals(#[case] input: TheoremValue, #[case] expecte
 #[case::single_letter("a", "a")]
 fn valid_ref_decodes_as_reference(#[case] name: &str, #[case] expected: &str) {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(name.to_owned()))]);
-    let result = decode_arg_value("param", TheoremValue::Mapping(map));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map));
     assert_eq!(
         result.expect("should decode"),
         ArgValue::Reference(expected.to_owned())
@@ -53,7 +53,8 @@ fn valid_ref_decodes_as_reference(#[case] name: &str, #[case] expected: &str) {
 #[test]
 fn empty_ref_name_is_rejected() {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(String::new()))]);
-    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::EmptyRefTarget {
@@ -67,7 +68,8 @@ fn empty_ref_name_is_rejected() {
 #[case::keyword_let("let")]
 fn keyword_ref_name_is_rejected(#[case] name: &str) {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(name.to_owned()))]);
-    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::ReservedKeyword {
@@ -82,7 +84,8 @@ fn keyword_ref_name_is_rejected(#[case] name: &str) {
 #[case::contains_hyphen("foo-bar")]
 fn invalid_identifier_ref_name_is_rejected(#[case] name: &str) {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(name.to_owned()))]);
-    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::InvalidIdentifier {
@@ -101,7 +104,8 @@ fn ref_with_non_string_value_is_rejected(
     #[case] expected_kind: &'static str,
 ) {
     let map = IndexMap::from([("ref".to_owned(), value)]);
-    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::NonStringRefTarget {
@@ -116,7 +120,7 @@ fn ref_with_non_string_value_is_rejected(
 #[test]
 fn other_single_key_map_is_raw_map() {
     let map = IndexMap::from([("other_key".to_owned(), TheoremValue::String("value".into()))]);
-    let result = decode_arg_value("param", TheoremValue::Mapping(map.clone()));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map.clone()));
     assert_eq!(result.expect("should decode"), ArgValue::RawMap(map));
 }
 
@@ -126,21 +130,21 @@ fn multi_key_map_with_ref_is_raw_map() {
         ("ref".to_owned(), TheoremValue::String("name".into())),
         ("extra".to_owned(), TheoremValue::Integer(1)),
     ]);
-    let result = decode_arg_value("param", TheoremValue::Mapping(map.clone()));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map.clone()));
     assert_eq!(result.expect("should decode"), ArgValue::RawMap(map));
 }
 
 #[test]
 fn empty_map_is_raw_map() {
     let map = IndexMap::new();
-    let result = decode_arg_value("param", TheoremValue::Mapping(map.clone()));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map.clone()));
     assert_eq!(result.expect("should decode"), ArgValue::RawMap(map));
 }
 
 #[test]
 fn sequence_is_raw_sequence() {
     let seq = vec![TheoremValue::Integer(1), TheoremValue::Integer(2)];
-    let result = decode_arg_value("param", TheoremValue::Sequence(seq.clone()));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Sequence(seq.clone()));
     assert_eq!(result.expect("should decode"), ArgValue::RawSequence(seq));
 }
 
@@ -152,7 +156,7 @@ fn sequence_is_raw_sequence() {
 #[case::whitespace_string("  spaces  ", "  spaces  ")]
 fn valid_literal_wrapper_decodes_as_string_literal(#[case] input: &str, #[case] expected: &str) {
     let map = IndexMap::from([("literal".to_owned(), TheoremValue::String(input.to_owned()))]);
-    let result = decode_arg_value("param", TheoremValue::Mapping(map));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map));
     assert_eq!(
         result.expect("should decode"),
         ArgValue::Literal(LiteralValue::String(expected.to_owned()))
@@ -176,7 +180,8 @@ fn literal_with_non_string_value_is_rejected(
     #[case] expected_kind: &'static str,
 ) {
     let map = IndexMap::from([("literal".to_owned(), value)]);
-    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::NonStringLiteralValue {
@@ -192,7 +197,7 @@ fn multi_key_map_with_literal_is_raw_map() {
         ("literal".to_owned(), TheoremValue::String("text".into())),
         ("extra".to_owned(), TheoremValue::Integer(1)),
     ]);
-    let result = decode_arg_value("param", TheoremValue::Mapping(map.clone()));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map.clone()));
     assert_eq!(result.expect("should decode"), ArgValue::RawMap(map));
 }
 
@@ -201,7 +206,8 @@ fn multi_key_map_with_literal_is_raw_map() {
 #[test]
 fn error_message_includes_param_name() {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String("fn".into()))]);
-    let err = decode_arg_value("graph_ref", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("graph_ref"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::ReservedKeyword {
@@ -220,7 +226,8 @@ fn error_message_includes_param_name() {
 #[test]
 fn literal_error_message_includes_param_name() {
     let map = IndexMap::from([("literal".to_owned(), TheoremValue::Integer(7))]);
-    let err = decode_arg_value("my_label", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("my_label"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::NonStringLiteralValue {

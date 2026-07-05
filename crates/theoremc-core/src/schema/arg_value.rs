@@ -206,6 +206,24 @@ pub enum LiteralValue {
     String(String),
 }
 
+/// Identifies the action-call argument being decoded, for diagnostic breadcrumbs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParamName<'a>(&'a str);
+
+impl<'a> ParamName<'a> {
+    /// Creates a parameter-name breadcrumb from the YAML argument key.
+    #[must_use]
+    pub const fn new(name: &'a str) -> Self {
+        Self(name)
+    }
+
+    /// Returns the underlying YAML argument key.
+    #[must_use]
+    pub const fn as_str(self) -> &'a str {
+        self.0
+    }
+}
+
 /// Decodes a raw [`TheoremValue`] into a semantically typed [`ArgValue`].
 ///
 /// Decoding rules (`TFS-5` section 5.2):
@@ -245,11 +263,14 @@ pub enum LiteralValue {
 /// # Examples
 ///
 ///     use theoremc_core::schema::{ArgValue, LiteralValue, TheoremValue};
-///     use theoremc_core::schema::arg_value::decode_arg_value;
+///     use theoremc_core::schema::arg_value::{ParamName, decode_arg_value};
 ///
-///     let result = decode_arg_value("name", TheoremValue::String("hello".into()));
+///     let result = decode_arg_value(ParamName::new("name"), TheoremValue::String("hello".into()));
 ///     assert_eq!(result.unwrap(), ArgValue::Literal(LiteralValue::String("hello".into())));
-pub fn decode_arg_value(param_name: &str, value: TheoremValue) -> Result<ArgValue, ArgDecodeError> {
+pub fn decode_arg_value(
+    param_name: ParamName<'_>,
+    value: TheoremValue,
+) -> Result<ArgValue, ArgDecodeError> {
     match value {
         TheoremValue::Bool(b) => Ok(ArgValue::Literal(LiteralValue::Bool(b))),
         TheoremValue::Integer(n) => Ok(ArgValue::Literal(LiteralValue::Integer(n))),
@@ -264,7 +285,7 @@ pub fn decode_arg_value(param_name: &str, value: TheoremValue) -> Result<ArgValu
 /// `Literal`) if the map has exactly one recognized sentinel key, or
 /// a `RawMap` for all other maps (struct literal candidates).
 fn decode_mapping(
-    param_name: &str,
+    param_name: ParamName<'_>,
     map: IndexMap<String, TheoremValue>,
 ) -> Result<ArgValue, ArgDecodeError> {
     let Some(kind) = classify_sentinel(&map) else {
@@ -300,30 +321,33 @@ fn classify_sentinel(map: &IndexMap<String, TheoremValue>) -> Option<SentinelKin
 }
 
 /// Validates the `ref` target value and produces an `ArgValue::Reference`.
-fn decode_ref_target(param_name: &str, value: TheoremValue) -> Result<ArgValue, ArgDecodeError> {
+fn decode_ref_target(
+    param_name: ParamName<'_>,
+    value: TheoremValue,
+) -> Result<ArgValue, ArgDecodeError> {
     let TheoremValue::String(name) = value else {
         return Err(ArgDecodeError::NonStringRefTarget {
-            param: param_name.to_owned(),
+            param: param_name.as_str().to_owned(),
             kind: non_string_kind(&value),
         });
     };
 
     if name.is_empty() {
         return Err(ArgDecodeError::EmptyRefTarget {
-            param: param_name.to_owned(),
+            param: param_name.as_str().to_owned(),
         });
     }
 
     if !is_valid_ascii_identifier_pattern(&name) {
         return Err(ArgDecodeError::InvalidIdentifier {
-            param: param_name.to_owned(),
+            param: param_name.as_str().to_owned(),
             name,
         });
     }
 
     if is_rust_reserved_keyword(&name) {
         return Err(ArgDecodeError::ReservedKeyword {
-            param: param_name.to_owned(),
+            param: param_name.as_str().to_owned(),
             name,
         });
     }
@@ -337,12 +361,12 @@ fn decode_ref_target(param_name: &str, value: TheoremValue) -> Result<ArgValue, 
 /// Unlike [`decode_ref_target`], empty strings are accepted because
 /// an empty string is a valid string literal.
 fn decode_literal_target(
-    param_name: &str,
+    param_name: ParamName<'_>,
     value: TheoremValue,
 ) -> Result<ArgValue, ArgDecodeError> {
     let TheoremValue::String(s) = value else {
         return Err(ArgDecodeError::NonStringLiteralValue {
-            param: param_name.to_owned(),
+            param: param_name.as_str().to_owned(),
             kind: non_string_kind(&value),
         });
     };

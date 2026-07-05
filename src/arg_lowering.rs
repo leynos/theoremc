@@ -14,7 +14,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::schema::TheoremValue;
-use crate::schema::arg_value::{ArgValue, LiteralValue, decode_arg_value};
+use crate::schema::arg_value::{ArgValue, LiteralValue, ParamName, decode_arg_value};
 
 /// Errors produced during argument lowering.
 #[derive(Debug, Clone, thiserror::Error, PartialEq, Eq)]
@@ -188,12 +188,13 @@ fn lower_theorem_value(
             // Attempt sentinel decoding first: maps like { ref: graph } or
             // { literal: "x" } are valid nested values that decode into
             // ArgValue::Reference or ArgValue::Literal respectively.
-            let decoded = decode_arg_value(param_name, value.clone()).map_err(|e| {
-                LoweringError::NestedDecodeError {
-                    param: param_name.to_owned(),
-                    detail: e.to_string(),
-                }
-            })?;
+            let decoded =
+                decode_arg_value(ParamName::new(param_name), value.clone()).map_err(|e| {
+                    LoweringError::NestedDecodeError {
+                        param: param_name.to_owned(),
+                        detail: e.to_string(),
+                    }
+                })?;
             match decoded {
                 ArgValue::Literal(lit) => lower_literal(param_name, &lit),
                 ArgValue::Reference(name) => lower_reference(param_name, &name),

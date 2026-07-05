@@ -10,7 +10,7 @@
 use indexmap::IndexMap;
 use serde::Deserialize;
 
-use super::arg_value::{ArgDecodeError, decode_arg_value};
+use super::arg_value::{ArgDecodeError, ParamName, decode_arg_value};
 use super::types::{
     ActionCall, LetBinding, LetCall, LetMust, MaybeBlock, Step, StepCall, StepMaybe, StepMust,
 };
@@ -112,7 +112,7 @@ pub(crate) struct RawMaybeBlock {
 pub(crate) fn convert_action_call(raw: &RawActionCall) -> Result<ActionCall, ArgDecodeError> {
     let mut args = IndexMap::with_capacity(raw.args.len());
     for (key, value) in &raw.args {
-        let decoded = decode_arg_value(key, value.clone())?;
+        let decoded = decode_arg_value(ParamName::new(key), value.clone())?;
         args.insert(key.clone(), decoded);
     }
     Ok(ActionCall {
