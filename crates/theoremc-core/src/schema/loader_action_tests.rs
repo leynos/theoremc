@@ -123,6 +123,24 @@ Witness:
     because: always reachable
 "#;
 
+const FREE_LIFETIME_ACTION_RETURN_YAML: &str = r#"
+Theorem: InvalidActionReturnLifetime
+About: Declares an unbound action return lifetime
+Actions:
+  account.deposit:
+    returns: "&'a crate::DepositOutcome"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+"#;
+
 #[rstest]
 #[case(
     INVALID_ACTION_TYPE_YAML,
@@ -131,6 +149,10 @@ Witness:
 #[case(
     FREE_LIFETIME_ACTION_YAML,
     "Actions entry 'account.deposit': account type contains a free named lifetime parameter 'a'"
+)]
+#[case(
+    FREE_LIFETIME_ACTION_RETURN_YAML,
+    "Actions entry 'account.deposit': returns type contains a free named lifetime parameter 'a'"
 )]
 fn invalid_action_type_or_free_lifetime_is_rejected(
     #[case] yaml: &str,

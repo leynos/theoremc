@@ -95,12 +95,28 @@ Witness:
     because: always reachable
 "#;
 
-const FREE_LIFETIME_ACTION_RETURN_YAML: &str = r#"
-Theorem: InvalidActionReturnLifetime
-About: Declares an unbound action return lifetime
-Actions:
-  account.deposit:
-    returns: "&'a crate::DepositOutcome"
+const BOUND_LIFETIME_BARE_FN_YAML: &str = r#"
+Theorem: BoundBareFunctionLifetime
+About: Declares a bound bare function lifetime
+Forall:
+  callback: "for<'a> fn(&'a crate::Account)"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+"#;
+
+const BOUND_LIFETIME_TRAIT_OBJECT_YAML: &str = r#"
+Theorem: BoundTraitObjectLifetime
+About: Declares a bound trait object lifetime
+Forall:
+  callback: "dyn for<'a> Trait<&'a crate::Account>"
 Prove:
   - assert: 'true'
     because: trivially true
@@ -129,6 +145,14 @@ fn invalid_rust_type_or_free_lifetime_is_rejected(
     assert_parse_error_contains(yaml, expected_fragment);
 }
 
+#[rstest]
+#[case(BOUND_LIFETIME_BARE_FN_YAML)]
+#[case(BOUND_LIFETIME_TRAIT_OBJECT_YAML)]
+fn bound_lifetime_rust_types_are_accepted(#[case] yaml: &str) {
+    load_theorem_docs(yaml).expect("bound lifetime type should parse");
+}
+
+#[rstest]
 fn load_multi_document_file() {
     let yaml = r"
 Theorem: First

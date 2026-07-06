@@ -3,11 +3,29 @@
 use super::tests_support::{TheoremFixture, expand_fixture};
 use camino::Utf8Path;
 
+macro_rules! theorem_with_trailer {
+    ($($body:literal),+ $(,)?) => {
+        concat!(
+            $($body,)+
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+        )
+    };
+}
+
 #[test]
 fn expansion_emits_referenced_type_probes_for_forall_and_actions()
 -> Result<(), Box<dyn std::error::Error>> {
     let theorem = TheoremFixture(
-        concat!(
+        theorem_with_trailer!(
             "Theorem: ReferencedTypes\n",
             "About: Probe all declared Rust types\n",
             "Forall:\n",
@@ -25,16 +43,7 @@ fn expansion_emits_referenced_type_probes_for_forall_and_actions()
             "      args:\n",
             "        command:\n",
             "          amount: 10\n",
-            "Witness:\n",
-            "  - cover: \"true\"\n",
-            "    because: \"reachable\"\n",
-            "Prove:\n",
-            "  - assert: \"true\"\n",
-            "    because: \"trivial\"\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
+            "      as: outcome\n",
         )
         .to_owned(),
     );
@@ -72,7 +81,7 @@ fn expansion_emits_referenced_type_probes_for_forall_and_actions()
 fn expansion_emits_referenced_type_probes_for_primitive_types()
 -> Result<(), Box<dyn std::error::Error>> {
     let theorem = TheoremFixture(
-        concat!(
+        theorem_with_trailer!(
             "Theorem: PrimitiveTypes\n",
             "About: Probe primitive Rust types\n",
             "Forall:\n",
@@ -87,16 +96,6 @@ fn expansion_emits_referenced_type_probes_for_primitive_types()
             "      action: flag.check\n",
             "      args:\n",
             "        flag: true\n",
-            "Witness:\n",
-            "  - cover: \"true\"\n",
-            "    because: \"reachable\"\n",
-            "Prove:\n",
-            "  - assert: \"true\"\n",
-            "    because: \"trivial\"\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
         )
         .to_owned(),
     );
@@ -121,56 +120,37 @@ fn expansion_emits_referenced_type_probes_for_primitive_types()
 #[test]
 fn expansion_deduplicates_whitespace_equivalent_referenced_types()
 -> Result<(), Box<dyn std::error::Error>> {
-    let theorem = TheoremFixture(
-        concat!(
-            "Theorem: CompactType\n",
-            "About: First reference uses compact spacing\n",
-            "Actions:\n",
-            "  payload.write:\n",
-            "    params:\n",
-            "      buffer: Vec<u8>\n",
-            "    returns: u64\n",
-            "Do:\n",
-            "  - call:\n",
-            "      action: payload.write\n",
-            "      args:\n",
-            "        buffer: [0]\n",
-            "Witness:\n",
-            "  - cover: \"true\"\n",
-            "    because: \"reachable\"\n",
-            "Prove:\n",
-            "  - assert: \"true\"\n",
-            "    because: \"trivial\"\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-            "---\n",
-            "Theorem: SpacedType\n",
-            "About: Second reference uses extra spacing\n",
-            "Actions:\n",
-            "  payload.write:\n",
-            "    params:\n",
-            "      buffer: \"Vec <u8>\"\n",
-            "    returns: u64\n",
-            "Do:\n",
-            "  - call:\n",
-            "      action: payload.write\n",
-            "      args:\n",
-            "        buffer: [0]\n",
-            "Witness:\n",
-            "  - cover: \"true\"\n",
-            "    because: \"reachable\"\n",
-            "Prove:\n",
-            "  - assert: \"true\"\n",
-            "    because: \"trivial\"\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-        )
-        .to_owned(),
+    let compact_theorem = theorem_with_trailer!(
+        "Theorem: CompactType\n",
+        "About: First reference uses compact spacing\n",
+        "Actions:\n",
+        "  payload.write:\n",
+        "    params:\n",
+        "      buffer: Vec<u8>\n",
+        "    returns: u64\n",
+        "Do:\n",
+        "  - call:\n",
+        "      action: payload.write\n",
+        "      args:\n",
+        "        buffer: [0]\n",
+        "      as: compact_len\n",
     );
+    let spaced_theorem = theorem_with_trailer!(
+        "Theorem: SpacedType\n",
+        "About: Second reference uses extra spacing\n",
+        "Actions:\n",
+        "  payload.write:\n",
+        "    params:\n",
+        "      buffer: \"Vec <u8>\"\n",
+        "    returns: u64\n",
+        "Do:\n",
+        "  - call:\n",
+        "      action: payload.write\n",
+        "      args:\n",
+        "        buffer: [0]\n",
+        "      as: spaced_len\n",
+    );
+    let theorem = TheoremFixture(format!("{compact_theorem}---\n{spaced_theorem}"));
 
     let expanded = expand_fixture(Utf8Path::new("theorems/equivalent-types.theorem"), &theorem)?;
     let probe_count = expanded
@@ -188,19 +168,9 @@ fn expansion_deduplicates_whitespace_equivalent_referenced_types()
 fn expansion_omits_referenced_type_probe_block_when_no_types_are_referenced()
 -> Result<(), Box<dyn std::error::Error>> {
     let theorem = TheoremFixture(
-        concat!(
+        theorem_with_trailer!(
             "Theorem: NoReferencedTypes\n",
             "About: No Forall entries and no Actions map\n",
-            "Witness:\n",
-            "  - cover: \"true\"\n",
-            "    because: \"reachable\"\n",
-            "Prove:\n",
-            "  - assert: \"true\"\n",
-            "    because: \"trivial\"\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
         )
         .to_owned(),
     );

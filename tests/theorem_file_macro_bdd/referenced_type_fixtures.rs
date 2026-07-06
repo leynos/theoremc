@@ -1,6 +1,24 @@
 //! Fixture sources for theorem-file referenced-type behavioural tests.
 
-pub(crate) const REFERENCED_TYPES_THEOREM: &str = concat!(
+macro_rules! theorem_with_trailer {
+    ($($body:literal),+ $(,)?) => {
+        concat!(
+            $($body,)+
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+        )
+    };
+}
+
+pub(crate) const REFERENCED_TYPES_THEOREM: &str = theorem_with_trailer!(
     "Theorem: ReferencedTypeSmoke\n",
     "About: Referenced type probe coverage\n",
     "Forall:\n",
@@ -16,36 +34,17 @@ pub(crate) const REFERENCED_TYPES_THEOREM: &str = concat!(
     "      args:\n",
     "        command:\n",
     "          amount: 10\n",
-    "Witness:\n",
-    "  - cover: \"true\"\n",
-    "    because: \"reachable\"\n",
-    "Prove:\n",
-    "  - assert: \"true\"\n",
-    "    because: \"trivial\"\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 1\n",
-    "    expect: SUCCESS\n",
+    "      as: outcome\n",
 );
 
-pub(crate) const MISSING_FORALL_TYPE_THEOREM: &str = concat!(
+pub(crate) const MISSING_FORALL_TYPE_THEOREM: &str = theorem_with_trailer!(
     "Theorem: MissingForallType\n",
     "About: Missing Forall type probe coverage\n",
     "Forall:\n",
     "  account: crate::MissingAccount\n",
-    "Witness:\n",
-    "  - cover: \"true\"\n",
-    "    because: \"reachable\"\n",
-    "Prove:\n",
-    "  - assert: \"true\"\n",
-    "    because: \"trivial\"\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 1\n",
-    "    expect: SUCCESS\n",
 );
 
-pub(crate) const MOVED_ACTION_TYPE_THEOREM: &str = concat!(
+pub(crate) const MOVED_ACTION_TYPE_THEOREM: &str = theorem_with_trailer!(
     "Theorem: MovedActionType\n",
     "About: Moved Actions type probe coverage\n",
     "Actions:\n",
@@ -53,16 +52,6 @@ pub(crate) const MOVED_ACTION_TYPE_THEOREM: &str = concat!(
     "    params:\n",
     "      command: crate::old::DepositCommand\n",
     "    returns: crate::DepositOutcome\n",
-    "Witness:\n",
-    "  - cover: \"true\"\n",
-    "    because: \"reachable\"\n",
-    "Prove:\n",
-    "  - assert: \"true\"\n",
-    "    because: \"trivial\"\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 1\n",
-    "    expect: SUCCESS\n",
 );
 
 pub(crate) const REFERENCED_TYPES_LIB_RS: &str = concat!(
