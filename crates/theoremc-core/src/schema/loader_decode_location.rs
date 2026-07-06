@@ -102,6 +102,34 @@ fn locate_let_binding_argument(
     None
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DoStepLineOutcome {
+    Found(usize, usize),
+    ExitScope,
+    Continue,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DoStepLineContext<'a> {
+    scope: StepScope,
+    indent: usize,
+    argument_name: YamlKey<'a>,
+}
+
+fn scan_do_step_line(
+    index: usize,
+    line: &str,
+    context: DoStepLineContext<'_>,
+) -> DoStepLineOutcome {
+    if context.scope != StepScope::SelectedStart && exits_scope(line, context.indent) {
+        return DoStepLineOutcome::ExitScope;
+    }
+    match locate_argument_line(index, line, context.argument_name) {
+        Some((row, column)) => DoStepLineOutcome::Found(row, column),
+        None => DoStepLineOutcome::Continue,
+    }
+}
+
 fn locate_do_step_argument(
     input: &str,
     start_index: usize,
@@ -129,11 +157,15 @@ fn locate_do_step_argument(
         let Some(indent) = step_indent else {
             continue;
         };
-        if scope != StepScope::SelectedStart && exits_scope(line, indent) {
-            break;
-        }
-        if let Some(location) = locate_argument_line(index, line, argument_name) {
-            return Some(location);
+        let context = DoStepLineContext {
+            scope,
+            indent,
+            argument_name,
+        };
+        match scan_do_step_line(index, line, context) {
+            DoStepLineOutcome::Found(row, column) => return Some((row, column)),
+            DoStepLineOutcome::ExitScope => break,
+            DoStepLineOutcome::Continue => {}
         }
     }
 
