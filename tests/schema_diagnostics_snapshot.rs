@@ -2,14 +2,13 @@
 
 mod common;
 
-use common::load_fixture;
+use common::{fixture_source_id, load_fixture};
 use rstest::rstest;
-use theoremc::schema::{SourceId, load_theorem_docs_with_source};
+use theoremc::schema::load_theorem_docs_with_source;
 
 fn render_diagnostic_for_fixture(fixture_name: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let source = format!("tests/fixtures/{fixture_name}");
     let yaml = load_fixture(fixture_name)?;
-    let error = load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
+    let error = load_theorem_docs_with_source(&fixture_source_id(fixture_name), &yaml)
         .err()
         .ok_or_else(|| std::io::Error::other("fixture should fail"))?;
     let diagnostic = error.diagnostic().ok_or_else(|| {

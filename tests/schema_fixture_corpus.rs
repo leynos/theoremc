@@ -2,18 +2,13 @@
 
 mod common;
 
-use common::load_fixture;
+use common::{fixture_source, fixture_source_id, load_fixture};
 use rstest::rstest;
-use theoremc::schema::{SourceId, load_theorem_docs_with_source};
-
-fn fixture_source(fixture_name: &str) -> String {
-    format!("tests/fixtures/{fixture_name}")
-}
+use theoremc::schema::load_theorem_docs_with_source;
 
 fn load_from_fixture(fixture_name: &str) -> Result<(), String> {
-    let source = fixture_source(fixture_name);
     let yaml = load_fixture(fixture_name).map_err(|error| error.to_string())?;
-    load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
+    load_theorem_docs_with_source(&fixture_source_id(fixture_name), &yaml)
         .map(|_| ())
         .map_err(|error| error.to_string())
 }
@@ -41,7 +36,7 @@ fn valid_fixture_corpus_parses(#[case] fixture_name: &str) {
 fn invalid_fixture_corpus_fails_with_diagnostic_source(#[case] fixture_name: &str) {
     let source = fixture_source(fixture_name);
     let yaml = load_fixture(fixture_name).expect("failed to load fixture");
-    let result = load_theorem_docs_with_source(&SourceId::new(&source), &yaml);
+    let result = load_theorem_docs_with_source(&fixture_source_id(fixture_name), &yaml);
     let error = result.expect_err("expected fixture to fail");
     let diagnostic = error.diagnostic().expect("diagnostic should be present");
     assert_eq!(diagnostic.location.source, source);

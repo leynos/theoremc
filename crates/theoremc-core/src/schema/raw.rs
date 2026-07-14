@@ -8,73 +8,13 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, de::Error};
 use serde_saphyr::{Location, Spanned};
 
-use super::arg_value::ArgDecodeError;
+use crate::canonical_action_name::{CanonicalActionName, InvalidCanonicalActionName};
+
 use super::newtypes::{ForallVar, TheoremName};
-use super::raw_action::{self, RawLetBinding, RawStep};
-use super::types::{Evidence, KaniEvidence, KaniExpectation, TheoremDoc};
-use super::validate::reason_markers;
+use super::raw_action::{self, RawActionCallDecodeError, RawLetBinding, RawStep};
+use super::types::{ActionSignature, Evidence, KaniEvidence, KaniExpectation, TheoremDoc};
+use super::validate::{ValidationField, ValidationPath};
 use super::value::TheoremValue;
-
-/// Semantic wrapper for validation failure reason strings.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct ValidationReason<'a>(&'a str);
-
-impl<'a> ValidationReason<'a> {
-    pub(crate) const fn new(reason: &'a str) -> Self {
-        Self(reason)
-    }
-
-    pub(crate) const fn as_str(&self) -> &'a str {
-        self.0
-    }
-
-    fn kind(self) -> Option<ValidationKind> {
-        let reason = self.as_str();
-        let is_because = reason.contains(reason_markers::BECAUSE_FIELD_FRAGMENT);
-
-        if reason.starts_with(reason_markers::ABOUT_NON_EMPTY) {
-            return Some(ValidationKind::AboutEmpty);
-        }
-
-        if let Some(index) = indexed_error_position(self, reason_markers::PROVE_ASSERTION) {
-            return Some(ValidationKind::Prove { index, is_because });
-        }
-
-        if let Some(index) = indexed_error_position(self, reason_markers::ASSUME_CONSTRAINT) {
-            return Some(ValidationKind::Assume { index, is_because });
-        }
-
-        if let Some(index) = indexed_error_position(self, reason_markers::WITNESS) {
-            return Some(ValidationKind::Witness { index, is_because });
-        }
-
-        if reason.starts_with(reason_markers::KANI_UNWIND_NON_ZERO) {
-            return Some(ValidationKind::KaniUnwind);
-        }
-
-        if reason.starts_with(reason_markers::KANI_VACUITY_REASON_REQUIRED) {
-            return Some(ValidationKind::KaniAllowVacuousRequired);
-        }
-
-        if reason.starts_with(reason_markers::KANI_VACUITY_REASON_NON_EMPTY) {
-            return Some(ValidationKind::KaniVacuityBecauseNonEmpty);
-        }
-
-        None
-    }
-}
-
-/// Classification of validation reason shapes used for location mapping.
-#[derive(Debug, Clone, Copy)]
-enum ValidationKind {
-    AboutEmpty,
-    Prove { index: usize, is_because: bool },
-    Assume { index: usize, is_because: bool },
-    Witness { index: usize, is_because: bool },
-    KaniUnwind,
-    KaniAllowVacuousRequired,
-    KaniVacuityBecauseNonEmpty,
-}
 
 /// Errors raised during the raw-to-public conversion in
 /// [`RawTheoremDoc::to_theorem_doc`].
@@ -86,14 +26,24 @@ enum ValidationKind {
 /// [`SchemaError::ValidationFailed`](super::error::SchemaError::ValidationFailed).
 #[derive(Debug, Clone, thiserror::Error)]
 pub(crate) enum RawDocDecodeError {
+    /// An `Actions` map key failed canonical action-name validation.
+    #[error("Actions entry '{action}': {source}")]
+    ActionSignature {
+        /// Rejected action-name string.
+        action: String,
+        /// Underlying typed validation failure.
+        #[source]
+        source: InvalidCanonicalActionName,
+    },
+
     /// An argument in a `Let` binding failed decoding.
     #[error("Let binding '{name}': {source}")]
     LetBinding {
         /// The binding name from the `Let` map.
         name: String,
-        /// The underlying argument decoding failure.
+        /// The underlying action-call decoding failure.
         #[source]
-        source: ArgDecodeError,
+        source: Box<RawActionCallDecodeError>,
     },
 
     /// An argument in a `Do` step failed decoding.
@@ -101,10 +51,21 @@ pub(crate) enum RawDocDecodeError {
     DoStep {
         /// One-based step index in the `Do` list.
         index: usize,
-        /// The underlying argument decoding failure.
+        /// The underlying action-call decoding failure.
         #[source]
-        source: ArgDecodeError,
+        source: Box<RawActionCallDecodeError>,
     },
+}
+
+impl RawDocDecodeError {
+    /// Returns the source location most closely associated with this error.
+    #[must_use]
+    pub(crate) const fn location(&self) -> Option<Location> {
+        match self {
+            Self::ActionSignature { .. } => None,
+            Self::LetBinding { source, .. } | Self::DoStep { source, .. } => source.location(),
+        }
+    }
 }
 
 /// Raw theorem document with location-carrying fields.
@@ -198,6 +159,7 @@ impl RawTheoremDoc {
     /// Returns [`RawDocDecodeError`] when an argument value fails
     /// decoding (e.g., an invalid `{ ref: ... }` target).
     pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, RawDocDecodeError> {
+        let actions = convert_actions(&self.actions)?;
         let let_bindings = convert_let_bindings(&self.let_bindings)?;
         let do_steps = convert_steps(&self.do_steps)?;
 
@@ -208,7 +170,7 @@ impl RawTheoremDoc {
             tags: self.tags.clone(),
             given: self.given.clone(),
             forall: self.forall.clone(),
-            actions: self.actions.clone(),
+            actions,
             assume: self
                 .assume
                 .iter()
@@ -245,59 +207,56 @@ impl RawTheoremDoc {
         self.theorem.referenced
     }
 
-    /// Returns the best-effort field location for a validation error reason.
+    /// Returns the best-effort field location for a typed validation path.
     #[must_use]
-    pub(crate) fn location_for_validation_reason(&self, reason: ValidationReason<'_>) -> Location {
-        self.location_for_reason(reason)
+    pub(crate) fn location_for_validation_path(&self, path: ValidationPath) -> Location {
+        self.location_for_path(path)
             .unwrap_or_else(|| self.theorem_location())
     }
 
-    fn location_for_reason(&self, reason: ValidationReason<'_>) -> Option<Location> {
-        match reason.kind()? {
-            ValidationKind::AboutEmpty => Some(self.about.referenced),
-            ValidationKind::Prove { index, is_because } => {
-                let prove = self.prove.get(index)?;
-                Some(if is_because {
-                    prove.because.referenced
-                } else {
-                    prove.assert_expr.referenced
+    fn location_for_path(&self, path: ValidationPath) -> Option<Location> {
+        match path {
+            ValidationPath::Theorem => Some(self.theorem_location()),
+            ValidationPath::About => Some(self.about.referenced),
+            ValidationPath::Prove { index, field } => {
+                let prove = self.prove.get(index.checked_sub(1)?)?;
+                Some(match field {
+                    ValidationField::Because => prove.because.referenced,
+                    ValidationField::Assert => prove.assert_expr.referenced,
+                    ValidationField::Expr | ValidationField::Cover => return None,
                 })
             }
-            ValidationKind::Assume { index, is_because } => {
-                let assume = self.assume.get(index)?;
-                Some(if is_because {
-                    assume.because.referenced
-                } else {
-                    assume.expr.referenced
+            ValidationPath::Assume { index, field } => {
+                let assume = self.assume.get(index.checked_sub(1)?)?;
+                Some(match field {
+                    ValidationField::Because => assume.because.referenced,
+                    ValidationField::Expr => assume.expr.referenced,
+                    ValidationField::Assert | ValidationField::Cover => return None,
                 })
             }
-            ValidationKind::Witness { index, is_because } => {
-                let witness = self.witness.get(index)?;
-                Some(if is_because {
-                    witness.because.referenced
-                } else {
-                    witness.cover.referenced
+            ValidationPath::Witness { index, field } => {
+                let witness = self.witness.get(index.checked_sub(1)?)?;
+                Some(match field {
+                    ValidationField::Because => witness.because.referenced,
+                    ValidationField::Cover => witness.cover.referenced,
+                    ValidationField::Assert | ValidationField::Expr => return None,
                 })
             }
-            ValidationKind::KaniUnwind => self
+            ValidationPath::KaniUnwind => self
                 .evidence
                 .kani
                 .as_ref()
                 .map(|kani| kani.unwind.referenced),
-            ValidationKind::KaniAllowVacuousRequired => {
-                self.evidence.kani.as_ref().and_then(|kani| {
-                    kani.allow_vacuous
-                        .as_ref()
-                        .map(|allow_vacuous| allow_vacuous.referenced)
-                })
-            }
-            ValidationKind::KaniVacuityBecauseNonEmpty => {
-                self.evidence.kani.as_ref().and_then(|kani| {
-                    kani.vacuity_because
-                        .as_ref()
-                        .map(|vacuity_because| vacuity_because.referenced)
-                })
-            }
+            ValidationPath::KaniAllowVacuous => self.evidence.kani.as_ref().and_then(|kani| {
+                kani.allow_vacuous
+                    .as_ref()
+                    .map(|allow_vacuous| allow_vacuous.referenced)
+            }),
+            ValidationPath::KaniVacuityBecause => self.evidence.kani.as_ref().and_then(|kani| {
+                kani.vacuity_because
+                    .as_ref()
+                    .map(|vacuity_because| vacuity_because.referenced)
+            }),
         }
     }
 }
@@ -329,7 +288,24 @@ impl RawKaniEvidence {
     }
 }
 
-// ── Argument decoding helpers ────────────────────────────────────────
+// ── Domain conversion helpers ────────────────────────────────────────
+
+/// Converts raw action signature keys into canonical action-name keys.
+fn convert_actions(
+    raw: &IndexMap<String, ActionSignature>,
+) -> Result<IndexMap<CanonicalActionName, ActionSignature>, RawDocDecodeError> {
+    let mut out = IndexMap::with_capacity(raw.len());
+    for (action, signature) in raw {
+        let canonical = CanonicalActionName::new(action).map_err(|source| {
+            RawDocDecodeError::ActionSignature {
+                action: action.clone(),
+                source,
+            }
+        })?;
+        out.insert(canonical, signature.clone());
+    }
+    Ok(out)
+}
 
 /// Converts a map of raw `Let` bindings, decoding argument values.
 fn convert_let_bindings(
@@ -340,7 +316,7 @@ fn convert_let_bindings(
         let converted = raw_action::convert_let_binding(binding).map_err(|source| {
             RawDocDecodeError::LetBinding {
                 name: name.clone(),
-                source,
+                source: Box::new(source),
             }
         })?;
         out.insert(name.clone(), converted);
@@ -355,20 +331,11 @@ fn convert_steps(raw: &[RawStep]) -> Result<Vec<super::types::Step>, RawDocDecod
         let converted =
             raw_action::convert_step(step).map_err(|source| RawDocDecodeError::DoStep {
                 index: i + 1,
-                source,
+                source: Box::new(source),
             })?;
         out.push(converted);
     }
     Ok(out)
-}
-
-/// Parses indexed validation reason prefixes like `Prove assertion 2: …`.
-fn indexed_error_position(reason: ValidationReason<'_>, prefix: &str) -> Option<usize> {
-    let prefixed_tail = reason.as_str().strip_prefix(prefix)?;
-    let indexed_tail = prefixed_tail.strip_prefix(' ')?;
-    let (raw_index, _) = indexed_tail.split_once(':')?;
-    let parsed = raw_index.trim().parse::<usize>().ok()?;
-    parsed.checked_sub(1)
 }
 
 /// Deserializes optional `allow_vacuous` values as `Option<Spanned<bool>>`.
@@ -390,4 +357,210 @@ where
         },
         |value| Ok(Some(value)),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for raw-to-domain schema conversion.
+
+    use googletest::prelude::*;
+    use rstest::rstest;
+
+    use super::{RawDocDecodeError, RawTheoremDoc};
+    use crate::schema::validate::{ValidationField, ValidationPath};
+
+    const VALID_DOCUMENT: &str = r"
+Theorem: RawBoundary
+About: Exercises raw conversion
+Actions:
+  account.deposit:
+    params: {}
+Do:
+  - call:
+      action: account.deposit
+      args: {}
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+";
+
+    fn parse_one_raw_doc(yaml: &str) -> RawTheoremDoc {
+        serde_saphyr::from_multiple::<RawTheoremDoc>(yaml)
+            .expect("raw document should deserialize")
+            .into_iter()
+            .next()
+            .expect("test input should contain one document")
+    }
+
+    #[rstest]
+    fn raw_conversion_carries_canonical_action_names_into_domain() {
+        let raw_doc = parse_one_raw_doc(VALID_DOCUMENT);
+        let doc = raw_doc
+            .to_theorem_doc()
+            .expect("valid canonical action names should convert");
+
+        let action = doc
+            .do_steps
+            .first()
+            .and_then(|step| match step {
+                super::super::types::Step::Call(step) => Some(step.call.action.as_str()),
+                _ => None,
+            })
+            .expect("first step should be a call action");
+
+        assert_that!(doc.actions.get("account.deposit"), some(anything()));
+        assert_that!(action, eq("account.deposit"));
+    }
+
+    #[rstest]
+    fn raw_conversion_rejects_invalid_action_signature_key() {
+        let raw_doc = parse_one_raw_doc(&VALID_DOCUMENT.replace("account.deposit:", "deposit:"));
+        let error = raw_doc
+            .to_theorem_doc()
+            .expect_err("invalid Actions key should be rejected");
+
+        assert!(
+            matches!(
+                &error,
+                RawDocDecodeError::ActionSignature { action, .. } if action == "deposit"
+            ),
+            "expected invalid Actions key error, got: {error}",
+        );
+        assert_that!(
+            error.to_string(),
+            contains_substring("must contain at least two dot-separated segments")
+        );
+    }
+
+    #[rstest]
+    fn raw_conversion_rejects_invalid_action_call_name() {
+        let raw_doc = parse_one_raw_doc(
+            &VALID_DOCUMENT.replace("action: account.deposit", "action: deposit"),
+        );
+        let error = raw_doc
+            .to_theorem_doc()
+            .expect_err("invalid action call name should be rejected");
+
+        assert!(
+            matches!(&error, RawDocDecodeError::DoStep { index: 1, .. }),
+            "expected Do step action-name error, got: {error}",
+        );
+        assert_that!(
+            error.to_string(),
+            contains_substring("action 'deposit': invalid canonical action name")
+        );
+    }
+
+    #[rstest]
+    #[case::about(ValidationPath::About, |doc: &RawTheoremDoc| doc.about.referenced)]
+    #[case::prove_assert(
+        ValidationPath::Prove {
+            index: 1,
+            field: ValidationField::Assert,
+        },
+        |doc: &RawTheoremDoc| doc.prove[0].assert_expr.referenced
+    )]
+    #[case::prove_because(
+        ValidationPath::Prove {
+            index: 1,
+            field: ValidationField::Because,
+        },
+        |doc: &RawTheoremDoc| doc.prove[0].because.referenced
+    )]
+    #[case::assume_expr(
+        ValidationPath::Assume {
+            index: 1,
+            field: ValidationField::Expr,
+        },
+        |doc: &RawTheoremDoc| doc.assume[0].expr.referenced
+    )]
+    #[case::assume_because(
+        ValidationPath::Assume {
+            index: 1,
+            field: ValidationField::Because,
+        },
+        |doc: &RawTheoremDoc| doc.assume[0].because.referenced
+    )]
+    #[case::witness_cover(
+        ValidationPath::Witness {
+            index: 1,
+            field: ValidationField::Cover,
+        },
+        |doc: &RawTheoremDoc| doc.witness[0].cover.referenced
+    )]
+    #[case::witness_because(
+        ValidationPath::Witness {
+            index: 1,
+            field: ValidationField::Because,
+        },
+        |doc: &RawTheoremDoc| doc.witness[0].because.referenced
+    )]
+    #[case::kani_unwind(
+        ValidationPath::KaniUnwind,
+        |doc: &RawTheoremDoc| doc.evidence.kani.as_ref().expect("kani evidence").unwind.referenced
+    )]
+    #[case::kani_allow_vacuous(
+        ValidationPath::KaniAllowVacuous,
+        |doc: &RawTheoremDoc| {
+            doc.evidence
+                .kani
+                .as_ref()
+                .expect("kani evidence")
+                .allow_vacuous
+                .as_ref()
+                .expect("allow_vacuous")
+                .referenced
+        }
+    )]
+    #[case::kani_vacuity_because(
+        ValidationPath::KaniVacuityBecause,
+        |doc: &RawTheoremDoc| {
+            doc.evidence
+                .kani
+                .as_ref()
+                .expect("kani evidence")
+                .vacuity_because
+                .as_ref()
+                .expect("vacuity_because")
+                .referenced
+        }
+    )]
+    fn validation_path_maps_to_raw_field_location(
+        #[case] path: ValidationPath,
+        #[case] expected_location: fn(&RawTheoremDoc) -> serde_saphyr::Location,
+    ) {
+        let raw_doc = parse_one_raw_doc(
+            r"
+Theorem: RawBoundary
+About: Exercises raw conversion
+Assume:
+  - assume: 'balance > 0'
+    because: balance is positive
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+    allow_vacuous: true
+    vacuity_because: proof intentionally omits witnesses
+Witness:
+  - cover: 'true'
+    because: always reachable
+",
+        );
+
+        assert_that!(
+            raw_doc.location_for_validation_path(path),
+            eq(expected_location(&raw_doc))
+        );
+    }
 }

@@ -7,6 +7,7 @@
 mod common;
 
 use common::load_fixture;
+use pretty_assertions::assert_eq;
 use rstest::rstest;
 use theoremc::schema::{LetBinding, Step, load_theorem_docs};
 

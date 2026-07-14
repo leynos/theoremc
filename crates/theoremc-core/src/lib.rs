@@ -6,6 +6,9 @@
 /// Mangled-identifier collision detection across loaded theorem documents.
 pub mod collision;
 
+/// Canonical action-name grammar and domain newtype.
+pub mod canonical_action_name;
+
 /// Action name mangling for deterministic, injective resolution.
 pub mod mangle;
 

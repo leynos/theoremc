@@ -9,6 +9,7 @@ use quote::quote;
 use syn::{LitStr, parse_macro_input};
 use theoremc_core::{
     TheoremFileLoadError,
+    canonical_action_name::CanonicalActionName,
     collision::referenced_actions,
     load_theorem_file_from_manifest_dir,
     mangle::{mangle_action_name, mangle_module_path, mangle_theorem_harness},
@@ -217,7 +218,7 @@ fn generated_action_probes(
 
 fn action_signature_for<'a>(
     theorem_docs: &'a [theoremc_core::schema::TheoremDoc],
-    canonical: &str,
+    canonical: &CanonicalActionName,
 ) -> Result<&'a ActionSignature, MacroExpansionError> {
     let signatures = theorem_docs
         .iter()
@@ -225,7 +226,7 @@ fn action_signature_for<'a>(
         .collect::<Vec<_>>();
     let Some(first) = signatures.first().copied() else {
         return Err(MacroExpansionError::MissingActionSignature {
-            action: canonical.to_owned(),
+            action: canonical.as_str().to_owned(),
         });
     };
     if signatures
@@ -233,22 +234,22 @@ fn action_signature_for<'a>(
         .any(|signature| !signature.is_semantically_equivalent(first))
     {
         return Err(MacroExpansionError::ConflictingActionSignature {
-            action: canonical.to_owned(),
+            action: canonical.as_str().to_owned(),
         });
     }
     Ok(first)
 }
 
 fn action_probe(
-    canonical: &str,
+    canonical: &CanonicalActionName,
     signature: &ActionSignature,
 ) -> Result<GeneratedActionProbe, MacroExpansionError> {
     let param_types = signature
         .params
         .values()
-        .map(|param| parse_action_type(canonical, param))
+        .map(|param| parse_action_type(canonical.as_str(), param))
         .collect::<Result<Vec<_>, _>>()?;
-    let return_type = parse_action_type(canonical, &signature.returns)?;
+    let return_type = parse_action_type(canonical.as_str(), &signature.returns)?;
 
     Ok(GeneratedActionProbe {
         ident: identifier(mangle_action_name(canonical).identifier()),
