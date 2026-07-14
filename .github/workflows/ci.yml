@@ -18,7 +18,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@24a51cbb53fdb6f4a4a35007fc85b4fc2f796f27
+        uses: leynos/shared-actions/.github/actions/setup-rust@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
       - name: Format
         run: make check-fmt
       - name: Markdown lint
@@ -31,7 +31,7 @@ jobs:
       - name: Lint
         run: make lint
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@24a51cbb53fdb6f4a4a35007fc85b4fc2f796f27
+        uses: leynos/shared-actions/.github/actions/generate-coverage@927edd45ae77be4251a8a18ca9eb5613a2e32cbd
         with:
           use-cargo-nextest: "true"
           output-path: lcov.info
