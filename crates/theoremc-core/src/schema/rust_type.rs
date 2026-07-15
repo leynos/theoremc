@@ -236,11 +236,19 @@ fn scoped_lifetimes(
 }
 
 fn free_named_lifetime_name(name: &str, scope: LifetimeScope<'_>) -> Option<String> {
-    if name == "static" || name == "_" || scope.contains(name) {
+    if is_reserved_lifetime_name(name) || is_bound_lifetime(name, scope) {
         None
     } else {
         Some(name.to_owned())
     }
+}
+
+fn is_reserved_lifetime_name(name: &str) -> bool {
+    name == "static" || name == "_"
+}
+
+fn is_bound_lifetime(name: &str, scope: LifetimeScope<'_>) -> bool {
+    scope.contains(name)
 }
 
 #[cfg(test)]
