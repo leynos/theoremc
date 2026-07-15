@@ -1,0 +1,40 @@
+Theorem: FirstConflict
+About: First conflicting action declaration
+Actions:
+  account.deposit:
+    params:
+      account: u64
+    returns: bool
+Do:
+  - call:
+      action: account.deposit
+      args:
+        account: 1
+Witness:
+  - cover: "true"
+    because: reachable
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+---
+Theorem: SecondConflict
+About: Second conflicting action declaration
+Actions:
+  account.deposit:
+    params:
+      account: u32
+    returns: bool
+Witness:
+  - cover: "true"
+    because: reachable
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS

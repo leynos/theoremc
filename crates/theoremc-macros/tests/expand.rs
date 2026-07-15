@@ -35,6 +35,8 @@ fn compile_errors() -> Result<(), Box<dyn std::error::Error>> {
     stage_fixture("invalid_theorem.theorem")?;
     stage_fixture("missing_kani_evidence.theorem")?;
     stage_fixture("missing_action_export.theorem")?;
+    stage_fixture("conflicting_action_signatures.theorem")?;
+    stage_fixture("equivalent_action_signatures.theorem")?;
     stage_fixture("signature_drift.theorem")?;
     stage_fixture("typed_action_probe.theorem")?;
     stage_fixture("valid_theorem.theorem")?;
@@ -42,6 +44,8 @@ fn compile_errors() -> Result<(), Box<dyn std::error::Error>> {
     let t = trybuild::TestCases::new();
     t.pass("tests/expand/typed_action_probe.rs");
     t.pass("tests/expand/valid_theorem.rs");
+    t.pass("tests/expand/equivalent_action_signatures.rs");
+    t.compile_fail("tests/expand/conflicting_action_signatures.rs");
     t.compile_fail("tests/expand/invalid_theorem.rs");
     t.compile_fail("tests/expand/missing_action_export.rs");
     t.compile_fail("tests/expand/missing_kani_evidence.rs");
