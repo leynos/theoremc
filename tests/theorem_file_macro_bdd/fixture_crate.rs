@@ -89,12 +89,15 @@ pub(crate) const FIXTURE_LIB_RS: &str = concat!(
 );
 
 pub(crate) fn run_valid_fixture_build(spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
+    run_fixture_build(FIXTURE_LIB_RS, spec)
+}
+
+pub(crate) fn run_fixture_build(lib_rs: &str, spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
     let guard = CargoGuard::acquire();
-    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
+    let fixture = FixtureCrate::new(lib_rs)?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
     fixture.cargo_build(&guard)
 }
-
 pub(crate) fn build_fixture_and_list_kani_harnesses(
     spec: &TheoremFixtureSpec<'_>,
 ) -> Result<String, String> {
@@ -105,6 +108,8 @@ pub(crate) fn build_fixture_and_list_kani_harnesses(
 }
 
 mod tests {
+    //! Tests for Cargo TOML fixture generation.
+
     use super::{FIXTURE_BUILD_DEPENDENCIES, fixture_cargo_toml_for};
 
     #[test]

@@ -61,7 +61,7 @@ Observable success:
    Rust diagnostic against the generated probe.
 5. Distinct probes are deduplicated by canonical `syn::Type` token stream
    so semantically equivalent type strings (`Vec<u8>` and `Vec <u8>`) collapse
-   to one probe; whitespace normalisation is a side effect of the canonical
+   to one probe; whitespace normalization is a side effect of the canonical
    token comparison, not the primary contract.
 6. Primitive types (`u64`, `bool`, `()`) are accepted by the probe without any
    special-casing and do not produce false positives or Clippy noise.
@@ -123,9 +123,9 @@ Observable success:
   consuming crate verbatim.
 - Behavioural tests that model user workflows must use `rstest-bdd` matching
   the existing local configuration (`rstest-bdd-macros`).
-- Property tests are not required for deterministic traversal or token
-  rendering. Add `proptest` only if the implementation introduces a new
-  invariant over arbitrary type sets.
+- Existing `proptest` coverage already exercises `referenced_types`
+  placements, order, and whitespace-equivalent canonical dedup. Add `proptest`
+  only if the implementation introduces a new invariant beyond that surface.
 - Kani and Verus proofs are not required for this change. The feature is a
   Rust compile-time type-checking contract, not a proof obligation or unsafe
   code invariant.
@@ -335,7 +335,7 @@ that affects the planned contract before continuing.
 ### Milestone 1: extend schema validation and expose distinct referenced types
 
 Introduce a new private module `crates/theoremc-core/src/schema/rust_type.rs`
-that owns Rust type parsing and canonicalisation for the whole crate. It
+that owns Rust type parsing and canonicalization for the whole crate. It
 exposes:
 
 - `pub(crate) fn parse(ty: &str) -> Result<syn::Type, syn::Error>` — the
@@ -444,7 +444,7 @@ Implementation notes:
   module, even when many types are probed; the renderer must not emit one
   helper per probe statement.
 - Treat `__theoremc_assert_referenced` as the stable renderer anchor for the
-  generated block so a theorem author running `cargo expand` can recognise the
+  generated block so a theorem author running `cargo expand` can recognize the
   probe immediately. The helper name must remain stable if proc-macro output
   formatting changes; record any future anchor change in the Decision Log.
 - Probes live outside the `#[cfg(kani)]` backend module so ordinary builds
@@ -623,7 +623,7 @@ the diagnostic anchor or rustc note tracking genuinely changes.
 
 Use `rstest-bdd` behavioural tests for end-to-end theorem-owner workflows. The
 existing `tests/theorem_file_macro_bdd.rs` suite already builds temporary
-fixture crates, serialises Cargo invocations, and optionally checks Kani
+fixture crates, serializes Cargo invocations, and optionally checks Kani
 harness discovery when `cargo-kani` is installed. Extend it with the
 referenced-type scenarios so the user workflow is covered with stable substring
 assertions and not fragile full-snapshot stderr matching.

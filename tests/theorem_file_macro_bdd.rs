@@ -1,6 +1,5 @@
 //! Behavioural tests for real `theorem_file!` proc-macro expansion.
 
-use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::mangle::mangle_theorem_harness;
 
@@ -16,7 +15,7 @@ mod referenced_type_fixtures;
 
 use cargo_runner::CargoGuard;
 use fixture_crate::{
-    FIXTURE_LIB_RS, FixtureCrate, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses,
+    FIXTURE_LIB_RS, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses, run_fixture_build,
     run_valid_fixture_build,
 };
 use referenced_type_fixtures::{
@@ -269,16 +268,15 @@ fn assert_fixture_build_fails_with(
 }
 
 fn assert_fixture_build_fails_with_lib(expected: &ExpectedBuildFailure<'_>) -> Result<(), String> {
-    let guard = CargoGuard::acquire();
-    let fixture = FixtureCrate::new(expected.lib_rs)?;
-    fixture.write(
-        Utf8Path::new(expected.theorem_path),
-        expected.theorem_content,
-    )?;
-    let build_error = fixture
-        .cargo_build(&guard)
-        .err()
-        .ok_or_else(|| expected.unexpected_success_msg.to_owned())?;
+    let build_error = run_fixture_build(
+        expected.lib_rs,
+        &TheoremFixtureSpec {
+            path: expected.theorem_path,
+            content: expected.theorem_content,
+        },
+    )
+    .err()
+    .ok_or_else(|| expected.unexpected_success_msg.to_owned())?;
     for fragment in expected.expected_fragments {
         if !build_error.contains(fragment) {
             return Err(format!(
@@ -287,13 +285,6 @@ fn assert_fixture_build_fails_with_lib(expected: &ExpectedBuildFailure<'_>) -> R
         }
     }
     Ok(())
-}
-
-fn run_fixture_build(lib_rs: &str, spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
-    let guard = CargoGuard::acquire();
-    let fixture = FixtureCrate::new(lib_rs)?;
-    fixture.write(Utf8Path::new(spec.path), spec.content)?;
-    fixture.cargo_build(&guard)
 }
 
 #[then("compiling the fixture crate fails with an actionable theorem diagnostic")]

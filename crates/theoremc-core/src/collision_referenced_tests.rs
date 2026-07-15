@@ -88,6 +88,8 @@ fn forall_var(name: &str) -> ForallVar {
 }
 
 mod referenced_types_proptests {
+    //! Property-based tests for referenced type handling.
+
     use super::super::referenced_types;
     use super::super::test_helpers::{DocBoilerplate, boilerplate, theorem_doc};
     use super::forall_var;
