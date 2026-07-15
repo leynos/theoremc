@@ -4,17 +4,17 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: ACTIVE
+Status: COMPLETE
 
 ## Purpose / big picture
 
-Resolve every finding from the 2026-06-14 codebase audit in a deliberate,
+Resolved every finding from the 2026-06-14 codebase audit in a deliberate,
 reviewable sequence. The audit found diagnostic coupling, repeated validation
 and test scaffolding, documentation drift, dependency policy drift, and several
-smaller ergonomics problems. The desired outcome is a repository where schema
-diagnostics are typed before they are rendered, macro expansion avoids
-avoidable repeated scans, tests share clear support code, public documentation
-matches the implemented API, and dependency declarations obey the local policy.
+smaller ergonomics problems. The resulting repository has schema diagnostics
+typed before they are rendered, macro expansion that avoids avoidable repeated
+scans, tests that share clear support code, public documentation that matches
+the implemented API, and dependency declarations that obey the local policy.
 
 Observable success means that every audit finding is either fixed, documented
 as intentionally deferred with approval, or superseded by a better design
@@ -139,8 +139,8 @@ concerns, and the work is committed as a small logical unit.
 - Milestone 7 addresses roadmap Steps 3.1 and 3.2 by centralizing path
   normalization and theorem-file path rejection policy. It satisfies `DES-7`,
   `NMR-1`, and `TFS-1`.
-- Milestone 8 addresses roadmap Step 3.1 by removing wall-clock dependence from
-  build-discovery behavioural tests. It satisfies `DES-7`.
+- Milestone 8 addressed roadmap Step 3.1 by removing wall-clock dependence from
+  build-discovery behavioural tests. It satisfied `DES-7`.
 - Milestone 9 addresses roadmap Steps 4.1 and 4.2 readiness by keeping argument
   lowering lint-clean before Kani step emission grows. It satisfies `DES-8`,
   `TFS-4`, and `TFS-5`.
@@ -688,7 +688,7 @@ Update `Outcomes & Retrospective`, then commit the final plan update.
   delegation.
 - 2026-06-17: Use explicit fixture mtime advancement for Milestone 8 rather
   than wall-clock sleeps or a new dependency. `std::fs::File::set_modified` is
-  stable from Rust 1.75, which is below this workspace's Rust 1.85 floor, and
+  stable from Rust 1.75, which is below this workspace's Rust 1.88 floor, and
   it can mark both watched files and watched directories dirty for Cargo's
   `rerun-if-changed` checks.
 - 2026-06-17: CodeRabbit again did not report a rate limit for Milestone 8. A
