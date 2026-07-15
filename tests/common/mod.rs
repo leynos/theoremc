@@ -17,8 +17,8 @@ pub struct FixtureName<'a>(&'a str);
 impl<'a> FixtureName<'a> {
     /// Creates a fixture-name wrapper.
     #[must_use]
-    pub const fn new(name: &'a str) -> Self {
-        Self(name)
+    pub const fn new(value: &'a str) -> Self {
+        Self(value)
     }
 
     /// Returns the wrapped fixture name.
@@ -35,8 +35,8 @@ pub struct ExpectedFragment<'a>(&'a str);
 impl<'a> ExpectedFragment<'a> {
     /// Creates an expected-fragment wrapper.
     #[must_use]
-    pub const fn new(fragment: &'a str) -> Self {
-        Self(fragment)
+    pub const fn new(value: &'a str) -> Self {
+        Self(value)
     }
 
     /// Returns the wrapped expected fragment.
