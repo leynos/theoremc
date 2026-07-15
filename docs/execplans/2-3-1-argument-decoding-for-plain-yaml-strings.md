@@ -70,9 +70,9 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
 
 - Risk: The custom `Deserialize` for `TheoremValue` is used to build
   `ActionCall.args`. Changing the args type to `ArgValue` means serde must
-  deserialize YAML into `ArgValue` directly, or a post-deserialization
+  deserialise YAML into `ArgValue` directly, or a post-deserialisation
   conversion step is needed. Severity: high. Likelihood: certain (by design).
-  Mitigation: use a two-stage approach — serde deserializes into `TheoremValue`
+  Mitigation: use a two-stage approach — serde deserialises into `TheoremValue`
   in the raw layer as before, then a conversion function
   `decode_arg_value(param_name, value)` runs during the raw-to-public
   conversion step in `RawTheoremDoc::to_theorem_doc()`. Keep the helper

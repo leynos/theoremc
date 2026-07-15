@@ -1,71 +1,90 @@
 # [Documentation contents](contents.md)
 
-- [Documentation contents](contents.md) - Index of all documentation files in
-  this directory.
-- [Architecture Decision Record (ADR) 001: theorem symbol stability and non-vacuity policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- [Documentation contents](contents.md) - Index of all documentation files
+  in this directory.
+- [Architecture Decision Record (ADR) 001: theorem symbol stability and
+  non-vacuity policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
   - Decision record for injective symbol mangling, explicit reference
-  semantics, non-vacuity requirements, and theorem ID migration.
-- [Architecture Decision Record (ADR) 002: library-first internationalization and localization with Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
-  - Decision record for Fluent-based, library-safe localization via injected
-  localizers, structured diagnostic codes, and deterministic fallback policy.
-- [Architecture Decision Record (ADR) 003: architectural boundary enforcement for schema layers](adr-003-architectural-boundary-enforcement.md)
+    semantics, non-vacuity requirements, and theorem ID migration.
+- [Architecture Decision Record (ADR) 002: library-first internationalisation
+  and localisation with Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+  - Decision record for Fluent-based, library-safe localisation via injected
+    localisers, structured diagnostic codes, and deterministic fallback policy.
+- [Architecture Decision Record (ADR) 003: architectural boundary
+  enforcement for schema layers](adr-003-architectural-boundary-enforcement.md)
   - Decision record for schema layering constraints, module boundary policy,
-  and an incremental architecture-enforcement stack.
-- [Architecture Decision Record (ADR) 004: theorem-side action signatures](adr-004-action-signature-specification.md)
+    and an incremental architecture-enforcement stack.
+- [Architecture Decision Record (ADR) 004: theorem-side action signatures]
+  (adr-004-action-signature-specification.md)
   - Decision record for explicit theorem-side action signatures used by typed
-  action probes and future argument shaping.
-- [Navigating code complexity: a guide for implementers and maintainers](complexity-antipatterns-and-refactoring-strategies.md)
+    action probes and future argument shaping.
+- [Navigating code complexity: a guide for implementers and maintainers]
+  (complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring
-  strategies for long-lived codebases.
+    strategies for long-lived codebases.
 - [Developer's guide](developers-guide.md) - Maintainer-oriented manual
-  covering the build system, internal architecture, contributor workflows, and
-  extension points.
+  covering the build system, internal architecture, contributor workflows,
+  and extension points.
 - [Documentation style guide](documentation-style-guide.md) - Authoring rules
   for spelling, formatting, Markdown structure, diagrams, and documentation
   consistency.
 - [Name mangling rules](name-mangling-rules.md) - Normative mapping rules for
   theorem action names, generated Kani harness symbols, and external theorem
   identifiers.
-- [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)
+- [Reliable testing in Rust via dependency injection]
+  (reliable-testing-in-rust-via-dependency-injection.md)
   - Patterns for testable Rust design using dependency injection to avoid
-  global-state coupling.
+    global-state coupling.
 - [Repository layout](repository-layout.md) - Map of top-level files,
   workspace crates, test directories, and documentation ownership.
-- [A systematic guide to effective, ergonomic, and "don't repeat yourself" (DRY) doctests in Rust](rust-doctest-dry-guide.md)
+- [A systematic guide to effective, ergonomic, and "don't repeat yourself"
+  (DRY) doctests in Rust](rust-doctest-dry-guide.md)
   - Detailed reference for writing maintainable Rust doctests with minimal
-  duplication.
-- [Mastering test fixtures in Rust with `rstest`](rust-testing-with-rstest-fixtures.md)
-  - Comprehensive reference for fixture design, parametrization, and best
-  practices with `rstest`.
+    duplication.
+- [Mastering test fixtures in Rust with `rstest`]
+  (rust-testing-with-rstest-fixtures.md)
+  - Comprehensive reference for fixture design, parametrisation, and best
+    practices with `rstest`.
 - [Scripting standards](scripting-standards.md) - Standards for project
-  scripts, covering toolchain choices, structure, and operational expectations.
-- [Theorem file format](theorem-file-specification.md) - Schema and behavioural
-  specification for `.theorem` documents and their compile-time semantics.
-- [Theoremc development roadmap](roadmap.md) - Phased
-  implementation roadmap with traceable tasks derived from design, schema,
-  mangling, and ADR requirements.
-- [Theoremc design specification](theoremc-design.md) - End-to-end architecture
-  and design rationale for theoremc, including parser, code generation,
-  backend, and reporting design.
-- [User's guide](users-guide.md) - Guide for library consumers covering
-  schema types, loading API, identifier rules, and value forms.
+  scripts, covering toolchain choices, structure, and operational
+  expectations.
+- [Theorem file format](theorem-file-specification.md) - Schema and
+  behavioural specification for `.theorem` documents and their compile-time
+  semantics.
+- [Theoremc development roadmap](roadmap.md) - Phased implementation roadmap
+  with traceable tasks derived from design, schema, mangling, and ADR
+  requirements.
+- [Theoremc design specification](theoremc-design.md) - End-to-end
+  architecture and design rationale for theoremc, including parser, code
+  generation, backend, and reporting design.
+- [User's guide](users-guide.md) - Guide for library consumers covering schema
+  types, loading API, identifier rules, and value forms.
 - [Execution plans](execplans/) - Implementation plans for roadmap steps.
-  - [Step 1.1: `TheoremDoc` and subordinate schema types](execplans/1-1-1-theorem-doc-and-subordinate-schema-types.md)
-    - ExecPlan for strict theorem document deserialization.
-  - [Step 1.2.1: Validate required fields and non-empty constraints](execplans/1-2-1-validate-required-fields-and-non-empty-constraints.md)
-    - ExecPlan for post-deserialization semantic validation rules.
-  - [Step 1.2.2: Parse expression fields as `syn::Expr`](execplans/1-2-2-parse-assume-prove-and-witness-expressions.md)
+  - [Step 1.1: `TheoremDoc` and subordinate schema types]
+    (execplans/1-1-1-theorem-doc-and-subordinate-schema-types.md)
+    - ExecPlan for strict theorem document deserialisation.
+  - [Step 1.2.1: Validate required fields and non-empty constraints]
+    (execplans/1-2-1-validate-required-fields-and-non-empty-constraints.md)
+    - ExecPlan for post-deserialisation semantic validation rules.
+  - [Step 1.2.2: Parse expression fields as `syn::Expr`]
+    (execplans/1-2-2-parse-assume-prove-and-witness-expressions.md)
     - ExecPlan for expression syntax validation and statement block
-    rejection.
-  - [Step 1.2.3: Enforce `Step` and `LetBinding` shape rules](execplans/1-2-3-enforce-step-and-let-binding.md)
+      rejection.
+  - [Step 1.2.3: Enforce `Step` and `LetBinding` shape rules]
+    (execplans/1-2-3-enforce-step-and-let-binding.md)
     - ExecPlan for step and let-binding structural validation.
-  - [Step 1.2.4: Enforce non-vacuity defaults](execplans/1-2-4-enforce-non-vacuity-defaults.md)
+  - [Step 1.2.4: Enforce non-vacuity defaults]
+    (execplans/1-2-4-enforce-non-vacuity-defaults.md)
     - ExecPlan for vacuity policy defaults and override validation.
-  - [Step 1.3.1: Structured diagnostics for parser failures](execplans/1-3-1-structured-diagnostics-for-parser-failures.md)
-    - ExecPlan for source-located diagnostics and parser regression fixtures.
-  - [Step 2.1.1: Canonical action-name
-    validation](execplans/2-1-1-canonical-action-name-validation.md)
-    - ExecPlan for dot-separated action-name grammar and keyword validation.
-  - [Resolve the 2026-06-14 codebase audit](execplans/codebase-audit-2026-06-14.md)
-    - ExecPlan for resolving audit findings across diagnostics, validation,
-      tests, documentation, and dependency policy.
+  - [Step 1.3.1: Structured diagnostics for parser failures]
+    (execplans/1-3-1-structured-diagnostics-for-parser-failures.md)
+    - ExecPlan for source-located diagnostics and parser regression
+      fixtures.
+  - [Step 2.1.1: Canonical action-name validation]
+    (execplans/2-1-1-canonical-action-name-validation.md)
+    - ExecPlan for dot-separated action-name grammar and keyword
+      validation.
+  - [Resolve the 2026-06-14 codebase audit]
+    (execplans/codebase-audit-2026-06-14.md)
+    - ExecPlan for resolving audit findings across diagnostics,
+      validation, tests, documentation, and dependency policy.

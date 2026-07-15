@@ -191,8 +191,8 @@ prevents false regressions.
 
 Create `src/schema/validate.rs` with:
 
-- `pub(crate) fn validate_theorem_doc(doc: &TheoremDoc) -> Result<(), SchemaError>`
-  as the entry point.
+- `validate_theorem_doc(doc: &TheoremDoc)` is the entry point.
+  It returns `Result<(), SchemaError>`.
 - Private helpers: `is_blank(s: &str) -> bool` and
   `fail(doc: &TheoremDoc, reason: String) -> SchemaError`.
 - Move existing validation logic from `loader.rs` (lines 55-96: the
