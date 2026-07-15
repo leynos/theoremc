@@ -49,6 +49,7 @@ impl Drop for EnvGuard {
 ///
 /// Passing [`None`] removes the variable until the guard is dropped. Dropping
 /// the guard restores the previous value, if any.
+#[must_use = "retain the returned environment guard for the duration of the override"]
 pub fn set_cargo_manifest_dir_for_test(value: Option<&str>) -> EnvGuard {
     set_env_var_for_test("CARGO_MANIFEST_DIR", value)
 }
