@@ -1,14 +1,10 @@
 //! Unit tests for shared integration-test support helpers.
 
-mod common {
-    pub(crate) use test_helpers::{FixtureCrate, toml_section};
-}
-
 use std::time::SystemTime;
 
 use camino::Utf8Path;
-use common::{FixtureCrate, toml_section};
 use rstest::rstest;
+use test_helpers::{FixtureCrate, toml_section};
 
 const MINIMAL_CARGO_TOML: &str = concat!(
     "[package]\n",
@@ -71,8 +67,8 @@ fn write_with_advanced_mtime_marks_created_file_and_parent_newer() -> Result<(),
 
     fixture.write_with_advanced_mtime(Utf8Path::new("theorems/created.theorem"), "created")?;
 
-    let file_mtime = modified_time(fixture.manifest_dir().join("theorems/created.theorem"))?;
-    let parent_mtime = modified_time(fixture.manifest_dir().join("theorems"))?;
+    let file_mtime = fixture.modified_time(Utf8Path::new("theorems/created.theorem"))?;
+    let parent_mtime = fixture.modified_time(Utf8Path::new("theorems"))?;
     ensure_later(file_mtime, write_started, "created theorem file")?;
     ensure_later(
         parent_mtime,
@@ -87,13 +83,13 @@ fn overwrite_in_place_with_advanced_mtime_marks_file_newer() -> Result<(), Strin
     let fixture = FixtureCrate::new(MINIMAL_CARGO_TOML, MINIMAL_LIB_RS)?;
     let theorem_path = Utf8Path::new("theorems/existing.theorem");
     fixture.write(theorem_path, "before")?;
-    let previous_mtime = modified_time(fixture.manifest_dir().join(theorem_path))?;
-    let previous_parent_mtime = modified_time(fixture.manifest_dir().join("theorems"))?;
+    let previous_mtime = fixture.modified_time(theorem_path)?;
+    let previous_parent_mtime = fixture.modified_time(Utf8Path::new("theorems"))?;
 
     fixture.overwrite_in_place_with_advanced_mtime(theorem_path, "after")?;
 
-    let advanced_mtime = modified_time(fixture.manifest_dir().join(theorem_path))?;
-    let advanced_parent_mtime = modified_time(fixture.manifest_dir().join("theorems"))?;
+    let advanced_mtime = fixture.modified_time(theorem_path)?;
+    let advanced_parent_mtime = fixture.modified_time(Utf8Path::new("theorems"))?;
     ensure_later(advanced_mtime, previous_mtime, "overwritten theorem file")?;
     ensure_later(
         advanced_parent_mtime,
@@ -106,8 +102,7 @@ fn overwrite_in_place_with_advanced_mtime_marks_file_newer() -> Result<(), Strin
 #[test]
 fn overwrite_in_place_rejects_missing_files() -> Result<(), String> {
     let fixture = FixtureCrate::new(MINIMAL_CARGO_TOML, "//! fixture\n")?;
-    std::fs::create_dir(fixture.manifest_dir().join("theorems"))
-        .map_err(|error| error.to_string())?;
+    fixture.create_dir(Utf8Path::new("theorems"))?;
 
     let result = fixture.overwrite_in_place(Utf8Path::new("theorems/missing.theorem"), "after");
 
@@ -115,12 +110,6 @@ fn overwrite_in_place_rejects_missing_files() -> Result<(), String> {
         Ok(()) => Err("missing fixture file was created".to_owned()),
         Err(_) => Ok(()),
     }
-}
-
-fn modified_time(path: camino::Utf8PathBuf) -> Result<SystemTime, String> {
-    std::fs::metadata(path)
-        .and_then(|metadata| metadata.modified())
-        .map_err(|error| error.to_string())
 }
 
 fn ensure_later(actual: SystemTime, previous: SystemTime, label: &str) -> Result<(), String> {

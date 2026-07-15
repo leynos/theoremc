@@ -3,11 +3,13 @@
 - [Documentation contents](contents.md) - Index of all documentation files
   in this directory.
 - [Architecture Decision Record (ADR) 001: theorem symbol stability and
-  non-vacuity policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+  non-vacuity
+  policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
   - Decision record for injective symbol mangling, explicit reference
     semantics, non-vacuity requirements, and theorem ID migration.
 - [Architecture Decision Record (ADR) 002: library-first internationalisation
-  and localisation with Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+  and localisation with
+  Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
   - Decision record for Fluent-based, library-safe localisation via injected
     localisers, structured diagnostic codes, and deterministic fallback policy.
 - [Architecture Decision Record (ADR) 003: architectural boundary
@@ -23,8 +25,8 @@
   - Practical guide to complexity metrics, anti-patterns, and refactoring
     strategies for long-lived codebases.
 - [Developer's guide](developers-guide.md) - Maintainer-oriented manual
-  covering the build system, internal architecture, contributor workflows,
-  and extension points.
+  covering the build system, internal architecture, contributor workflows, and
+  extension points.
 - [Documentation style guide](documentation-style-guide.md) - Authoring rules
   for spelling, formatting, Markdown structure, diagrams, and documentation
   consistency.
@@ -46,8 +48,7 @@
   - Comprehensive reference for fixture design, parametrisation, and best
     practices with `rstest`.
 - [Scripting standards](scripting-standards.md) - Standards for project
-  scripts, covering toolchain choices, structure, and operational
-  expectations.
+  scripts, covering toolchain choices, structure, and operational expectations.
 - [Theorem file format](theorem-file-specification.md) - Schema and
   behavioural specification for `.theorem` documents and their compile-time
   semantics.

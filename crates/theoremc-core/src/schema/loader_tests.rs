@@ -392,6 +392,7 @@ Let:
       action: account.deposit
       args:
         target: 1
+
   x:
     call:
       action: account.deposit
@@ -426,9 +427,5 @@ Witness:
         diagnostic.location.source,
         "tests/fixtures/invalid_ref_target.theorem"
     );
-    assert!(
-        diagnostic.location.line > 11,
-        "decode diagnostics should point to the failing binding, got line {}",
-        diagnostic.location.line
-    );
+    assert_eq!(diagnostic.location.line, 15);
 }

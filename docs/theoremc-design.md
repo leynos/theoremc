@@ -106,8 +106,8 @@ to generate harness code. Kani harnesses are functions annotated with
 
 The build flow starts with `.theorem` sources and Rust action modules, passes
 through Cargo discovery and macro expansion, parses and validates YAML into
-core schema types, lowers those documents into backend-ready IR, and then
-emits verification harnesses for execution and reporting.
+core schema types, lowers those documents into backend-ready IR, and then emits
+verification harnesses for execution and reporting.
 
 ```mermaid
 flowchart TD

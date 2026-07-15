@@ -1,13 +1,9 @@
 //! Behavioural tests for non-vacuity defaults using `rstest-bdd`.
 
-mod common {
-    pub(crate) use test_helpers::{
-        ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_loads,
-    };
-}
-
-use common::{ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_loads};
 use rstest_bdd_macros::{given, scenario, then};
+use test_helpers::{
+    ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_loads,
+};
 
 #[given("a valid default theorem fixture")]
 fn given_valid_default_theorem_fixture() {}

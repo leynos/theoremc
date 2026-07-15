@@ -4,18 +4,11 @@
 //! These tests use `rstest` parameterization to express Given/When/Then
 //! acceptance criteria for the schema validation rules.
 
-mod common {
-    pub(crate) use test_helpers::{
-        ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_fails,
-        assert_fixture_loads, load_fixture_docs,
-    };
-}
-
-use common::{
+use rstest::rstest;
+use test_helpers::{
     ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_fails,
     assert_fixture_loads, load_fixture_docs,
 };
-use rstest::rstest;
 use theoremc::schema::load_theorem_docs;
 
 // ── Given valid documents, deserialization succeeds ──────────────────

@@ -1,12 +1,8 @@
 //! Behavioural tests for Cargo build discovery of theorem files.
 
-mod common {
-    pub(crate) use test_helpers::{ExpectedFragment, FixtureCrate, TRIVIAL_THEOREM, toml_section};
-}
-
 use camino::Utf8Path;
-use common::{ExpectedFragment, FixtureCrate, TRIVIAL_THEOREM, toml_section};
 use rstest_bdd_macros::{given, scenario, then};
+use test_helpers::{ExpectedFragment, FixtureCrate, TRIVIAL_THEOREM, toml_section};
 
 const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
 const FIXTURE_LIB_RS: &str = "//! Fixture crate for build discovery behavioural tests.\n";

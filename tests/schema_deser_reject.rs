@@ -4,83 +4,72 @@
 //! errors, cover `KaniExpectation` variants, and exercise inline edge cases
 //! for unknown keys in subordinate structures.
 
-mod common {
-    pub(crate) use test_helpers::{FixtureName, load_fixture};
-}
-
-use common::{FixtureName, load_fixture};
 use rstest::rstest;
+use test_helpers::{FixtureName, fixture_error_message};
 use theoremc::schema::{KaniExpectation, load_theorem_docs};
 
-/// Helper to assert that loading a fixture fails.
-fn assert_fixture_fails(fixture_name: &str) -> String {
-    let yaml = load_fixture(FixtureName::new(fixture_name))
-        .unwrap_or_else(|error| panic!("failed to load fixture: {error}"));
-    let result = load_theorem_docs(&yaml);
-    assert!(
-        result.is_err(),
-        "expected {fixture_name} to fail deserialization"
-    );
-    result.err().map(|e| e.to_string()).unwrap_or_default()
+fn require_message_contains(message: &str, expected: &str) -> Result<(), String> {
+    if message.contains(expected) {
+        Ok(())
+    } else {
+        Err(format!("error should mention {expected:?}, got: {message}"))
+    }
 }
 
 // ── Unhappy-path tests ──────────────────────────────────────────────
 
 #[test]
-fn rejects_unknown_top_level_key() {
-    let msg = assert_fixture_fails("invalid_unknown_key.theorem");
-    assert!(
-        msg.contains("unknown field"),
-        "error should mention unknown field, got: {msg}"
-    );
+fn rejects_unknown_top_level_key() -> Result<(), String> {
+    let msg = fixture_error_message(FixtureName::new("invalid_unknown_key.theorem"))?;
+    require_message_contains(&msg, "unknown field")
 }
 
 #[test]
-fn rejects_wrong_scalar_type_for_tags() {
-    assert_fixture_fails("invalid_wrong_type.theorem");
+fn rejects_wrong_scalar_type_for_tags() -> Result<(), String> {
+    fixture_error_message(FixtureName::new("invalid_wrong_type.theorem"))?;
+    Ok(())
 }
 
 #[test]
-fn rejects_missing_theorem_field() {
-    assert_fixture_fails("invalid_missing_theorem.theorem");
+fn rejects_missing_theorem_field() -> Result<(), String> {
+    fixture_error_message(FixtureName::new("invalid_missing_theorem.theorem"))?;
+    Ok(())
 }
 
 #[test]
-fn rejects_missing_about_field() {
-    assert_fixture_fails("invalid_missing_about.theorem");
+fn rejects_missing_about_field() -> Result<(), String> {
+    fixture_error_message(FixtureName::new("invalid_missing_about.theorem"))?;
+    Ok(())
 }
 
 #[test]
-fn rejects_missing_prove_field() {
-    assert_fixture_fails("invalid_missing_prove.theorem");
+fn rejects_missing_prove_field() -> Result<(), String> {
+    fixture_error_message(FixtureName::new("invalid_missing_prove.theorem"))?;
+    Ok(())
 }
 
 #[test]
-fn rejects_missing_evidence_field() {
-    assert_fixture_fails("invalid_missing_evidence.theorem");
+fn rejects_missing_evidence_field() -> Result<(), String> {
+    fixture_error_message(FixtureName::new("invalid_missing_evidence.theorem"))?;
+    Ok(())
 }
 
 #[test]
-fn rejects_rust_keyword_theorem_name() {
-    let msg = assert_fixture_fails("invalid_keyword_name.theorem");
-    assert!(
-        msg.contains("Rust reserved keyword"),
-        "error should mention keyword, got: {msg}"
-    );
+fn rejects_rust_keyword_theorem_name() -> Result<(), String> {
+    let msg = fixture_error_message(FixtureName::new("invalid_keyword_name.theorem"))?;
+    require_message_contains(&msg, "Rust reserved keyword")
 }
 
 #[test]
-fn rejects_invalid_identifier_starting_with_digit() {
-    let msg = assert_fixture_fails("invalid_bad_identifier.theorem");
-    assert!(
-        msg.contains("must match the pattern"),
-        "error should mention pattern, got: {msg}"
-    );
+fn rejects_invalid_identifier_starting_with_digit() -> Result<(), String> {
+    let msg = fixture_error_message(FixtureName::new("invalid_bad_identifier.theorem"))?;
+    require_message_contains(&msg, "must match the pattern")
 }
 
 #[test]
-fn rejects_invalid_kani_expect_value() {
-    assert_fixture_fails("invalid_bad_expect.theorem");
+fn rejects_invalid_kani_expect_value() -> Result<(), String> {
+    fixture_error_message(FixtureName::new("invalid_bad_expect.theorem"))?;
+    Ok(())
 }
 
 // ── KaniExpectation enum coverage ───────────────────────────────────

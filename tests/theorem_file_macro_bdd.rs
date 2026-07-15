@@ -7,9 +7,6 @@ use theoremc::mangle::mangle_theorem_harness;
 /// Cargo process helpers used by the fixture crate module and BDD steps.
 #[path = "theorem_file_macro_bdd/cargo_runner.rs"]
 mod cargo_runner;
-mod common {
-    pub(crate) use test_helpers::FixtureCrate;
-}
 /// Temporary crate builder that lets these BDD scenarios compile real macros.
 #[path = "theorem_file_macro_bdd/fixture_crate.rs"]
 mod fixture_crate;

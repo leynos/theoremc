@@ -10,7 +10,7 @@ use camino::Utf8Path;
 use theoremc_core::path_format::{normalize_path_separators, toml_basic_string_value};
 
 use super::cargo_runner::{CargoGuard, CargoSubcommand, cargo_run, cargo_run_output};
-use crate::common::FixtureCrate as CommonFixtureCrate;
+use test_helpers::FixtureCrate as CommonFixtureCrate;
 
 const ROOT_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 pub(crate) const FIXTURE_BUILD_DEPENDENCIES: &str = concat!(

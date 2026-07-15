@@ -3,13 +3,9 @@
 //! These tests prove that the generated theorem suite compiles correctly
 //! for empty, single-file, and multi-file theorem trees.
 
-mod common {
-    pub(crate) use test_helpers::{FixtureCrate, TRIVIAL_THEOREM, toml_section};
-}
-
 use camino::Utf8Path;
-use common::{FixtureCrate, TRIVIAL_THEOREM, toml_section};
 use rstest_bdd_macros::{given, scenario, then};
+use test_helpers::{FixtureCrate, TRIVIAL_THEOREM, toml_section};
 
 const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
 
@@ -49,17 +45,7 @@ fn fixture_cargo_toml() -> Result<String, String> {
 }
 
 fn generated_suite_contents(fixture: &FixtureCrate) -> Result<String, String> {
-    let build_dir = fixture.manifest_dir().join("target/debug/build");
-    for build_entry_result in std::fs::read_dir(build_dir).map_err(|error| error.to_string())? {
-        let build_entry = build_entry_result.map_err(|error| error.to_string())?;
-        let suite_path = build_entry.path().join("out/theorem_suite.rs");
-        match std::fs::read_to_string(&suite_path) {
-            Ok(contents) => return Ok(contents),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error.to_string()),
-        }
-    }
-    Err("generated theorem_suite.rs was not found".to_owned())
+    fixture.generated_suite_contents()
 }
 
 fn assert_sorted_suite_order(contents: &str) -> Result<(), String> {

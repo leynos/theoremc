@@ -1,11 +1,7 @@
 //! Snapshot tests for structured parser and validator diagnostics.
 
-mod common {
-    pub(crate) use test_helpers::{FixtureName, load_fixture};
-}
-
-use common::{FixtureName, load_fixture};
 use rstest::rstest;
+use test_helpers::{FixtureName, load_fixture};
 use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 
 fn render_diagnostic_for_fixture(fixture_name: &str) -> Result<String, Box<dyn std::error::Error>> {
