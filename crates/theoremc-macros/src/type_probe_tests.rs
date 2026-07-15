@@ -37,102 +37,115 @@ fn theorem_trailer() -> &'static str {
 }
 
 fn theorem_fixture(fixture: ProbeFixture, trailer: &str) -> TheoremFixture {
-    let source = match fixture {
-        ProbeFixture::ForallAndActions => format!(
-            concat!(
-                "Theorem: ReferencedTypes\n",
-                "About: Probe all declared Rust types\n",
-                "Forall:\n",
-                "  account: crate::Account\n",
-                "Actions:\n",
-                "  account.deposit:\n",
-                "    params:\n",
-                "      command: crate::DepositCommand\n",
-                "      account: \"&mut crate::Account\"\n",
-                "      profile: \"&crate::Profile\"\n",
-                "    returns: crate::DepositOutcome\n",
-                "Do:\n",
-                "  - call:\n",
-                "      action: account.deposit\n",
-                "      args:\n",
-                "        command:\n",
-                "          amount: 10\n",
-                "      as: outcome\n",
-                "{trailer}",
-            ),
-            trailer = trailer
+    match fixture {
+        ProbeFixture::ForallAndActions => forall_and_actions_fixture(trailer),
+        ProbeFixture::Primitives => primitives_fixture(trailer),
+        ProbeFixture::WhitespaceEquivalent => whitespace_equivalent_fixture(trailer),
+        ProbeFixture::NoTypes => no_types_fixture(trailer),
+    }
+}
+
+fn forall_and_actions_fixture(trailer: &str) -> TheoremFixture {
+    TheoremFixture(format!(
+        concat!(
+            "Theorem: ReferencedTypes\n",
+            "About: Probe all declared Rust types\n",
+            "Forall:\n",
+            "  account: crate::Account\n",
+            "Actions:\n",
+            "  account.deposit:\n",
+            "    params:\n",
+            "      command: crate::DepositCommand\n",
+            "      account: \"&mut crate::Account\"\n",
+            "      profile: \"&crate::Profile\"\n",
+            "    returns: crate::DepositOutcome\n",
+            "Do:\n",
+            "  - call:\n",
+            "      action: account.deposit\n",
+            "      args:\n",
+            "        command:\n",
+            "          amount: 10\n",
+            "      as: outcome\n",
+            "{trailer}",
         ),
-        ProbeFixture::Primitives => format!(
-            concat!(
-                "Theorem: PrimitiveTypes\n",
-                "About: Probe primitive Rust types\n",
-                "Forall:\n",
-                "  n: u64\n",
-                "Actions:\n",
-                "  flag.check:\n",
-                "    params:\n",
-                "      flag: bool\n",
-                "    returns: ()\n",
-                "Do:\n",
-                "  - call:\n",
-                "      action: flag.check\n",
-                "      args:\n",
-                "        flag: true\n",
-                "{trailer}",
-            ),
-            trailer = trailer
+        trailer = trailer
+    ))
+}
+
+fn primitives_fixture(trailer: &str) -> TheoremFixture {
+    TheoremFixture(format!(
+        concat!(
+            "Theorem: PrimitiveTypes\n",
+            "About: Probe primitive Rust types\n",
+            "Forall:\n",
+            "  n: u64\n",
+            "Actions:\n",
+            "  flag.check:\n",
+            "    params:\n",
+            "      flag: bool\n",
+            "    returns: ()\n",
+            "Do:\n",
+            "  - call:\n",
+            "      action: flag.check\n",
+            "      args:\n",
+            "        flag: true\n",
+            "{trailer}",
         ),
-        ProbeFixture::WhitespaceEquivalent => {
-            let compact = format!(
-                concat!(
-                    "Theorem: CompactType\n",
-                    "About: First reference uses compact spacing\n",
-                    "Actions:\n",
-                    "  payload.write:\n",
-                    "    params:\n",
-                    "      buffer: Vec<u8>\n",
-                    "    returns: u64\n",
-                    "Do:\n",
-                    "  - call:\n",
-                    "      action: payload.write\n",
-                    "      args:\n",
-                    "        buffer: [0]\n",
-                    "      as: compact_len\n",
-                    "{trailer}",
-                ),
-                trailer = trailer
-            );
-            let spaced = format!(
-                concat!(
-                    "Theorem: SpacedType\n",
-                    "About: Second reference uses extra spacing\n",
-                    "Actions:\n",
-                    "  payload.write:\n",
-                    "    params:\n",
-                    "      buffer: \"Vec <u8>\"\n",
-                    "    returns: u64\n",
-                    "Do:\n",
-                    "  - call:\n",
-                    "      action: payload.write\n",
-                    "      args:\n",
-                    "        buffer: [0]\n",
-                    "      as: spaced_len\n",
-                    "{trailer}",
-                ),
-                trailer = trailer
-            );
-            return TheoremFixture(format!("{compact}---\n{spaced}"));
-        }
-        ProbeFixture::NoTypes => format!(
-            concat!(
-                "Theorem: NoReferencedTypes\n",
-                "About: No Forall entries and no Actions map\n",
-                "{trailer}",
-            ),
-            trailer = trailer
+        trailer = trailer
+    ))
+}
+
+fn whitespace_equivalent_fixture(trailer: &str) -> TheoremFixture {
+    let compact = format!(
+        concat!(
+            "Theorem: CompactType\n",
+            "About: First reference uses compact spacing\n",
+            "Actions:\n",
+            "  payload.write:\n",
+            "    params:\n",
+            "      buffer: Vec<u8>\n",
+            "    returns: u64\n",
+            "Do:\n",
+            "  - call:\n",
+            "      action: payload.write\n",
+            "      args:\n",
+            "        buffer: [0]\n",
+            "      as: compact_len\n",
+            "{trailer}",
         ),
-    };
-    TheoremFixture(source)
+        trailer = trailer
+    );
+    let spaced = format!(
+        concat!(
+            "Theorem: SpacedType\n",
+            "About: Second reference uses extra spacing\n",
+            "Actions:\n",
+            "  payload.write:\n",
+            "    params:\n",
+            "      buffer: \"Vec <u8>\"\n",
+            "    returns: u64\n",
+            "Do:\n",
+            "  - call:\n",
+            "      action: payload.write\n",
+            "      args:\n",
+            "        buffer: [0]\n",
+            "      as: spaced_len\n",
+            "{trailer}",
+        ),
+        trailer = trailer
+    );
+    TheoremFixture(format!("{compact}---\n{spaced}"))
+}
+
+fn no_types_fixture(trailer: &str) -> TheoremFixture {
+    TheoremFixture(format!(
+        concat!(
+            "Theorem: NoReferencedTypes\n",
+            "About: No Forall entries and no Actions map\n",
+            "{trailer}",
+        ),
+        trailer = trailer
+    ))
 }
 
 #[rstest]
