@@ -24,33 +24,15 @@ fn rejects_unknown_top_level_key() -> Result<(), String> {
     require_message_contains(&msg, "unknown field")
 }
 
-#[test]
-fn rejects_wrong_scalar_type_for_tags() -> Result<(), String> {
-    fixture_error_message(FixtureName::new("invalid_wrong_type.theorem"))?;
-    Ok(())
-}
-
-#[test]
-fn rejects_missing_theorem_field() -> Result<(), String> {
-    fixture_error_message(FixtureName::new("invalid_missing_theorem.theorem"))?;
-    Ok(())
-}
-
-#[test]
-fn rejects_missing_about_field() -> Result<(), String> {
-    fixture_error_message(FixtureName::new("invalid_missing_about.theorem"))?;
-    Ok(())
-}
-
-#[test]
-fn rejects_missing_prove_field() -> Result<(), String> {
-    fixture_error_message(FixtureName::new("invalid_missing_prove.theorem"))?;
-    Ok(())
-}
-
-#[test]
-fn rejects_missing_evidence_field() -> Result<(), String> {
-    fixture_error_message(FixtureName::new("invalid_missing_evidence.theorem"))?;
+#[rstest]
+#[case::wrong_scalar_type("invalid_wrong_type.theorem")]
+#[case::missing_theorem("invalid_missing_theorem.theorem")]
+#[case::missing_about("invalid_missing_about.theorem")]
+#[case::missing_prove("invalid_missing_prove.theorem")]
+#[case::missing_evidence("invalid_missing_evidence.theorem")]
+#[case::invalid_kani_expect("invalid_bad_expect.theorem")]
+fn rejects_invalid_fixture(#[case] fixture_name: &str) -> Result<(), String> {
+    fixture_error_message(FixtureName::new(fixture_name))?;
     Ok(())
 }
 
@@ -64,12 +46,6 @@ fn rejects_rust_keyword_theorem_name() -> Result<(), String> {
 fn rejects_invalid_identifier_starting_with_digit() -> Result<(), String> {
     let msg = fixture_error_message(FixtureName::new("invalid_bad_identifier.theorem"))?;
     require_message_contains(&msg, "must match the pattern")
-}
-
-#[test]
-fn rejects_invalid_kani_expect_value() -> Result<(), String> {
-    fixture_error_message(FixtureName::new("invalid_bad_expect.theorem"))?;
-    Ok(())
 }
 
 // ── KaniExpectation enum coverage ───────────────────────────────────

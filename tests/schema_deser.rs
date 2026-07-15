@@ -25,16 +25,17 @@ macro_rules! ensure {
 }
 
 macro_rules! ensure_eq {
-    ($actual:expr, $expected:expr) => {
-        if $actual != $expected {
-            return Err(std::io::Error::other(concat!(
-                "assertion failed: ",
+    ($actual:expr, $expected:expr) => {{
+        let actual = &$actual;
+        let expected = &$expected;
+        if actual != expected {
+            return Err(std::io::Error::other(format!(
+                "assertion failed: {} == {}; actual: {actual:?}; expected: {expected:?}",
                 stringify!($actual),
-                " == ",
                 stringify!($expected),
             )));
         }
-    };
+    }};
 }
 
 // ── Happy-path tests ────────────────────────────────────────────────

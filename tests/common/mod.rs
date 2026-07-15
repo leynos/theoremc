@@ -8,7 +8,7 @@ pub use fixture_crate::{
     TRIVIAL_THEOREM, toml_section,
 };
 pub use schema_fixtures::{
-    assert_diagnostic_failure, assert_fixture_error_contains, assert_fixture_fails,
+    FIXTURES_DIR, assert_diagnostic_failure, assert_fixture_error_contains, assert_fixture_fails,
     assert_fixture_loads, fixture_error_message, load_fixture, load_fixture_docs,
     load_fixture_text,
 };

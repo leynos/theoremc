@@ -7,13 +7,16 @@ use theoremc_core::schema::{
 
 use super::{ExpectedFragment, FixtureName};
 
+/// Directory containing theorem YAML fixtures used by integration tests.
+pub const FIXTURES_DIR: &str = "tests/fixtures";
+
 /// Loads a fixture file from the `tests/fixtures/` directory.
 ///
 /// # Errors
 ///
 /// Returns an I/O error when the fixture cannot be read.
 pub fn load_fixture(name: FixtureName<'_>) -> std::io::Result<String> {
-    Dir::open_ambient_dir("tests/fixtures", ambient_authority())?.read_to_string(name.as_str())
+    Dir::open_ambient_dir(FIXTURES_DIR, ambient_authority())?.read_to_string(name.as_str())
 }
 
 /// Loads a fixture file and formats I/O failures as test-friendly strings.
@@ -98,7 +101,7 @@ pub fn assert_diagnostic_failure(
     fixture_name: FixtureName<'_>,
     expected_code: SchemaDiagnosticCode,
 ) -> Result<(), String> {
-    let source = format!("tests/fixtures/{}", fixture_name.as_str());
+    let source = format!("{FIXTURES_DIR}/{}", fixture_name.as_str());
     let yaml = load_fixture_text(fixture_name)?;
     let error = load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
         .err()

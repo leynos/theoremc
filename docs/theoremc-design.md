@@ -104,10 +104,11 @@ to generate harness code. Kani harnesses are functions annotated with
 
 ### 3.1 Pipeline diagram
 
-The build flow starts with `.theorem` sources and Rust action modules, passes
-through Cargo discovery and macro expansion, parses and validates YAML into
-core schema types, lowers those documents into backend-ready IR, and then emits
-verification harnesses for execution and reporting.
+The implemented build flow starts with `.theorem` sources and Rust action
+modules, passes through Cargo discovery and macro expansion, and parses and
+validates YAML into core schema types. The diagram's action resolution,
+backend-ready IR lowering, harness emission, and verification reporting stages
+remain planned architecture.
 
 ```mermaid
 flowchart TD
@@ -724,9 +725,9 @@ post-deserialization semantic validation (Step 1.2.1 of the roadmap):
   `str::trim()` is the most defensive choice and aligns with Rust's standard
   library semantics.
 - Validation logic is extracted into
-  `crates/theoremc-core/src/schema/validate.rs`
-  to keep `crates/theoremc-core/src/schema/loader.rs` under the 400-line limit
-  and to improve separation of concerns between deserialization and semantic
+  `crates/theoremc-core/src/schema/validate.rs` to keep
+  `crates/theoremc-core/src/schema/loader.rs` under the 400-line limit and to
+  improve separation of concerns between deserialization and semantic
   validation.
 - `unwind: 0` is rejected because the spec (`TFS-6` §6.2) says,
   "positive integer", meaning > 0. The `u32` serde type already rejects
@@ -744,9 +745,8 @@ syntax validation (Step 1.2.2 of the roadmap):
   `syn::parse_str::<Expr>` and `full` provides all `Expr` variant types needed
   for the denylist check. Other features are not needed.
 - A new `crates/theoremc-core/src/schema/expr.rs` module isolates expression
-  parsing from
-  structural validation in `validate.rs`, preserving the 400-line file limit
-  and separation of concerns.
+  parsing from structural validation in `validate.rs`, preserving the 400-line
+  file limit and separation of concerns.
 - A denylist approach rejects 14 `syn::Expr` variants that represent
   statement-like or block-like constructs: `Assign`, `Async`, `Block`, `Break`,
   `Const`, `Continue`, `ForLoop`, `Let`, `Loop`, `Return`, `TryBlock`, `Unsafe`,
@@ -776,9 +776,8 @@ deserialization (Step 1.1 of the roadmap):
   for the `UPPERCASE` string forms, catching invalid values at deserialization
   time.
 - Schema types live in `crates/theoremc-core/src/schema/` (not `src/parser/`)
-  because Step 1.1
-  is purely deserialization. A future parser component in the target
-  architecture may encompass the full parsing and validation pipeline.
+  because Step 1.1 is purely deserialization. A future parser component in the
+  target architecture may encompass the full parsing and validation pipeline.
 - The `ActionCall.as` field uses Rust field name `as_binding` with
   `#[serde(rename = "as", default)]`.
 - `src/lib.rs` is added alongside `src/main.rs` so schema types are testable
@@ -802,10 +801,10 @@ The following decisions were taken during the implementation of `Step` and
   "Let allows only call or must". Improving the error message is a Step 1.3
   concern (diagnostics quality).
 - Validation logic is extracted into `crates/theoremc-core/src/schema/step.rs`,
-  following the
-  `expr.rs` pattern from Step 1.2.2. The module provides `pub(crate)` functions
-  returning `Result<(), String>`, allowing `validate.rs` to wrap errors with
-  theorem-level context. This keeps `validate.rs` under the 400-line limit.
+  following the `expr.rs` pattern from Step 1.2.2. The module provides
+  `pub(crate)` functions returning `Result<(), String>`, allowing `validate.rs`
+  to wrap errors with theorem-level context. This keeps `validate.rs` under the
+  400-line limit.
 - Error path context uses a "breadcrumb" string
   (e.g., `"Do step 2: maybe.do step 1"`) that builds up through recursion,
   giving users a clear trail to the problematic field.
@@ -819,9 +818,9 @@ The following decisions were taken during implementation of non-vacuity
 defaults (Step 1.2.4 of the roadmap):
 
 - Vacuity policy enforcement stays in
-  `crates/theoremc-core/src/schema/validate.rs` under two
-  focused helpers: `validate_kani_vacuity` (override contract) and
-  `validate_kani_witnesses` (default witness requirement).
+  `crates/theoremc-core/src/schema/validate.rs` under two focused helpers:
+  `validate_kani_vacuity` (override contract) and `validate_kani_witnesses`
+  (default witness requirement).
 - `allow_vacuous: false` and omitted `allow_vacuous` are treated identically.
   Both require at least one `Witness` entry.
 - `allow_vacuous: true` is accepted only when `vacuity_because` is present and
@@ -872,9 +871,9 @@ action-name validation (Step 2.1.1 of the roadmap):
   and action-name segments stay aligned on ASCII identifier and Rust keyword
   rules.
 - A dedicated `crates/theoremc-core/src/schema/action_name.rs` module isolates
-  canonical action-name
-  checks from step-shape checks in `crates/theoremc-core/src/schema/step.rs`,
-  keeping complexity low and preserving headroom under the 400-line limit.
+  canonical action-name checks from step-shape checks in
+  `crates/theoremc-core/src/schema/step.rs`, keeping complexity low and
+  preserving headroom under the 400-line limit.
 - Behavioural coverage for this step uses `rstest-bdd` v0.5.0 with a dedicated
   feature file and scenarios for canonical happy path, malformed names, and
   reserved-keyword segments.
@@ -985,8 +984,8 @@ naming (Step 2.2.1 of the roadmap):
   ensures two paths that differ only in characters lost during sanitization
   (e.g., `my-file` vs `my_file`) produce different module names.
 - Unit tests were extracted to `crates/theoremc-core/src/mangle_tests.rs` via
-  `#[path = ...]` to
-  keep `crates/theoremc-core/src/mangle.rs` under the 400-line code-size rule.
+  `#[path = ...]` to keep `crates/theoremc-core/src/mangle.rs` under the
+  400-line code-size rule.
 - Behavioural coverage uses `rstest-bdd` v0.5.0 with scenarios for
   deterministic naming, separator normalization, and punctuation-collision
   disambiguation.
@@ -1001,9 +1000,8 @@ roadmap):
   via `theorem_key`, `theorem_slug`, `mangle_theorem_harness`, and the
   `MangledHarness` result type.
 - To keep `crates/theoremc-core/src/mangle.rs` under the repository line-count
-  limit, per-file
-  module naming and theorem harness naming are split into focused sibling files
-  `crates/theoremc-core/src/mangle_path.rs` and
+  limit, per-file module naming and theorem harness naming are split into
+  focused sibling files `crates/theoremc-core/src/mangle_path.rs` and
   `crates/theoremc-core/src/mangle_harness.rs`, while
   `crates/theoremc-core/src/mangle.rs` remains the public API surface and
   re-export point.
