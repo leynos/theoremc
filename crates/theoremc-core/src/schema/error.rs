@@ -49,7 +49,10 @@ pub enum SchemaError {
         /// A human-readable explanation of the violation.
         reason: String,
         /// Optional structured diagnostic payload.
-        diagnostic: Option<SchemaDiagnostic>,
+        diagnostic: Option<Box<SchemaDiagnostic>>,
+        /// Optional structured source error preserved from decoding.
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
     },
 
     /// Two or more different canonical action names produce the same
@@ -82,11 +85,12 @@ pub enum SchemaError {
 impl SchemaError {
     /// Returns the structured diagnostic payload when available.
     #[must_use]
-    pub const fn diagnostic(&self) -> Option<&SchemaDiagnostic> {
+    pub fn diagnostic(&self) -> Option<&SchemaDiagnostic> {
         match self {
-            Self::Deserialize { diagnostic, .. }
-            | Self::ValidationFailed { diagnostic, .. }
-            | Self::DuplicateTheoremKey { diagnostic, .. } => diagnostic.as_ref(),
+            Self::Deserialize { diagnostic, .. } | Self::DuplicateTheoremKey { diagnostic, .. } => {
+                diagnostic.as_ref()
+            }
+            Self::ValidationFailed { diagnostic, .. } => diagnostic.as_deref(),
             Self::InvalidIdentifier { .. }
             | Self::InvalidActionName { .. }
             | Self::MangledIdentifierCollision { .. } => None,

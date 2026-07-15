@@ -1,5 +1,7 @@
 //! Unit tests for schema document loading.
 
+use std::error::Error;
+
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use rstest::*;
 
@@ -57,105 +59,6 @@ fn load_single_minimal_document() {
     let docs = load_theorem_docs(MINIMAL_YAML).expect("should parse");
     assert_eq!(docs.len(), 1);
     assert_eq!(docs.first().map(|d| d.theorem.as_str()), Some("Minimal"));
-}
-
-#[rstest]
-fn action_signatures_parse_with_ordered_params_and_default_return() {
-    let yaml = r"
-Theorem: HasActions
-About: Declares action signatures
-Actions:
-  account.deposit:
-    params:
-      account: '&mut crate::account::Account'
-      amount: u64
-Let:
-  updated:
-    call:
-      action: account.deposit
-      args:
-        account: { ref: account }
-        amount: { ref: amount }
-Prove:
-  - assert: 'true'
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: 'true'
-    because: always reachable
-";
-    let docs = load_theorem_docs(yaml).expect("should parse action signature");
-    let signature = docs[0]
-        .actions
-        .get("account.deposit")
-        .expect("signature should be present");
-
-    assert_eq!(signature.returns, "()");
-    assert_eq!(
-        signature
-            .params
-            .keys()
-            .map(String::as_str)
-            .collect::<Vec<_>>(),
-        vec!["account", "amount"]
-    );
-}
-
-#[rstest]
-fn missing_action_signature_for_referenced_action_is_rejected() {
-    let yaml = r"
-Theorem: MissingSignature
-About: References an undeclared action
-Do:
-  - call:
-      action: account.deposit
-      args: {}
-Prove:
-  - assert: 'true'
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: 'true'
-    because: always reachable
-";
-
-    assert_parse_error_contains(
-        yaml,
-        "referenced action 'account.deposit' is missing an Actions signature entry",
-    );
-}
-
-#[rstest]
-fn invalid_action_signature_type_is_rejected() {
-    let yaml = r"
-Theorem: InvalidSignature
-About: Declares an invalid action signature
-Actions:
-  account.deposit:
-    params:
-      amount: 'not a type %'
-Prove:
-  - assert: 'true'
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: 'true'
-    because: always reachable
-";
-
-    assert_parse_error_contains(
-        yaml,
-        "Actions entry 'account.deposit': amount type is not a valid Rust type",
-    );
 }
 
 #[rstest]
@@ -476,4 +379,53 @@ Witness:
     );
     assert!(diagnostic.location.line > 0);
     assert!(diagnostic.location.column > 0);
+}
+
+#[rstest]
+fn decode_failures_preserve_source_error() {
+    let yaml = r"
+Theorem: InvalidRef
+About: Invalid ref target
+Let:
+  y:
+    call:
+      action: account.deposit
+      args:
+        target: 1
+
+  x:
+    call:
+      action: account.deposit
+      args:
+        target:
+          ref: 'not valid'
+Prove:
+  - assert: 'true'
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: reachable
+";
+    let error = load_theorem_docs_with_source(
+        &SourceId::new("tests/fixtures/invalid_ref_target.theorem"),
+        yaml,
+    )
+    .expect_err("invalid ref target should fail decoding");
+
+    let source = error.source().expect("decode failure should be preserved");
+    let diagnostic = error.diagnostic().expect("diagnostic expected");
+
+    assert!(
+        source.to_string().contains("Let binding 'x'"),
+        "unexpected source error: {source}"
+    );
+    assert_eq!(
+        diagnostic.location.source,
+        "tests/fixtures/invalid_ref_target.theorem"
+    );
+    assert_eq!(diagnostic.location.line, 15);
 }

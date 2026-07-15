@@ -2,7 +2,7 @@
 name = "theoremc-core"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [features]
 test-support = []
@@ -20,9 +20,11 @@ camino = "1.2.2"
 cap-std = { version = "4.0.2", features = ["fs_utf8"] }
 
 [dev-dependencies]
-proptest = "1"
+googletest = "0.14.3"
+pretty_assertions = "1.4.1"
+proptest = "1.11.0"
 rstest = "0.26.1"
-tempfile = "3"
+tempfile = "3.27.0"
 
 [lints]
 workspace = true

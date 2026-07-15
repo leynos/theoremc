@@ -10,7 +10,7 @@
 use indexmap::IndexMap;
 use serde::Deserialize;
 
-use super::arg_value::{ArgDecodeError, decode_arg_value};
+use super::arg_value::{ArgDecodeError, ParamName, decode_arg_value};
 use super::types::{
     ActionCall, LetBinding, LetCall, LetMust, MaybeBlock, Step, StepCall, StepMaybe, StepMust,
 };
@@ -112,7 +112,7 @@ pub(crate) struct RawMaybeBlock {
 pub(crate) fn convert_action_call(raw: &RawActionCall) -> Result<ActionCall, ArgDecodeError> {
     let mut args = IndexMap::with_capacity(raw.args.len());
     for (key, value) in &raw.args {
-        let decoded = decode_arg_value(key, value.clone())?;
+        let decoded = decode_arg_value(ParamName::new(key), value.clone())?;
         args.insert(key.clone(), decoded);
     }
     Ok(ActionCall {
@@ -163,7 +163,7 @@ fn convert_maybe_block(raw: &RawMaybeBlock) -> Result<MaybeBlock, ArgDecodeError
         do_steps.push(convert_step(step).map_err(|e| {
             // Re-wrap with nested path context so error messages
             // identify the failing step inside `maybe.do`.
-            remap_with_prefix(e, &format!("maybe.do step {}", i + 1))
+            e.with_param_prefix(&format!("maybe.do step {}", i + 1))
         })?);
     }
     Ok(MaybeBlock {
@@ -172,30 +172,6 @@ fn convert_maybe_block(raw: &RawMaybeBlock) -> Result<MaybeBlock, ArgDecodeError
     })
 }
 
-/// Prepends a breadcrumb path prefix to an [`ArgDecodeError`]'s
-/// `param` field so nested decode failures identify their location.
-fn remap_with_prefix(error: ArgDecodeError, prefix: &str) -> ArgDecodeError {
-    match error {
-        ArgDecodeError::EmptyRefTarget { param } => ArgDecodeError::EmptyRefTarget {
-            param: format!("{prefix}: {param}"),
-        },
-        ArgDecodeError::InvalidIdentifier { param, name } => ArgDecodeError::InvalidIdentifier {
-            param: format!("{prefix}: {param}"),
-            name,
-        },
-        ArgDecodeError::ReservedKeyword { param, name } => ArgDecodeError::ReservedKeyword {
-            param: format!("{prefix}: {param}"),
-            name,
-        },
-        ArgDecodeError::NonStringRefTarget { param, kind } => ArgDecodeError::NonStringRefTarget {
-            param: format!("{prefix}: {param}"),
-            kind,
-        },
-        ArgDecodeError::NonStringLiteralValue { param, kind } => {
-            ArgDecodeError::NonStringLiteralValue {
-                param: format!("{prefix}: {param}"),
-                kind,
-            }
-        }
-    }
-}
+#[cfg(test)]
+#[path = "raw_action_tests.rs"]
+mod tests;

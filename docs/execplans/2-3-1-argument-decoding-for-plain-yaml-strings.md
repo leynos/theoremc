@@ -59,7 +59,8 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
 
 - Risk: Clippy `too_many_arguments` triggered by rstest parameterized tests
   with 5+ case params. Severity: medium. Likelihood: medium. Mitigation: use
-  helper structs as per the `Golden` pattern established in `src/mangle.rs`.
+  helper structs as per the `Golden` pattern established in
+  `crates/theoremc-core/src/mangle.rs`.
 
 - Risk: Changing `ActionCall.args` from `IndexMap<String, TheoremValue>` to
   `IndexMap<String, ArgValue>` may break existing test builders. Severity:
@@ -69,9 +70,9 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
 
 - Risk: The custom `Deserialize` for `TheoremValue` is used to build
   `ActionCall.args`. Changing the args type to `ArgValue` means serde must
-  deserialize YAML into `ArgValue` directly, or a post-deserialization
+  deserialise YAML into `ArgValue` directly, or a post-deserialisation
   conversion step is needed. Severity: high. Likelihood: certain (by design).
-  Mitigation: use a two-stage approach — serde deserializes into `TheoremValue`
+  Mitigation: use a two-stage approach — serde deserialises into `TheoremValue`
   in the raw layer as before, then a conversion function
   `decode_arg_value(param_name, value)` runs during the raw-to-public
   conversion step in `RawTheoremDoc::to_theorem_doc()`. Keep the helper
@@ -84,31 +85,32 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
   ) -> Result<ArgValue, ArgDecodeError>
   ```
 
-- Risk: `src/schema/types.rs` is already 312 lines. Adding `ArgValue` and
-  `LiteralValue` types could push it near the 400-line limit. Severity: medium.
-  Likelihood: medium. Mitigation: place `ArgValue` in a new file
-  `src/schema/arg_value.rs`.
+- Risk: `crates/theoremc-core/src/schema/types.rs` is already 312 lines.
+  Adding `ArgValue` and `LiteralValue` types could push it near the 400-line
+  limit. Severity: medium. Likelihood: medium. Mitigation: place `ArgValue` in
+  a new file `crates/theoremc-core/src/schema/arg_value.rs`.
 
-- Risk: `src/schema/raw.rs` is already 316 lines. Adding `RawActionCall`,
-  `RawLetCall`, `RawLetMust`, `RawStepCall`, `RawStepMust`, `RawStepMaybe`,
-  `RawMaybeBlock`, `RawLetBinding`, `RawStep` types and conversion logic could
-  push it well over 400 lines. Severity: high. Likelihood: high. Mitigation:
-  extract the new raw action types and their conversion logic into a new file
-  `src/schema/raw_action.rs`, keeping `raw.rs` focused on the existing
-  `RawTheoremDoc` and its conversions. Import and use the raw action types from
-  the new module. Alternatively, the existing `LetBinding`, `Step`, and related
-  types in `raw.rs` already use the public `ActionCall` directly (they are
-  `use super::types::{...LetBinding, Step...}`). Instead of duplicating all
-  wrapper types, consider deserializing `ActionCall` with `TheoremValue` args
-  via an intermediate serde approach, then converting in `to_theorem_doc()`.
-  The preferred approach is: keep `raw.rs` importing the serde-compatible raw
-  step/let types from a new `raw_action.rs` module.
+- Risk: `crates/theoremc-core/src/schema/raw.rs` is already 316 lines.
+  Adding `RawActionCall`, `RawLetCall`, `RawLetMust`, `RawStepCall`,
+  `RawStepMust`, `RawStepMaybe`, `RawMaybeBlock`, `RawLetBinding`, `RawStep`
+  types and conversion logic could push it well over 400 lines. Severity: high.
+  Likelihood: high. Mitigation: extract the new raw action types and their
+  conversion logic into a new file
+  `crates/theoremc-core/src/schema/raw_action.rs`, keeping `raw.rs` focused on
+  the existing `RawTheoremDoc` and its conversions. Import and use the raw
+  action types from the new module. Alternatively, the existing `LetBinding`,
+  `Step`, and related types in `raw.rs` already use the public `ActionCall`
+  directly (they are `use super::types::{...LetBinding, Step...}`). Instead of
+  duplicating all wrapper types, consider deserialising `ActionCall` with
+  `TheoremValue` args via an intermediate serde approach, then converting in
+  `to_theorem_doc()`. The preferred approach is: keep `raw.rs` importing the
+  serde-compatible raw step/let types from a new `raw_action.rs` module.
 
 ## Progress
 
 - [x] Milestone 0: baseline verification (all existing tests pass).
 - [x] Milestone 1: create `ArgValue` and `LiteralValue` types in
-  `src/schema/arg_value.rs`.
+  `crates/theoremc-core/src/schema/arg_value.rs`.
 - [x] Milestone 2: implement `decode_arg_value` conversion function.
 - [x] Milestone 3: change `ActionCall.args` to `IndexMap<String, ArgValue>` and
   wire decoding into `RawTheoremDoc::to_theorem_doc()`.
@@ -185,21 +187,24 @@ documentation files updated. Well within the 15-file / 700-line tolerance.
 
 ## Context and orientation
 
-The `theoremc` crate (repository root) compiles `.theorem` YAML files into Rust
-proof harnesses. The current loading pipeline is:
+The root `theoremc` crate acts as the public façade and build-integration
+layer. It compiles `.theorem` YAML files into Rust proof harnesses while
+delegating schema and decoding logic to `theoremc-core`. The current loading
+pipeline is:
 
-1. `load_theorem_docs(yaml)` in `src/schema/loader.rs` calls
-   `serde_saphyr::from_multiple(input)` to deserialize YAML into
+1. `load_theorem_docs(yaml)` in `crates/theoremc-core/src/schema/loader.rs`
+   calls `serde_saphyr::from_multiple(input)` to deserialize YAML into
    `Vec<RawTheoremDoc>`.
 2. Each `RawTheoremDoc` is converted to a `TheoremDoc` via
-   `raw_doc.to_theorem_doc()` in `src/schema/raw.rs`.
-3. `validate_theorem_doc(&doc)` in `src/schema/validate.rs` validates each
-   document (fields, expressions, action name grammar).
+   `raw_doc.to_theorem_doc()` in `crates/theoremc-core/src/schema/raw.rs`.
+3. `validate_theorem_doc(&doc)` in
+   `crates/theoremc-core/src/schema/validate.rs` validates each document
+   (fields, expressions, action name grammar).
 4. `load_theorem_docs_with_source(...)` runs duplicate-theorem-key checks
    across the loaded source after per-document validation and before returning
    the accumulated documents.
-5. `check_action_collisions(&docs)` in `src/collision.rs` detects mangled
-   identifier collisions.
+5. `check_action_collisions(&docs)` in `crates/theoremc-core/src/collision.rs`
+   detects mangled identifier collisions.
 
 Action arguments currently live in `ActionCall.args` as
 `IndexMap<String, TheoremValue>` where `TheoremValue` is a generic YAML value
@@ -209,23 +214,30 @@ semantic interpretation — a string `"x"` and a map `{ ref: x }` are both just
 
 Key files and their approximate line counts:
 
-- `src/lib.rs` (15 lines) — crate root, declares `pub mod schema`, `pub mod
-  mangle`, `pub mod collision`.
-- `src/schema/mod.rs` (33 lines) — module root with public re-exports.
-- `src/schema/types.rs` (312 lines) — `TheoremDoc`, `ActionCall`, `Step`,
-  `LetBinding`, and related types. `ActionCall` is at line 241.
-- `src/schema/value.rs` (116 lines) — `TheoremValue` enum with custom
-  `Deserialize` implementation.
-- `src/schema/raw.rs` (317 lines) — `RawTheoremDoc` with `to_theorem_doc()`
-  conversion at line 160.
-- `src/schema/error.rs` (69 lines) — `SchemaError` enum.
-- `src/schema/validate.rs` (389 lines) — post-deserialization validation.
-- `src/schema/step.rs` (278 lines) — step and action call validation.
-- `src/schema/identifier.rs` (168 lines) — identifier validation including
-  `is_valid_ascii_identifier_pattern` and `is_rust_reserved_keyword`.
-- `src/schema/loader.rs` (241 lines) — multi-document loading.
-- `src/collision_tests.rs` (~200 lines) — collision detection tests with
-  `action_call()` builder at line 49.
+- `src/lib.rs` (15 lines) — `theoremc` façade and build-integration crate
+  root, re-exporting the post-split `theoremc-core` schema, mangle, and
+  collision APIs.
+- `crates/theoremc-core/src/schema/mod.rs` (33 lines) — module root with
+  public re-exports.
+- `crates/theoremc-core/src/schema/types.rs` (312 lines) — `TheoremDoc`,
+  `ActionCall`, `Step`, `LetBinding`, and related types. `ActionCall` is at
+  line 241.
+- `crates/theoremc-core/src/schema/value.rs` (116 lines) — `TheoremValue`
+  enum with custom `Deserialize` implementation.
+- `crates/theoremc-core/src/schema/raw.rs` (317 lines) — `RawTheoremDoc` with
+  `to_theorem_doc()` conversion at line 160.
+- `crates/theoremc-core/src/schema/error.rs` (69 lines) — `SchemaError` enum.
+- `crates/theoremc-core/src/schema/validate.rs` (389 lines) —
+  post-deserialization validation.
+- `crates/theoremc-core/src/schema/step.rs` (278 lines) — step and action
+  call validation.
+- `crates/theoremc-core/src/schema/identifier.rs` (168 lines) — identifier
+  validation including `is_valid_ascii_identifier_pattern` and
+  `is_rust_reserved_keyword`.
+- `crates/theoremc-core/src/schema/loader.rs` (241 lines) — multi-document
+  loading.
+- `crates/theoremc-core/src/collision_tests.rs` (~200 lines) — collision
+  detection tests with `action_call()` builder at line 49.
 - `tests/fixtures/valid_full.theorem` — fixture using `{ ref: ... }` syntax.
 
 The existing fixture `tests/fixtures/valid_full.theorem` already uses
@@ -243,7 +255,7 @@ Go/no-go check: existing suite passes.
 
 ### Milestone 1: create `ArgValue` and `LiteralValue` types
 
-Create `src/schema/arg_value.rs` with the following types:
+Create `crates/theoremc-core/src/schema/arg_value.rs` with the following types:
 
 ```rust
 //! Semantically decoded action-call argument values.
@@ -291,14 +303,15 @@ pub enum LiteralValue {
 }
 ```
 
-Wire `mod arg_value;` into `src/schema/mod.rs` and add `pub use` for `ArgValue`
-and `LiteralValue`.
+Wire `mod arg_value;` into `crates/theoremc-core/src/schema/mod.rs` and add
+`pub use` for `ArgValue` and `LiteralValue`.
 
 Go/no-go check: `cargo check` succeeds.
 
 ### Milestone 2: implement `decode_arg_value` conversion
 
-In `src/schema/arg_value.rs`, add a public conversion function:
+In `crates/theoremc-core/src/schema/arg_value.rs`, add a public conversion
+function:
 
 ```rust
 /// Decodes a raw `TheoremValue` into a semantically typed `ArgValue`.
@@ -329,8 +342,9 @@ failed decoding (e.g., "argument 'graph_ref': ref value 'fn' is a Rust reserved
 keyword").
 
 The function uses `super::identifier::is_valid_ascii_identifier_pattern` and
-`super::identifier::is_rust_reserved_keyword` from `src/schema/identifier.rs`
-for validating the `ref` target name.
+`super::identifier::is_rust_reserved_keyword` from
+`crates/theoremc-core/src/schema/identifier.rs` for validating the `ref` target
+name.
 
 Detection of `{ ref: <name> }`: check if the map has exactly one entry, the key
 is the string `"ref"`, and the value is a `TheoremValue::String`. If the key is
@@ -340,7 +354,7 @@ Go/no-go check: `cargo check` succeeds.
 
 ### Milestone 3: change `ActionCall.args` and wire decoding
 
-In `src/schema/types.rs`, change `ActionCall`:
+In `crates/theoremc-core/src/schema/types.rs`, change `ActionCall`:
 
 ```rust
 pub struct ActionCall {
@@ -352,8 +366,8 @@ pub struct ActionCall {
 
 Update the import in `types.rs` to bring in `ArgValue` from `super::arg_value`.
 
-In `src/schema/raw.rs`, `RawTheoremDoc` currently imports and uses the public
-`LetBinding`, `Step`, and related types directly (line 12):
+In `crates/theoremc-core/src/schema/raw.rs`, `RawTheoremDoc` currently imports
+and uses the public `LetBinding`, `Step`, and related types directly (line 12):
 `use super::types::{Evidence, KaniEvidence, KaniExpectation, LetBinding, Step, TheoremDoc};`.
 Since `ActionCall.args` changes from `TheoremValue` to `ArgValue`, serde can
 no longer deserialize YAML directly into the public `ActionCall` (the YAML
@@ -370,10 +384,11 @@ The dependency chain requiring raw counterparts:
 - `MaybeBlock` (contains `Vec<Step>`)
 - `Step` (enum of `StepCall` | `StepMust` | `StepMaybe`)
 
-That is 9 raw types. Place them in a new `src/schema/raw_action.rs` module to
-keep `raw.rs` under 400 lines (currently 316 lines).
+That is 9 raw types. Place them in a new
+`crates/theoremc-core/src/schema/raw_action.rs` module to keep `raw.rs` under
+400 lines (currently 316 lines).
 
-`src/schema/raw_action.rs` will contain:
+`crates/theoremc-core/src/schema/raw_action.rs` will contain:
 
 - `RawActionCall` — same as current `ActionCall` but with `TheoremValue` args
 - `RawLetCall`, `RawLetMust`, `RawLetBinding` — mirrors of public types
@@ -444,9 +459,9 @@ Go/no-go check: `cargo check` succeeds.
 
 ### Milestone 5: unit tests for `decode_arg_value`
 
-Add unit tests in `src/schema/arg_value.rs` (inline `#[cfg(test)] mod tests`)
-or, if the file would exceed 400 lines, in a separate
-`src/schema/arg_value_tests.rs` via `#[path]` attribute.
+Add unit tests in `crates/theoremc-core/src/schema/arg_value.rs` (inline
+`#[cfg(test)] mod tests`) or, if the file would exceed 400 lines, in a separate
+`crates/theoremc-core/src/schema/arg_value_tests.rs` via `#[path]` attribute.
 
 Test cases:
 
@@ -636,11 +651,12 @@ gate before rerunning the full gate sequence.
 
 New artefacts:
 
-- `src/schema/arg_value.rs` — `ArgValue`, `LiteralValue` types and
-  `decode_arg_value` conversion function.
-- `src/schema/raw_action.rs` — raw serde-compatible action types
-  (`RawActionCall`, `RawLetBinding`, `RawStep`, etc.) and conversion functions
-  to their public counterparts with decoded `ArgValue` args.
+- `crates/theoremc-core/src/schema/arg_value.rs` — `ArgValue`, `LiteralValue`
+  types and `decode_arg_value` conversion function.
+- `crates/theoremc-core/src/schema/raw_action.rs` — raw serde-compatible
+  action types (`RawActionCall`, `RawLetBinding`, `RawStep`, etc.) and
+  conversion functions to their public counterparts with decoded `ArgValue`
+  args.
 - `tests/features/arg_decode.feature` — BDD feature file.
 - `tests/arg_decode_bdd.rs` — BDD test runner.
 - `tests/fixtures/valid_arg_string_literal.theorem` — fixture with plain
@@ -657,25 +673,26 @@ New artefacts:
 
 Updated artefacts:
 
-- `src/schema/mod.rs` — add `mod arg_value;`, `mod raw_action;`, and
-  `pub use` for `ArgValue`, `LiteralValue`.
-- `src/schema/types.rs` — change `ActionCall.args` from
+- `crates/theoremc-core/src/schema/mod.rs` — add `mod arg_value;`,
+  `mod raw_action;`, and `pub use` for `ArgValue`, `LiteralValue`.
+- `crates/theoremc-core/src/schema/types.rs` — change `ActionCall.args` from
   `IndexMap<String, TheoremValue>` to `IndexMap<String, ArgValue>`. Remove the
   `TheoremValue` import; add `ArgValue` import. Remove `Deserialize` derive from
   `ActionCall` and all types that contain it (`LetCall`, `LetMust`, `StepCall`,
   `StepMust`, `StepMaybe`, `MaybeBlock`, `LetBinding`, `Step`) — serde now
   deserializes the raw versions instead.
-- `src/schema/raw.rs` — change `RawTheoremDoc.let_bindings` type from
-  `IndexMap<String, LetBinding>` to `IndexMap<String, RawLetBinding>` and
-  `do_steps` from `Vec<Step>` to `Vec<RawStep>`. Update `to_theorem_doc()` to
-  return `Result<TheoremDoc, RawDocDecodeError>` and use conversion functions
-  from `raw_action.rs`. Update imports.
-- `src/schema/loader.rs` — update `to_theorem_doc()` call site to handle
-  `Result`.
-- `src/schema/step.rs` — no changes needed (validates `action` string only,
-  does not inspect `args`).
-- `src/collision_tests.rs` — update `action_call()` builder if it inserts
-  values (currently it uses `IndexMap::new()` so no change expected).
+- `crates/theoremc-core/src/schema/raw.rs` — change `RawTheoremDoc.let_bindings`
+  type from `IndexMap<String, LetBinding>` to `IndexMap<String, RawLetBinding>`
+  and `do_steps` from `Vec<Step>` to `Vec<RawStep>`. Update `to_theorem_doc()`
+  to return `Result<TheoremDoc, RawDocDecodeError>` and use conversion
+  functions from `raw_action.rs`. Update imports.
+- `crates/theoremc-core/src/schema/loader.rs` — update `to_theorem_doc()`
+  call site to handle `Result`.
+- `crates/theoremc-core/src/schema/step.rs` — no changes needed (validates
+  `action` string only, does not inspect `args`).
+- `crates/theoremc-core/src/collision_tests.rs` — update `action_call()`
+  builder if it inserts values (currently it uses `IndexMap::new()` so no
+  change expected).
 - `docs/theoremc-design.md` — add §6.x implementation decisions for 2.3.1.
 - `docs/users-guide.md` — expand argument value semantics section.
 - `docs/roadmap.md` — mark Step 2.3.1 checkbox `[x]`.
@@ -684,7 +701,7 @@ Updated artefacts:
 
 ### New public types (`theoremc::schema`)
 
-In `src/schema/arg_value.rs`:
+In `crates/theoremc-core/src/schema/arg_value.rs`:
 
 ```rust
 /// A semantically decoded action-call argument value.
@@ -717,7 +734,7 @@ pub enum LiteralValue {
 
 ### Modified public type (`theoremc::schema::ActionCall`)
 
-In `src/schema/types.rs`:
+In `crates/theoremc-core/src/schema/types.rs`:
 
 ```rust
 pub struct ActionCall {
@@ -729,7 +746,7 @@ pub struct ActionCall {
 
 ### Internal conversion function
 
-In `src/schema/arg_value.rs`:
+In `crates/theoremc-core/src/schema/arg_value.rs`:
 
 ```rust
 pub fn decode_arg_value(

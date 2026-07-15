@@ -1,5 +1,6 @@
 //! Unit tests for argument value decoding.
 
+use googletest::prelude::*;
 use indexmap::IndexMap;
 use rstest::rstest;
 
@@ -27,7 +28,7 @@ use crate::schema::value::TheoremValue;
     ArgValue::Literal(LiteralValue::Float(99.5))
 )]
 fn scalar_values_decode_as_literals(#[case] input: TheoremValue, #[case] expected: ArgValue) {
-    let result = decode_arg_value("param", input);
+    let result = decode_arg_value(ParamName::new("param"), input);
     assert_eq!(result.expect("should decode"), expected);
 }
 
@@ -40,7 +41,7 @@ fn scalar_values_decode_as_literals(#[case] input: TheoremValue, #[case] expecte
 #[case::single_letter("a", "a")]
 fn valid_ref_decodes_as_reference(#[case] name: &str, #[case] expected: &str) {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(name.to_owned()))]);
-    let result = decode_arg_value("param", TheoremValue::Mapping(map));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map));
     assert_eq!(
         result.expect("should decode"),
         ArgValue::Reference(expected.to_owned())
@@ -52,7 +53,8 @@ fn valid_ref_decodes_as_reference(#[case] name: &str, #[case] expected: &str) {
 #[test]
 fn empty_ref_name_is_rejected() {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(String::new()))]);
-    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::EmptyRefTarget {
@@ -66,7 +68,8 @@ fn empty_ref_name_is_rejected() {
 #[case::keyword_let("let")]
 fn keyword_ref_name_is_rejected(#[case] name: &str) {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(name.to_owned()))]);
-    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::ReservedKeyword {
@@ -81,7 +84,8 @@ fn keyword_ref_name_is_rejected(#[case] name: &str) {
 #[case::contains_hyphen("foo-bar")]
 fn invalid_identifier_ref_name_is_rejected(#[case] name: &str) {
     let map = IndexMap::from([("ref".to_owned(), TheoremValue::String(name.to_owned()))]);
-    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::InvalidIdentifier {
@@ -100,7 +104,8 @@ fn ref_with_non_string_value_is_rejected(
     #[case] expected_kind: &'static str,
 ) {
     let map = IndexMap::from([("ref".to_owned(), value)]);
-    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::NonStringRefTarget {
@@ -115,7 +120,7 @@ fn ref_with_non_string_value_is_rejected(
 #[test]
 fn other_single_key_map_is_raw_map() {
     let map = IndexMap::from([("other_key".to_owned(), TheoremValue::String("value".into()))]);
-    let result = decode_arg_value("param", TheoremValue::Mapping(map.clone()));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map.clone()));
     assert_eq!(result.expect("should decode"), ArgValue::RawMap(map));
 }
 
@@ -125,21 +130,21 @@ fn multi_key_map_with_ref_is_raw_map() {
         ("ref".to_owned(), TheoremValue::String("name".into())),
         ("extra".to_owned(), TheoremValue::Integer(1)),
     ]);
-    let result = decode_arg_value("param", TheoremValue::Mapping(map.clone()));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map.clone()));
     assert_eq!(result.expect("should decode"), ArgValue::RawMap(map));
 }
 
 #[test]
 fn empty_map_is_raw_map() {
     let map = IndexMap::new();
-    let result = decode_arg_value("param", TheoremValue::Mapping(map.clone()));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map.clone()));
     assert_eq!(result.expect("should decode"), ArgValue::RawMap(map));
 }
 
 #[test]
 fn sequence_is_raw_sequence() {
     let seq = vec![TheoremValue::Integer(1), TheoremValue::Integer(2)];
-    let result = decode_arg_value("param", TheoremValue::Sequence(seq.clone()));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Sequence(seq.clone()));
     assert_eq!(result.expect("should decode"), ArgValue::RawSequence(seq));
 }
 
@@ -151,7 +156,7 @@ fn sequence_is_raw_sequence() {
 #[case::whitespace_string("  spaces  ", "  spaces  ")]
 fn valid_literal_wrapper_decodes_as_string_literal(#[case] input: &str, #[case] expected: &str) {
     let map = IndexMap::from([("literal".to_owned(), TheoremValue::String(input.to_owned()))]);
-    let result = decode_arg_value("param", TheoremValue::Mapping(map));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map));
     assert_eq!(
         result.expect("should decode"),
         ArgValue::Literal(LiteralValue::String(expected.to_owned()))
@@ -175,7 +180,8 @@ fn literal_with_non_string_value_is_rejected(
     #[case] expected_kind: &'static str,
 ) {
     let map = IndexMap::from([("literal".to_owned(), value)]);
-    let err = decode_arg_value("param", TheoremValue::Mapping(map)).expect_err("should fail");
+    let err = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map))
+        .expect_err("should fail");
     assert_eq!(
         err,
         ArgDecodeError::NonStringLiteralValue {
@@ -191,45 +197,118 @@ fn multi_key_map_with_literal_is_raw_map() {
         ("literal".to_owned(), TheoremValue::String("text".into())),
         ("extra".to_owned(), TheoremValue::Integer(1)),
     ]);
-    let result = decode_arg_value("param", TheoremValue::Mapping(map.clone()));
+    let result = decode_arg_value(ParamName::new("param"), TheoremValue::Mapping(map.clone()));
     assert_eq!(result.expect("should decode"), ArgValue::RawMap(map));
 }
 
 // ── Error message includes parameter name ───────────────────────────
 
-#[test]
-fn error_message_includes_param_name() {
-    let map = IndexMap::from([("ref".to_owned(), TheoremValue::String("fn".into()))]);
-    let err = decode_arg_value("graph_ref", TheoremValue::Mapping(map)).expect_err("should fail");
-    assert_eq!(
-        err,
-        ArgDecodeError::ReservedKeyword {
-            param: "graph_ref".into(),
-            name: "fn".into(),
-        }
-    );
-    // Display format also includes the parameter name.
+#[rstest]
+#[case::reserved_keyword(
+    "ref",
+    TheoremValue::String("fn".into()),
+    "graph_ref",
+    ArgDecodeError::ReservedKeyword {
+        param: "graph_ref".into(),
+        name: "fn".into(),
+    },
+    "graph_ref"
+)]
+#[case::non_string_literal(
+    "literal",
+    TheoremValue::Integer(7),
+    "my_label",
+    ArgDecodeError::NonStringLiteralValue {
+        param: "my_label".into(),
+        kind: "an integer",
+    },
+    "my_label"
+)]
+fn error_message_includes_param_name(
+    #[case] key: &str,
+    #[case] value: TheoremValue,
+    #[case] param_name: &str,
+    #[case] expected: ArgDecodeError,
+    #[case] expected_fragment: &str,
+) {
+    let map = IndexMap::from([(key.to_owned(), value)]);
+    let err = decode_arg_value(ParamName::new(param_name), TheoremValue::Mapping(map))
+        .expect_err("should fail");
+    assert_eq!(err, expected);
     let msg = err.to_string();
     assert!(
-        msg.contains("graph_ref"),
-        "expected display to mention 'graph_ref', got: {msg}"
+        msg.contains(expected_fragment),
+        "expected display to mention '{expected_fragment}', got: {msg}"
     );
 }
 
+// ── Error breadcrumb prefixing ──────────────────────────────────────
+
+#[rstest]
+#[case::empty_ref(
+    ArgDecodeError::EmptyRefTarget {
+        param: "name".into(),
+    },
+    ArgDecodeError::EmptyRefTarget {
+        param: "maybe.do step 2: name".into(),
+    },
+)]
+#[case::invalid_identifier(
+    ArgDecodeError::InvalidIdentifier {
+        param: "name".into(),
+        name: "not-valid".into(),
+    },
+    ArgDecodeError::InvalidIdentifier {
+        param: "maybe.do step 2: name".into(),
+        name: "not-valid".into(),
+    },
+)]
+#[case::reserved_keyword(
+    ArgDecodeError::ReservedKeyword {
+        param: "name".into(),
+        name: "fn".into(),
+    },
+    ArgDecodeError::ReservedKeyword {
+        param: "maybe.do step 2: name".into(),
+        name: "fn".into(),
+    },
+)]
+#[case::non_string_ref(
+    ArgDecodeError::NonStringRefTarget {
+        param: "name".into(),
+        kind: "an integer",
+    },
+    ArgDecodeError::NonStringRefTarget {
+        param: "maybe.do step 2: name".into(),
+        kind: "an integer",
+    },
+)]
+#[case::non_string_literal(
+    ArgDecodeError::NonStringLiteralValue {
+        param: "name".into(),
+        kind: "a boolean",
+    },
+    ArgDecodeError::NonStringLiteralValue {
+        param: "maybe.do step 2: name".into(),
+        kind: "a boolean",
+    },
+)]
+fn with_param_prefix_updates_every_error_variant(
+    #[case] error: ArgDecodeError,
+    #[case] expected: ArgDecodeError,
+) {
+    assert_that!(error.with_param_prefix("maybe.do step 2"), eq(&expected));
+}
+
 #[test]
-fn literal_error_message_includes_param_name() {
-    let map = IndexMap::from([("literal".to_owned(), TheoremValue::Integer(7))]);
-    let err = decode_arg_value("my_label", TheoremValue::Mapping(map)).expect_err("should fail");
-    assert_eq!(
-        err,
-        ArgDecodeError::NonStringLiteralValue {
-            param: "my_label".into(),
-            kind: "an integer",
-        }
-    );
-    let msg = err.to_string();
-    assert!(
-        msg.contains("my_label"),
-        "expected display to mention 'my_label', got: {msg}"
+fn with_param_prefix_keeps_display_message_stable() {
+    let error = ArgDecodeError::NonStringLiteralValue {
+        param: "label".into(),
+        kind: "an integer",
+    };
+
+    pretty_assertions::assert_eq!(
+        error.with_param_prefix("maybe.do step 1").to_string(),
+        "argument 'maybe.do step 1: label': literal value must be a string, not an integer",
     );
 }

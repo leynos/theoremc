@@ -83,22 +83,32 @@ ______________________________________________________________________
 
 ## 3. High-level architecture
 
-`theoremc` is a Cargo workspace composed of:
+`theoremc` is currently a Cargo workspace composed of:
 
-- a core library (`theoremc-core`) containing the schema, parsing, validation,
-  resolution, diagnostic modelling, localization contracts, and
-  backend-agnostic IR,
+- a root facade package (`theoremc`) that re-exports public APIs and owns Cargo
+  build integration,
+- a core library (`theoremc-core`) containing schema loading, validation,
+  diagnostics, name mangling, collision checks, and theorem-file IO,
 - a proc-macro crate (`theoremc-macros`) that embeds theorem compilation into
-  normal Rust builds,
-- backend emitter crates (MVP: Kani),
-- a reporter CLI (`theoremd`) to run verification and produce human/CI reports,
-- optional enforcement lints (`theoremc-dylint`) to discourage bypassing.
+  normal Rust builds, and
+- a small shared test-support crate (`test-helpers`).
+
+Planned components remain in this design as target architecture, not current
+workspace members: backend emitter crates, a reporter CLI (`theoremd`) to run
+verification and produce human/CI reports, and optional enforcement lints
+(`theoremc-dylint`) to discourage bypassing.
 
 The “compile-time theorem loader” pattern uses proc-macro expansion each build
 to generate harness code. Kani harnesses are functions annotated with
 `#[kani::proof]` (and optionally `#[kani::unwind(n)]`).[^2]
 
 ### 3.1 Pipeline diagram
+
+The implemented build flow starts with `.theorem` sources and Rust action
+modules, passes through Cargo discovery and macro expansion, and parses and
+validates YAML into core schema types. The diagram's action resolution,
+backend-ready IR lowering, harness emission, and verification reporting stages
+remain planned architecture.
 
 ```mermaid
 flowchart TD
@@ -116,8 +126,8 @@ flowchart TD
   subgraph Core["theoremc-core"]
     P["Parse YAML via serde-saphyr"]
     V["Validate schema + expressions (syn)"]
-    R["Resolve action paths + arg shaping"]
-    IR["Backend-agnostic IR"]
+    R["Resolve action paths + arg shaping (planned)"]
+    IR["Backend-agnostic IR (planned)"]
   end
 
   subgraph Emit["Backend emitters"]
@@ -133,7 +143,7 @@ flowchart TD
 
   subgraph Run["Verification"]
     CK["cargo kani ..."]
-    REP["theoremd report (Markdown/HTML/JUnit/Cucumber JSON)"]
+    REP["theoremd report (planned)"]
   end
 
   T --> BS --> INC --> PM
@@ -149,9 +159,9 @@ the “no inline Rust blocks” rule and to use `serde-saphyr`.)
 
 ### 3.2 Schema layering boundary contract
 
-The current schema subsystem (`src/schema`) follows a layered architecture with
-hexagonal influences and an anti-corruption boundary between YAML input and
-domain types.
+The current schema subsystem (`crates/theoremc-core/src/schema`) follows a
+layered architecture with hexagonal influences and an anti-corruption boundary
+between YAML input and domain types.
 
 Normative boundary rules live in
 [ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
@@ -512,7 +522,7 @@ pub fn attach_node(/*...*/) -> Result<(), AttachError> { /*...*/ }
 Purposes:
 
 - produce compile-time checks that the string name matches the mangled export,
-- emit metadata for reporting (theoremd),
+- emit metadata for future reporting (`theoremd`),
 - enable future tooling (docs, coverage, cross-ref navigation).
 
 For metadata collection, `inventory` is appropriate: it provides typed
@@ -714,9 +724,11 @@ post-deserialization semantic validation (Step 1.2.1 of the roadmap):
   says, "non-empty after trimming" without specifying the algorithm;
   `str::trim()` is the most defensive choice and aligns with Rust's standard
   library semantics.
-- Validation logic is extracted into `src/schema/validate.rs`
-  to keep `src/schema/loader.rs` under the 400-line limit and to improve
-  separation of concerns between deserialization and semantic validation.
+- Validation logic is extracted into
+  `crates/theoremc-core/src/schema/validate.rs` to keep
+  `crates/theoremc-core/src/schema/loader.rs` under the 400-line limit and to
+  improve separation of concerns between deserialization and semantic
+  validation.
 - `unwind: 0` is rejected because the spec (`TFS-6` §6.2) says,
   "positive integer", meaning > 0. The `u32` serde type already rejects
   negatives.
@@ -732,9 +744,9 @@ syntax validation (Step 1.2.2 of the roadmap):
   features (`default-features = false`). The `parsing` feature provides
   `syn::parse_str::<Expr>` and `full` provides all `Expr` variant types needed
   for the denylist check. Other features are not needed.
-- A new `src/schema/expr.rs` module isolates expression parsing from
-  structural validation in `validate.rs`, preserving the 400-line file limit
-  and separation of concerns.
+- A new `crates/theoremc-core/src/schema/expr.rs` module isolates expression
+  parsing from structural validation in `validate.rs`, preserving the 400-line
+  file limit and separation of concerns.
 - A denylist approach rejects 14 `syn::Expr` variants that represent
   statement-like or block-like constructs: `Assign`, `Async`, `Block`, `Break`,
   `Const`, `Continue`, `ForLoop`, `Let`, `Loop`, `Return`, `TryBlock`, `Unsafe`,
@@ -763,9 +775,9 @@ deserialization (Step 1.1 of the roadmap):
   `Failure`, `Unreachable`, `Undetermined`) and `#[serde(rename)]` attributes
   for the `UPPERCASE` string forms, catching invalid values at deserialization
   time.
-- Schema types live in `src/schema/` (not `src/parser/`) because Step 1.1
-  is purely deserialization. The eventual `parser/` module in the workspace
-  layout will encompass the full parsing and validation pipeline.
+- Schema types live in `crates/theoremc-core/src/schema/` (not `src/parser/`)
+  because Step 1.1 is purely deserialization. A future parser component in the
+  target architecture may encompass the full parsing and validation pipeline.
 - The `ActionCall.as` field uses Rust field name `as_binding` with
   `#[serde(rename = "as", default)]`.
 - `src/lib.rs` is added alongside `src/main.rs` so schema types are testable
@@ -788,10 +800,11 @@ The following decisions were taken during the implementation of `Step` and
   This is sufficient — no additional runtime validation is needed to enforce
   "Let allows only call or must". Improving the error message is a Step 1.3
   concern (diagnostics quality).
-- Validation logic is extracted into `src/schema/step.rs`, following the
-  `expr.rs` pattern from Step 1.2.2. The module provides `pub(crate)` functions
-  returning `Result<(), String>`, allowing `validate.rs` to wrap errors with
-  theorem-level context. This keeps `validate.rs` under the 400-line limit.
+- Validation logic is extracted into `crates/theoremc-core/src/schema/step.rs`,
+  following the `expr.rs` pattern from Step 1.2.2. The module provides
+  `pub(crate)` functions returning `Result<(), String>`, allowing `validate.rs`
+  to wrap errors with theorem-level context. This keeps `validate.rs` under the
+  400-line limit.
 - Error path context uses a "breadcrumb" string
   (e.g., `"Do step 2: maybe.do step 1"`) that builds up through recursion,
   giving users a clear trail to the problematic field.
@@ -804,9 +817,10 @@ The following decisions were taken during the implementation of `Step` and
 The following decisions were taken during implementation of non-vacuity
 defaults (Step 1.2.4 of the roadmap):
 
-- Vacuity policy enforcement stays in `src/schema/validate.rs` under two
-  focused helpers: `validate_kani_vacuity` (override contract) and
-  `validate_kani_witnesses` (default witness requirement).
+- Vacuity policy enforcement stays in
+  `crates/theoremc-core/src/schema/validate.rs` under two focused helpers:
+  `validate_kani_vacuity` (override contract) and `validate_kani_witnesses`
+  (default witness requirement).
 - `allow_vacuous: false` and omitted `allow_vacuous` are treated identically.
   Both require at least one `Witness` entry.
 - `allow_vacuous: true` is accepted only when `vacuity_because` is present and
@@ -853,11 +867,13 @@ action-name validation (Step 2.1.1 of the roadmap):
   `Segment ("." Segment)+`. This means at least one `.` is required, and empty
   segments are rejected.
 - Segment-level checks reuse the existing identifier lexical predicates from
-  `src/schema/identifier.rs`, ensuring theorem identifiers and action-name
-  segments stay aligned on ASCII identifier and Rust keyword rules.
-- A dedicated `src/schema/action_name.rs` module isolates canonical action-name
-  checks from step-shape checks in `src/schema/step.rs`, keeping complexity low
-  and preserving headroom under the 400-line limit.
+  `crates/theoremc-core/src/schema/identifier.rs`, ensuring theorem identifiers
+  and action-name segments stay aligned on ASCII identifier and Rust keyword
+  rules.
+- A dedicated `crates/theoremc-core/src/schema/action_name.rs` module isolates
+  canonical action-name checks from step-shape checks in
+  `crates/theoremc-core/src/schema/step.rs`, keeping complexity low and
+  preserving headroom under the 400-line limit.
 - Behavioural coverage for this step uses `rstest-bdd` v0.5.0 with a dedicated
   feature file and scenarios for canonical happy path, malformed names, and
   reserved-keyword segments.
@@ -868,10 +884,10 @@ The following decisions were taken during implementation of action name
 mangling (Step 2.1.2 of the roadmap):
 
 - Action mangling is placed in a new top-level `mangle` module
-  (`src/mangle.rs`), separate from the `schema` module, because mangling is an
-  action-resolution concern, not a schema concern (see ADR-003 boundary rules).
-  The `schema` and `mangle` modules have no cross-dependency; callers wire them
-  together.
+  (`crates/theoremc-core/src/mangle.rs`), separate from the `schema` module,
+  because mangling is an action-resolution concern, not a schema concern (see
+  ADR-003 boundary rules). The `schema` and `mangle` modules have no
+  cross-dependency; callers wire them together.
 - The `blake3` crate (version 1.8.3) is added as a regular dependency for
   `hash12` computation. blake3 is deterministic, platform-independent, and
   licensed under CC0/Apache-2.0.
@@ -892,9 +908,10 @@ The following decisions were taken during implementation of action name
 collision detection (Step 2.1.3 of the roadmap):
 
 - Collision detection is placed in a new top-level `collision` module
-  (`src/collision.rs`), separate from both `schema` and `mangle`. This
-  preserves the ADR-003 boundary: `schema` and `mangle` do not cross-depend. The
-  `collision` module wires both together as a cross-cutting concern.
+  (`crates/theoremc-core/src/collision.rs`), separate from both `schema` and
+  `mangle`. This preserves the ADR-003 boundary: `schema` and `mangle` do not
+  cross-depend. The `collision` module wires both together as a cross-cutting
+  concern.
 - The collision check detects **mangled-identifier collisions**: different
   canonical names that produce the same mangled Rust identifier. This is a
   defensive safety net since the mangling algorithm is injective by design.
@@ -916,8 +933,9 @@ The following decisions were taken during implementation of argument value
 decoding for plain YAML strings (Step 2.3.1 of the roadmap):
 
 - Two new domain types `ArgValue` and `LiteralValue` are placed in a dedicated
-  `src/schema/arg_value.rs` module to keep `src/schema/types.rs` under the
-  400-line limit. `ArgValue` is re-exported from `theoremc::schema`.
+  `crates/theoremc-core/src/schema/arg_value.rs` module to keep
+  `crates/theoremc-core/src/schema/types.rs` under the 400-line limit.
+  `ArgValue` is re-exported from `theoremc::schema`.
 - `ActionCall.args` is changed from `IndexMap<String, TheoremValue>` to
   `IndexMap<String, ArgValue>`. This is the correct semantic representation for
   action arguments at the domain level. `TheoremValue` remains available for
@@ -928,9 +946,11 @@ decoding for plain YAML strings (Step 2.3.1 of the roadmap):
   `Spanned<String>` becomes `String` for other fields.
 - Nine raw serde-compatible types (`RawActionCall`, `RawLetCall`, `RawLetMust`,
   `RawLetBinding`, `RawStepCall`, `RawStepMust`, `RawStepMaybe`,
-  `RawMaybeBlock`, `RawStep`) are extracted into `src/schema/raw_action.rs` to
-  keep `src/schema/raw.rs` under the 400-line limit. These mirror the public
-  types but retain `TheoremValue` in `args` for serde compatibility.
+  `RawMaybeBlock`, `RawStep`) are extracted into
+  `crates/theoremc-core/src/schema/raw_action.rs` to keep
+  `crates/theoremc-core/src/schema/raw.rs` under the 400-line limit. These
+  mirror the public types but retain `TheoremValue` in `args` for serde
+  compatibility.
 - YAML maps that are not `{ ref: <name> }` are passed through as
   `ArgValue::RawMap(IndexMap<String, TheoremValue>)`, preserving forward
   compatibility for Step 2.3.2 (`{ literal: ... }` wrapper) and Step 2.3.3
@@ -938,8 +958,8 @@ decoding for plain YAML strings (Step 2.3.1 of the roadmap):
   `ArgValue::RawSequence(Vec<TheoremValue>)`.
 - The `{ ref: <name> }` target is validated using the existing
   `is_valid_ascii_identifier_pattern` and `is_rust_reserved_keyword` functions
-  from `src/schema/identifier.rs`, ensuring argument reference targets and
-  theorem identifiers follow the same lexical rules.
+  from `crates/theoremc-core/src/schema/identifier.rs`, ensuring argument
+  reference targets and theorem identifiers follow the same lexical rules.
 - Decoding errors are routed through `SchemaError::ValidationFailed` with a
   descriptive reason string. A distinct error variant is not warranted at this
   stage and may need to change when Steps 2.3.2 and 2.3.3 extend decoding.
@@ -963,8 +983,9 @@ naming (Step 2.2.1 of the roadmap):
 - `hash12` receives the **original** path string, not the mangled stem. This
   ensures two paths that differ only in characters lost during sanitization
   (e.g., `my-file` vs `my_file`) produce different module names.
-- Unit tests were extracted to `src/mangle_tests.rs` via `#[path = ...]` to
-  keep `src/mangle.rs` under the 400-line code-size rule.
+- Unit tests were extracted to `crates/theoremc-core/src/mangle_tests.rs` via
+  `#[path = ...]` to keep `crates/theoremc-core/src/mangle.rs` under the
+  400-line code-size rule.
 - Behavioural coverage uses `rstest-bdd` v0.5.0 with scenarios for
   deterministic naming, separator normalization, and punctuation-collision
   disambiguation.
@@ -978,10 +999,12 @@ roadmap):
 - Harness naming helpers are added as additive public API in `theoremc::mangle`
   via `theorem_key`, `theorem_slug`, `mangle_theorem_harness`, and the
   `MangledHarness` result type.
-- To keep `src/mangle.rs` under the repository line-count limit, per-file
-  module naming and theorem harness naming are split into focused sibling files
-  `src/mangle_path.rs` and `src/mangle_harness.rs`, while `src/mangle.rs`
-  remains the public API surface and re-export point.
+- To keep `crates/theoremc-core/src/mangle.rs` under the repository line-count
+  limit, per-file module naming and theorem harness naming are split into
+  focused sibling files `crates/theoremc-core/src/mangle_path.rs` and
+  `crates/theoremc-core/src/mangle_harness.rs`, while
+  `crates/theoremc-core/src/mangle.rs` remains the public API surface and
+  re-export point.
 - `theorem_slug` preserves identifiers already matching
   `^[a-z_][a-z0-9_]*$` exactly. Non-snake identifiers are converted with an
   explicit character-walk algorithm that handles acronym runs (`HNSWInvariant` →
@@ -1139,7 +1162,7 @@ sequenceDiagram
 ### 6.10 Diagnostic and localization class model
 
 Figure 2. Class-level model for diagnostic payloads, localization contracts,
-and report-entry population in theoremc and theoremd.
+and future report-entry population in theoremc and `theoremd`.
 
 ```mermaid
 classDiagram
@@ -1349,9 +1372,10 @@ For each theorem file it emitted:
   report them as dead code.
 
 Invalid theorem files now fail compilation through the proc-macro expansion
-path using the existing schema loader and its deterministic diagnostics. This
-keeps theorem parsing, validation, and compile-time code generation on one
-shared contract rather than introducing a second parser in the macro crate.
+path using the existing schema loader in `crates/theoremc-core/src/schema` and
+its deterministic diagnostics. This keeps theorem parsing, validation, and
+compile-time code generation on one shared contract rather than introducing a
+second parser in the macro crate.
 
 ### 7.2.2 Implementation decisions (Step 3.2.2)
 
@@ -1436,9 +1460,9 @@ For each theorem:
 
 Kani documents that `UNREACHABLE` means a check is unreachable and the property
 holds vacuously, and it reports reachability for assertion macros.[^4]
-Therefore:
+Therefore, the planned reporting flow is:
 
-- theoremd treats `UNREACHABLE` as failure unless explicitly expected,
+- `theoremd` treats `UNREACHABLE` as failure unless explicitly expected,
 - and requires nontriviality witnesses unless vacuity is explicitly justified.
 
 ### 8.4 Nontriviality witnesses (required by default)
@@ -1456,15 +1480,16 @@ This is a direct response to the vacuity risk described above.[^4]
 
 Kani’s usage supports concrete playback generation (replaying counterexamples
 as concrete tests), which turns a model-checker failure into a reproducible
-unit test for humans.[^8] `theoremd` integrates this by re-running failed
-harnesses with the relevant Kani flags and attaching the produced playback to
-reports (MVP: `print`; later: `inplace` workflows).
+unit test for humans.[^8] Planned `theoremd` reporting integrates this by
+re-running failed harnesses with the relevant Kani flags and attaching the
+produced playback to reports (MVP: `print`; later: `inplace` workflows).
 
 ______________________________________________________________________
 
 ## 9. Reporting (`theoremd`)
 
-`theoremd` runs theorem suites and generates artefacts:
+`theoremd` is a planned reporter CLI. It will run theorem suites and generate
+artefacts:
 
 - Human-friendly report (Markdown/HTML).
 - CI formats (JUnit XML, Cucumber JSON) to integrate with existing “test
@@ -1526,8 +1551,8 @@ This section focuses on enforcement tooling and rollout.
 | Dylint custom lints                      | Catch forbidden layer-edge imports that visibility alone cannot express     | Medium   |
 | `cargo-deny` policy checks               | Enforce architecture-sensitive dependency policy                            | Low      |
 
-`theoremc-dylint` provides lints using Dylint, which runs Rust lints from
-dynamic libraries.[^10]
+`theoremc-dylint` is a planned lint crate. It will provide lints using Dylint,
+which runs Rust lints from dynamic libraries.[^10]
 
 ### 10.3 Minimal CI architecture gate
 
@@ -1556,35 +1581,47 @@ ______________________________________________________________________
 
 ## 11. Repository layout (workspace)
 
-The layout below follows the attached exploration’s successful separation of
-concerns, but updates parsing to `serde-saphyr` and corrects the
-action-resolution story to match the compile-time binding rules.
+The canonical path map is maintained in
+[repository layout](repository-layout.md). The current workspace contains the
+root facade package, `crates/theoremc-core`, `crates/theoremc-macros`, and
+`crates/test-helpers`. Planned components such as backend crates, `theoremd`,
+and `theoremc-dylint` are part of the target architecture but are not current
+workspace members.
 
 ```plaintext
 /
 ├── Cargo.toml
+├── build.rs
+├── src/
+│   ├── lib.rs                 # public facade and generated-suite include
+│   ├── main.rs                # placeholder binary entrypoint
+│   ├── build_discovery.rs     # theorem discovery for build.rs
+│   ├── build_suite.rs         # generated-suite rendering for build.rs
+│   └── arg_lowering.rs        # test-gated argument lowering prototype
 ├── crates/
+│   ├── test-helpers/
+│   │   └── src/
+│   │       └── lib.rs         # reusable integration-test helpers
 │   ├── theoremc-core/
 │   │   └── src/
-│   │       ├── parser/        # serde-saphyr schema + validation
-│   │       ├── resolver/      # action path resolution + arg shaping
-│   │       ├── ir/            # backend-agnostic IR
-│   │       └── backends/      # backend-agnostic interfaces
+│   │       ├── schema/        # serde-saphyr schema, validation, diagnostics
+│   │       ├── mangle*.rs     # stable generated identifier rules
+│   │       ├── collision.rs   # cross-document collision checks
+│   │       └── theorem_file.rs # crate-relative theorem file loading
 │   ├── theoremc-macros/
-│   │   └── src/               # theorem_file! proc macro, #[theorem_action]
-│   ├── theoremc-backends/
-│   │   └── src/
-│   │       └── kani/          # MVP emitter + runner helpers (optional)
-│   ├── theoremd/
-│   │   └── src/               # runner + report formats
-│   └── theoremc-dylint/
-│       └── src/               # optional enforcement lints
-├── examples/
-│   ├── account/
-│   └── hnsw/
+│   │   ├── src/               # theorem_file! proc macro implementation
+│   │   └── tests/             # proc-macro compile fixtures
+├── tests/
+│   ├── features/              # rstest-bdd feature files
+│   ├── fixtures/              # .theorem fixture corpus
+│   └── common/                # shared integration-test support
 └── docs/
-    ├── reference/theorem-schema.md
-    └── guides/writing-theorems.md
+    ├── contents.md
+    ├── repository-layout.md
+    ├── users-guide.md
+    ├── developers-guide.md
+    ├── theorem-file-specification.md
+    └── theoremc-design.md
 ```
 
 ______________________________________________________________________

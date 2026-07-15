@@ -29,8 +29,9 @@ This guide covers the build system, internal architecture, contributor
 workflows, and extension points for the theoremc crate. For user-facing
 behaviour and public API documentation, see the [user's guide](users-guide.md).
 For high-level design rationale, see the
-[design specification](theoremc-design.md). Normative references listed in the
-design specification take precedence if wording diverges.
+[design specification](theoremc-design.md). For file and directory ownership,
+see the [repository layout](repository-layout.md). Normative references listed
+in the design specification take precedence if wording diverges.
 
 ## 1. Build system overview
 
@@ -126,7 +127,7 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 | Mangle        | `theoremc-core`   | `mangle*.rs`                                       | Deterministic identifier generation                                           |
 | Cross-cutting | `theoremc-core`   | `collision.rs`                                     | Collision detection across schema and mangle                                  |
 | Proc-macro    | `theoremc-macros` | `lib.rs`                                           | Proc-macro entry points, theorem-file loading delegation, and code generation |
-| Lowering      | `theoremc`        | `arg_lowering.rs`                                  | Conversion of semantic values to Rust token trees                             |
+| Lowering      | `theoremc`        | `arg_lowering.rs`                                  | Test-gated prototype for converting semantic values to Rust token trees       |
 | Build         | `theoremc`        | `build_discovery.rs`, `build_suite.rs`, `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking           |
 
 The schema layer must not import from `mangle`, and vice versa. The `collision`
@@ -190,7 +191,14 @@ Accessors return iterators over `&Utf8Path`:
 
 ## 3. Contributor workflows
 
-### 3.1 Quality gates
+### 3.1 Rust toolchain policy
+
+The workspace minimum supported Rust version (MSRV) is Rust 1.88, declared via
+the root `Cargo.toml` `rust-version` field. This floor permits the use of let
+chains in conditionals while keeping the compiler requirement explicit for
+contributors and downstream automation.
+
+### 3.2 Quality gates
 
 Before committing any change, run the following gates. Use the Makefile targets
 where available, and run the direct Cargo invocations for specialized checks:
@@ -226,7 +234,7 @@ losing truncated results:
 set -o pipefail; make lint | tee /tmp/make-lint.log
 ```
 
-### 3.2 Test conventions
+### 3.3 Test conventions
 
 - Use `rstest` fixtures for shared setup.
 - Replace duplicated tests with `#[rstest(...)]` parameterized cases.
@@ -234,17 +242,29 @@ set -o pipefail; make lint | tee /tmp/make-lint.log
   `tests/features/`.
 - Test files use `#[cfg(test)] #[path = "..._tests.rs"] mod tests;` to
   keep implementation files under 400 lines.
+- Cargo build-script rerun tests must use explicit fixture mtime helpers such
+  as `FixtureCrate::write_with_advanced_mtime()` after an initial build rather
+  than sleeping for a filesystem timestamp tick.
 - Integration tests under `tests/` are separate crates and inherit
   package lint policy. Note that `expect_used = "deny"` fires in integration
   tests but not in `#[cfg(test)]` modules.
 
-### 3.3 File size limits
+### 3.4 File size limits
 
 No single code file may exceed 400 lines. When a module and its tests grow
 beyond this limit, extract tests into a sibling `*_tests.rs` file using the
 `#[path = ...]` attribute.
 
-### 3.4 Extending the build system
+### 3.5 Dependency requirements
+
+Use Cargo's default caret-compatible version requirements for third-party
+crates, but spell the lower bound as an explicit patch version such as
+`1.11.0`, not a broad major-only or minor-only floor such as `1` or `0.2`. When
+tightening a manifest requirement to match this policy, prefer the version
+already resolved in `Cargo.lock` and avoid `cargo update` unless Cargo requires
+the lockfile to change.
+
+### 3.6 Extending the build system
 
 To add new build-time discovery or generation:
 
@@ -269,7 +289,7 @@ The live workspace split is:
 - `crates/theoremc-macros` for proc-macro expansion, and
 - the root `theoremc` crate for the public API plus build integration.
 
-#### 3.4.1 `theoremc-core` and proc-macro boundary
+#### 3.6.1 `theoremc-core` and proc-macro boundary
 
 The following items are exported from `theoremc-core` and form the stable
 internal interface between the core library and the proc-macro crate:
@@ -321,6 +341,14 @@ Discovered theorem paths are normalized to forward-slash crate-relative form
 (`theorems/nested/example.theorem`) regardless of host platform separator. This
 normalization is important because downstream name mangling rules assume stable
 path identity.
+
+String-level path formatting that feeds proc-macro expansion or fixture Cargo
+manifests belongs in `theoremc_core::path_format`. Use
+`normalize_path_separators` instead of open-coded `replace('\\', "/")`, and use
+`toml_basic_string_value` when writing a normalized path into a TOML basic
+string. Keep filesystem validation in `theorem_file.rs` behind the named path
+violation classifier so tests can assert the rejected path class rather than a
+single opaque invalid-path boolean.
 
 ## 5. Lint and error handling policy
 

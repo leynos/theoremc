@@ -1,17 +1,15 @@
 //! Behavioural tests for mangled-identifier collision detection.
 
-mod common;
-
-use common::load_fixture;
 use rstest_bdd_macros::{given, scenario, then};
+use test_helpers::{FixtureName, load_fixture};
 use theoremc::collision::check_action_collisions;
 use theoremc::schema::load_theorem_docs;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
 fn assert_fixture_ok(fixture_name: &str) -> Result<(), String> {
-    let yaml =
-        load_fixture(fixture_name).map_err(|error| format!("failed to load fixture: {error}"))?;
+    let yaml = load_fixture(FixtureName::new(fixture_name))
+        .map_err(|error| format!("failed to load fixture: {error}"))?;
     load_theorem_docs(&yaml)
         .map(|_| ())
         .map_err(|error| format!("fixture should load: {error}"))

@@ -1,0 +1,5 @@
+error: referenced action `account.deposit` has conflicting Actions signatures
+ --> tests/expand/conflicting_action_signatures.rs:5:15
+  |
+5 | theorem_file!("tests/expand/conflicting_action_signatures.theorem");
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

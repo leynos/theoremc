@@ -101,6 +101,18 @@ fn should_insert_slug_separator(previous: char, current: char, next: Option<char
     }
 }
 
+fn needs_slug_separator(chars: &[char], index: usize, slug: &str) -> bool {
+    let Some(current) = chars.get(index).copied() else {
+        return false;
+    };
+    let Some(previous) = index.checked_sub(1).and_then(|idx| chars.get(idx).copied()) else {
+        return false;
+    };
+
+    should_insert_slug_separator(previous, current, chars.get(index + 1).copied())
+        && !slug.ends_with('_')
+}
+
 fn sanitize_slug_fragment(raw_slug: &str) -> String {
     let mut sanitized = String::with_capacity(raw_slug.len());
 
@@ -171,11 +183,8 @@ pub fn theorem_slug(theorem: impl AsRef<str>) -> String {
     let mut slug = String::with_capacity(chars.len() + 4);
 
     for (index, current) in chars.iter().copied().enumerate() {
-        if let Some(previous) = index.checked_sub(1).and_then(|idx| chars.get(idx).copied()) {
-            let next = chars.get(index + 1).copied();
-            if should_insert_slug_separator(previous, current, next) && !slug.ends_with('_') {
-                slug.push('_');
-            }
+        if needs_slug_separator(&chars, index, &slug) {
+            slug.push('_');
         }
 
         slug.push(current.to_ascii_lowercase());

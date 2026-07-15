@@ -2,7 +2,7 @@
 name = "theoremc-macros"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [lib]
 proc-macro = true
@@ -16,14 +16,16 @@ theoremc-core = { version = "0.1.0", path = "../theoremc-core" }
 thiserror = "2.0.18"
 
 [dev-dependencies]
-tempfile = "3.15.0"
 cap-std = { version = "4.0.2", features = ["fs_utf8"] }
-insta = "1"
-prettyplease = "0.2"
-proptest = "1"
+googletest = "0.14.3"
+insta = "1.47.2"
+prettyplease = "0.2.37"
+pretty_assertions = "1.4.1"
+proptest = "1.11.0"
 rstest = "0.26.1"
+tempfile = "3.15.0"
 test-helpers = { version = "0.1.0", path = "../test-helpers" }
-trybuild = { version = "1", features = ["diff"] }
+trybuild = { version = "1.0.116", features = ["diff"] }
 
 [lints]
 workspace = true

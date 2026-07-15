@@ -1,6 +1,9 @@
 //! Proc-macro expansion for compile-time theorem integration.
 
-use std::env;
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    env,
+};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use proc_macro::TokenStream;
@@ -12,6 +15,7 @@ use theoremc_core::{
     collision::referenced_actions,
     load_theorem_file_from_manifest_dir,
     mangle::{mangle_action_name, mangle_module_path, mangle_theorem_harness},
+    path_format::normalize_path_separators,
     schema::{ActionSignature, SchemaDiagnostic},
 };
 
@@ -130,7 +134,8 @@ fn expand_theorem_file_at(
     manifest_dir: &Utf8Path,
     path_literal: &LitStr,
 ) -> Result<TokenStream2, MacroExpansionError> {
-    let canonical_path = path_literal.value().replace('\\', "/");
+    let path_value = path_literal.value();
+    let canonical_path = normalize_path_separators(&path_value);
     let canonical_path_literal = LitStr::new(&canonical_path, path_literal.span());
     let theorem_path = Utf8PathBuf::from(&canonical_path);
     let theorem_docs = load_theorem_file_from_manifest_dir(manifest_dir, &theorem_path)
@@ -206,37 +211,71 @@ fn generated_harnesses(
 fn generated_action_probes(
     theorem_docs: &[theoremc_core::schema::TheoremDoc],
 ) -> Result<Vec<GeneratedActionProbe>, MacroExpansionError> {
-    referenced_actions(theorem_docs)
-        .into_iter()
+    let referenced = referenced_actions(theorem_docs);
+    let signature_index = ActionSignatureIndex::for_actions(theorem_docs, &referenced)?;
+    referenced
+        .iter()
         .map(|canonical| {
-            let signature = action_signature_for(theorem_docs, canonical)?;
+            let signature = signature_index.signature_for(canonical)?;
             action_probe(canonical, signature)
         })
         .collect()
 }
 
-fn action_signature_for<'a>(
-    theorem_docs: &'a [theoremc_core::schema::TheoremDoc],
-    canonical: &str,
-) -> Result<&'a ActionSignature, MacroExpansionError> {
-    let signatures = theorem_docs
-        .iter()
-        .filter_map(|doc| doc.actions.get(canonical))
-        .collect::<Vec<_>>();
-    let Some(first) = signatures.first().copied() else {
-        return Err(MacroExpansionError::MissingActionSignature {
-            action: canonical.to_owned(),
-        });
-    };
-    if signatures
-        .iter()
-        .any(|signature| !signature.is_semantically_equivalent(first))
-    {
-        return Err(MacroExpansionError::ConflictingActionSignature {
-            action: canonical.to_owned(),
-        });
+#[derive(Debug)]
+struct ActionSignatureIndex<'a> {
+    signatures: BTreeMap<&'a str, &'a ActionSignature>,
+}
+
+impl<'a> ActionSignatureIndex<'a> {
+    fn for_actions(
+        theorem_docs: &'a [theoremc_core::schema::TheoremDoc],
+        canonical_actions: &[&str],
+    ) -> Result<Self, MacroExpansionError> {
+        let selected = canonical_actions.iter().copied().collect::<BTreeSet<_>>();
+        let mut declared_signatures: BTreeMap<&'a str, &'a ActionSignature> = BTreeMap::new();
+
+        for doc in theorem_docs {
+            for (action, signature) in &doc.actions {
+                let canonical = action.as_str();
+                Self::insert_signature(&mut declared_signatures, canonical, signature)?;
+            }
+        }
+
+        let signatures = declared_signatures
+            .into_iter()
+            .filter(|(action, _)| selected.contains(action))
+            .collect();
+
+        Ok(Self { signatures })
     }
-    Ok(first)
+
+    fn insert_signature(
+        signatures: &mut BTreeMap<&'a str, &'a ActionSignature>,
+        canonical: &'a str,
+        signature: &'a ActionSignature,
+    ) -> Result<(), MacroExpansionError> {
+        let Some(first) = signatures.get(canonical) else {
+            signatures.insert(canonical, signature);
+            return Ok(());
+        };
+
+        if signature.is_semantically_equivalent(first) {
+            return Ok(());
+        }
+
+        Err(MacroExpansionError::ConflictingActionSignature {
+            action: canonical.to_owned(),
+        })
+    }
+
+    fn signature_for(&self, canonical: &str) -> Result<&'a ActionSignature, MacroExpansionError> {
+        self.signatures.get(canonical).copied().ok_or_else(|| {
+            MacroExpansionError::MissingActionSignature {
+                action: canonical.to_owned(),
+            }
+        })
+    }
 }
 
 fn action_probe(

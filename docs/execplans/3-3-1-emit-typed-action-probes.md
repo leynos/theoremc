@@ -382,7 +382,7 @@ action exports and signature drift fail ordinary Rust compilation in the
 theorem owner crate, while schema validation failures still come from
 theoremc's loader diagnostics.
 
-Update `docs/developers-guide.md` §3.4.1 to list the new `theoremc-core`
+Update `docs/developers-guide.md` §3.6.1 to list the new `theoremc-core`
 internal helper used by the proc-macro crate and to describe the probe emission
 testing convention.
 

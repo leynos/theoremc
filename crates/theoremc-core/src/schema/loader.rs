@@ -9,38 +9,13 @@ use std::collections::BTreeMap;
 
 use super::diagnostic::{SchemaDiagnostic, SchemaDiagnosticCode, create_diagnostic, first_line};
 use super::error::SchemaError;
-use super::raw::{RawTheoremDoc, ValidationReason};
+use super::loader_decode_location::locate_decode_failure;
+use super::loader_message::{ErrorMessage, FieldName};
+use super::raw::{RawDocDecodeError, RawTheoremDoc};
 use super::source_id::SourceId;
 use super::types::TheoremDoc;
 use super::validate::validate_theorem_doc;
-
-/// Newtype representing a YAML field name extracted from error messages.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct FieldName<'a>(&'a str);
-
-impl<'a> FieldName<'a> {
-    const fn new(name: &'a str) -> Self {
-        Self(name)
-    }
-
-    const fn as_str(self) -> &'a str {
-        self.0
-    }
-}
-
-/// Newtype representing an error message from deserialization failures.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ErrorMessage<'a>(&'a str);
-
-impl<'a> ErrorMessage<'a> {
-    const fn new(message: &'a str) -> Self {
-        Self(message)
-    }
-
-    const fn as_str(self) -> &'a str {
-        self.0
-    }
-}
+use super::validation_reason::ValidationFailure;
 
 /// Synthetic source identifier used by [`load_theorem_docs`].
 const INLINE_SOURCE: &str = "<inline>";
@@ -122,16 +97,10 @@ pub fn load_theorem_docs_with_source(
     let mut docs = Vec::with_capacity(raw_docs.len());
     for raw_doc in &raw_docs {
         let doc = raw_doc.to_theorem_doc().map_err(|decode_err| {
-            let reason = decode_err.to_string();
-            let error = SchemaError::ValidationFailed {
-                theorem: raw_doc.theorem.value.to_string(),
-                reason,
-                diagnostic: None,
-            };
-            attach_validation_diagnostic(error, source, raw_doc)
+            attach_decode_failure_diagnostic(decode_err, source, input, raw_doc)
         })?;
         validate_theorem_doc(&doc)
-            .map_err(|error| attach_validation_diagnostic(error, source, raw_doc))?;
+            .map_err(|failure| attach_validation_failure_diagnostic(failure, source, raw_doc))?;
         docs.push(doc);
     }
 
@@ -264,30 +233,48 @@ fn render_duplicate_location(source: &SourceId, location: DuplicateTheoremLocati
     format!("{}:{}:{}", source.as_str(), location.line, location.column,)
 }
 
-fn attach_validation_diagnostic(
-    error: SchemaError,
+fn attach_decode_failure_diagnostic(
+    error: RawDocDecodeError,
+    source: &SourceId,
+    input: &str,
+    raw_doc: &RawTheoremDoc,
+) -> SchemaError {
+    let reason = error.to_string();
+    let mut diagnostic = create_diagnostic(
+        SchemaDiagnosticCode::ValidationFailure,
+        source,
+        reason.clone(),
+        raw_doc.theorem_location(),
+    );
+    if let Some((line, column)) = locate_decode_failure(input, raw_doc, &error) {
+        diagnostic.location.line = line;
+        diagnostic.location.column = column;
+    }
+
+    SchemaError::ValidationFailed {
+        theorem: raw_doc.theorem.value.to_string(),
+        reason,
+        diagnostic: Some(Box::new(diagnostic)),
+        source: Some(Box::new(error)),
+    }
+}
+
+fn attach_validation_failure_diagnostic(
+    failure: ValidationFailure,
     source: &SourceId,
     raw_doc: &RawTheoremDoc,
 ) -> SchemaError {
-    match error {
-        SchemaError::ValidationFailed {
-            theorem, reason, ..
-        } => {
-            let location = raw_doc.location_for_validation_reason(ValidationReason::new(&reason));
-            let diagnostic = create_diagnostic(
-                SchemaDiagnosticCode::ValidationFailure,
-                source,
-                reason.clone(),
-                location,
-            );
-            SchemaError::ValidationFailed {
-                theorem,
-                reason,
-                diagnostic: Some(diagnostic),
-            }
-        }
-        other => other,
-    }
+    let location = failure.reason_kind().map_or_else(
+        || raw_doc.theorem_location(),
+        |reason| raw_doc.location_for_validation_reason(reason),
+    );
+    let diagnostic = create_diagnostic(
+        SchemaDiagnosticCode::ValidationFailure,
+        source,
+        failure.reason().to_owned(),
+        location,
+    );
+    failure.into_schema_error(Some(diagnostic))
 }
 
 fn build_parse_diagnostic(
@@ -304,13 +291,13 @@ fn build_parse_diagnostic(
         location,
     );
 
-    if should_reanchor_unknown_field(&diagnostic) {
-        // `serde_saphyr` may report unknown-field deserialization failures at
-        // document-start (1:1). Re-anchor to the offending key when possible.
-        if let Some((line, column)) = locate_unknown_field(input, message) {
-            diagnostic.location.line = line;
-            diagnostic.location.column = column;
-        }
+    // `serde_saphyr` may report unknown-field deserialization failures at
+    // document-start (1:1). Re-anchor to the offending key when possible.
+    if should_reanchor_unknown_field(&diagnostic)
+        && let Some((line, column)) = locate_unknown_field(input, message)
+    {
+        diagnostic.location.line = line;
+        diagnostic.location.column = column;
     }
 
     Some(diagnostic)
@@ -378,6 +365,10 @@ fn is_mapping_key_for_field(line: &str, field: FieldName<'_>) -> bool {
 #[cfg(test)]
 #[path = "loader_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "loader_action_tests.rs"]
+mod action_tests;
 
 #[cfg(test)]
 #[path = "loader_duplicate_tests.rs"]

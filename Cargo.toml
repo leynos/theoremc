@@ -6,17 +6,12 @@ resolver = "2"
 name = "theoremc"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [features]
 test-support = ["theoremc-core/test-support"]
 
 [dependencies]
-indexmap = { version = "2.13.0", features = ["serde"] }
-thiserror = "2.0.18"
-syn = { version = "2.0.117", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
-quote = "1.0.45"
-proc-macro2 = "1.0.106"
 theoremc-core = { version = "0.1.0", path = "crates/theoremc-core" }
 theoremc-macros = { version = "0.1.0", path = "crates/theoremc-macros" }
 
@@ -32,6 +27,13 @@ rstest-bdd-macros = "0.5.0"
 tempfile = "3.15.0"
 camino = "1.2.2"
 cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+filetime = "0.2.29"
+indexmap = { version = "2.13.0", features = ["serde"] }
+proc-macro2 = "1.0.106"
+quote = "1.0.45"
+syn = { version = "2.0.117", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
+test-helpers = { path = "crates/test-helpers" }
+thiserror = "2.0.18"
 
 [[test]]
 name = "action_mangle_bdd"

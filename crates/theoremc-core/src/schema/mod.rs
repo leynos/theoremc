@@ -12,6 +12,8 @@ mod error;
 mod expr;
 mod identifier;
 mod loader;
+mod loader_decode_location;
+mod loader_message;
 mod newtypes;
 mod raw;
 mod raw_action;
@@ -19,6 +21,7 @@ mod source_id;
 mod step;
 mod types;
 mod validate;
+mod validation_reason;
 mod value;
 
 #[cfg(any(test, feature = "test-support"))]

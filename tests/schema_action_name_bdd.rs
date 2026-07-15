@@ -1,40 +1,17 @@
 //! Behavioural tests for canonical action-name validation.
 
-mod common;
-
-use common::load_fixture;
 use rstest_bdd_macros::{given, scenario, then};
-use theoremc::schema::load_theorem_docs;
-
-fn assert_fixture_ok(fixture_name: &str) -> Result<(), String> {
-    let yaml =
-        load_fixture(fixture_name).map_err(|error| format!("failed to load fixture: {error}"))?;
-    load_theorem_docs(&yaml)
-        .map(|_| ())
-        .map_err(|error| format!("fixture should load: {error}"))
-}
-
-fn assert_fixture_err_contains(fixture_name: &str, expected: &str) -> Result<(), String> {
-    let yaml =
-        load_fixture(fixture_name).map_err(|error| format!("failed to load fixture: {error}"))?;
-    let error = load_theorem_docs(&yaml)
-        .err()
-        .ok_or_else(|| format!("fixture should fail: {fixture_name}"))?;
-    let message = error.to_string();
-
-    if message.contains(expected) {
-        return Ok(());
-    }
-
-    Err(format!(
-        "expected '{expected}' in error for {fixture_name}, got: {message}"
-    ))
-}
+use test_helpers::{
+    ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_loads,
+};
 
 /// Helper to assert multiple fixtures fail with expected error messages.
 fn assert_fixtures_fail_with_errors(test_cases: &[(&str, &str)]) -> Result<(), String> {
     for (fixture_name, expected) in test_cases {
-        assert_fixture_err_contains(fixture_name, expected)?;
+        assert_fixture_error_contains(
+            FixtureName::new(fixture_name),
+            ExpectedFragment::new(expected),
+        )?;
     }
     Ok(())
 }
@@ -44,8 +21,8 @@ fn given_theorem_fixture_with_canonical_action_names() {}
 
 #[then("loading succeeds for canonical action names")]
 fn then_loading_succeeds_for_canonical_action_names() -> Result<(), String> {
-    assert_fixture_ok("valid_full.theorem")?;
-    assert_fixture_ok("valid_nested_maybe.theorem")
+    assert_fixture_loads(FixtureName::new("valid_full.theorem"))?;
+    assert_fixture_loads(FixtureName::new("valid_nested_maybe.theorem"))
 }
 
 #[given("a theorem fixture with malformed action names")]

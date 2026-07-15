@@ -1,7 +1,9 @@
 //! Unit tests for generated compile-time action binding probes.
 
+use super::MacroExpansionError;
 use super::tests_support::{TheoremFixture, expand_fixture};
 use camino::Utf8Path;
+use googletest::prelude::*;
 use rstest::rstest;
 
 #[test]
@@ -115,13 +117,138 @@ fn expansion_rejects_conflicting_signatures_for_shared_action(
 
     let expansion = expand_fixture(Utf8Path::new("theorems/conflicting.theorem"), &theorem)
         .expect_err("conflicting shared action signatures should fail expansion");
-    assert!(
-        expansion
-            .to_string()
-            .contains("conflicting Actions signatures"),
-        "expected conflicting signature error, got: {expansion}"
+    let error = expansion
+        .downcast_ref::<MacroExpansionError>()
+        .ok_or_else(|| std::io::Error::other("expected macro expansion error"))?;
+
+    assert_that!(
+        error,
+        matches_pattern!(MacroExpansionError::ConflictingActionSignature { .. })
     );
     Ok(())
+}
+
+fn assert_conflicting_action_signature(
+    fixture_path: &str,
+    theorem_source: String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let theorem = TheoremFixture(theorem_source);
+
+    let expansion = expand_fixture(Utf8Path::new(fixture_path), &theorem)
+        .expect_err("conflicting action signature should fail expansion");
+    let error = expansion
+        .downcast_ref::<MacroExpansionError>()
+        .ok_or_else(|| std::io::Error::other("expected macro expansion error"))?;
+
+    assert_that!(
+        error,
+        matches_pattern!(MacroExpansionError::ConflictingActionSignature { .. })
+    );
+    Ok(())
+}
+
+#[test]
+fn expansion_rejects_stale_unreferenced_conflicting_action_signature()
+-> Result<(), Box<dyn std::error::Error>> {
+    let theorem_source = concat!(
+        "Theorem: ReferencedActionProbe\n",
+        "About: Referenced action with stale declaration\n",
+        "Actions:\n",
+        "  account.deposit:\n",
+        "    params:\n",
+        "      account: u64\n",
+        "    returns: bool\n",
+        "Do:\n",
+        "  - call:\n",
+        "      action: account.deposit\n",
+        "      args:\n",
+        "        account: 1\n",
+        "Witness:\n",
+        "  - cover: \"true\"\n",
+        "    because: \"reachable\"\n",
+        "Prove:\n",
+        "  - assert: \"true\"\n",
+        "    because: \"trivial\"\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "---\n",
+        "Theorem: StaleActionDeclaration\n",
+        "About: Stale conflicting declaration\n",
+        "Actions:\n",
+        "  account.deposit:\n",
+        "    params:\n",
+        "      account: u32\n",
+        "    returns: bool\n",
+        "Witness:\n",
+        "  - cover: \"true\"\n",
+        "    because: \"reachable\"\n",
+        "Prove:\n",
+        "  - assert: \"true\"\n",
+        "    because: \"trivial\"\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+    )
+    .to_owned();
+
+    assert_conflicting_action_signature("theorems/stale-conflict.theorem", theorem_source)
+}
+
+#[test]
+fn expansion_rejects_conflicting_unreferenced_action_signature()
+-> Result<(), Box<dyn std::error::Error>> {
+    let theorem_source = concat!(
+        "Theorem: ReferencedActionProbe\n",
+        "About: Referenced action with stale unreferenced declaration\n",
+        "Actions:\n",
+        "  account.deposit:\n",
+        "    params:\n",
+        "      account: u64\n",
+        "    returns: bool\n",
+        "  inventory.reserve:\n",
+        "    params:\n",
+        "      sku: u64\n",
+        "    returns: bool\n",
+        "Do:\n",
+        "  - call:\n",
+        "      action: account.deposit\n",
+        "      args:\n",
+        "        account: 1\n",
+        "Witness:\n",
+        "  - cover: \"true\"\n",
+        "    because: \"reachable\"\n",
+        "Prove:\n",
+        "  - assert: \"true\"\n",
+        "    because: \"trivial\"\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "---\n",
+        "Theorem: StaleUnreferencedActionDeclaration\n",
+        "About: Stale unreferenced conflicting declaration\n",
+        "Actions:\n",
+        "  inventory.reserve:\n",
+        "    params:\n",
+        "      sku: String\n",
+        "    returns: bool\n",
+        "Witness:\n",
+        "  - cover: \"true\"\n",
+        "    because: \"reachable\"\n",
+        "Prove:\n",
+        "  - assert: \"true\"\n",
+        "    because: \"trivial\"\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+    )
+    .to_owned();
+
+    assert_conflicting_action_signature("theorems/unreferenced-conflict.theorem", theorem_source)
 }
 
 #[test]
@@ -187,3 +314,6 @@ fn whitespace_only_signature_drift_does_not_conflict() -> Result<(), Box<dyn std
     );
     Ok(())
 }
+
+#[path = "action_probe_tests/action_signature_index.rs"]
+mod action_signature_index;

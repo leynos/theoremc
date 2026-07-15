@@ -35,10 +35,10 @@ impl DiscoveryFixture {
     }
 
     fn write(&self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(parent) = Utf8Path::new(path).parent() {
-            if !parent.as_str().is_empty() {
-                self.dir.create_dir_all(parent)?;
-            }
+        if let Some(parent) = Utf8Path::new(path).parent()
+            && !parent.as_str().is_empty()
+        {
+            self.dir.create_dir_all(parent)?;
         }
         self.dir.write(path, "fixture")?;
         Ok(())

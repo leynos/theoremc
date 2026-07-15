@@ -106,7 +106,9 @@ A theorem document is a YAML mapping with these fields.
 
 - Type: integer
 - Optional
-- Default: `1`
+- Default: `None` (unspecified). Consumers should treat an omitted schema field
+  as the current format version, but the loader preserves the distinction
+  between omitted and explicitly declared values.
 - Purpose: forwards compatibility for future schema changes.
 
 ### 3.2 `Theorem` (required)
@@ -753,8 +755,8 @@ This is not “extra design”; it is the schema expressed in the shape actually
 deserialized into.
 
 This can be implemented with `serde` derives and deserialized using
-`serde-saphyr` (e.g., `serde_saphyr::from_str`, or multi-doc APIs), as required.
-[^1]
+`serde-saphyr` (e.g., `serde_saphyr::from_str`, or multi-doc APIs), as
+required.[^1]
 
 ```rust
 // Pseudocode-level skeleton; fields omitted for brevity.
@@ -855,8 +857,8 @@ pub struct ActionCall {
     pub action: String,
     // Or your own Value type.
     pub args: indexmap::IndexMap<String, serde_saphyr::Value>,
-    #[serde(default)]
-    pub as_: Option<String>,
+    #[serde(rename = "as", default)]
+    pub as_binding: Option<String>,
 }
 
 #[derive(serde::Deserialize)]

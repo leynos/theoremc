@@ -17,7 +17,8 @@ pub use theoremc_core::schema;
 /// The public proc macro that expands one crate-relative `.theorem` file.
 pub use theoremc_macros::theorem_file;
 
-/// Argument-expression lowering for proof harness code generation.
+/// Argument-expression lowering prototype for proof harness code generation.
+#[cfg(test)]
 #[doc(hidden)]
 pub(crate) mod arg_lowering;
 

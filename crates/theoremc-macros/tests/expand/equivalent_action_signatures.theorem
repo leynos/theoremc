@@ -1,0 +1,40 @@
+Theorem: FirstEquivalent
+About: First equivalent action declaration
+Actions:
+  account.deposit:
+    params:
+      account: u64
+    returns: bool
+Do:
+  - call:
+      action: account.deposit
+      args:
+        account: 1
+Witness:
+  - cover: "true"
+    because: reachable
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+---
+Theorem: SecondEquivalent
+About: Second equivalent action declaration
+Actions:
+  account.deposit:
+    params:
+      account: "u64 "
+    returns: "bool "
+Witness:
+  - cover: "true"
+    because: reachable
+Prove:
+  - assert: "true"
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS

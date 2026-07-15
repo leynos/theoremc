@@ -2,9 +2,14 @@
 name = "test-helpers"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [dependencies]
+camino = "1.2.2"
+cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+filetime = "0.2.29"
+tempfile = "3.27.0"
+theoremc-core = { version = "0.1.0", path = "../theoremc-core" }
 
 [lints]
 workspace = true

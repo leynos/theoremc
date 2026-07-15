@@ -57,6 +57,9 @@ Theorem paths passed to `theorem_file!` must satisfy all of the following:
 - The path must not contain `..` components.
 - The path is resolved relative to the consuming crate's `CARGO_MANIFEST_DIR`.
 
+The macro normalizes backslash separators (`\`) to forward slashes (`/`) before
+loading the theorem file and deriving generated module or harness names.
+
 Paths that violate any rule cause a compile-time error at the macro call site.
 
 ### Error variants
@@ -132,21 +135,21 @@ Every theorem document is a YAML mapping with the following fields. Keys use
 `TitleCase` canonically, but lowercase aliases are also accepted (e.g.,
 `Theorem` or `theorem`).
 
-| Field      | Type                               | Required                                   | Default              | Notes                                                                                                                                      |
-| ---------- | ---------------------------------- | ------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Schema`   | integer                            | no                                         | `None` (unspecified) | Forwards compatibility.                                                                                                                    |
-| `Theorem`  | string                             | **yes**                                    | —                    | Must be a valid identifier (see below).                                                                                                    |
-| `About`    | string                             | **yes**                                    | —                    | Human-readable description of intent. Must be non-empty after trimming.                                                                    |
-| `Tags`     | list of strings                    | no                                         | `[]`                 | Metadata for filtering and reporting.                                                                                                      |
-| `Given`    | list of strings                    | no                                         | `[]`                 | Narrative context (no codegen impact).                                                                                                     |
-| `Forall`   | map (identifier → type)            | no                                         | `{}`                 | Symbolic quantified variables.                                                                                                             |
-| `Assume`   | list of `Assumption`               | no                                         | `[]`                 | Constraints on symbolic inputs.                                                                                                            |
-| `Witness`  | list of `WitnessCheck`             | no                                         | `[]`                 | Non-vacuity witnesses.                                                                                                                     |
-| `Let`      | map (identifier → `LetBinding`)    | no                                         | `{}`                 | Named fixtures.                                                                                                                            |
-| `Do`       | list of `Step`                     | no                                         | `[]`                 | Theorem step sequence.                                                                                                                     |
-| `Actions`  | map (canonical action → signature) | required when `Let`/`Do` reference actions | `{}`                 | Maps canonical action names to Rust signatures used by `Let`/`Do` probes. See [Declaring action signatures](#declaring-action-signatures). |
-| `Prove`    | list of `Assertion`                | **yes**                                    | —                    | Proof obligations.                                                                                                                         |
-| `Evidence` | `Evidence`                         | **yes**                                    | —                    | Backend configuration.                                                                                                                     |
+| Field      | Type                               | Required                                   | Default             | Notes                                                                                                                                                               |
+| ---------- | ---------------------------------- | ------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Schema`   | integer                            | no                                         | `None` when omitted | Forwards compatibility; omitted values are represented as `None`, and the loader preserves the distinction between omitted and explicitly declared `Schema` values. |
+| `Theorem`  | string                             | **yes**                                    | —                   | Must be a valid identifier (see below).                                                                                                                             |
+| `About`    | string                             | **yes**                                    | —                   | Human-readable description of intent. Must be non-empty after trimming.                                                                                             |
+| `Tags`     | list of strings                    | no                                         | `[]`                | Metadata for filtering and reporting.                                                                                                                               |
+| `Given`    | list of strings                    | no                                         | `[]`                | Narrative context (no codegen impact).                                                                                                                              |
+| `Forall`   | map (identifier → type)            | no                                         | `{}`                | Symbolic quantified variables.                                                                                                                                      |
+| `Assume`   | list of `Assumption`               | no                                         | `[]`                | Constraints on symbolic inputs.                                                                                                                                     |
+| `Witness`  | list of `WitnessCheck`             | no                                         | `[]`                | Non-vacuity witnesses.                                                                                                                                              |
+| `Let`      | map (identifier → `LetBinding`)    | no                                         | `{}`                | Named fixtures.                                                                                                                                                     |
+| `Do`       | list of `Step`                     | no                                         | `[]`                | Theorem step sequence.                                                                                                                                              |
+| `Actions`  | map (canonical action → signature) | required when `Let`/`Do` reference actions | `{}`                | Maps canonical action names to Rust signatures used by `Let`/`Do` probes. See [Declaring action signatures](#declaring-action-signatures).                          |
+| `Prove`    | list of `Assertion`                | **yes**                                    | —                   | Proof obligations.                                                                                                                                                  |
+| `Evidence` | `Evidence`                         | **yes**                                    | —                   | Backend configuration.                                                                                                                                              |
 
 ### Identifier rules
 
@@ -432,8 +435,9 @@ string. Non-string values are rejected:
 - `InvalidIdentifier { identifier, reason }` — identifier validation failure.
 - `InvalidActionName { action, reason }` — action name grammar or keyword
   validation failure.
-- `ValidationFailed { theorem, reason, diagnostic }` — structural constraint
-  violation (e.g., empty `Prove` section or no Evidence backend).
+- `ValidationFailed { theorem, reason, diagnostic, source }` — structural
+  constraint violation (e.g., empty `Prove` section or no Evidence backend), or
+  a raw-to-public decode failure with its original source error preserved.
 - `MangledIdentifierCollision { message }` — two or more different canonical
   action names produce the same mangled Rust identifier.
 - `DuplicateTheoremKey { theorem_key, collisions, diagnostic }` — two theorem
