@@ -272,4 +272,31 @@ mod tests {
             Some("a".to_owned())
         );
     }
+
+    #[rstest]
+    #[case("&'static crate::Account")]
+    #[case("&'_ crate::Account")]
+    fn reserved_lifetime_names_are_not_free(#[case] ty: &str) {
+        assert_eq!(free_named_lifetime(ty), None);
+    }
+
+    #[rstest]
+    #[case("[&'a crate::Account; 1]")]
+    #[case("fn() -> &'a crate::Account")]
+    #[case("impl Trait<&'a crate::Account>")]
+    #[case("(&'a crate::Account)")]
+    #[case("*const &'a crate::Account")]
+    #[case("[&'a crate::Account]")]
+    #[case("dyn Trait<'a>")]
+    #[case("dyn Fn(crate::Account) -> &'a crate::Account")]
+    #[case("dyn Trait<Item = &'a crate::Account>")]
+    #[case("dyn Trait<Assoc: Other<'a>>")]
+    fn nested_named_lifetimes_are_free(#[case] ty: &str) {
+        assert_eq!(free_named_lifetime(ty), Some("a".to_owned()));
+    }
+
+    #[test]
+    fn macro_types_have_no_scanned_lifetimes() {
+        assert_eq!(free_named_lifetime("type_macro!()"), None);
+    }
 }
