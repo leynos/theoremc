@@ -259,3 +259,7 @@ fn exits_scope(line: &str, scope_indent: usize) -> bool {
 fn indent_width(line: &str) -> usize {
     line.len() - line.trim_start().len()
 }
+
+#[cfg(test)]
+#[path = "loader_decode_location_tests.rs"]
+mod tests;
