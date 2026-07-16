@@ -343,28 +343,28 @@ Introduce a new private module `crates/theoremc-core/src/schema/rust_type.rs`
 that owns Rust type parsing and canonicalization for the whole crate. It
 exposes:
 
-- `pub(crate) fn parse(ty: &str) -> Result<syn::Type, syn::Error>` — the
-  thin `syn::parse_str` wrapper, trimming whitespace before parsing so callers
-  do not duplicate that step;
+- `pub(crate) fn parse_with_free_named_lifetime(ty: &str) -> Result<...>` —
+  parses once, trimming whitespace before parsing, and returns the first free
+  named lifetime so callers do not duplicate parsing or lifetime analysis;
 - `pub(crate) fn canonical_token_stream(ty: &str) -> Option<String>` — the
   `quote::ToTokens` round-trip used as the canonical dedup and equivalence key.
   Returns `None` when parsing fails, in which case callers fall back to trimmed
   string equality;
-- `pub(crate) fn validate(...) -> Result<(), SchemaError>` — drives validation
-  with a caller-supplied diagnostic context closure so each call site keeps its
-  own deterministic error string shape.
+- `validate_type_without_free_named_lifetime` — the shared schema validation
+  wrapper in `schema/validate_types.rs` used by both `Forall` and `Actions`,
+  preserving each caller's context and error-string shape.
 
 Re-point the existing `validate_action_signatures` validator
 (`crates/theoremc-core/src/schema/validate.rs:188-215`) at
-`rust_type::validate` so the existing diagnostic text remains stable. Re-point
-`ActionSignature::is_semantically_equivalent`
+`validate_type_without_free_named_lifetime` so the existing diagnostic text
+remains stable. Re-point `ActionSignature::is_semantically_equivalent`
 (`crates/theoremc-core/src/schema/types.rs:265-294`) at
 `rust_type::canonical_token_stream` so probe dedup and signature equivalence
 share one canonical comparison.
 
 Add a new `validate_forall_types` step inserted into the `validate_theorem_doc`
 pipeline immediately after `validate_action_signatures`. Use
-`rust_type::validate` with a
+`validate_type_without_free_named_lifetime` with a
 `Forall entry 'x': type is not a valid Rust type: <syn error>` shape, matching
 the established Actions pattern. Reject types containing free named lifetime
 parameters at this stage so the probe never emits a binding that rustc cannot
@@ -580,7 +580,9 @@ from typed action probes.
 
 Update `docs/developers-guide.md` §2.1 (or add §2.1.2) to list the new
 `theoremc-core` internal helpers: `collision::referenced_types`, plus the shared
-`schema::rust_type::{parse, canonical_token_stream, validate}` trio. Reference
+`schema::rust_type::{parse_with_free_named_lifetime, canonical_token_stream}`
+helpers and
+`schema::validate_types::validate_type_without_free_named_lifetime`. Reference
 the probe emission testing convention (unit-level red tests; trybuild fixtures
 only after probes exist; BDD substring assertions for the user workflow).
 
@@ -769,14 +771,14 @@ and documentation.
   `collision.rs` exceeds 350 lines. Rationale: ADR-003 keeps document traversal
   inside core; mirroring the action-probe precedent preserves layering and
   reuses the established testing approach.
-- 2026-06-02: Introduce a single new `crate::schema::rust_type` module that
-  owns both the `syn::Type` parsing helper and the canonical `quote::ToTokens`
-  round-trip used for equivalence. Re-point `validate_action_signatures` and
-  `ActionSignature::is_semantically_equivalent` at the new module, and use it
-  from the new `validate_forall_types`. Rationale: avoids divergence between
-  probe dedup, signature equivalence, and Forall validation, and concentrates
-  Rust-type concerns in one place rather than the two-path choice considered
-  during plan drafting.
+- 2026-06-02: Introduce `crate::schema::rust_type` for parsing and canonical
+  token rendering, and `crate::schema::validate_types` for the shared schema
+  validation wrapper. Re-point `validate_action_signatures` and
+  `ActionSignature::is_semantically_equivalent` at the new helpers, and use
+  `validate_type_without_free_named_lifetime` from the new
+  `validate_forall_types`. Rationale: avoids divergence between probe dedup,
+  signature equivalence, and Forall validation while keeping the
+  caller-specific error strings intact.
 - 2026-06-02: Validate `Forall` type strings as `syn::Type` at schema load
   time, and reject types with free named lifetime parameters in both `Forall`
   and `Actions` validators. Rationale: surfaces typos and unbindable lifetimes
@@ -811,11 +813,14 @@ referenced-type probes for the distinct Rust types declared in `Forall` and
 `Actions` signatures, so missing or moved owner-crate type paths fail ordinary
 Rust compilation before Phase 4 struct-literal synthesis relies on them.
 
-The implementation also centralizes Rust type parsing, validation, and
-canonical token rendering in `schema::rust_type`, reuses that path for action
-signature equivalence, rejects free named lifetimes in schema-declared types,
-and exposes `collision::referenced_types` as the ordered traversal helper for
-macro emission.
+The implementation also centralizes Rust type parsing in
+`schema::rust_type::parse_with_free_named_lifetime`, keeps canonical token
+rendering in `schema::rust_type::canonical_token_stream`, routes shared schema
+validation through
+`schema::validate_types::validate_type_without_free_named_lifetime`, reuses the
+canonical token path for action signature equivalence, rejects free named
+lifetimes in schema-declared types, and exposes `collision::referenced_types`
+as the ordered traversal helper for macro emission.
 
 Coverage now includes core traversal and validation tests, macro token-shape
 tests, and theorem-owner BDD fixture builds for present, missing, and moved
