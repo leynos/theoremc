@@ -8,8 +8,6 @@ use syn::{
     TypeTraitObject, TypeTuple,
 };
 
-use super::SchemaError;
-
 #[derive(Clone, Copy)]
 struct LifetimeScope<'a>(&'a [String]);
 
@@ -34,10 +32,7 @@ pub(crate) fn canonical_token_stream(ty: &str) -> Option<String> {
 }
 
 /// Validates a theorem-owned Rust type string with caller-owned diagnostics.
-pub(crate) fn validate(
-    ty: &str,
-    context: impl FnOnce(syn::Error) -> SchemaError,
-) -> Result<(), SchemaError> {
+pub(crate) fn validate<E>(ty: &str, context: impl FnOnce(syn::Error) -> E) -> Result<(), E> {
     parse(ty).map_err(context)?;
     Ok(())
 }

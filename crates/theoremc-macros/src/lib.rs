@@ -418,4 +418,8 @@ mod tests;
 #[cfg(test)]
 #[path = "action_probe_tests.rs"]
 mod action_probe_tests;
+
+/// Private expansion tests for compile-time referenced-type probe generation.
+#[cfg(test)]
+#[path = "type_probe_tests.rs"]
 mod type_probe_tests;
