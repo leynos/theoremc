@@ -31,13 +31,14 @@ pub(crate) fn canonical_token_stream(ty: &str) -> Option<String> {
         .map(|parsed| parsed.to_token_stream().to_string())
 }
 
-/// Validates a theorem-owned Rust type string with caller-owned diagnostics.
-pub(crate) fn validate<E>(ty: &str, context: impl FnOnce(syn::Error) -> E) -> Result<(), E> {
-    parse(ty).map_err(context)?;
-    Ok(())
+/// Parses a Rust type and returns its first free named lifetime.
+pub(crate) fn parse_with_free_named_lifetime(ty: &str) -> Result<Option<String>, syn::Error> {
+    let parsed = parse(ty)?;
+    Ok(free_named_lifetime_in_type(&parsed, LifetimeScope::EMPTY))
 }
 
 /// Returns the first free named lifetime in a Rust type string.
+#[cfg(test)]
 pub(crate) fn free_named_lifetime(ty: &str) -> Option<String> {
     parse(ty)
         .ok()

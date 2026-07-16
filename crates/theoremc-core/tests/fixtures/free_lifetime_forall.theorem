@@ -1,0 +1,14 @@
+Theorem: InvalidForallLifetime
+About: Declares an unbound Forall lifetime
+Forall:
+  account: "&'a crate::Account"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable

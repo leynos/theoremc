@@ -25,19 +25,23 @@ pub(super) fn validate_type_without_free_named_lifetime(
     ty: &str,
     context: &str,
 ) -> ValidationResult {
-    rust_type::validate(ty, |error| {
+    let free_lifetime = rust_type::parse_with_free_named_lifetime(ty).map_err(|error| {
         fail(
             doc,
             format!("{context} is not a valid Rust type: {error}"),
             None,
         )
     })?;
-    if let Some(lifetime) = rust_type::free_named_lifetime(ty) {
+    if let Some(lifetime) = free_lifetime {
         return Err(fail(
             doc,
             format!(
-                "{context} contains a free named lifetime parameter '{lifetime}'; use an owned \
-                 type or an elided lifetime"
+                concat!(
+                    "{context} contains a free named lifetime parameter '{lifetime}'; ",
+                    "use an owned type or an elided lifetime"
+                ),
+                context = context,
+                lifetime = lifetime,
             ),
             None,
         ));

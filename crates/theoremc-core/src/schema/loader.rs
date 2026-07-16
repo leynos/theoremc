@@ -371,5 +371,9 @@ mod tests;
 mod action_tests;
 
 #[cfg(test)]
+#[path = "loader_diagnostic_tests.rs"]
+mod diagnostic_tests;
+
+#[cfg(test)]
 #[path = "loader_duplicate_tests.rs"]
 mod duplicate_theorem_key_tests;

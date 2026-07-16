@@ -160,11 +160,10 @@ Keep these conventions when extending probe generation:
 Referenced-type probes use the same layering.
 `theoremc_core::collision::referenced_types` walks each theorem document in
 deterministic first-seen order, visiting `Forall` first, then `Actions.params`,
-then `Actions.returns`, and deduplicating through
-`schema::rust_type::canonical_token_stream`.
-`schema::rust_type::{parse, canonical_token_stream, validate}` owns Rust type
-parsing and comparison so schema validation, action signature equivalence, and
-macro probe generation do not drift apart.
+then `Actions.returns`, with canonical-token-stream deduplication.
+`schema::rust_type::{parse, canonical_token_stream, parse_with_free_named_lifetime}`
+owns Rust type parsing and comparison so schema validation, action signature
+equivalence, and macro probe generation do not drift apart.
 
 Macro tests should keep the layers distinct:
 
@@ -313,12 +312,11 @@ internal interface between the core library and the proc-macro crate:
 
 **Table:** `theoremc-core` stable internal API
 
-| Symbol                                | Kind   | Purpose                                                                                                                                             |
-| ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `load_theorem_file_from_manifest_dir` | `fn`   | Opens a crate-relative `.theorem` file via `cap_std`, validates it through the shared schema loader, and returns one `TheoremDoc` per YAML document |
-| `TheoremFileLoadError`                | `enum` | Typed error covering all failure modes: `OpenManifestDir`, `InvalidTheoremPath`, `ReadTheoremFile`, `EmptyTheoremFile`, `InvalidTheoremFile`        |
-| `collision::referenced_types`         | `fn`   | Returns distinct Rust type strings referenced by `Forall` and `Actions` declarations in deterministic first-seen order                              |
-| `schema::rust_type`                   | module | Shared Rust type parsing, canonical token comparison, validation, and free named lifetime detection                                                 |
+| Symbol                                | Kind   | Purpose                                                                                                                                                            |
+| ------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `load_theorem_file_from_manifest_dir` | `fn`   | Opens a crate-relative `.theorem` file via `cap_std`, validates it through the shared schema loader, and returns one `TheoremDoc` per YAML document                |
+| `TheoremFileLoadError`                | `enum` | Typed error covering all failure modes: `OpenManifestDir`, `InvalidTheoremPath`, `ReadTheoremFile`, `EmptyTheoremFile`, `InvalidTheoremFile`                       |
+| `collision::referenced_types`         | `fn`   | Returns distinct Rust type strings referenced by `Forall`, `Actions.params`, and `Actions.returns` in deterministic first-seen order, with canonical deduplication |
 
 The proc-macro crate exposes the companion expansion boundary:
 

@@ -1,0 +1,14 @@
+Theorem: BoundTraitObjectLifetime
+About: Declares a bound trait object lifetime
+Forall:
+  callback: "dyn for<'a> Trait<&'a crate::Account>"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable

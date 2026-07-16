@@ -2,16 +2,8 @@
 
 use rstest::*;
 
+use super::super::test_support::assert_parse_error_contains;
 use super::load_theorem_docs;
-
-fn assert_parse_error_contains(yaml: &str, expected_substring: &str) {
-    let error = load_theorem_docs(yaml).expect_err("expected parser to reject fixture");
-    let message = error.to_string();
-    assert!(
-        message.contains(expected_substring),
-        "expected parse error to contain '{expected_substring}', got: {message}"
-    );
-}
 
 #[rstest]
 fn action_signatures_parse_with_ordered_params_and_default_return() {

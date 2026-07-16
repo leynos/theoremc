@@ -123,9 +123,11 @@ Observable success:
   consuming crate verbatim.
 - Behavioural tests that model user workflows must use `rstest-bdd` matching
   the existing local configuration (`rstest-bdd-macros`).
-- Existing `proptest` coverage already exercises `referenced_types`
-  placements, order, and whitespace-equivalent canonical dedup. Add `proptest`
-  only if the implementation introduces a new invariant beyond that surface.
+- Existing `proptest` coverage in
+  `crates/theoremc-core/src/collision_referenced_tests.rs::referenced_types_proptests`
+  already exercises arbitrary placements, order, and whitespace-equivalent
+  canonical dedup. Add `proptest` only if the implementation introduces a new
+  invariant beyond that surface.
 - Kani and Verus proofs are not required for this change. The feature is a
   Rust compile-time type-checking contract, not a proof obligation or unsafe
   code invariant.
@@ -318,8 +320,8 @@ flip to assert the expected probe block in Milestone 2:
   case — no probe block expected before *or* after).
 
 Do not proceed to Milestone 1 until the red tests fail for the expected reason:
-the macro understands the theorem but does not yet emit referenced- type
-probes. Run:
+the macro understands the theorem but does not yet emit referenced-type probes.
+Run:
 
 ```sh
 cargo nextest run -p theoremc-macros 2>&1 \
@@ -364,10 +366,10 @@ pipeline immediately after `validate_action_signatures`. Use
 the established Actions pattern. Reject types containing free named lifetime
 parameters at this stage so the probe never emits a binding that rustc cannot
 bind (for example, `&'a Foo` written by a theorem author). The rejection
-diagnostic shape is the rejection diagnostic says that the `Forall` entry type
-contains a free named lifetime parameter and recommends an owned type or an
-elided lifetime. Apply the same check inside `validate_action_signatures` for
-`Actions.params` and `Actions.returns` to keep the two validators symmetric.
+diagnostic should say that the `Forall` entry type contains a free named
+lifetime parameter and recommend an owned type or an elided lifetime. Apply the
+same check inside `validate_action_signatures` for `Actions.params` and
+`Actions.returns` to keep the two validators symmetric.
 
 Next, add a narrow helper alongside `referenced_actions` in
 `crates/theoremc-core/src/collision.rs` that returns distinct referenced types
@@ -429,12 +431,10 @@ body. The canonical emitted form is one shared helper declaration plus one
 anonymous `const _` block:
 
 ```rust
-// theoremc: compile-time referenced-type probe (3.3.2)
 const _: () = {
     fn __theoremc_assert_referenced<T: ?Sized>() {}
     let _ = __theoremc_assert_referenced::<ExpectedTypeOne>;
     let _ = __theoremc_assert_referenced::<ExpectedTypeTwo>;
-    // ... one statement per distinct referenced type
 };
 ```
 
@@ -444,7 +444,7 @@ Implementation notes:
   module, even when many types are probed; the renderer must not emit one
   helper per probe statement.
 - Treat `__theoremc_assert_referenced` as the stable renderer anchor for the
-  generated block so a theorem author running `cargo expand` can recognize the
+  generated block so a theorem author running `cargo expand` can recognise the
   probe immediately. The helper name must remain stable if proc-macro output
   formatting changes; record any future anchor change in the Decision Log.
 - Probes live outside the `#[cfg(kani)]` backend module so ordinary builds
@@ -482,14 +482,14 @@ Update macro unit tests and snapshots to prove:
 
 Add the trybuild compile-fail fixtures now that probes exist:
 
-- `referenced_type_missing.rs`, `referenced_type_missing.theorem`, and a
+- `missing_referenced_type.rs`, `missing_referenced_type.theorem`, and a
   matching fixture `theorem_actions` module covering a `Forall` variable
   declared as `crate::Missing` with no matching type in the consuming fixture
   crate;
-- `referenced_type_moved.rs`, `referenced_type_moved.theorem`, and a
-  matching fixture `theorem_actions` module covering an `Actions.params` type
-  renamed under the consuming crate so the typed action probe still finds the
-  function path but the referenced-type probe fails to resolve.
+- `moved_referenced_type.rs`, `moved_referenced_type.theorem`, and a matching
+  fixture `theorem_actions` module covering an `Actions.params` type renamed
+  under the consuming crate so the typed action probe still finds the function
+  path but the referenced-type probe fails to resolve.
 
 Keep the trybuild `*.stderr` snapshots narrow: assert on the probe-pointing
 source line and the missing-type fragment (`cannot find type` and the type
@@ -533,8 +533,9 @@ module. Add `rstest-bdd` scenarios for:
   action probe coercion still finds the function path.
 
 Reuse the existing `assert_fixture_build_fails_with` helper and assert on
-stable substrings (the type name, `cannot find type`, the probe block
-identifier). Keep existing non-Kani and `cargo kani list` scenarios intact.
+stable diagnostic fragments (`cannot find type` and the type name), plus the
+probe-pointing source line. Keep existing non-Kani and `cargo kani list`
+scenarios intact.
 
 Run:
 
@@ -550,15 +551,16 @@ the behavioural tests.
 
 Update `docs/theoremc-design.md` §7.3 with the concrete generated
 referenced-type probe shape, the chosen probe construction (one anonymous
-`const _` block per file with a single shared `fn _assert<T: ?Sized>()` helper
-and one `let _ = ...;` statement per distinct referenced type), the
-deduplication rule based on `syn::Type` canonical token streams, and the
-explicit non-goal of probing struct field names or decomposing generic
-arguments. Note the double-underscore-prefixed helper name
-(`__theoremc_assert_referenced`) is the stable `cargo expand` and diagnostic
-anchor because procedural macro `TokenStream` output cannot reliably preserve a
-marker comment. Cross-reference Step 3.3.1 typed action probes and the Phase 4
-struct-literal synthesis wiring so the reader sees the layered coverage.
+`const _` block per file with a single shared
+`fn __theoremc_assert_referenced<T: ?Sized>()` helper and one `let _ = ...;`
+statement per distinct referenced type), the deduplication rule based on
+`syn::Type` canonical token streams, and the explicit non-goal of probing
+struct field names or decomposing generic arguments. Note the
+double-underscore-prefixed helper name (`__theoremc_assert_referenced`) is the
+stable `cargo expand` anchor because procedural macro `TokenStream` output
+cannot reliably preserve a marker comment. Cross-reference Step 3.3.1 typed
+action probes and the Phase 4 struct-literal synthesis wiring so the reader
+sees the layered coverage.
 
 Update `docs/theorem-file-specification.md` §3.6 (Forall) to note that type
 strings are validated as `syn::Type` at schema load time, mirroring §3.9.1
@@ -762,7 +764,7 @@ and documentation.
 - 2026-06-02: Introduce a single new `crate::schema::rust_type` module that
   owns both the `syn::Type` parsing helper and the canonical `quote::ToTokens`
   round-trip used for equivalence. Re-point `validate_action_signatures` and
-  `ActionSignature::is_semantically_ equivalent` at the new module, and use it
+  `ActionSignature::is_semantically_equivalent` at the new module, and use it
   from the new `validate_forall_types`. Rationale: avoids divergence between
   probe dedup, signature equivalence, and Forall validation, and concentrates
   Rust-type concerns in one place rather than the two-path choice considered
