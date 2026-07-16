@@ -1,10 +1,15 @@
 //! Unit tests for schema document loading.
 
-use std::error::Error;
-
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use rstest::*;
 
+use super::super::{
+    test_fixtures::{
+        bound_lifetime_bare_fn_yaml, bound_lifetime_trait_object_yaml, free_lifetime_forall_yaml,
+        invalid_forall_type_yaml,
+    },
+    test_support::assert_parse_error_contains,
+};
 use super::*;
 
 /// Minimal valid YAML for a theorem document.
@@ -45,20 +50,34 @@ fn assert_parse_error(yaml: &str) {
     assert!(result.is_err(), "expected parser to reject fixture");
 }
 
-fn assert_parse_error_contains(yaml: &str, expected_substring: &str) {
-    let error = load_theorem_docs(yaml).expect_err("expected parser to reject fixture");
-    let message = error.to_string();
-    assert!(
-        message.contains(expected_substring),
-        "expected parse error to contain '{expected_substring}', got: {message}"
-    );
-}
-
 #[rstest]
 fn load_single_minimal_document() {
     let docs = load_theorem_docs(MINIMAL_YAML).expect("should parse");
     assert_eq!(docs.len(), 1);
     assert_eq!(docs.first().map(|d| d.theorem.as_str()), Some("Minimal"));
+}
+
+#[rstest]
+#[case(
+    invalid_forall_type_yaml(),
+    "Forall entry 'account': type is not a valid Rust type"
+)]
+#[case(
+    free_lifetime_forall_yaml(),
+    "Forall entry 'account': type contains a free named lifetime parameter 'a'"
+)]
+fn invalid_rust_type_or_free_lifetime_is_rejected(
+    #[case] yaml: &str,
+    #[case] expected_fragment: &str,
+) {
+    assert_parse_error_contains(yaml, expected_fragment);
+}
+
+#[rstest]
+#[case(bound_lifetime_bare_fn_yaml())]
+#[case(bound_lifetime_trait_object_yaml())]
+fn bound_lifetime_rust_types_are_accepted(#[case] yaml: &str) {
+    load_theorem_docs(yaml).expect("bound lifetime type should parse");
 }
 
 #[rstest]
@@ -328,104 +347,4 @@ fn load_full_example_populates_all_sections(full_doc: TheoremDoc) {
     assert_eq!(full_doc.let_bindings.len(), 2);
     assert_eq!(full_doc.do_steps.len(), 2);
     assert_eq!(full_doc.prove.len(), 2);
-}
-
-#[rstest]
-fn parse_diagnostics_include_explicit_source() {
-    let yaml = "Theorem: T\nAbout: bad\nUnknown: key\n";
-    let result = load_theorem_docs_with_source(
-        &SourceId::new("tests/fixtures/invalid_unknown_key.theorem"),
-        yaml,
-    );
-    assert!(result.is_err(), "fixture should fail parsing");
-
-    let error = result.expect_err("error expected");
-    let diagnostic = error.diagnostic().expect("diagnostic expected");
-    assert_eq!(
-        diagnostic.location.source,
-        "tests/fixtures/invalid_unknown_key.theorem"
-    );
-    assert_eq!(diagnostic.location.line, 3);
-    assert_eq!(diagnostic.location.column, 1);
-}
-
-#[rstest]
-fn validation_diagnostics_include_source_and_location() {
-    let yaml = r"
-Theorem: InvalidAbout
-About: ''
-Prove:
-  - assert: 'true'
-    because: trivial
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: 'true'
-    because: reachable
-";
-    let result = load_theorem_docs_with_source(
-        &SourceId::new("tests/fixtures/invalid_empty_about.theorem"),
-        yaml,
-    );
-    assert!(result.is_err(), "fixture should fail validation");
-
-    let error = result.expect_err("error expected");
-    let diagnostic = error.diagnostic().expect("diagnostic expected");
-    assert_eq!(
-        diagnostic.location.source,
-        "tests/fixtures/invalid_empty_about.theorem"
-    );
-    assert!(diagnostic.location.line > 0);
-    assert!(diagnostic.location.column > 0);
-}
-
-#[rstest]
-fn decode_failures_preserve_source_error() {
-    let yaml = r"
-Theorem: InvalidRef
-About: Invalid ref target
-Let:
-  y:
-    call:
-      action: account.deposit
-      args:
-        target: 1
-
-  x:
-    call:
-      action: account.deposit
-      args:
-        target:
-          ref: 'not valid'
-Prove:
-  - assert: 'true'
-    because: trivial
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: 'true'
-    because: reachable
-";
-    let error = load_theorem_docs_with_source(
-        &SourceId::new("tests/fixtures/invalid_ref_target.theorem"),
-        yaml,
-    )
-    .expect_err("invalid ref target should fail decoding");
-
-    let source = error.source().expect("decode failure should be preserved");
-    let diagnostic = error.diagnostic().expect("diagnostic expected");
-
-    assert!(
-        source.to_string().contains("Let binding 'x'"),
-        "unexpected source error: {source}"
-    );
-    assert_eq!(
-        diagnostic.location.source,
-        "tests/fixtures/invalid_ref_target.theorem"
-    );
-    assert_eq!(diagnostic.location.line, 15);
 }

@@ -1,0 +1,14 @@
+Theorem: BoundBareFunctionLifetime
+About: Declares a bound bare function lifetime
+Forall:
+  callback: "for<'a> fn(&'a crate::Account)"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable

@@ -1,6 +1,5 @@
 //! Behavioural tests for real `theorem_file!` proc-macro expansion.
 
-use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
 use theoremc::mangle::mangle_theorem_harness;
 
@@ -10,11 +9,19 @@ mod cargo_runner;
 /// Temporary crate builder that lets these BDD scenarios compile real macros.
 #[path = "theorem_file_macro_bdd/fixture_crate.rs"]
 mod fixture_crate;
+/// Fixture inputs for referenced-type macro scenarios.
+#[path = "theorem_file_macro_bdd/referenced_type_fixtures.rs"]
+mod referenced_type_fixtures;
 
 use cargo_runner::CargoGuard;
 use fixture_crate::{
-    FIXTURE_BUILD_DEPENDENCIES, FIXTURE_LIB_RS, FixtureCrate, TheoremFixtureSpec,
-    build_fixture_and_list_kani_harnesses, fixture_cargo_toml_for, run_valid_fixture_build,
+    FIXTURE_LIB_RS, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses, run_fixture_build,
+    run_valid_fixture_build,
+};
+use referenced_type_fixtures::{
+    EMPTY_TYPES_LIB_RS, ExpectedBuildFailure, MISSING_FORALL_TYPE_THEOREM,
+    MOVED_ACTION_TYPE_LIB_RS, MOVED_ACTION_TYPE_THEOREM, REFERENCED_TYPES_LIB_RS,
+    REFERENCED_TYPES_THEOREM,
 };
 
 const VALID_SINGLE_THEOREM: &str = concat!(
@@ -195,6 +202,54 @@ fn given_a_fixture_crate_with_one_theorem_file_missing_kani_evidence() {}
 #[given("a fixture crate with a multi-document theorem file missing one Kani evidence block")]
 fn given_a_fixture_crate_with_a_multi_document_theorem_file_missing_one_kani_evidence_block() {}
 
+#[given("a fixture crate with declared theorem types")]
+fn given_a_fixture_crate_with_declared_theorem_types() {}
+
+#[then("the fixture crate builds referenced type probes without a Kani dependency")]
+fn then_the_fixture_crate_builds_referenced_type_probes_without_a_kani_dependency()
+-> Result<(), String> {
+    run_fixture_build(
+        REFERENCED_TYPES_LIB_RS,
+        &TheoremFixtureSpec {
+            path: "theorems/referenced-types.theorem",
+            content: REFERENCED_TYPES_THEOREM,
+        },
+    )
+}
+
+#[given("a fixture crate with a missing Forall type")]
+fn given_a_fixture_crate_with_a_missing_forall_type() {}
+
+#[then("compiling the fixture crate fails with a missing Forall type diagnostic")]
+fn then_compiling_the_fixture_crate_fails_with_a_missing_forall_type_diagnostic()
+-> Result<(), String> {
+    assert_fixture_build_fails_with_lib(&ExpectedBuildFailure {
+        lib_rs: EMPTY_TYPES_LIB_RS,
+        theorem_path: "theorems/missing-forall-type.theorem",
+        theorem_content: MISSING_FORALL_TYPE_THEOREM,
+        unexpected_success_msg: "theorem with missing Forall type unexpectedly compiled",
+        expected_fragments: &[
+            "cannot find type `MissingAccount` in the crate root",
+            "MissingAccount",
+        ],
+    })
+}
+
+#[given("a fixture crate with a moved Actions type")]
+fn given_a_fixture_crate_with_a_moved_actions_type() {}
+
+#[then("compiling the fixture crate fails with a moved Actions type diagnostic")]
+fn then_compiling_the_fixture_crate_fails_with_a_moved_actions_type_diagnostic()
+-> Result<(), String> {
+    assert_fixture_build_fails_with_lib(&ExpectedBuildFailure {
+        lib_rs: MOVED_ACTION_TYPE_LIB_RS,
+        theorem_path: "theorems/moved-action-type.theorem",
+        theorem_content: MOVED_ACTION_TYPE_THEOREM,
+        unexpected_success_msg: "theorem with moved Actions type unexpectedly compiled",
+        expected_fragments: &["could not find `old` in the crate root", "old"],
+    })
+}
+
 /// Asserts that a fixture build using the given theorem file fails and that the
 /// build error contains every string in `expected_fragments`.
 fn assert_fixture_build_fails_with(
@@ -203,14 +258,26 @@ fn assert_fixture_build_fails_with(
     unexpected_success_msg: &str,
     expected_fragments: &[&str],
 ) -> Result<(), String> {
-    let guard = CargoGuard::acquire();
-    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
-    fixture.write(Utf8Path::new(theorem_path), theorem_content)?;
-    let build_error = fixture
-        .cargo_build(&guard)
-        .err()
-        .ok_or_else(|| unexpected_success_msg.to_owned())?;
-    for fragment in expected_fragments {
+    assert_fixture_build_fails_with_lib(&ExpectedBuildFailure {
+        lib_rs: FIXTURE_LIB_RS,
+        theorem_path,
+        theorem_content,
+        unexpected_success_msg,
+        expected_fragments,
+    })
+}
+
+fn assert_fixture_build_fails_with_lib(expected: &ExpectedBuildFailure<'_>) -> Result<(), String> {
+    let build_error = run_fixture_build(
+        expected.lib_rs,
+        &TheoremFixtureSpec {
+            path: expected.theorem_path,
+            content: expected.theorem_content,
+        },
+    )
+    .err()
+    .ok_or_else(|| expected.unexpected_success_msg.to_owned())?;
+    for fragment in expected.expected_fragments {
         if !build_error.contains(fragment) {
             return Err(format!(
                 "expected build failure to contain {fragment:?}, got:\n{build_error}"
@@ -279,6 +346,24 @@ fn a_multi_document_theorem_file_compiles_without_kani_installed() {}
 
 #[scenario(
     path = "tests/features/theorem_file_macro.feature",
+    name = "Referenced Forall and Actions types are checked during ordinary builds"
+)]
+fn referenced_forall_and_actions_types_are_checked_during_ordinary_builds() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "A missing Forall type fails ordinary compilation"
+)]
+fn a_missing_forall_type_fails_ordinary_compilation() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "A moved Actions type fails ordinary compilation"
+)]
+fn a_moved_actions_type_fails_ordinary_compilation() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
     name = "An invalid theorem file fails compilation during macro expansion"
 )]
 fn an_invalid_theorem_file_fails_compilation_during_macro_expansion() {}
@@ -299,38 +384,4 @@ fn a_multi_document_theorem_file_with_partial_kani_evidence_fails_macro_expansio
 fn fixture_cargo_lock_acquires_without_poisoning() {
     let guard = CargoGuard::acquire();
     drop(guard);
-}
-
-#[test]
-fn fixture_cargo_toml_normalizes_windows_paths() {
-    // Simulate a Windows-style `CARGO_MANIFEST_DIR` with backslash separators.
-    // `fixture_cargo_toml` reads `ROOT_MANIFEST_DIR`, which is set at compile
-    // time, but the normalization logic is what this test needs to verify.
-    let windows_path = r"C:\Users\user\projects\theoremc";
-    let toml = fixture_cargo_toml_for(windows_path);
-
-    // Forward slashes must appear in the TOML; no backslashes.
-    assert!(
-        !toml.contains('\\'),
-        "TOML must not contain backslashes after normalization; got:\n{toml}",
-    );
-
-    // The path must appear as a TOML basic string after normalization.
-    assert!(
-        toml.contains("\"C:/Users/user/projects/theoremc\""),
-        "expected normalized forward-slash path in TOML; got:\n{toml}",
-    );
-    assert!(toml.contains(FIXTURE_BUILD_DEPENDENCIES));
-}
-
-#[test]
-fn fixture_cargo_toml_escapes_basic_string_paths() {
-    let checkout_path = "/home/user/project's/\"theoremc\"";
-    let toml = fixture_cargo_toml_for(checkout_path);
-
-    assert!(
-        toml.contains("path = \"/home/user/project's/\\\"theoremc\\\"\""),
-        "expected escaped TOML basic string path, got:\n{toml}",
-    );
-    assert!(toml.contains(FIXTURE_BUILD_DEPENDENCIES));
 }

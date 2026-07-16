@@ -1,0 +1,110 @@
+//! Fixture sources for theorem-file referenced-type behavioural tests.
+
+macro_rules! theorem_with_trailer {
+    ($($body:literal),+ $(,)?) => {
+        concat!(
+            $($body,)+
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+        )
+    };
+}
+
+pub(crate) const REFERENCED_TYPES_THEOREM: &str = theorem_with_trailer!(
+    "Theorem: ReferencedTypeSmoke\n",
+    "About: Referenced type probe coverage\n",
+    "Forall:\n",
+    "  account: crate::Account\n",
+    "Actions:\n",
+    "  account.deposit:\n",
+    "    params:\n",
+    "      command: crate::DepositCommand\n",
+    "    returns: crate::DepositOutcome\n",
+    "Do:\n",
+    "  - call:\n",
+    "      action: account.deposit\n",
+    "      args:\n",
+    "        command:\n",
+    "          amount: 10\n",
+    "      as: outcome\n",
+);
+
+pub(crate) const MISSING_FORALL_TYPE_THEOREM: &str = theorem_with_trailer!(
+    "Theorem: MissingForallType\n",
+    "About: Missing Forall type probe coverage\n",
+    "Forall:\n",
+    "  account: crate::MissingAccount\n",
+);
+
+pub(crate) const MOVED_ACTION_TYPE_THEOREM: &str = theorem_with_trailer!(
+    "Theorem: MovedActionType\n",
+    "About: Moved Actions type probe coverage\n",
+    "Actions:\n",
+    "  account.deposit:\n",
+    "    params:\n",
+    "      command: crate::old::DepositCommand\n",
+    "    returns: crate::DepositOutcome\n",
+);
+
+pub(crate) const REFERENCED_TYPES_LIB_RS: &str = concat!(
+    "//! Fixture crate for referenced-type behavioural tests.\n\n",
+    "pub struct Account;\n",
+    "pub struct DepositCommand {\n",
+    "    pub amount: u64,\n",
+    "}\n",
+    "pub struct DepositOutcome;\n\n",
+    "pub mod theorem_actions {\n",
+    "    #[expect(non_snake_case, reason = \"theorem action exports use mangled identifiers\")]\n",
+    "    pub fn account__deposit__h05158894bfb4(\n",
+    "        _command: crate::DepositCommand,\n",
+    "    ) -> crate::DepositOutcome {\n",
+    "        crate::DepositOutcome\n",
+    "    }\n",
+    "}\n\n",
+    "#[doc(hidden)]\n",
+    "mod __theoremc_generated_suite {\n",
+    "    #[cfg(theoremc_has_theorems)]\n",
+    "    use theoremc::theorem_file;\n",
+    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
+    "}\n",
+);
+
+pub(crate) const EMPTY_TYPES_LIB_RS: &str = concat!(
+    "//! Fixture crate with no theorem-owned type definitions.\n\n",
+    "#[doc(hidden)]\n",
+    "mod __theoremc_generated_suite {\n",
+    "    #[cfg(theoremc_has_theorems)]\n",
+    "    use theoremc::theorem_file;\n",
+    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
+    "}\n",
+);
+
+pub(crate) const MOVED_ACTION_TYPE_LIB_RS: &str = concat!(
+    "//! Fixture crate where an action type moved modules.\n\n",
+    "pub mod new {\n",
+    "    pub struct DepositCommand;\n",
+    "}\n",
+    "pub struct DepositOutcome;\n\n",
+    "#[doc(hidden)]\n",
+    "mod __theoremc_generated_suite {\n",
+    "    #[cfg(theoremc_has_theorems)]\n",
+    "    use theoremc::theorem_file;\n",
+    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
+    "}\n",
+);
+
+pub(crate) struct ExpectedBuildFailure<'a> {
+    pub(crate) lib_rs: &'a str,
+    pub(crate) theorem_path: &'a str,
+    pub(crate) theorem_content: &'a str,
+    pub(crate) unexpected_success_msg: &'a str,
+    pub(crate) expected_fragments: &'a [&'a str],
+}

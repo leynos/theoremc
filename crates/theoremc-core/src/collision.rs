@@ -18,7 +18,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::mangle::mangle_action_name;
-use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc};
+use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc, rust_type};
 
 /// Mangles a canonical action name string and returns the identifier.
 fn mangle_to_identifier(name: &str) -> String {
@@ -108,6 +108,33 @@ pub fn referenced_actions(docs: &[TheoremDoc]) -> Vec<&str> {
         }
     }
     distinct
+}
+
+/// Returns each distinct Rust type referenced by the loaded theorem documents
+/// in deterministic first-seen order.
+#[must_use]
+pub fn referenced_types(docs: &[TheoremDoc]) -> Vec<&str> {
+    let mut seen = BTreeSet::new();
+    let mut distinct = Vec::new();
+    for ty in collect_referenced_type_occurrences(docs) {
+        let key = rust_type::canonical_token_stream(ty).unwrap_or_else(|| ty.trim().to_owned());
+        if seen.insert(key) {
+            distinct.push(ty);
+        }
+    }
+    distinct
+}
+
+fn collect_referenced_type_occurrences(docs: &[TheoremDoc]) -> Vec<&str> {
+    let mut out = Vec::new();
+    for doc in docs {
+        out.extend(doc.forall.values().map(String::as_str));
+        for signature in doc.actions.values() {
+            out.extend(signature.params.values().map(String::as_str));
+            out.push(signature.returns.as_str());
+        }
+    }
+    out
 }
 
 /// Collects all canonical action name occurrences from all documents.

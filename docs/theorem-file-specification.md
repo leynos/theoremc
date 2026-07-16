@@ -92,6 +92,8 @@ symbol generation deterministic across tooling and platform boundaries.
 
 - A string containing a Rust type expression.
 - It **MUST** parse as `syn::Type`.
+- It **MUST NOT** contain a free named lifetime parameter such as `&'a T`.
+  Use an owned type, an elided lifetime, or `'static` where appropriate.
 
 Examples: `"u64"`, `"crate::account::Account"`, `"std::sync::Arc<MyType>"`,
 `"Option<&'static str>"`.
@@ -152,6 +154,11 @@ Forall:
 
 Semantics (Kani backend): each entry becomes a symbolic input
 `kani::any::<Ty>()`.
+
+Semantics (ordinary Rust builds): each type is validated as `syn::Type` during
+schema loading and participates in generated referenced-type probes during
+`theorem_file!` expansion. If a type path is missing or moved in the theorem
+owner crate, `cargo build` fails before any Kani harness is run.
 
 Implementation note: preserve YAML map order by deserializing into an
 insertion-ordered map (e.g., `IndexMap`) so generated harnesses stay stable
@@ -272,9 +279,13 @@ Semantics:
   parameter order.
 - Parameter names must match `args` keys used by calls to the action.
 - Parameter and return type strings must parse as Rust type expressions.
+- Parameter and return type strings must not contain free named lifetime
+  parameters such as `&'a T`.
 - `returns` defaults to `()` when omitted.
 - The generated probe checks the declared signature against the resolved
   `crate::theorem_actions::{mangled_identifier}` export.
+- Every declared parameter and return type also participates in the
+  referenced-type probe, even before Phase 4 action execution wiring exists.
 
 ### 3.10 `Prove` (required)
 
@@ -372,6 +383,20 @@ written with names.
 
 The `ActionSignature` declaration does not resolve or call the action. It is
 input to generated compile-time probes and later Kani action lowering.
+
+During ordinary `theorem_file!` expansion, all distinct types declared in
+`Forall` and `Actions` are probed in the theorem owner crate:
+
+```rust
+const _: () = {
+    fn __theoremc_assert_referenced<T: ?Sized>() {}
+    let _ = __theoremc_assert_referenced::<crate::account::Account>;
+};
+```
+
+The probe forces Rust to resolve the declared type path. It does not validate
+struct fields or lower YAML maps into struct literals; those checks occur when
+later generated harness code uses the type in executable Rust.
 
 ### 4.2 `Step` variants
 

@@ -4,4 +4,5 @@ target/
 *.rlib
 .grepai/
 .memdb/
+.claude/
 *:Zone.Identifier

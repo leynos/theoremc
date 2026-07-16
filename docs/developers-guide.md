@@ -157,6 +157,26 @@ Keep these conventions when extending probe generation:
 - probe emission is ordinary non-Kani Rust so drift fails during normal
   compilation, not only under `cargo kani`.
 
+Referenced-type probes use the same layering.
+`theoremc_core::collision::referenced_types` walks each theorem document in
+deterministic first-seen order, visiting `Forall` first, then `Actions.params`,
+then `Actions.returns`, with canonical-token-stream deduplication.
+`schema::rust_type::{parse, canonical_token_stream, parse_with_free_named_lifetime}`
+owns Rust type parsing and comparison so schema validation, action signature
+equivalence, and macro probe generation do not drift apart.
+`parse_with_free_named_lifetime` parses once and performs the schema-validation
+lifetime analysis for free named lifetime parameters. The macro renderer still
+uses `syn::parse_str` directly for probe emission rather than routing through
+the shared parser.
+
+Macro tests should keep the layers distinct:
+
+- unit tests in `crates/theoremc-macros` assert the emitted token shape and
+  deduplication behaviour;
+- trybuild-style compile checks cover generated Rust diagnostics where stable;
+- fixture-crate BDD tests in `tests/theorem_file_macro_bdd.rs` assert the
+  theorem-author workflow using stable rustc fragments.
+
 ### 2.2 Build system API
 
 Contributors extending the build system should note the following internal API
@@ -296,10 +316,11 @@ internal interface between the core library and the proc-macro crate:
 
 **Table:** `theoremc-core` stable internal API
 
-| Symbol                                | Kind   | Purpose                                                                                                                                             |
-| ------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `load_theorem_file_from_manifest_dir` | `fn`   | Opens a crate-relative `.theorem` file via `cap_std`, validates it through the shared schema loader, and returns one `TheoremDoc` per YAML document |
-| `TheoremFileLoadError`                | `enum` | Typed error covering all failure modes: `OpenManifestDir`, `InvalidTheoremPath`, `ReadTheoremFile`, `EmptyTheoremFile`, `InvalidTheoremFile`        |
+| Symbol                                | Kind   | Purpose                                                                                                                                                            |
+| ------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `load_theorem_file_from_manifest_dir` | `fn`   | Opens a crate-relative `.theorem` file via `cap_std`, validates it through the shared schema loader, and returns one `TheoremDoc` per YAML document                |
+| `TheoremFileLoadError`                | `enum` | Typed error covering all failure modes: `OpenManifestDir`, `InvalidTheoremPath`, `ReadTheoremFile`, `EmptyTheoremFile`, `InvalidTheoremFile`                       |
+| `collision::referenced_types`         | `fn`   | Returns distinct Rust type strings referenced by `Forall`, `Actions.params`, and `Actions.returns` in deterministic first-seen order, with canonical deduplication |
 
 The proc-macro crate exposes the companion expansion boundary:
 

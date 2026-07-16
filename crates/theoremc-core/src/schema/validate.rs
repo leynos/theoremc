@@ -18,6 +18,8 @@ mod expressions;
 mod fields;
 #[path = "validate_steps.rs"]
 mod steps;
+#[path = "validate_types.rs"]
+mod types;
 
 use actions::{validate_action_signatures, validate_referenced_action_signatures};
 use evidence::validate_evidence;
@@ -27,6 +29,7 @@ use fields::{
     validate_witnesses,
 };
 use steps::{validate_do_steps, validate_let_bindings};
+use types::validate_forall_types;
 
 type ValidationResult = Result<(), ValidationFailure>;
 
@@ -56,6 +59,8 @@ fn fail(
 /// - All `WitnessCheck` fields are non-empty after trimming.
 /// - All expression fields (`Assume.expr`, `Prove.assert`, `Witness.cover`)
 ///   parse as `syn::Expr` and are not statement-like forms.
+/// - All `Forall` type strings parse as `syn::Type` and avoid free named
+///   lifetime parameters.
 /// - All `Let` binding and `Do` step `ActionCall.action` fields are non-empty
 ///   after trimming.
 /// - All `MaybeBlock.because` fields are non-empty after trimming and
@@ -78,6 +83,7 @@ pub(crate) fn validate_theorem_doc(doc: &TheoremDoc) -> ValidationResult {
     validate_witnesses(doc)?;
     validate_expressions(doc)?;
     validate_action_signatures(doc)?;
+    validate_forall_types(doc)?;
     validate_let_bindings(doc)?;
     validate_do_steps(doc)?;
     validate_referenced_action_signatures(doc)?;

@@ -1,0 +1,7 @@
+error[E0425]: cannot find type `MissingAccount` in the crate root
+  --> tests/expand/missing_referenced_type.rs:16:1
+   |
+16 | theorem_file!("tests/expand/missing_referenced_type.theorem");
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ not found in the crate root
+   |
+   = note: this error originates in the macro `theorem_file` (in Nightly builds, run with -Z macro-backtrace for more info)

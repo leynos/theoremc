@@ -14,6 +14,18 @@ Feature: theorem_file macro expansion
     Given a fixture crate with one valid multi-document theorem file
     Then the fixture crate builds all generated theorem entries without a Kani dependency
 
+  Scenario: Referenced Forall and Actions types are checked during ordinary builds
+    Given a fixture crate with declared theorem types
+    Then the fixture crate builds referenced type probes without a Kani dependency
+
+  Scenario: A missing Forall type fails ordinary compilation
+    Given a fixture crate with a missing Forall type
+    Then compiling the fixture crate fails with a missing Forall type diagnostic
+
+  Scenario: A moved Actions type fails ordinary compilation
+    Given a fixture crate with a moved Actions type
+    Then compiling the fixture crate fails with a moved Actions type diagnostic
+
   Scenario: An invalid theorem file fails compilation during macro expansion
     Given a fixture crate with one invalid theorem file
     Then compiling the fixture crate fails with an actionable theorem diagnostic

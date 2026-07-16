@@ -2,16 +2,8 @@
 
 use rstest::*;
 
+use super::super::test_support::assert_parse_error_contains;
 use super::load_theorem_docs;
-
-fn assert_parse_error_contains(yaml: &str, expected_substring: &str) {
-    let error = load_theorem_docs(yaml).expect_err("expected parser to reject fixture");
-    let message = error.to_string();
-    assert!(
-        message.contains(expected_substring),
-        "expected parse error to contain '{expected_substring}', got: {message}"
-    );
-}
 
 #[rstest]
 fn action_signatures_parse_with_ordered_params_and_default_return() {
@@ -85,9 +77,7 @@ Witness:
     );
 }
 
-#[rstest]
-fn invalid_action_signature_type_is_rejected() {
-    let yaml = r"
+const INVALID_ACTION_TYPE_YAML: &str = r"
 Theorem: InvalidSignature
 About: Declares an invalid action signature
 Actions:
@@ -106,8 +96,59 @@ Witness:
     because: always reachable
 ";
 
-    assert_parse_error_contains(
-        yaml,
-        "Actions entry 'account.deposit': amount type is not a valid Rust type",
-    );
+const FREE_LIFETIME_ACTION_YAML: &str = r#"
+Theorem: InvalidActionLifetime
+About: Declares an unbound action lifetime
+Actions:
+  account.deposit:
+    params:
+      account: "&'a crate::Account"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+"#;
+
+const FREE_LIFETIME_ACTION_RETURN_YAML: &str = r#"
+Theorem: InvalidActionReturnLifetime
+About: Declares an unbound action return lifetime
+Actions:
+  account.deposit:
+    returns: "&'a crate::DepositOutcome"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+"#;
+
+#[rstest]
+#[case(
+    INVALID_ACTION_TYPE_YAML,
+    "Actions entry 'account.deposit': amount type is not a valid Rust type"
+)]
+#[case(
+    FREE_LIFETIME_ACTION_YAML,
+    "Actions entry 'account.deposit': account type contains a free named lifetime parameter 'a'"
+)]
+#[case(
+    FREE_LIFETIME_ACTION_RETURN_YAML,
+    "Actions entry 'account.deposit': returns type contains a free named lifetime parameter 'a'"
+)]
+fn invalid_action_type_or_free_lifetime_is_rejected(
+    #[case] yaml: &str,
+    #[case] expected_fragment: &str,
+) {
+    assert_parse_error_contains(yaml, expected_fragment);
 }
