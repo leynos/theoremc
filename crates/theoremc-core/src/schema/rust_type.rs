@@ -68,13 +68,23 @@ fn free_named_lifetime_in_array(ty: &TypeArray, scope: LifetimeScope<'_>) -> Opt
 }
 
 fn free_named_lifetime_in_bare_fn(ty: &TypeBareFn, scope: LifetimeScope<'_>) -> Option<String> {
-    let scoped_lifetimes = scoped_lifetimes(scope, ty.lifetimes.as_ref());
-    let scoped_scope = LifetimeScope(&scoped_lifetimes);
+    ty.lifetimes.as_ref().map_or_else(
+        || free_named_lifetime_in_bare_fn_signature(ty, scope),
+        |lifetimes| {
+            let scoped_lifetimes = scoped_lifetimes(scope, Some(lifetimes));
+            free_named_lifetime_in_bare_fn_signature(ty, LifetimeScope(&scoped_lifetimes))
+        },
+    )
+}
 
+fn free_named_lifetime_in_bare_fn_signature(
+    ty: &TypeBareFn,
+    scope: LifetimeScope<'_>,
+) -> Option<String> {
     ty.inputs
         .iter()
-        .find_map(|arg| free_named_lifetime_in_type(&arg.ty, scoped_scope))
-        .or_else(|| free_named_lifetime_in_return_type(&ty.output, scoped_scope))
+        .find_map(|arg| free_named_lifetime_in_type(&arg.ty, scope))
+        .or_else(|| free_named_lifetime_in_return_type(&ty.output, scope))
 }
 
 fn free_named_lifetime_in_group(ty: &TypeGroup, scope: LifetimeScope<'_>) -> Option<String> {
@@ -150,13 +160,16 @@ fn free_named_lifetime_in_type_param_bound(
     scope: LifetimeScope<'_>,
 ) -> Option<String> {
     match bound {
-        syn::TypeParamBound::Trait(trait_bound) => {
-            let scoped_lifetimes = scoped_lifetimes(scope, trait_bound.lifetimes.as_ref());
-            free_named_lifetime_in_path_arguments(
-                &trait_bound.path.segments,
-                LifetimeScope(&scoped_lifetimes),
-            )
-        }
+        syn::TypeParamBound::Trait(trait_bound) => trait_bound.lifetimes.as_ref().map_or_else(
+            || free_named_lifetime_in_path_arguments(&trait_bound.path.segments, scope),
+            |lifetimes| {
+                let scoped_lifetimes = scoped_lifetimes(scope, Some(lifetimes));
+                free_named_lifetime_in_path_arguments(
+                    &trait_bound.path.segments,
+                    LifetimeScope(&scoped_lifetimes),
+                )
+            },
+        ),
         syn::TypeParamBound::Lifetime(lifetime) => {
             free_named_lifetime_name(&lifetime.ident.to_string(), scope)
         }
