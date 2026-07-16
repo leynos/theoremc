@@ -97,7 +97,9 @@ Observable success:
 
 ## Constraints
 
-- This plan must not be implemented until the user explicitly approves it.
+- This plan required explicit user approval before implementation, and that
+  approval was obtained before the 2026-06-08 implementation to match the
+  `COMPLETE` status.
 - Scope is limited to roadmap step `3.3.2`, "emit referenced-type probes for
   generated struct literal synthesis and step bindings". Do not implement
   nested struct-field introspection, struct-literal synthesis wiring into
@@ -324,6 +326,7 @@ the macro understands the theorem but does not yet emit referenced-type probes.
 Run:
 
 ```sh
+set -o pipefail
 cargo nextest run -p theoremc-macros 2>&1 \
     | tee /tmp/test-theoremc-3-3-2-macro-red.out
 ```
@@ -414,6 +417,7 @@ Add `rstest` unit coverage for:
 Run:
 
 ```sh
+set -o pipefail
 cargo nextest run -p theoremc-core 2>&1 \
     | tee /tmp/test-theoremc-3-3-2-core.out
 ```
@@ -503,6 +507,7 @@ diagnostic anchors point at the generated probe block.
 Run:
 
 ```sh
+set -o pipefail
 cargo nextest run -p theoremc-macros 2>&1 \
     | tee /tmp/test-theoremc-3-3-2-macros.out
 cargo clippy --workspace --all-targets --all-features -- -D warnings 2>&1 \
@@ -540,6 +545,7 @@ scenarios intact.
 Run:
 
 ```sh
+set -o pipefail
 cargo nextest run --test theorem_file_macro_bdd 2>&1 \
     | tee /tmp/test-theoremc-3-3-2-bdd.out
 ```
@@ -584,6 +590,7 @@ later Phase 3 and Phase 4 items unchecked.
 Run:
 
 ```sh
+set -o pipefail
 make fmt 2>&1 | tee /tmp/fmt-theoremc-3-3-2.out
 make markdownlint 2>&1 | tee /tmp/markdownlint-theoremc-3-3-2.out
 make nixie 2>&1 | tee /tmp/nixie-theoremc-3-3-2.out
@@ -597,6 +604,7 @@ the documentation and roadmap updates.
 Run the repository gates sequentially:
 
 ```sh
+set -o pipefail
 make check-fmt 2>&1 | tee /tmp/check-fmt-theoremc-3-3-2.out
 make lint 2>&1 | tee /tmp/lint-theoremc-3-3-2.out
 make test 2>&1 | tee /tmp/test-theoremc-3-3-2.out

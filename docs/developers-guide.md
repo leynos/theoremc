@@ -164,6 +164,10 @@ then `Actions.returns`, with canonical-token-stream deduplication.
 `schema::rust_type::{parse, canonical_token_stream, parse_with_free_named_lifetime}`
 owns Rust type parsing and comparison so schema validation, action signature
 equivalence, and macro probe generation do not drift apart.
+`parse_with_free_named_lifetime` parses once and performs the schema-validation
+lifetime analysis for free named lifetime parameters. The macro renderer still
+uses `syn::parse_str` directly for probe emission rather than routing through
+the shared parser.
 
 Macro tests should keep the layers distinct:
 
