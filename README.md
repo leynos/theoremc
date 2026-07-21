@@ -1,5 +1,8 @@
 # Theorem Compiler
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](
+https://deepwiki.com/leynos/theoremc)
+
 theoremc is a Rust workspace for compile-time theorem validation via
 [Kani](https://github.com/model-checking/kani).
 
