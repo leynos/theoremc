@@ -6,3 +6,6 @@ target/
 .memdb/
 .claude/
 *:Zone.Identifier
+.vtcode/
+*.swo
+*~
