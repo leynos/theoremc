@@ -12,7 +12,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde-saphyr = "1.0.1"
 indexmap = { version = "2.13.0", features = ["serde"] }
 thiserror = "2.0.18"
-syn = { version = "2.0.117", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
+syn = { version = "3.0.3", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
 quote = "1.0.45"
 proc-macro2 = "1.0.106"
 blake3 = "1.8.3"
