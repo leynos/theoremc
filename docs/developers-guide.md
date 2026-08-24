@@ -352,6 +352,34 @@ When theorem expansion behaviour changes, prefer testing it in two layers:
 1. direct proc-macro unit tests in `crates/theoremc-macros`, and
 2. fixture-crate behavioural tests in `tests/theorem_file_macro_bdd.rs`.
 
+### 3.7 `cargo theorem` application boundary
+
+The planned [`cargo theorem` CLI design](cargo-theorem-cli-design.md) adds a
+dedicated `crates/cargo-theorem/` application package. It owns the Cargo
+external-subcommand entry point, OrthoConfig command and configuration types,
+dispatch, application rendering, and exit-code mapping. Reusable theorem,
+project, execution, and report services remain in library packages rather than
+moving into the CLI.
+
+The CLI has a separate MSRV from the libraries because OrthoConfig 0.9.0
+requires Rust 1.89. The library packages, including the root `theoremc` crate,
+remain on Rust 1.88 until a separate compatibility decision changes that
+policy. Validate the split independently with `cargo +1.88 check
+--workspace --exclude cargo-theorem` and `cargo +1.89 check -p cargo-theorem`.
+
+Backend integration uses narrow ports. Backend lifecycle concerns (discovery,
+resolution, installation, and health checks) must remain separate from backend
+execution and replay concerns. A shared command-runner abstraction owns
+argument-vector process creation, timeout and cancellation handling, output
+capture, and test doubles; providers supply backend-specific plans and parsers.
+
+Build integration belongs to the reusable `theoremc-build` boundary. It owns
+theorem discovery, suite rendering, and the planned Cargo manifest and
+`build.rs` integration services. The injector may update a project, while
+`build-script run` calls the reusable service directly. Commands that invoke
+Cargo, such as `check --compile` and `run`, execute the package's normal
+`build.rs`; their plans and context must make that side effect explicit.
+
 ## 4. Filesystem and path conventions
 
 The crate uses `cap_std` and `camino` in place of `std::fs` and `std::path` for

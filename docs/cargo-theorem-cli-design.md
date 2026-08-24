@@ -150,6 +150,8 @@ flowchart LR
     O --> CI["Markdown, HTML, JUnit, Cucumber"]
 ```
 
+*Figure 1: Application, project, runner, backend, and output boundaries.*
+
 The initial crate responsibilities are:
 
 | Package | Responsibility |
@@ -160,6 +162,8 @@ The initial crate responsibilities are:
 | `theoremc-runner` | Backend provider interface, command execution abstraction, canonical run records, run ledger, replay orchestration |
 | `theoremc-report` | Markdown, HTML, JUnit XML, Cucumber JSON, and canonical JSON report rendering |
 | `theoremc-macros` | Compile-time theorem expansion and generated backend harnesses |
+
+*Table 1: Initial package responsibilities and dependency boundaries.*
 
 `theoremc-build`, `theoremc-runner`, and `theoremc-report` may begin as
 feature-grouped modules while their interfaces settle. They must nevertheless
@@ -303,7 +307,7 @@ The first stable command tree is:
 cargo theorem init
 cargo theorem list
 cargo theorem get <theorem-id>
-cargo theorem create <theorem-id>
+cargo theorem create <theorem-name>
 cargo theorem action list
 cargo theorem action get <action-name>
 cargo theorem action create <action-name>
@@ -314,7 +318,7 @@ cargo theorem build-script run
 cargo theorem build-script delete
 cargo theorem generate
 cargo theorem run
-cargo theorem replay <run-id>
+cargo theorem replay <run-id> [--id <theorem-id>]
 cargo theorem report create <run-id>
 cargo theorem backend list
 cargo theorem backend get <backend>
@@ -349,9 +353,9 @@ CLI does not stutter as `cargo theorem theorem list`.
 | `init` | Add theoremc project integration | Yes | Not applicable | `--dry-run`; `--force` only for conflicts |
 | `list` | List theorem metadata | Yes | `--limit`, `--cursor` | Read-only |
 | `get` | Read one theorem and its resolved metadata | Yes | One resource | Read-only |
-| `create` | Scaffold a theorem document | Yes | One resource | `--dry-run`; refuses overwrite without `--force` |
+| `create` | Scaffold a theorem document | Yes | One resource | `--dry-run`; refuses to overwrite without `--force` |
 | `action *` | Inspect or scaffold action bindings | Yes | Lists are paginated | Mutations support `--dry-run` |
-| `check` | Validate sources, aliases, integration, and configured backend availability | Yes | Summary plus artefact paths | Read-only; never installs |
+| `check` | Validate sources, aliases, integration, and configured backend availability | Yes | Summary plus artefact paths | Read-only by default; `--compile` is effectful; never installs |
 | `build-script *` | Manage or execute build integration | Yes | One package per mutation | Mutations support `--dry-run` and atomic writes |
 | `generate` | Render suite, harness, or metadata output | Yes | Selected theorems only | Writes only through `--deliver` |
 | `run` | Execute selected theorem evidence | Yes | Filtered selection and bounded summaries | Records a run; never installs |
@@ -362,6 +366,8 @@ CLI does not stutter as `cargo theorem theorem list`.
 | `profile *` | Manage named configuration overlays | Yes | Profile list is paginated | Save/delete support `--dry-run`; delete needs `--force` |
 | `context` | Emit compact command context | Required | Versioned compact schema | Read-only and project-independent |
 | `feedback` | Record CLI friction | Yes | One record | Local append; optional delivery is explicit |
+
+*Table 2: Command effects, response bounds, and mutation guards.*
 
 ## 8. Global application contracts
 
@@ -382,12 +388,21 @@ Data-returning commands support `--json`. In JSON mode:
 
 - success writes exactly one JSON document to stdout and nothing to stderr;
 - failure writes no stdout and exactly one JSON diagnostic document to stderr;
+- `result` is present only for a successful command and contains command data;
+- `error` is present only for a failed command and contains its diagnostic;
+- `result` and `error` are mutually exclusive and absent from envelopes whose
+  status is neither `success` nor `error`;
 - progress, subprocess output, and tracing logs are captured rather than
   inherited;
 - the result includes paths to full logs and artefacts instead of embedding
   unbounded output; and
 - schema identifiers, diagnostic codes, exit classes, backend names, and status
   values are never localized.
+
+`--json --deliver stdout` is invalid. It returns one usage-error JSON diagnostic
+on stderr and does not deliver the report or generated source, preserving stdout
+for exactly one JSON document. JSON callers must use a file or another
+supported delivery target.
 
 Human mode writes primary output to stdout and diagnostics or progress to
 stderr. The global renderer options follow OrthoConfig's glossary:
@@ -413,7 +428,8 @@ JSON on stdout.
 ### 8.3 JSON envelope
 
 All application JSON documents use a versioned envelope. Command-specific data
-lives under `result`.
+lives under `result` for successful commands only. Failure diagnostics live under
+`error` for failed commands only; the two fields are mutually exclusive.
 
 ```json
 {
@@ -435,10 +451,12 @@ lives under `result`.
         "path": ".theoremc/runs/01J6Y7ZKQ9Y8W13Q2H4ST8X9N7/run.json"
       }
     ]
-  },
-  "warnings": []
+  }
 }
 ```
+
+The success example contains command data only in `result`; the failure example
+contains its diagnostic only in `error`. An envelope never includes both.
 
 Errors use the same versioning discipline and enumerate known choices when
 applicable:
@@ -479,6 +497,8 @@ The stable application exit codes are:
 | `8` | `external_tool_failure` | Cargo, Rustup, or a backend failed outside a parsed proof result |
 | `9` | `delivery_failure` | Execution succeeded but an explicitly requested delivery target failed |
 | `10` | `internal` | The CLI violated an invariant or encountered an unclassified failure |
+
+*Table 3: Stable application exit classes and their process exit codes.*
 
 Backend-native exit codes are recorded in run data and diagnostics. The
 high-level CLI never leaks them as its own unstable taxonomy. The low-level
@@ -524,9 +544,19 @@ workspace-local lock and retain a recovery journal until all renames complete.
 
 ### 9.2 Theorem scaffolding
 
-`cargo theorem create <theorem-id>` creates one valid `.theorem` document. It
+`cargo theorem create <theorem-name>` creates one valid `.theorem` document. The
+positional value is the theorem's name (`T`), not its canonical external ID. It
 accepts `--about`, `--backend`, `--tag`, `--path`, and `--template`. Without an
-explicit path, it derives a normalized file name under `theorems/`.
+explicit path, it derives `theorems/<normalized-name>.theorem`. The canonical
+external ID is then `{normalized_path(P)}#<theorem-name>`, where `P` is the
+created path; callers use that ID with `get` and stable-ID selectors.
+
+An explicit `--path` is resolved relative to the selected workspace when it is
+not absolute. Before any file is written, theoremc canonicalizes the workspace
+root and the path (resolving existing symlinks), then verifies that the target
+remains within the canonical workspace. The default `theorems/` path receives
+the same containment check. External paths are not supported, so there is no
+escape hatch from this guard.
 
 The scaffold contains no invented business property. It includes explicit
 placeholders represented as schema-valid documentary text and refuses to claim
@@ -599,11 +629,12 @@ manifest entry or source reference still needs the dependency.
 
 ### 10.3 `check` and `generate`
 
-Top-level `check` composes schema validation, alias validation,
-action-signature checks, build-script checks, and non-installing backend
-pin checks. It may invoke
-`cargo check` when `--compile` is selected. Network access and installation are
-always out of scope.
+Top-level `check` composes schema validation, alias validation, action-signature
+checks, build-script checks, and non-installing backend pin checks. The default
+command is read-only. `check --compile` is an explicit effectful command
+boundary: Cargo may execute the package's arbitrary `build.rs`, so its plan and
+agent context classify it separately from read-only validation. Network access
+and backend installation remain out of scope in both modes.
 
 `generate` exposes deterministic internal artefacts for diagnosis and tooling:
 
@@ -666,6 +697,31 @@ a key with an identical input digest returns the existing job. Reusing it with
 different inputs fails and reports both digests. `--force-new` creates a new job
 while retaining the relationship to the prior run.
 
+#### Concurrency and task ownership
+
+The workspace lock covers mutation plans, idempotency reservations, and the
+append-only run index. A per-run lock covers that run's plan, record, and
+artefacts. Lock acquisition has one order—workspace, then run—and code never
+acquires them in reverse. Each acquisition has a bounded timeout and reports
+the current owner and lock path on timeout; a stale owner is recoverable only
+through startup reconciliation, not by silently breaking the lock.
+
+Idempotency reservation and run creation are one atomic critical section. The
+reservation stores the key, input digest, and job ID before any child process is
+spawned. A matching reservation returns that job; a conflicting digest fails
+without starting work. Reservation state is committed before the command
+returns, including for `--no-wait`.
+
+Every detached task owns its process group, temporary files, and run directory.
+Cancellation records intent, stops theoremc-owned descendants, and waits a
+bounded grace period before forcefully terminating that group. Shutdown stops
+new submissions, waits for owned tasks up to the configured deadline, and then
+cleans temporary files while retaining logs and the final run record. Startup
+reconciliation marks tasks whose owner crashed as `interrupted`, releases
+their leases, and preserves their partial artefacts. Each theorem/backend
+outcome is persisted atomically, so a partial failure retains completed
+outcomes and a bounded diagnostic for unfinished work.
+
 ### 11.3 Canonical run record
 
 The run record absorbs the reporting model previously assigned to `theoremd`.
@@ -677,7 +733,7 @@ It includes:
 - selected theorem IDs and alias resolutions;
 - theorem metadata, assumptions, steps, assertions, witnesses, and evidence;
 - backend, harness, command arguments, native exit code, and bounded log
-  previews;
+  previews, with sensitive argument values redacted;
 - expected and actual statuses with policy decisions;
 - counterexample and playback artefacts;
 - stable diagnostic codes, arguments, English fallback text, and optional
@@ -687,6 +743,14 @@ It includes:
 The canonical record is deterministic apart from fields explicitly documented
 as run identity or wall-clock data. Report renderers consume it and never parse
 human terminal output.
+
+Repeated `--backend-arg` values are parsed as typed `BackendArgument` entries
+with an explicit `public` or `secret` sensitivity. Provider schemas classify
+known arguments, and undeclared arguments are rejected rather than guessed. The
+original secret value is supplied to the injected runner only in memory; it is
+replaced with `<redacted>` before command metadata, provenance, tracing logs,
+or run-record persistence. Public argument names and values remain available
+for reproducibility.
 
 ### 11.4 Reports and replay
 
@@ -705,35 +769,47 @@ pattern. Machine-facing formats retain stable codes and English fallback text.
 Localized strings are optional projections and do not replace invariant fields.
 
 `replay <run-id>` selects a failed theorem and delegates to the owning backend's
-replay capability. Kani concrete playback is the first implementation. The
-result is a child run with links to the original counterexample, generated
-playback source, command line, and logs. Replaying never rewrites application
-source unless a future explicit `--apply` workflow is separately designed.
+replay capability. With one replayable failure, the selector is implicit. When
+the source run has multiple replayable failures, `--id <theorem-id>` is
+required; omitting it fails with a bounded list of valid failed IDs. An ID that
+is not in that list is also a bounded usage diagnostic. Kani concrete playback
+is the first implementation. The result is a child run with links to the
+original counterexample, generated playback source, command line, and logs.
+Replaying never rewrites application source unless a future explicit `--apply`
+workflow is separately designed.
 
 ## 12. Proof backend management
 
 ### 12.1 Provider interface
 
-Backends implement a library-owned capability interface rather than adding
-ad-hoc CLI branches:
+Backends implement narrow, library-owned capability interfaces rather than
+adding ad-hoc CLI branches:
 
 ```rust
-pub trait BackendProvider {
+pub trait BackendLifecycle {
     fn descriptor(&self) -> BackendDescriptor;
     fn discover(&self, context: &BackendContext) -> Result<Installation, BackendError>;
     fn resolve(&self, request: &VersionRequest) -> Result<ResolvedRelease, BackendError>;
     fn plan_install(&self, release: &ResolvedRelease) -> Result<InstallPlan, BackendError>;
     fn check(&self, installation: &Installation) -> Result<CheckResult, BackendError>;
+}
+
+pub trait BackendExecution {
     fn plan_run(&self, request: &BackendRunRequest) -> Result<CommandSpec, BackendError>;
     fn parse_run(&self, output: &CommandOutput) -> Result<BackendRunResult, BackendError>;
+}
+
+pub trait BackendReplay {
     fn plan_replay(&self, request: &ReplayRequest) -> Result<CommandSpec, BackendError>;
 }
 ```
 
-The trait is illustrative rather than a frozen Rust API, but the separation is
-normative. Providers construct argument vectors, never shell command strings.
-One injected command runner owns process creation, timeouts, cancellation,
-stdout/stderr capture, and test doubles.
+These traits are illustrative rather than a frozen Rust API, but the separation
+is normative. Providers construct argument vectors, never shell command strings,
+and every operation that discovers, plans, executes, or parses remains fallible.
+One injected command runner owns the process boundary, timeouts, cancellation,
+stdout/stderr capture, and test doubles; lifecycle code does not spawn processes
+directly.
 
 Descriptors declare capabilities such as installation, theorem-suite execution,
 raw proof-file execution, replay, supported hosts, and required Rust toolchains.
@@ -889,6 +965,11 @@ Commands that create artefacts accept:
 --deliver webhook:<url>
 ```
 
+`--deliver stdout` is supported only in human/plain mode. Combining it with
+`--json` is a usage error, because JSON mode reserves stdout for exactly one
+JSON document; JSON callers must select `file:<path>` or another supported
+non-stdout target.
+
 The local implementation must ship before webhook delivery. File delivery is
 atomic. Unknown schemes enumerate supported values. Webhook delivery, when
 implemented, reports HTTP status, retryability, and whether the local canonical
@@ -945,6 +1026,8 @@ schema.
 | Persistent profiles | Named overlays merge between project files and environment variables; secrets are redacted from context |
 | Two-way I/O | `--deliver` routes artefacts and `feedback` records friction through explicit, inspectable contracts |
 
+*Table 4: Agent-native principles mapped to CLI contracts.*
+
 ## 16. Security and trust boundaries
 
 Backend installation and execution cross a supply-chain boundary. The CLI must:
@@ -954,7 +1037,9 @@ Backend installation and execution cross a supply-chain boundary. The CLI must:
 - reject archive paths that escape the staging directory;
 - use bounded download size, connection timeout, and total timeout;
 - avoid shell interpolation and execute only argument vectors;
-- redact environment values and configured secrets from logs and run records;
+- redact environment values, configured secrets, and typed secret
+  `--backend-arg` values from command metadata, provenance, logs, and run
+  records;
 - distinguish project-trusted configuration from command-line overrides;
 - never execute a newly discovered project hook during `list`, `get`,
   `context`, or a dry run; and
@@ -993,6 +1078,14 @@ The CLI requires these test layers:
   `build.rs` files;
 - fake command-runner tests for Cargo, Rustup, Kani, and Verus without process
   globals or environment mutation;
+- concurrency tests for simultaneous submissions, atomic idempotency
+  reservation, and lock contention or timeout;
+- cancellation and shutdown tests for owned process trees, bounded grace
+  periods, and temporary-file cleanup;
+- crash-recovery tests for orphaned tasks, lease release, and retained partial
+  records; and
+- partial-failure tests for atomic theorem/backend outcomes and bounded
+  unfinished-work diagnostics;
 - end-to-end tests invoking `cargo-theorem` through Cargo's external-subcommand
   convention;
 - schema validation for canonical JSON, JUnit XML, and Cucumber JSON;
