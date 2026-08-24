@@ -1533,9 +1533,21 @@ dependencies = [
  "syn 3.0.6",
  "tempfile",
  "test-helpers",
+ "theoremc-build-support",
  "theoremc-core",
  "theoremc-macros",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "theoremc-build-support"
+version = "0.1.0"
+dependencies = [
+ "camino",
+ "cap-std 4.0.2",
+ "rstest",
+ "tempfile",
+ "thiserror 2.0.20",
 ]
 
 [[package]]
