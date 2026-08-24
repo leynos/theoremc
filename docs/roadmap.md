@@ -308,12 +308,12 @@ Out of scope: runtime reflection.
   Acceptance: compile-fail tests validate predictable drift diagnostics.
   Signposts: `DES-7`, `DES-5`.
 
-## Phase 3A: `cargo theorem` foundation and project integration
+## Phase 3.1: `cargo theorem` foundation and project integration
 
 Outcome: theoremc has one Cargo-native, agent-readable entry point for project
 inspection, scaffolding, build integration, and proof-backend management.
 
-### Step 3A.1: establish the Cargo subcommand and OrthoConfig spine
+### Step 3.1.1: establish the Cargo subcommand and OrthoConfig spine
 
 Dependencies: phase 1 and step 3.1.
 
@@ -347,9 +347,9 @@ Out of scope: theorem execution and project mutation.
   pagination rule, and exit class without reading project state or the network.
   Signposts: `CLI-DES`.
 
-### Step 3A.2: implement Cargo project discovery and read-only commands
+### Step 3.1.2: implement Cargo project discovery and read-only commands
 
-Dependencies: step 3A.1 and phases 1 to 3.
+Dependencies: step 3.1.1 and phases 1 to 3.
 
 In scope: Cargo metadata, package selection, theorem/action inspection, bounded
 results, and composed project checks.
@@ -373,9 +373,9 @@ Out of scope: modifying project files or installing proof tools.
   component produces a stable diagnostic code and application exit class.
   Signposts: `CLI-DES`, `DES-6`, `DES-7`.
 
-### Step 3A.3: implement mutation plans, scaffolding, and build integration
+### Step 3.1.3: implement mutation plans, scaffolding, and build integration
 
-Dependencies: step 3A.2 and phase 3.
+Dependencies: step 3.1.2 and phase 3.
 
 In scope: reusable build services, atomic project plans, theorem/action
 scaffolding, and managed `build.rs` integration.
@@ -409,9 +409,9 @@ Out of scope: arbitrary Rust source repair and proof generation from prose.
   generation matches build-script output byte for byte for the same inputs.
   Signposts: `CLI-DES`, `DES-7`.
 
-### Step 3A.4: implement backend providers and prover-tool parity
+### Step 3.1.4: implement backend providers and prover-tool parity
 
-Dependencies: step 3A.1. This step may proceed in parallel with phase 4, but
+Dependencies: step 3.1.1. This step may proceed in parallel with phase 4, but
 high-level theorem execution depends on both.
 
 In scope: provider capabilities, lock data, managed installations, Kani and
@@ -445,9 +445,9 @@ Out of scope: backend-neutral theorem lowering beyond Kani.
   diagnostics identify the replacement setting, and `--passthrough-exit-code`
   is isolated as an advanced compatibility option. Signposts: `CLI-DES`.
 
-### Step 3A.5: validate the public CLI contract
+### Step 3.1.5: validate the public CLI contract
 
-Dependencies: steps 3A.1 to 3A.4.
+Dependencies: steps 3.1.1 to 3.1.4.
 
 In scope: public help, context, JSON schemas, bounded behaviour, mutation
 safety, migration parity, and agent-native policy.
@@ -539,7 +539,7 @@ IDs across renames and moves.
 
 ### Step 5.0: implement theorem execution orchestration and the run ledger
 
-Dependencies: phase 4 and steps 3A.2 to 3A.4.
+Dependencies: phase 4, steps 3.1.2 to 3.1.4, and step 5.2.
 
 In scope: theorem selection, immutable execution plans, backend orchestration,
 policy application, durable jobs, idempotency, and stable application outcomes.
@@ -599,7 +599,7 @@ Out of scope: dashboard hosting.
 
 ### Step 5.2: implement stable external theorem IDs and alias migration
 
-Dependencies: phase 4 and step 3A.2.
+Dependencies: phase 4 and step 3.1.2.
 
 In scope: canonical ID generation, alias graph loading, cycle detection, and
 resolution semantics.
@@ -620,7 +620,7 @@ Out of scope: automatic alias file editing.
 
 ### Step 5.3: implement counterexample playback integration
 
-Dependencies: steps 5.0 and 5.1, plus step 3A.4.
+Dependencies: steps 5.0 and 5.1, plus step 3.1.4.
 
 In scope: Kani failure replay orchestration and report attachment of playback
 artefacts.
@@ -638,7 +638,7 @@ Out of scope: automated source rewriting workflows.
 
 ### Step 5.4: implement profiles, delivery, feedback, and migration completion
 
-Dependencies: steps 3A.5 and 5.1. Reusable OrthoConfig contracts are preferred;
+Dependencies: steps 3.1.5 and 5.1. Reusable OrthoConfig contracts are preferred;
 tracked temporary adapters may cover soft dependencies until they ship.
 
 In scope: persistent configuration overlays, artefact routing, local feedback,
@@ -798,12 +798,14 @@ Out of scope: parser keyword localization.
 - [ ] Keep proc-macro and code-generation diagnostics deterministic English.
   Acceptance: compile-fail and snapshot tests confirm output stability across
   host locale changes. Signposts: `DES-6.5`, `ADR2-4`.
-- [ ] Extend `cargo theorem` outputs to always include stable diagnostic code
-  and arguments, include required English fallback text, and attach localized
-  text only when a localizer is configured. Acceptance: application JSON and
-  report snapshots for Markdown, HTML, JUnit XML, and Cucumber JSON confirm
-  invariant machine fields and optional localized projection fields.
-  Signposts: `DES-9`, `DES-6.5`, `ADR2-2`, `ADR2-4`, `CLI-DES`.
+- [ ] Extend `cargo theorem` diagnostic objects to always include stable
+  diagnostic code and arguments, include required English fallback text, and
+  attach localized text only when a localizer is configured. Acceptance:
+  application JSON and report snapshots for Markdown, HTML, JUnit XML, and
+  Cucumber JSON confirm invariant machine fields on diagnostic objects and
+  optional localized projection fields; successful envelopes do not require
+  diagnostic fields. Signposts: `DES-9`, `DES-6.5`, `ADR2-2`, `ADR2-4`,
+  `CLI-DES`.
 - [ ] Add locale-determinism regression tests proving machine-facing artefacts
   are identical across locales while localized human-facing strings vary only
   in localized fields. Signposts: `DES-9`, `DES-6.5`, `ADR2-4`.
@@ -826,13 +828,14 @@ Out of scope: implementation of localized theorem schema keys.
 
 - Execute phases in order, except where the dependencies below explicitly
   permit parallel work.
-- Complete steps 3A.1 and 3A.2 after the existing compile-time foundation;
-  step 3A.4 may proceed in parallel with phase 4 because tool management does
+- Complete steps 3.1.1 and 3.1.2 after the existing compile-time foundation;
+  step 3.1.4 may proceed in parallel with phase 4 because tool management does
   not depend on completed theorem lowering.
 - Do not implement high-level `cargo theorem run` until both Kani execution
   semantics and the backend provider/pin-check contracts are stable.
-- Do not start report rendering or alias migration before the Kani execution
-  model is stable and the canonical run ledger exists.
+- Do not start report rendering before the Kani execution model is stable and
+  the canonical run ledger exists; complete alias migration before alias-aware
+  selection tests or execution.
 - Treat vacuity policy implementation as a release gate, not an optional
   enhancement.
 - Keep backend installation explicit: `check`, `build-script run`, and top-level
