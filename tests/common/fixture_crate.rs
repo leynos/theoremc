@@ -12,11 +12,25 @@ use super::ExpectedFragment;
 /// Source for the repository build script copied into fixture crates.
 pub const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
 
-/// Source for build-time theorem discovery copied into fixture crates.
-pub const BUILD_DISCOVERY_SOURCE: &str = include_str!("../../src/build_discovery.rs");
+/// Manifest for the internal build-support crate copied into fixture crates.
+pub const BUILD_SUPPORT_CARGO_TOML: &str =
+    include_str!("../../crates/theoremc-build-support/Cargo.toml");
 
-/// Source for build-time theorem-suite generation copied into fixture crates.
-pub const BUILD_SUITE_SOURCE: &str = include_str!("../../src/build_suite.rs");
+/// Root source for the internal build-support crate copied into fixture crates.
+pub const BUILD_SUPPORT_LIB_SOURCE: &str =
+    include_str!("../../crates/theoremc-build-support/src/lib.rs");
+
+/// Build-script source for the internal build-support crate copied into fixtures.
+pub const BUILD_SUPPORT_BUILD_SCRIPT_SOURCE: &str =
+    include_str!("../../crates/theoremc-build-support/src/build_script.rs");
+
+/// Discovery source for the internal build-support crate copied into fixtures.
+pub const BUILD_DISCOVERY_SOURCE: &str =
+    include_str!("../../crates/theoremc-build-support/src/discovery.rs");
+
+/// Suite source for the internal build-support crate copied into fixtures.
+pub const BUILD_SUITE_SOURCE: &str =
+    include_str!("../../crates/theoremc-build-support/src/suite.rs");
 
 /// Minimal valid theorem document used by build-script fixture crates.
 pub const TRIVIAL_THEOREM: &str = concat!(
@@ -65,10 +79,25 @@ impl FixtureCrate {
         fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
         fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
         fixture.write(
-            Utf8Path::new("src/build_discovery.rs"),
+            Utf8Path::new("build-support/Cargo.toml"),
+            &fixture_build_support_cargo_toml(),
+        )?;
+        fixture.write(
+            Utf8Path::new("build-support/src/lib.rs"),
+            BUILD_SUPPORT_LIB_SOURCE,
+        )?;
+        fixture.write(
+            Utf8Path::new("build-support/src/build_script.rs"),
+            BUILD_SUPPORT_BUILD_SCRIPT_SOURCE,
+        )?;
+        fixture.write(
+            Utf8Path::new("build-support/src/discovery.rs"),
             BUILD_DISCOVERY_SOURCE,
         )?;
-        fixture.write(Utf8Path::new("src/build_suite.rs"), BUILD_SUITE_SOURCE)?;
+        fixture.write(
+            Utf8Path::new("build-support/src/suite.rs"),
+            BUILD_SUITE_SOURCE,
+        )?;
 
         Ok(fixture)
     }
@@ -252,6 +281,10 @@ impl FixtureCrate {
         filetime::set_file_mtime(&absolute_path, FileTime::from_system_time(advanced_mtime))
             .map_err(|error| error.to_string())
     }
+}
+
+fn fixture_build_support_cargo_toml() -> String {
+    BUILD_SUPPORT_CARGO_TOML.replace("\n[lints]\nworkspace = true\n", "\n")
 }
 
 /// Combined stdout and stderr emitted by a fixture `cargo build` run.

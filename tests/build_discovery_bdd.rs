@@ -2,26 +2,19 @@
 
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{ExpectedFragment, FixtureCrate, TRIVIAL_THEOREM, toml_section};
-
-const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
+use test_helpers::{ExpectedFragment, FixtureCrate, TRIVIAL_THEOREM};
 const FIXTURE_LIB_RS: &str = "//! Fixture crate for build discovery behavioural tests.\n";
 
-fn fixture_cargo_toml() -> Result<String, String> {
-    let build_dependencies = toml_section(ROOT_CARGO_TOML, "build-dependencies")
-        .ok_or_else(|| "root Cargo.toml is missing [build-dependencies]".to_owned())?;
-
-    Ok(format!(
-        concat!(
-            "[package]\n",
-            "name = \"build_discovery_fixture\"\n",
-            "version = \"0.1.0\"\n",
-            "edition = \"2024\"\n\n",
-            "[build-dependencies]\n",
-            "{build_dependencies}",
-        ),
-        build_dependencies = build_dependencies
-    ))
+fn fixture_cargo_toml() -> String {
+    concat!(
+        "[package]\n",
+        "name = \"build_discovery_fixture\"\n",
+        "version = \"0.1.0\"\n",
+        "edition = \"2024\"\n\n",
+        "[build-dependencies]\n",
+        "theoremc-build-support = { path = \"build-support\" }\n",
+    )
+    .to_owned()
 }
 
 /// Precondition stub; the nested theorem fixture is created in the `then` step.
@@ -31,7 +24,7 @@ fn given_a_crate_with_nested_theorem_files() {}
 #[then("building twice stays fresh and editing a theorem reruns the build script")]
 fn then_building_twice_stays_fresh_and_editing_a_theorem_reruns_the_build_script()
 -> Result<(), String> {
-    let fixture = FixtureCrate::new(&fixture_cargo_toml()?, FIXTURE_LIB_RS)?;
+    let fixture = FixtureCrate::new(&fixture_cargo_toml(), FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new("theorems/root.theorem"), TRIVIAL_THEOREM)?;
     fixture.write(
         Utf8Path::new("theorems/nested/alpha.theorem"),
@@ -81,7 +74,7 @@ fn given_a_crate_with_ignored_non_theorem_files_under_theorems() {}
 
 #[then("the build script emits only theorem inputs")]
 fn then_the_build_script_emits_only_theorem_inputs() -> Result<(), String> {
-    let fixture = FixtureCrate::new(&fixture_cargo_toml()?, FIXTURE_LIB_RS)?;
+    let fixture = FixtureCrate::new(&fixture_cargo_toml(), FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new("theorems/kept.theorem"), TRIVIAL_THEOREM)?;
     fixture.write(Utf8Path::new("theorems/ignored.txt"), "not a theorem")?;
 
@@ -108,7 +101,7 @@ fn given_a_crate_without_a_theorems_directory() {}
 #[then("creating theorems later reruns the build script without manual seeding")]
 fn then_creating_theorems_later_reruns_the_build_script_without_manual_seeding()
 -> Result<(), String> {
-    let fixture = FixtureCrate::new(&fixture_cargo_toml()?, FIXTURE_LIB_RS)?;
+    let fixture = FixtureCrate::new(&fixture_cargo_toml(), FIXTURE_LIB_RS)?;
 
     let first_build = fixture.cargo_build_log()?;
     if !first_build.ran() {

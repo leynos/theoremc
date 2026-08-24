@@ -17,7 +17,7 @@ const THEOREMS_DIR: &str = "theorems";
 
 /// Ordered theorem inputs plus the directories Cargo should watch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct BuildDiscovery {
+pub struct BuildDiscovery {
     theorem_files: Vec<Utf8PathBuf>,
     watched_directories: Vec<Utf8PathBuf>,
 }
@@ -42,33 +42,41 @@ impl BuildDiscovery {
     }
 
     /// Returns the discovered theorem files in deterministic order.
-    pub(crate) fn theorem_files(&self) -> impl Iterator<Item = &Utf8Path> {
+    pub fn theorem_files(&self) -> impl Iterator<Item = &Utf8Path> {
         self.theorem_files.iter().map(Utf8PathBuf::as_path)
     }
 
     /// Returns the watched directories in deterministic order.
-    pub(crate) fn watched_directories(&self) -> impl Iterator<Item = &Utf8Path> {
+    pub fn watched_directories(&self) -> impl Iterator<Item = &Utf8Path> {
         self.watched_directories.iter().map(Utf8PathBuf::as_path)
     }
 
     /// Returns the exact rerun path order emitted by `build.rs`.
-    pub(crate) fn rerun_paths(&self) -> impl Iterator<Item = &Utf8Path> {
+    pub fn rerun_paths(&self) -> impl Iterator<Item = &Utf8Path> {
         self.watched_directories().chain(self.theorem_files())
     }
 }
 
 /// Filesystem-traversal failures during build discovery.
 #[derive(Debug, Error)]
-pub(crate) enum BuildDiscoveryError {
+pub enum BuildDiscoveryError {
+    /// An I/O operation failed while inspecting the theorem tree.
     #[error("could not {operation} '{path}': {source}")]
     Io {
+        /// A stable description of the operation that failed.
         operation: &'static str,
+        /// The crate-relative path involved in the failed operation.
         path: Utf8PathBuf,
+        /// The underlying filesystem error.
         #[source]
         source: io::Error,
     },
+    /// The `theorems` path exists but is not a directory.
     #[error("theorem root '{path}' exists but is not a directory")]
-    TheoremRootNotDirectory { path: Utf8PathBuf },
+    TheoremRootNotDirectory {
+        /// The crate-relative path that must be a directory.
+        path: Utf8PathBuf,
+    },
 }
 
 /// Discovers theorem files below `CARGO_MANIFEST_DIR/theorems`.
@@ -82,7 +90,7 @@ pub(crate) enum BuildDiscoveryError {
 /// Returns [`BuildDiscoveryError`] when the crate root cannot be opened or the
 /// theorem tree cannot be traversed. An absent `theorems/` directory is not an
 /// error; it returns a root-only watch set.
-pub(crate) fn discover_theorem_inputs(
+pub fn discover_theorem_inputs(
     manifest_dir: &Utf8Path,
 ) -> Result<BuildDiscovery, BuildDiscoveryError> {
     let crate_root = Dir::open_ambient_dir(manifest_dir, ambient_authority())
@@ -195,5 +203,5 @@ fn io_err(operation: &'static str, path: &Utf8Path, source: io::Error) -> BuildD
 }
 
 #[cfg(test)]
-#[path = "build_discovery_tests.rs"]
+#[path = "discovery_tests.rs"]
 mod tests;
