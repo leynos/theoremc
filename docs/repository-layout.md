@@ -59,8 +59,13 @@ owned by the workspace crates.
 | `docs/developers-guide.md`           | Maintainer workflows, quality gates, and internal conventions           |
 | `docs/theorem-file-specification.md` | Normative `.theorem` schema and semantics reference                     |
 | `docs/theoremc-design.md`            | Architecture, design rationale, and current versus planned system shape |
-| `docs/adr-*.md`                      | Architecture Decision Records (ADRs)                                    |
+| `docs/adr-*.md`                      | Accepted Architecture Decision Records (ADRs)                           |
+| `docs/rfcs/`                         | Language and architecture Requests for Comments (RFCs)                  |
 | `docs/execplans/`                    | Living implementation plans and milestone records                       |
+
+An RFC defines a substantial proposed or accepted language and architecture
+change. An ADR records the decision and constraints that govern implementation.
+An ExecPlan translates accepted decisions into executable milestones.
 
 Update this file and `docs/contents.md` when a directory gains a new durable
 responsibility or when documentation moves.
