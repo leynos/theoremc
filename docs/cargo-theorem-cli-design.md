@@ -517,6 +517,34 @@ the canonical run artefact. JSON summaries contain bounded arrays and explicit
 counts. Full backend logs are stored as artefacts and retrieved through a
 specific `jobs get` request with an explicit byte limit.
 
+### 8.6 Resource limits and retention
+
+The following are hard default resource and retention limits. Configuration may
+lower a limit, but may not raise one until a future compatibility decision
+changes this contract:
+
+- a run may select and persist at most 500 theorem outcomes;
+- each backend process may retain at most 16 MiB of stdout and 16 MiB of
+  stderr;
+- a run may retain at most 256 MiB and 1,000 artefacts in total, and each
+  generated report, replay artefact, or partial artefact is limited to 64 MiB;
+- the run ledger retains at most 10,000 runs, 10 GiB, or 30 days, whichever is
+  reached first;
+- each feedback record is limited to 8 KiB and a feedback file is limited to
+  1 MiB before rotation; and
+- the backend cache defaults to 10 GiB and evicts non-active entries by LRU or
+  age.
+
+Bounded sinks stream backend stdout and stderr to files rather than buffering
+them without a limit. Every truncated stream or artefact records
+`bytes_seen`, `bytes_retained`, `limit_bytes`, and `truncated`. Parsers accept
+bounded, framed input and return a stable limit or partial-result diagnostic
+when a bound is reached. After preflight verifies the selection and retention
+limits, theorem selection and outcomes are persisted incrementally; a failed
+later job does not require retaining unbounded intermediate state. `jobs prune`
+uses these same retention rules and never removes active runs or records still
+needed by an idempotency reservation.
+
 ## 9. Project initialization and scaffolding
 
 ### 9.1 `init`
@@ -633,8 +661,11 @@ Top-level `check` composes schema validation, alias validation, action-signature
 checks, build-script checks, and non-installing backend pin checks. The default
 command is read-only. `check --compile` is an explicit effectful command
 boundary: Cargo may execute the package's arbitrary `build.rs`, so its plan and
-agent context classify it separately from read-only validation. Network access
-and backend installation remain out of scope in both modes.
+agent context classify it separately from read-only validation. Theoremc itself
+performs no network access or backend installation in either mode. A project
+`build.rs` invoked by `check --compile` may independently access the network or
+install tools; those effects are outside theoremc's control and are reported as
+project build effects.
 
 `generate` exposes deterministic internal artefacts for diagnosis and tooling:
 
@@ -699,12 +730,23 @@ while retaining the relationship to the prior run.
 
 #### Concurrency and task ownership
 
-The workspace lock covers mutation plans, idempotency reservations, and the
-append-only run index. A per-run lock covers that run's plan, record, and
-artefacts. Lock acquisition has one order—workspace, then run—and code never
-acquires them in reverse. Each acquisition has a bounded timeout and reports
-the current owner and lock path on timeout; a stale owner is recoverable only
-through startup reconciliation, not by silently breaking the lock.
+The persistence boundaries are the profile store, workspace run ledger,
+per-run directory, workspace feedback JSONL, and platform backend cache. The
+profile lock covers atomic profile read-modify-write transactions. The
+workspace lock covers mutation plans, idempotency reservations, the append-only
+run index, pruning, and index compaction. A per-run lock covers that run's
+plan, record, artefacts, and incremental outcome updates. The feedback lock
+covers complete-line append and rotation; delivery occurs outside that lock.
+The backend cache uses per-key and index locks for staging, checksum
+verification, and atomic publication; readers use immutable entries and an
+active-install lease prevents eviction while a tool is in use.
+
+When an operation genuinely needs more than one lock, acquisition has one
+total order—profile, workspace, run, feedback, then backend-cache—and code
+never acquires locks in reverse. Single-store operations acquire only their
+store's lock. Each acquisition has a bounded timeout and reports the current
+owner and lock path on timeout; a stale owner is recoverable only through
+startup reconciliation, not by silently breaking the lock.
 
 Idempotency reservation and run creation are one atomic critical section. The
 reservation stores the key, input digest, and job ID before any child process is
@@ -744,13 +786,20 @@ The canonical record is deterministic apart from fields explicitly documented
 as run identity or wall-clock data. Report renderers consume it and never parse
 human terminal output.
 
-Repeated `--backend-arg` values are parsed as typed `BackendArgument` entries
-with an explicit `public` or `secret` sensitivity. Provider schemas classify
-known arguments, and undeclared arguments are rejected rather than guessed. The
-original secret value is supplied to the injected runner only in memory; it is
-replaced with `<redacted>` before command metadata, provenance, tracing logs,
-or run-record persistence. Public argument names and values remain available
-for reproducibility.
+`--backend-arg NAME=VALUE` accepts public values only. Provider schemas classify
+known arguments, and undeclared or secret-typed arguments supplied through this
+option are rejected rather than guessed. Providers declare protected secret
+inputs separately; a configured secret provider or injected execution context
+supplies a protected input reference, never secret bytes as a CLI value.
+
+Typed `BackendArgument` entries therefore distinguish `Public { name, value }`
+from `ProtectedSecret { name, input_ref }`. Public entries may be placed in the
+command's argument vector and persisted for reproducibility. A protected entry
+is delivered only through an in-memory value, an OS-protected handle, or a
+stdin-like channel that is not part of argv. Only its redacted name or input
+reference persists. Secret bytes and their serializations are never placed in
+argv, command metadata, provenance, tracing logs, run records, or test
+fixtures.
 
 ### 11.4 Reports and replay
 
@@ -807,9 +856,29 @@ pub trait BackendReplay {
 These traits are illustrative rather than a frozen Rust API, but the separation
 is normative. Providers construct argument vectors, never shell command strings,
 and every operation that discovers, plans, executes, or parses remains fallible.
-One injected command runner owns the process boundary, timeouts, cancellation,
-stdout/stderr capture, and test doubles; lifecycle code does not spawn processes
-directly.
+The illustrative command boundary is:
+
+```rust
+pub struct CommandSpec {
+    pub program: PathBuf,
+    pub argv: Vec<PublicArgument>,
+    pub protected_inputs: Vec<ProtectedInputRef>,
+}
+
+pub trait CommandRunner {
+    fn run(
+        &self,
+        spec: &CommandSpec,
+        inputs: &ProtectedInputChannel,
+    ) -> Result<CommandOutput, CommandError>;
+}
+```
+
+`argv` is public-only. The injected command runner owns the process boundary,
+protected-input delivery through an in-memory value, OS-protected handle, or
+stdin-like non-argv channel, timeouts, cancellation, bounded stdout/stderr
+capture, and test doubles; lifecycle code does not spawn processes directly.
+Protected inputs are never serialized, logged, or included in provenance.
 
 Descriptors declare capabilities such as installation, theorem-suite execution,
 raw proof-file execution, replay, supported hosts, and required Rust toolchains.
@@ -945,8 +1014,10 @@ Every run, including a foreground run, has a durable record under:
 
 The directory contains `run.json`, `plan.json`, bounded command metadata,
 backend stdout/stderr logs, generated reports, and replay artefacts. A
-workspace-local append-only index supports bounded job listing. Writes use a
-lock and atomic replacement where the platform permits it.
+workspace-local append-only index supports bounded job listing. The resource
+limits in §8.6 apply to every run and process. Writes use a lock and atomic
+replacement where the platform permits it; run pruning and index compaction
+hold the workspace lock, while updates inside a run hold its per-run lock.
 
 `jobs list` supports status, backend, theorem ID, time-range, and parent-run
 filters. `jobs get` returns one run summary and optional bounded log excerpts.
@@ -1037,19 +1108,27 @@ Backend installation and execution cross a supply-chain boundary. The CLI must:
 - reject archive paths that escape the staging directory;
 - use bounded download size, connection timeout, and total timeout;
 - avoid shell interpolation and execute only argument vectors;
-- redact environment values, configured secrets, and typed secret
-  `--backend-arg` values from command metadata, provenance, logs, and run
-  records;
+- accept public values only through `--backend-arg`; deliver provider-declared
+  protected secrets through a non-argv channel and redact their names or
+  references in command metadata, provenance, logs, and run records;
+- never serialize or log protected secret bytes, including in injected runner
+  inputs or provenance;
 - distinguish project-trusted configuration from command-line overrides;
 - never execute a newly discovered project hook during `list`, `get`,
   `context`, or a dry run; and
-- record executable path, resolved version, checksum where available, and
-  backend arguments in provenance.
+- record executable path, resolved version, checksum where available, public
+  backend arguments, and redacted protected-input names or references in
+  provenance.
 
 `build.rs` is executable project code. The injector edits it, but direct
-`build-script run` executes only theoremc's reusable build service. Top-level
-`check --compile` and `run` invoke Cargo and therefore execute the package's
-normal build script; their plans and context must state that boundary.
+`build-script run` executes only theoremc's reusable build service. Theoremc
+performs no network access or backend installation for either check mode.
+Top-level `check --compile` invokes Cargo and therefore may execute the
+package's normal build script; that arbitrary project code may access the
+network or install tools outside theoremc's control. Top-level `run` may also
+invoke Cargo as part of execution and has the same project build-effect
+boundary; it still never installs a backend implicitly. Plans and context must
+state these boundaries.
 
 ## 17. Observability
 
@@ -1078,12 +1157,17 @@ The CLI requires these test layers:
   `build.rs` files;
 - fake command-runner tests for Cargo, Rustup, Kani, and Verus without process
   globals or environment mutation;
+- protected-input tests proving secret bytes never enter argv, serialization,
+  logs, provenance, or persistence, and that public arguments remain intact;
 - concurrency tests for simultaneous submissions, atomic idempotency
-  reservation, and lock contention or timeout;
+  reservation, profile, feedback, and cache contention, lock ordering, and
+  lock timeout;
+- resource overflow, stream and artefact truncation, retention, feedback
+  rotation, and bounded-parser tests;
 - cancellation and shutdown tests for owned process trees, bounded grace
   periods, and temporary-file cleanup;
-- crash-recovery tests for orphaned tasks, lease release, and retained partial
-  records; and
+- crash-recovery tests for orphaned tasks, profile and feedback transactions,
+  cache publication and lease release, and retained partial records; and
 - partial-failure tests for atomic theorem/backend outcomes and bounded
   unfinished-work diagnostics;
 - end-to-end tests invoking `cargo-theorem` through Cargo's external-subcommand
