@@ -45,6 +45,10 @@ Use these signposts to trace each roadmap task to the defining requirement.
 - `DES-4.7`:
   [docs/theoremc-design.md §4.7](theoremc-design.md#47-theorem-schema-internationalization-scope)
   (theorem schema keyword internationalization scope).
+- `CLI-DES`:
+  [`cargo theorem` CLI design](cargo-theorem-cli-design.md) (Cargo-native
+  command surface, project integration, backend management, execution,
+  reporting, and agent-native contracts).
 - `TFS-1`:
   [docs/theorem-file-specification.md §§1-3](theorem-file-specification.md#1-yaml-a-human-readable-data-serialization-format-schema-reference-v1)
   (document model and conformance rules).
@@ -304,6 +308,165 @@ Out of scope: runtime reflection.
   Acceptance: compile-fail tests validate predictable drift diagnostics.
   Signposts: `DES-7`, `DES-5`.
 
+## Phase 3.1: `cargo theorem` foundation and project integration
+
+Outcome: theoremc has one Cargo-native, agent-readable entry point for project
+inspection, scaffolding, build integration, and proof-backend management.
+
+### Step 3.1.1: establish the Cargo subcommand and OrthoConfig spine
+
+Dependencies: phase 1 and step 3.1.
+
+In scope: package structure, command metadata, configuration merging, minimum
+Rust versions, direct and Cargo-mediated invocation, and base output contracts.
+
+Out of scope: theorem execution and project mutation.
+
+- [ ] Add a dedicated `crates/cargo-theorem` package and `cargo-theorem`
+  executable while keeping application-only dependencies outside the root
+  theoremc facade, and remove the placeholder root `src/main.rs`. Acceptance:
+  both `cargo theorem --help` and `cargo-theorem --help` execute the same
+  command tree in end-to-end tests, and no unrelated `theoremc` binary remains.
+  Signposts: `CLI-DES`.
+- [ ] Adopt `ortho_config` for CLI, environment, file, selected-profile, and
+  selected-subcommand merging, using `SelectedSubcommandMerge` and
+  `OrthoConfigSubcommandDocs`. Acceptance: precedence tests prove
+  defaults < files < profile < environment < flags, and generated recursive
+  documentation matches the Clap command tree. Signposts: `CLI-DES`.
+- [ ] Establish the mixed-MSRV policy required by `ortho_config` 0.9.0: retain
+  Rust 1.88 for library packages and declare Rust 1.89 for `cargo-theorem`.
+  Acceptance: CI tests the library workspace excluding the CLI on 1.88 and the
+  CLI package on 1.89. Signposts: `CLI-DES`.
+- [ ] Implement the versioned JSON application envelope, stdout/stderr stream
+  invariants, stable exit classes, and global renderer options. Acceptance:
+  snapshots cover success and failure for human and JSON modes, and subprocess
+  output cannot leak beside a JSON document. Signposts: `CLI-DES`, `ADR2-4`.
+- [ ] Implement `cargo theorem context --json` from OrthoConfig's compact agent
+  context and add agent-native policy checks to CI. Acceptance: the versioned
+  context includes every command path, mutation boundary, output mode,
+  pagination rule, and exit class without reading project state or the network.
+  Signposts: `CLI-DES`.
+
+### Step 3.1.2: implement Cargo project discovery and read-only commands
+
+Dependencies: step 3.1.1 and phases 1 to 3.
+
+In scope: Cargo metadata, package selection, theorem/action inspection, bounded
+results, and composed project checks.
+
+Out of scope: modifying project files or installing proof tools.
+
+- [ ] Implement workspace and package resolution through the stable
+  `cargo metadata` JSON protocol with `--manifest-path`, `--package`,
+  `--workspace`, and `--exclude`. Acceptance: fixtures cover virtual
+  workspaces, ambiguous names, excluded members, and explicit manifests;
+  ambiguity diagnostics enumerate valid package identifiers. Signposts:
+  `CLI-DES`.
+- [ ] Implement bounded top-level `list` and `get` theorem commands plus
+  `action list` and `action get`, using stable ordering, `--limit`, and opaque
+  cursors. Acceptance: JSON snapshots contain stable theorem IDs, paths,
+  backends, action names, signatures, and next-cursor metadata without
+  unbounded source or log content. Signposts: `CLI-DES`, `NMR-1`, `NMR-2`.
+- [ ] Implement read-only `check` composition for schema, aliases, action
+  signatures, build integration, and configured backend pins. Acceptance:
+  `check` never performs installation or network mutation, and every failing
+  component produces a stable diagnostic code and application exit class.
+  Signposts: `CLI-DES`, `DES-6`, `DES-7`.
+
+### Step 3.1.3: implement mutation plans, scaffolding, and build integration
+
+Dependencies: step 3.1.2 and phase 3.
+
+In scope: reusable build services, atomic project plans, theorem/action
+scaffolding, and managed `build.rs` integration.
+
+Out of scope: arbitrary Rust source repair and proof generation from prose.
+
+- [ ] Extract build discovery and suite rendering behind a reusable
+  `theoremc-build` library API, including fallible direct execution and the
+  stable build-script boundary
+  `theoremc::build::emit_suite_from_env_or_exit()`. Acceptance: the root build
+  script and direct CLI path use the same discovery and rendering fixtures.
+  Signposts: `CLI-DES`, `DES-7`.
+- [ ] Implement an immutable project mutation plan with create, edit,
+  unchanged, conflict, and manual-action entries. Apply plans under a
+  workspace lock with temporary siblings, flush, atomic rename, and a recovery
+  journal. Acceptance: property tests prove repeat application is idempotent,
+  and failure-injection tests leave either the old or complete new state.
+  Signposts: `CLI-DES`.
+- [ ] Implement `init`, top-level `create`, and `action create` with `--dry-run`
+  and narrowly scoped `--force` handling. Acceptance: scaffolds are schema
+  valid, do not invent assertions, do not generate panic or `todo!()` stubs by
+  default, and refuse unsafe overwrites. Signposts: `CLI-DES`, `TFS-1`,
+  `DES-5`.
+- [ ] Implement `build-script install`, `check`, `run`, and `delete` using
+  parsed Rust source spans and managed calls rather than blind string
+  replacement. Acceptance: fixtures cover absent, generated, already managed,
+  and complex existing build scripts; unsafe edits become structured conflicts.
+  Signposts: `CLI-DES`, `DES-7`.
+- [ ] Implement `generate --kind suite|harness|metadata` with deterministic
+  selection and explicit delivery for large artefacts. Acceptance: direct
+  generation matches build-script output byte for byte for the same inputs.
+  Signposts: `CLI-DES`, `DES-7`.
+
+### Step 3.1.4: implement backend providers and prover-tool parity
+
+Dependencies: step 3.1.1. This step may proceed in parallel with phase 4, but
+high-level theorem execution depends on both.
+
+In scope: provider capabilities, lock data, managed installations, Kani and
+Verus parity, low-level execution, and migration adapters.
+
+Out of scope: backend-neutral theorem lowering beyond Kani.
+
+- [ ] Define a backend provider contract for discovery, release resolution,
+  install planning, health checks, argument-vector execution, result parsing,
+  and replay planning. Inject one command runner for timeouts, cancellation,
+  stream capture, and test doubles; shell command strings are prohibited.
+  Acceptance: a fake provider exercises every capability without process-global
+  state. Signposts: `CLI-DES`.
+- [ ] Implement `theoremc.toml` backend intent, a deterministic
+  `theoremc.lock`, content-addressed platform cache entries, and `backend list`,
+  `get`, `install`, `check`, `sync`, `update`, and `delete`. Acceptance:
+  installation mutations support `--dry-run`, pin checks never install, and the
+  lock omits machine-specific paths. Signposts: `CLI-DES`.
+- [ ] Port Kani installation, setup, semantic-version checking, command
+  override, harness execution, and concrete playback from
+  `rust-prover-tools`. Acceptance: parity scenarios cover matching and
+  mismatched pins, missing installations, setup failure, and version parsing.
+  Signposts: `CLI-DES`, `DES-8`.
+- [ ] Port Verus release-target selection, bounded download, checksum
+  verification, safe extraction, binary discovery, Rust toolchain preparation,
+  and raw proof-file execution from `rust-prover-tools`. Acceptance: default
+  tests use fake executables and local archives; opt-in jobs cover real
+  releases. Signposts: `CLI-DES`.
+- [ ] Implement `backend run <backend>` and one-release legacy environment
+  migration for the existing Kani and Verus variables. Acceptance: migration
+  diagnostics identify the replacement setting, and `--passthrough-exit-code`
+  is isolated as an advanced compatibility option. Signposts: `CLI-DES`.
+
+### Step 3.1.5: validate the public CLI contract
+
+Dependencies: steps 3.1.1 to 3.1.4.
+
+In scope: public help, context, JSON schemas, bounded behaviour, mutation
+safety, migration parity, and agent-native policy.
+
+Out of scope: full theorem-suite execution, reports, and detached run jobs.
+
+- [ ] Add snapshot and schema tests for human help, `context --json`, JSON
+  success/error envelopes, exit classes, choice-enumerating diagnostics, and
+  pagination. Acceptance: every public command declares interaction, mutation,
+  output, and bounded-response metadata. Signposts: `CLI-DES`.
+- [ ] Add behavioural and end-to-end tests for direct invocation, Cargo external
+  subcommand invocation, configuration precedence, dry runs, project locks,
+  atomic writes, and fake backend processes. Acceptance: default tests require
+  neither a network nor real prover installations. Signposts: `CLI-DES`.
+- [ ] Add command-for-command migration fixtures for all four public
+  `rust-prover-tools` workflows. Acceptance: each legacy invocation has a
+  documented `cargo theorem` equivalent and equivalent externally observable
+  backend behaviour. Signposts: `CLI-DES`.
+
 ## Phase 4: Kani backend semantics and safety policy
 
 Outcome: theorem steps compile into correct Kani proof harnesses with explicit
@@ -369,33 +532,74 @@ Out of scope: extended policy for future backends.
   and runtime tests confirm missing rationale is rejected. Signposts: `ADR-4`,
   `TFS-6`, `DES-8`.
 
-## Phase 5: reporting and stable theorem identity
+## Phase 5: execution, reporting, and stable theorem identity
 
-Outcome: theorem runs produce actionable artefacts with stable IDs across
-renames and moves.
+Outcome: `cargo theorem` runs produce durable, actionable artefacts with stable
+IDs across renames and moves.
+
+### Step 5.0: implement theorem execution orchestration and the run ledger
+
+Dependencies: phase 4, steps 3.1.2 to 3.1.4, and step 5.2.
+
+In scope: theorem selection, immutable execution plans, backend orchestration,
+policy application, durable jobs, idempotency, and stable application outcomes.
+
+Out of scope: hosted execution and report dashboarding.
+
+- [ ] Implement shared selection by theorem ID, path, tag, package, backend, and
+  changed revision, with stable ordering and explicit empty-selection policy.
+  Acceptance: property tests cover category intersection, repeated-filter
+  union, aliases, exclusions, and deterministic order. Signposts: `CLI-DES`,
+  `NMR-2`.
+- [ ] Implement top-level `run` as resolve, validate, pin-check, plan, execute,
+  parse, policy, persist, and render stages. Acceptance: `run` never installs a
+  backend, records backend-native outcomes before applying evidence policy, and
+  maps every final state to a stable application exit class. Signposts:
+  `CLI-DES`, `DES-8`, `DES-9`.
+- [ ] Persist every foreground and detached run under
+  `.theoremc/runs/<run-id>/` with an append-only bounded index, captured logs,
+  input digest, parent link, and canonical plan. Acceptance: crash-recovery
+  tests leave inspectable terminal or resumable records rather than orphaned
+  processes. Signposts: `CLI-DES`.
+- [ ] Implement blocking-by-default execution, `--no-wait`, `--timeout`,
+  bounded parallelism, cancellation, and optional idempotency keys. Acceptance:
+  duplicate active submissions return the existing job when inputs match and
+  fail with both digests when they differ. Signposts: `CLI-DES`.
+- [ ] Implement `jobs list`, `get`, `cancel`, and `prune` with pagination,
+  bounded log excerpts, mutation previews, and explicit retention rules.
+  Acceptance: list/get remain bounded and prune cannot delete records outside
+  its structured plan. Signposts: `CLI-DES`.
 
 ### Step 5.1: implement theorem run result model and report outputs
 
-Dependencies: phase 4.
+Dependencies: step 5.0.
 
-In scope: `theoremd` run model and output formats (human report plus CI
-artefacts).
+In scope: the `cargo theorem` canonical run model and output formats (human
+report plus CI artefacts).
 
 Out of scope: dashboard hosting.
 
 - [ ] Implement a canonical theorem run record that includes theorem ID,
   metadata, assumptions, step outcomes, assertion outcomes, witness outcomes,
-  evidence config, and final status. Acceptance: serialized fixtures round-trip
-  without field loss. Signposts: `DES-9`, `TFS-1`, `TFS-6`.
+  evidence config, backend provenance, diagnostics, artefacts, and final status.
+  Acceptance: serialized fixtures round-trip without field loss and distinguish
+  invariant fields from wall-clock or run-identity fields. Signposts: `DES-9`,
+  `TFS-1`, `TFS-6`, `CLI-DES`.
 - [ ] Implement Markdown/HTML report rendering from the canonical run record.
-  Acceptance: golden snapshots cover pass, fail, unreachable, and undetermined
-  examples. Signposts: `DES-9`.
+  Acceptance: golden snapshots cover pass, fail, unreachable, undetermined,
+  timeout, cancellation, and expected-failure examples. Signposts: `DES-9`,
+  `CLI-DES`.
 - [ ] Implement JUnit XML and Cucumber JSON emitters for CI integration.
-  Acceptance: schema validation tests pass for both formats. Signposts: `DES-9`.
+  Acceptance: schema validation tests pass for both formats and no renderer
+  parses terminal output. Signposts: `DES-9`, `CLI-DES`.
+- [ ] Implement `report create <run-id>` with repeatable formats and explicit
+  delivery for large or multiple artefacts. Acceptance: JSON application mode
+  returns artefact references without mixing report bytes into stdout.
+  Signposts: `CLI-DES`.
 
 ### Step 5.2: implement stable external theorem IDs and alias migration
 
-Dependencies: phase 4.
+Dependencies: phase 4 and step 3.1.2.
 
 In scope: canonical ID generation, alias graph loading, cycle detection, and
 resolution semantics.
@@ -416,7 +620,7 @@ Out of scope: automatic alias file editing.
 
 ### Step 5.3: implement counterexample playback integration
 
-Dependencies: step 5.1.
+Dependencies: steps 5.0 and 5.1, plus step 3.1.4.
 
 In scope: Kani failure replay orchestration and report attachment of playback
 artefacts.
@@ -424,12 +628,41 @@ artefacts.
 Out of scope: automated source rewriting workflows.
 
 - [ ] Integrate Kani concrete playback execution for failed harnesses and
-  capture generated replay artefacts. Acceptance: failing theorem integration
-  test produces a linked playback artefact in the run output. Signposts:
-  `DES-8`, `DES-9`.
+  capture generated replay artefacts as a child run. Acceptance: a failing
+  theorem integration test produces linked source, command, log, and provenance
+  artefacts without rewriting application source. Signposts: `DES-8`, `DES-9`,
+  `CLI-DES`.
 - [ ] Surface playback metadata and retrieval paths in human and CI reports.
   Acceptance: report snapshots include replay references only when available.
-  Signposts: `DES-9`.
+  Signposts: `DES-9`, `CLI-DES`.
+
+### Step 5.4: implement profiles, delivery, feedback, and migration completion
+
+Dependencies: steps 3.1.5 and 5.1. Reusable OrthoConfig contracts are preferred;
+tracked temporary adapters may cover soft dependencies until they ship.
+
+In scope: persistent configuration overlays, artefact routing, local feedback,
+legacy command migration, and retirement gates.
+
+Out of scope: mandatory network services.
+
+- [ ] Implement named profiles with secret redaction and precedence between
+  project files and environment variables, plus bounded `profile list`, `get`,
+  `save`, and guarded `delete`. Acceptance: context exposes profile names and
+  non-secret fields only, and profile mutations support `--dry-run`.
+  Signposts: `CLI-DES`.
+- [ ] Implement atomic `stdout` and `file:<path>` delivery, leaving
+  `webhook:<url>` behind an explicit later capability. Acceptance: unknown
+  schemes enumerate valid choices and JSON mode returns delivery metadata
+  rather than mixed payloads. Signposts: `CLI-DES`.
+- [ ] Implement privacy-bounded local JSON Lines feedback with optional
+  diagnostic attachment and no implicit source, environment, proof, or log
+  capture. Acceptance: tests prove sensitive fields remain absent unless
+  explicitly attached. Signposts: `CLI-DES`.
+- [ ] Publish migration guidance and cross-platform parity results for all
+  `rust-prover-tools` workflows, then mark the Python CLI maintenance-only.
+  Acceptance: archival cannot occur until Kani and Verus parity fixtures pass
+  on every supported host. Signposts: `CLI-DES`.
 
 ## Phase 6: enforcement, examples, and developer ergonomics
 
@@ -492,17 +725,20 @@ checklists.
 Out of scope: production deployment templates.
 
 - [ ] Create end-to-end example crates (`account`, `hnsw`) that demonstrate
-  action exports, theorem files, and generated harness behaviour. Acceptance:
+  action exports, theorem files, generated harness behaviour, `cargo theorem`
+  project checks, backend synchronization, execution, and reports. Acceptance:
   examples compile and execute through the documented theorem workflow.
-  Signposts: `DES-3`, `DES-5`, `DES-8`.
+  Signposts: `DES-3`, `DES-5`, `DES-8`, `CLI-DES`.
 - [ ] Write and publish user-facing guidance for theorem authoring rules,
-  especially explicit references, witness policy, and expected status usage.
-  Acceptance: docs contain copy-paste-ready examples that match implementation
-  semantics. Signposts: `TFS-5`, `ADR-3`, `ADR-4`, `DES-4`.
+  especially explicit references, witness policy, expected status usage,
+  project initialization, backend pins, and run artefacts. Acceptance: docs
+  contain copy-paste-ready examples that match implementation semantics.
+  Signposts: `TFS-5`, `ADR-3`, `ADR-4`, `DES-4`, `CLI-DES`.
 - [ ] Add a contributor checklist that requires parser fixtures, codegen
-  snapshots, and report snapshots for behavioural changes. Acceptance: pull
-  request template and contributor docs reference the checklist explicitly.
-  Signposts: `DES-6`, `DES-7`, `DES-9`.
+  snapshots, command-context snapshots, run-record fixtures, and report
+  snapshots for behavioural changes. Acceptance: pull request template and
+  contributor docs reference the checklist explicitly. Signposts: `DES-6`,
+  `DES-7`, `DES-9`, `CLI-DES`.
 
 ## Phase 7: library-first localization and Fluent diagnostics
 
@@ -562,12 +798,14 @@ Out of scope: parser keyword localization.
 - [ ] Keep proc-macro and code-generation diagnostics deterministic English.
   Acceptance: compile-fail and snapshot tests confirm output stability across
   host locale changes. Signposts: `DES-6.5`, `ADR2-4`.
-- [ ] Extend `theoremd` outputs to always include stable diagnostic code and
-  arguments, include required English fallback text, and attach localized text
-  only when a localizer is configured. Acceptance: report snapshots for
-  Markdown, HTML, JUnit XML, and Cucumber JSON confirm invariant machine fields
-  and optional localized projection fields. Signposts: `DES-9`, `DES-6.5`,
-  `ADR2-2`, `ADR2-4`.
+- [ ] Extend `cargo theorem` diagnostic objects to always include stable
+  diagnostic code and arguments, include required English fallback text, and
+  attach localized text only when a localizer is configured. Acceptance:
+  application JSON and report snapshots for Markdown, HTML, JUnit XML, and
+  Cucumber JSON confirm invariant machine fields on diagnostic objects and
+  optional localized projection fields; successful envelopes do not require
+  diagnostic fields. Signposts: `DES-9`, `DES-6.5`, `ADR2-2`, `ADR2-4`,
+  `CLI-DES`.
 - [ ] Add locale-determinism regression tests proving machine-facing artefacts
   are identical across locales while localized human-facing strings vary only
   in localized fields. Signposts: `DES-9`, `DES-6.5`, `ADR2-4`.
@@ -588,14 +826,23 @@ Out of scope: implementation of localized theorem schema keys.
 
 ## Sequencing summary
 
-- Execute phases in order.
-- Within each phase, complete steps in order unless dependencies indicate they
-  are independent.
-- Do not start reporting and alias migration before the Kani execution model is
-  stable.
+- Execute phases in order, except where the dependencies below explicitly
+  permit parallel work.
+- Complete steps 3.1.1 and 3.1.2 after the existing compile-time foundation;
+  step 3.1.4 may proceed in parallel with phase 4 because tool management does
+  not depend on completed theorem lowering.
+- Do not implement high-level `cargo theorem run` until both Kani execution
+  semantics and the backend provider/pin-check contracts are stable.
+- Do not start report rendering before the Kani execution model is stable and
+  the canonical run ledger exists; complete alias migration before alias-aware
+  selection tests or execution.
 - Treat vacuity policy implementation as a release gate, not an optional
   enhancement.
+- Keep backend installation explicit: `check`, `build-script run`, and top-level
+  `run` must never install or update tools.
+- Do not retire `rust-prover-tools` until Kani and Verus parity fixtures pass on
+  every supported host and migration guidance has shipped.
 - Land schema architecture boundary checks before broadening examples and
   contributor workflow guidance.
-- Start localization integration only after core diagnostics are structured and
-  stable.
+- Start localization integration only after core diagnostics, application JSON,
+  and canonical run records are structured and stable.
