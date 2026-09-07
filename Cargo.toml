@@ -31,7 +31,7 @@ filetime = "0.2.29"
 indexmap = { version = "2.13.0", features = ["serde"] }
 proc-macro2 = "1.0.106"
 quote = "1.0.45"
-syn = { version = "2.0.117", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
+syn = { version = "3.0.3", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
 test-helpers = { path = "crates/test-helpers" }
 thiserror = "2.0.18"
 
