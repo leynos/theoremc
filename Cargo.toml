@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/test-helpers", "crates/theoremc-core", "crates/theoremc-macros"]
+members = [
+    "crates/test-helpers",
+    "crates/theoremc-build-support",
+    "crates/theoremc-core",
+    "crates/theoremc-macros",
+]
 resolver = "2"
 
 [package]
@@ -16,9 +21,7 @@ theoremc-core = { version = "0.1.0", path = "crates/theoremc-core" }
 theoremc-macros = { version = "0.1.0", path = "crates/theoremc-macros" }
 
 [build-dependencies]
-camino = "1.2.2"
-cap-std = { version = "4.0.2", features = ["fs_utf8"] }
-thiserror = "2.0.18"
+theoremc-build-support = { version = "0.1.0", path = "crates/theoremc-build-support" }
 
 [dev-dependencies]
 rstest = "0.26.1"

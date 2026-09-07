@@ -13,12 +13,6 @@ use super::cargo_runner::{CargoGuard, CargoSubcommand, cargo_run, cargo_run_outp
 use test_helpers::FixtureCrate as CommonFixtureCrate;
 
 const ROOT_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
-pub(crate) const FIXTURE_BUILD_DEPENDENCIES: &str = concat!(
-    "camino = \"1.2.2\"\n",
-    "cap-std = { version = \"4.0.2\", features = [\"fs_utf8\"] }\n",
-    "thiserror = \"2.0.18\"\n",
-);
-
 pub(crate) struct TheoremFixtureSpec<'a> {
     pub(crate) path: &'a str,
     pub(crate) content: &'a str,
@@ -60,6 +54,8 @@ pub(crate) fn fixture_cargo_toml() -> String {
 pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
     let normalized_root_manifest_dir = normalize_path_separators(root_manifest_dir);
     let escaped_root_manifest_dir = toml_basic_string_value(&normalized_root_manifest_dir);
+    let build_support_dir = format!("{normalized_root_manifest_dir}/crates/theoremc-build-support");
+    let escaped_build_support_dir = toml_basic_string_value(&build_support_dir);
     format!(
         concat!(
             "[package]\n",
@@ -71,10 +67,10 @@ pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
             "[dev-dependencies]\n",
             "theoremc = {{ path = \"{root_manifest_dir}\", features = [\"test-support\"] }}\n\n",
             "[build-dependencies]\n",
-            "{build_dependencies}",
+            "theoremc-build-support = {{ path = \"{build_support_dir}\" }}\n",
         ),
         root_manifest_dir = escaped_root_manifest_dir,
-        build_dependencies = FIXTURE_BUILD_DEPENDENCIES
+        build_support_dir = escaped_build_support_dir,
     )
 }
 
@@ -110,7 +106,7 @@ pub(crate) fn build_fixture_and_list_kani_harnesses(
 mod tests {
     //! Tests for Cargo TOML fixture generation.
 
-    use super::{FIXTURE_BUILD_DEPENDENCIES, fixture_cargo_toml_for};
+    use super::fixture_cargo_toml_for;
 
     #[test]
     fn fixture_cargo_toml_normalizes_windows_paths() {
@@ -129,7 +125,7 @@ mod tests {
             toml.contains("\"C:/Users/user/projects/theoremc\""),
             "expected normalized forward-slash path in TOML; got:\n{toml}",
         );
-        assert!(toml.contains(FIXTURE_BUILD_DEPENDENCIES));
+        assert!(toml.contains("theoremc-build-support = { path = \"C:/Users/user/projects/theoremc/crates/theoremc-build-support\" }"));
     }
 
     #[test]
@@ -141,6 +137,6 @@ mod tests {
             toml.contains("path = \"/home/user/project's/\\\"theoremc\\\"\""),
             "expected escaped TOML basic string path, got:\n{toml}",
         );
-        assert!(toml.contains(FIXTURE_BUILD_DEPENDENCIES));
+        assert!(toml.contains("theoremc-build-support = { path = \"/home/user/project's/\\\"theoremc\\\"/crates/theoremc-build-support\" }"));
     }
 }
