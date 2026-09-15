@@ -14,6 +14,14 @@ NEXTEST_FLAGS ?= --workspace $(CARGO_FLAGS)
 DOCTEST_FLAGS ?= --workspace --all-features --doc
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
+# `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
+# Markdown files Git tracks and `--include-untracked` adds the untracked files
+# Git does not ignore, so a new document is formatted before it is staged.
+# Both modes need mdtablefix 0.6.0 or later; CI pins the version in
+# .github/workflows/ci.yml.
+MDTABLEFIX ?= mdtablefix
+MDTABLEFIX_SELECT = --git --include-untracked
+MDTABLEFIX_RULES = --wrap --renumber --breaks --ellipsis --fences
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
@@ -39,10 +47,12 @@ typecheck: ## Run type checking for all targets and features
 
 fmt: ## Format Rust and Markdown sources
 	$(CARGO) fmt --all
-	mdformat-all
+	$(MDTABLEFIX) --in-place $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
+	@unset FORCE_COLOR; $(MDLINT) --fix "**/*.md"
 
 check-fmt: ## Verify formatting
 	$(CARGO) fmt --all -- --check
+	$(MDTABLEFIX) --check $(MDTABLEFIX_SELECT) $(MDTABLEFIX_RULES)
 
 markdownlint: ## Lint Markdown files
 	$(MDLINT) '**/*.md'
