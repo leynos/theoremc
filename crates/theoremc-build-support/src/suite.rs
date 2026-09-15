@@ -10,9 +10,7 @@ use camino::Utf8Path;
 ///
 /// Each theorem file produces one line: `theorem_file!("path/to/file.theorem");`
 /// The output always ends with a trailing newline, even for empty input.
-pub(crate) fn render_theorem_suite<'a>(
-    theorem_files: impl IntoIterator<Item = &'a Utf8Path>,
-) -> String {
+fn render_theorem_suite<'a>(theorem_files: impl IntoIterator<Item = &'a Utf8Path>) -> String {
     let mut output = String::new();
 
     for path in theorem_files {
@@ -43,7 +41,6 @@ fn escape_rust_string(s: &str) -> String {
         .collect()
 }
 
-#[cfg(not(test))]
 mod build_only {
     use std::io;
 
@@ -51,17 +48,25 @@ mod build_only {
     use thiserror::Error;
 
     use super::render_theorem_suite;
-    use crate::build_discovery::BuildDiscovery;
+    use crate::BuildDiscovery;
 
     const SUITE_FILENAME: &str = "theorem_suite.rs";
 
+    /// Errors returned while writing the generated theorem suite.
     #[derive(Debug, Error)]
-    pub(crate) enum BuildSuiteError {
+    pub enum BuildSuiteError {
+        /// An input or output operation on the generated suite failed.
         #[error("io error: {0}")]
         Io(#[from] io::Error),
     }
 
-    pub(crate) fn write_theorem_suite(
+    /// Writes `theorem_suite.rs` when its rendered contents changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BuildSuiteError`] when the output directory cannot be read or
+    /// the generated suite cannot be written.
+    pub fn write_theorem_suite(
         out_dir: &Utf8Dir,
         discovery: &BuildDiscovery,
     ) -> Result<(), BuildSuiteError> {
@@ -83,9 +88,8 @@ mod build_only {
     }
 }
 
-#[cfg(not(test))]
-pub(crate) use build_only::write_theorem_suite;
+pub use build_only::{BuildSuiteError, write_theorem_suite};
 
 #[cfg(test)]
-#[path = "build_suite_tests.rs"]
+#[path = "suite_tests.rs"]
 mod tests;
