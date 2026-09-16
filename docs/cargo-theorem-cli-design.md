@@ -530,8 +530,9 @@ changes this contract:
   generated report, replay artefact, or partial artefact is limited to 64 MiB;
 - the run ledger retains at most 10,000 runs, 10 GiB, or 30 days, whichever is
   reached first;
-- each feedback record is limited to 8 KiB and a feedback file is limited to
-  1 MiB before rotation; and
+- each feedback record is limited to 8 KiB, each feedback file is limited to
+  1 MiB before rotation, and the complete rotated feedback set is limited to
+  64 MiB or 64 files, whichever is reached first; and
 - the backend cache defaults to 10 GiB and evicts non-active entries by LRU or
   age.
 
@@ -543,7 +544,10 @@ when a bound is reached. After preflight verifies the selection and retention
 limits, theorem selection and outcomes are persisted incrementally; a failed
 later job does not require retaining unbounded intermediate state. `jobs prune`
 uses these same retention rules and never removes active runs or records still
-needed by an idempotency reservation.
+needed by an idempotency reservation. Feedback append, rotation, and deletion
+of rotated files all hold the feedback lock. Rotation deletes the oldest files
+only after the aggregate 64 MiB/64-file cap would otherwise be exceeded; the
+feedback cap is independent of the run-ledger cap.
 
 ## 9. Project initialization and scaffolding
 
@@ -736,10 +740,27 @@ profile lock covers atomic profile read-modify-write transactions. The
 workspace lock covers mutation plans, idempotency reservations, the append-only
 run index, pruning, and index compaction. A per-run lock covers that run's
 plan, record, artefacts, and incremental outcome updates. The feedback lock
-covers complete-line append and rotation; delivery occurs outside that lock.
-The backend cache uses per-key and index locks for staging, checksum
-verification, and atomic publication; readers use immutable entries and an
-active-install lease prevents eviction while a tool is in use.
+covers complete-line append, rotation, and rotated-file deletion; delivery
+occurs outside that lock. The backend cache uses per-key and index locks for
+staging, checksum verification, atomic publication, and eviction; readers use
+immutable entries and an active-install lease prevents eviction while a tool is
+in use. Cache admission reserves the complete expected entry size under the
+index lock before staging starts. It may evict only unleased entries, and an
+installation is rejected with a bounded resource diagnostic if the reservation
+cannot fit. A caller may wait for active leases only up to the configured
+admission timeout; the cache never exceeds its configured limit, including
+staged bytes.
+
+The cache lock protocol has one internal order: index lock before per-key lock.
+Staging and checksum verification hold only the per-key lock after admission
+has recorded a reservation. Publication releases the per-key lock, acquires the
+index lock, then reacquires the per-key lock, revalidates the reservation and
+checksum, and atomically publishes the immutable entry. Eviction acquires the
+index lock, then the affected per-key lock, and skips active leases and
+unexpired reservations. No operation acquires the index lock while holding a
+per-key lock; operations needing both release the first lock and reacquire in
+the stated order. This protocol covers staging, checksum verification,
+publication, and eviction without a lock cycle.
 
 When an operation genuinely needs more than one lock, acquisition has one
 total order—profile, workspace, run, feedback, then backend-cache—and code
@@ -748,21 +769,45 @@ store's lock. Each acquisition has a bounded timeout and reports the current
 owner and lock path on timeout; a stale owner is recoverable only through
 startup reconciliation, not by silently breaking the lock.
 
-Idempotency reservation and run creation are one atomic critical section. The
-reservation stores the key, input digest, and job ID before any child process is
-spawned. A matching reservation returns that job; a conflicting digest fails
-without starting work. Reservation state is committed before the command
-returns, including for `--no-wait`.
+Idempotency reservation and run creation are one atomic critical section. A
+reservation starts as `reserved` and stores the key, input digest, and job ID
+before any child process is spawned. It becomes `running` when ownership is
+confirmed, then becomes `succeeded`, `failed`, `cancelled`, or `interrupted`
+when the corresponding terminal run record is committed. A matching active
+reservation returns that job; a matching terminal reservation returns its run
+while that record is retained. A conflicting digest fails without starting
+work. Reservation state is committed before the command returns, including for
+`--no-wait`.
+
+Successful, failed, cancelled, and crash-recovered reservations retain their
+terminal run record until normal ledger retention permits pruning. Pruning
+removes the terminal run record and its reservation together in one
+workspace-locked transaction; it never removes a `reserved` or `running`
+reservation. Startup reconciliation converts a reservation whose owner has
+crashed to `interrupted` only when its process group cannot be adopted and has
+been terminated and fenced, then applies the same terminal-retention rule.
+Adopted work remains `running` with its reservation and leases. Live
+reservations are protected while the 10,000-run, 10 GiB, and 30-day ledger
+limits are enforced; if protected records leave no bounded capacity for a new
+run, submission fails rather than exceeding a hard limit.
 
 Every detached task owns its process group, temporary files, and run directory.
 Cancellation records intent, stops theoremc-owned descendants, and waits a
 bounded grace period before forcefully terminating that group. Shutdown stops
 new submissions, waits for owned tasks up to the configured deadline, and then
 cleans temporary files while retaining logs and the final run record. Startup
-reconciliation marks tasks whose owner crashed as `interrupted`, releases
-their leases, and preserves their partial artefacts. Each theorem/backend
-outcome is persisted atomically, so a partial failure retains completed
-outcomes and a bounded diagnostic for unfinished work.
+reconciliation first acquires the workspace and per-run locks and verifies
+owner identity. If the current supervisor can prove ownership, it adopts the
+recorded process group, transfers supervision and leases, and leaves the task
+`running`. Otherwise, it fences the run's writer epoch, terminates the group,
+and waits for every descendant to exit within the bounded grace period. The
+reconciler closes the group's output channels and rejects writes bearing the
+fenced epoch before marking the task `interrupted` and releasing its leases.
+Thus an unadoptable orphaned backend cannot continue running or write to
+retained artefacts. Completed outcomes remain immutable; after all writers have
+stopped, bounded partial artefacts and diagnostics are retained. Each
+theorem/backend outcome is persisted atomically, so a partial failure retains
+completed outcomes and a bounded diagnostic for unfinished work.
 
 ### 11.3 Canonical run record
 
@@ -796,10 +841,13 @@ Typed `BackendArgument` entries therefore distinguish `Public { name, value }`
 from `ProtectedSecret { name, input_ref }`. Public entries may be placed in the
 command's argument vector and persisted for reproducibility. A protected entry
 is delivered only through an in-memory value, an OS-protected handle, or a
-stdin-like channel that is not part of argv. Only its redacted name or input
-reference persists. Secret bytes and their serializations are never placed in
-argv, command metadata, provenance, tracing logs, run records, or test
-fixtures.
+stdin-like channel that is not part of argv. `input_ref` is an opaque,
+non-redeemable identifier used only to bind the request to that protected
+channel. At persistence boundaries it is omitted or replaced by a redacted
+surrogate; a run record must never contain a capability, token, handle, lookup
+key, or other reference that could retrieve the protected secret. Secret bytes,
+their serializations, and redeemable references are never placed in argv,
+command metadata, provenance, tracing logs, run records, or test fixtures.
 
 ### 11.4 Reports and replay
 
@@ -873,6 +921,16 @@ pub trait CommandRunner {
     ) -> Result<CommandOutput, CommandError>;
 }
 ```
+
+Before creating a process, the runner resolves every entry in
+`CommandSpec::protected_inputs` through `ProtectedInputChannel`. Each
+`ProtectedSecret::input_ref` is represented by a `ProtectedInputRef`, and the
+channel must provide an exact one-to-one mapping: every declared secret has one
+matching input, and no input is unclaimed. Missing, extra, duplicate, or
+unsupported references are rejected before process creation, without starting
+a child or writing execution artefacts. The `input_ref` used for this binding
+remains an opaque, non-redeemable identifier at the command boundary; the
+channel, rather than a persisted run record, owns the protected value.
 
 `argv` is public-only. The injected command runner owns the process boundary,
 protected-input delivery through an in-memory value, OS-protected handle, or
@@ -1109,16 +1167,17 @@ Backend installation and execution cross a supply-chain boundary. The CLI must:
 - use bounded download size, connection timeout, and total timeout;
 - avoid shell interpolation and execute only argument vectors;
 - accept public values only through `--backend-arg`; deliver provider-declared
-  protected secrets through a non-argv channel and redact their names or
-  references in command metadata, provenance, logs, and run records;
+  protected secrets through a non-argv channel and retain only redacted,
+  non-redeemable names or surrogates in command metadata, provenance, logs, and
+  run records;
 - never serialize or log protected secret bytes, including in injected runner
   inputs or provenance;
 - distinguish project-trusted configuration from command-line overrides;
 - never execute a newly discovered project hook during `list`, `get`,
   `context`, or a dry run; and
 - record executable path, resolved version, checksum where available, public
-  backend arguments, and redacted protected-input names or references in
-  provenance.
+  backend arguments, and redacted, non-redeemable protected-input names or
+  surrogates in provenance.
 
 `build.rs` is executable project code. The injector edits it, but direct
 `build-script run` executes only theoremc's reusable build service. Theoremc
@@ -1157,17 +1216,25 @@ The CLI requires these test layers:
   `build.rs` files;
 - fake command-runner tests for Cargo, Rustup, Kani, and Verus without process
   globals or environment mutation;
-- protected-input tests proving secret bytes never enter argv, serialization,
-  logs, provenance, or persistence, and that public arguments remain intact;
-- concurrency tests for simultaneous submissions, atomic idempotency
-  reservation, profile, feedback, and cache contention, lock ordering, and
+- protected-input tests proving secret bytes and redeemable references never
+  enter argv, serialization, logs, provenance, or persistence, and that public
+  arguments remain intact;
+- command-runner tests proving protected inputs bind exactly once through the
+  injected channel and reject missing, extra, duplicate, and unsupported
+  references before process creation;
+- concurrency tests for simultaneous submissions, idempotency reservation
+  success, failure, cancellation, and crash recovery, profile and feedback
+  contention, cache admission with active leases, cache lock ordering, and
   lock timeout;
-- resource overflow, stream and artefact truncation, retention, feedback
-  rotation, and bounded-parser tests;
+- resource overflow, stream and artefact truncation, run retention, the
+  aggregate feedback byte/file cap and locked deletion during rotation, and
+  bounded-parser tests;
 - cancellation and shutdown tests for owned process trees, bounded grace
   periods, and temporary-file cleanup;
-- crash-recovery tests for orphaned tasks, profile and feedback transactions,
-  cache publication and lease release, and retained partial records; and
+- crash-recovery tests for orphaned tasks and process-group adoption or
+  termination, writer fencing, profile and feedback transactions, cache
+  publication and lease release, idempotency reconciliation, and retained
+  partial records; and
 - partial-failure tests for atomic theorem/backend outcomes and bounded
   unfinished-work diagnostics;
 - end-to-end tests invoking `cargo-theorem` through Cargo's external-subcommand
