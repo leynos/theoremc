@@ -28,9 +28,9 @@ functionality:
 
 The CLI uses `ortho_config` for configuration discovery and merging, generated
 command documentation, recursive subcommand metadata, localization, and compact
-agent context. The command surface follows the agent-native principles described
-by Trevin Chow and the stricter reusable contract in OrthoConfig's agent-native
-CLI design.[^agent-native][^ortho-agent-native]
+agent context. The command surface follows the agent-native principles
+described by Trevin Chow and the stricter reusable contract in OrthoConfig's
+agent-native CLI design.[^agent-native][^ortho-agent-native]
 
 The CLI is not a second theorem compiler. It is an application shell around
 library-owned parsing, generation, execution, reporting, and project-mutation
@@ -85,16 +85,16 @@ the local CLI.
 ### 4.1 Cargo external subcommand
 
 A dedicated workspace package at `crates/cargo-theorem/` owns the
-`cargo-theorem` binary. Cargo discovers that executable on `PATH` and exposes it
-as `cargo theorem`. The entry point normalizes Cargo's external-subcommand
+`cargo-theorem` binary. Cargo discovers that executable on `PATH` and exposes
+it as `cargo theorem`. The entry point normalizes Cargo's external-subcommand
 argument convention before parsing the application arguments.
 
 The dedicated package keeps application-only dependencies out of the
-consumer-facing `theoremc` facade. The root package remains a library facade and
-build-integration owner rather than accumulating CLI rendering, process control,
-Cargo metadata, and report-delivery dependencies. The placeholder
-`src/main.rs` is removed when `cargo-theorem` lands so theoremc does not ship an
-unrelated `theoremc` executable beside the Cargo subcommand.
+consumer-facing `theoremc` facade. The root package remains a library facade
+and build-integration owner rather than accumulating CLI rendering, process
+control, Cargo metadata, and report-delivery dependencies. The placeholder
+`src/main.rs` is removed when `cargo-theorem` lands so theoremc does not ship
+an unrelated `theoremc` executable beside the Cargo subcommand.
 
 ### 4.2 Mixed minimum supported Rust version policy
 
@@ -154,14 +154,14 @@ flowchart LR
 
 The initial crate responsibilities are:
 
-| Package | Responsibility |
-| --- | --- |
-| `cargo-theorem` | Cargo entry point, OrthoConfig types, dispatch, human and JSON application rendering, exit-code mapping |
-| `theoremc-core` | Theorem loading, validation, identifiers, aliases, backend-neutral intermediate representation, diagnostics |
-| `theoremc-build` | Reusable theorem discovery, suite rendering, build-script entry points, Cargo manifest and `build.rs` integration plans |
-| `theoremc-runner` | Backend provider interface, command execution abstraction, canonical run records, run ledger, replay orchestration |
-| `theoremc-report` | Markdown, HTML, JUnit XML, Cucumber JSON, and canonical JSON report rendering |
-| `theoremc-macros` | Compile-time theorem expansion and generated backend harnesses |
+| Package           | Responsibility                                                                                                          |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `cargo-theorem`   | Cargo entry point, OrthoConfig types, dispatch, human and JSON application rendering, exit-code mapping                 |
+| `theoremc-core`   | Theorem loading, validation, identifiers, aliases, backend-neutral intermediate representation, diagnostics             |
+| `theoremc-build`  | Reusable theorem discovery, suite rendering, build-script entry points, Cargo manifest and `build.rs` integration plans |
+| `theoremc-runner` | Backend provider interface, command execution abstraction, canonical run records, run ledger, replay orchestration      |
+| `theoremc-report` | Markdown, HTML, JUnit XML, Cucumber JSON, and canonical JSON report rendering                                           |
+| `theoremc-macros` | Compile-time theorem expansion and generated backend harnesses                                                          |
 
 *Table 1: Initial package responsibilities and dependency boundaries.*
 
@@ -170,8 +170,8 @@ feature-grouped modules while their interfaces settle. They must nevertheless
 respect these dependency directions. The CLI must not become the only place
 where reusable project, execution, or report logic exists.
 
-The application depends inward on the libraries. Core libraries do not depend
-on `cargo-theorem`, Clap, terminal rendering, or process-global configuration.
+The application depends inward on the libraries. Core libraries do not depend on
+`cargo-theorem`, Clap, terminal rendering, or process-global configuration.
 Project and artefact filesystem services use `camino`, `cap_std`, and
 `cap_std::fs_utf8` rather than ambient `std::fs` operations.
 
@@ -348,24 +348,24 @@ CLI does not stutter as `cargo theorem theorem list`.
 
 ### 7.1 Command capability matrix
 
-| Command | Effect | JSON | Bounded | Mutation guard |
-| --- | --- | --- | --- | --- |
-| `init` | Add theoremc project integration | Yes | Not applicable | `--dry-run`; `--force` only for conflicts |
-| `list` | List theorem metadata | Yes | `--limit`, `--cursor` | Read-only |
-| `get` | Read one theorem and its resolved metadata | Yes | One resource | Read-only |
-| `create` | Scaffold a theorem document | Yes | One resource | `--dry-run`; refuses to overwrite without `--force` |
-| `action *` | Inspect or scaffold action bindings | Yes | Lists are paginated | Mutations support `--dry-run` |
-| `check` | Validate sources, aliases, integration, and configured backend availability | Yes | Summary plus artefact paths | Read-only by default; `--compile` is effectful; never installs |
-| `build-script *` | Manage or execute build integration | Yes | One package per mutation | Mutations support `--dry-run` and atomic writes |
-| `generate` | Render suite, harness, or metadata output | Yes | Selected theorems only | Writes only through `--deliver` |
-| `run` | Execute selected theorem evidence | Yes | Filtered selection and bounded summaries | Records a run; never installs |
-| `replay` | Reproduce a stored counterexample | Yes | One run/theorem at a time | Creates a child run record |
-| `report create` | Render a stored canonical run | Yes | One run, selected formats | Writes only through `--deliver` |
-| `backend *` | Inspect and manage prover tools | Yes | Backend list is paginated | Install/update/delete support `--dry-run` |
-| `jobs *` | Inspect durable run state | Yes | `--limit`, `--cursor`; log excerpts bounded | Cancel/prune require explicit targets |
-| `profile *` | Manage named configuration overlays | Yes | Profile list is paginated | Save/delete support `--dry-run`; delete needs `--force` |
-| `context` | Emit compact command context | Required | Versioned compact schema | Read-only and project-independent |
-| `feedback` | Record CLI friction | Yes | One record | Local append; optional delivery is explicit |
+| Command          | Effect                                                                      | JSON     | Bounded                                     | Mutation guard                                                 |
+| ---------------- | --------------------------------------------------------------------------- | -------- | ------------------------------------------- | -------------------------------------------------------------- |
+| `init`           | Add theoremc project integration                                            | Yes      | Not applicable                              | `--dry-run`; `--force` only for conflicts                      |
+| `list`           | List theorem metadata                                                       | Yes      | `--limit`, `--cursor`                       | Read-only                                                      |
+| `get`            | Read one theorem and its resolved metadata                                  | Yes      | One resource                                | Read-only                                                      |
+| `create`         | Scaffold a theorem document                                                 | Yes      | One resource                                | `--dry-run`; refuses to overwrite without `--force`            |
+| `action *`       | Inspect or scaffold action bindings                                         | Yes      | Lists are paginated                         | Mutations support `--dry-run`                                  |
+| `check`          | Validate sources, aliases, integration, and configured backend availability | Yes      | Summary plus artefact paths                 | Read-only by default; `--compile` is effectful; never installs |
+| `build-script *` | Manage or execute build integration                                         | Yes      | One package per mutation                    | Mutations support `--dry-run` and atomic writes                |
+| `generate`       | Render suite, harness, or metadata output                                   | Yes      | Selected theorems only                      | Writes only through `--deliver`                                |
+| `run`            | Execute selected theorem evidence                                           | Yes      | Filtered selection and bounded summaries    | Records a run; never installs                                  |
+| `replay`         | Reproduce a stored counterexample                                           | Yes      | One run/theorem at a time                   | Creates a child run record                                     |
+| `report create`  | Render a stored canonical run                                               | Yes      | One run, selected formats                   | Writes only through `--deliver`                                |
+| `backend *`      | Inspect and manage prover tools                                             | Yes      | Backend list is paginated                   | Install/update/delete support `--dry-run`                      |
+| `jobs *`         | Inspect durable run state                                                   | Yes      | `--limit`, `--cursor`; log excerpts bounded | Cancel/prune require explicit targets                          |
+| `profile *`      | Manage named configuration overlays                                         | Yes      | Profile list is paginated                   | Save/delete support `--dry-run`; delete needs `--force`        |
+| `context`        | Emit compact command context                                                | Required | Versioned compact schema                    | Read-only and project-independent                              |
+| `feedback`       | Record CLI friction                                                         | Yes      | One record                                  | Local append; optional delivery is explicit                    |
 
 *Table 2: Command effects, response bounds, and mutation guards.*
 
@@ -377,8 +377,8 @@ Commands do not prompt by default. Missing required values fail immediately and
 name the required flags. A future human wizard may be exposed only through an
 explicit `--interactive` flag and cannot be the sole route to any operation.
 
-`--no-input` is accepted globally and makes the no-prompt contract explicit.
-It is useful in generated examples and CI even though the default already avoids
+`--no-input` is accepted globally and makes the no-prompt contract explicit. It
+is useful in generated examples and CI even though the default already avoids
 prompts. Destructive confirmation bypass uses `--force`; synonyms such as
 `--yes` and `--skip-confirmations` are not introduced.
 
@@ -399,10 +399,10 @@ Data-returning commands support `--json`. In JSON mode:
 - schema identifiers, diagnostic codes, exit classes, backend names, and status
   values are never localized.
 
-`--json --deliver stdout` is invalid. It returns one usage-error JSON diagnostic
-on stderr and does not deliver the report or generated source, preserving stdout
-for exactly one JSON document. JSON callers must use a file or another
-supported delivery target.
+`--json --deliver stdout` is invalid. It returns one usage-error JSON
+diagnostic on stderr and does not deliver the report or generated source,
+preserving stdout for exactly one JSON document. JSON callers must use a file
+or another supported delivery target.
 
 Human mode writes primary output to stdout and diagnostics or progress to
 stderr. The global renderer options follow OrthoConfig's glossary:
@@ -420,16 +420,16 @@ stderr. The global renderer options follow OrthoConfig's glossary:
 --verbose
 ```
 
-A report's domain format is separate from the application protocol. For
-example, `report create --format junit --json` returns a JSON command result
-whose `artefacts` array identifies the JUnit file. It does not place XML beside
-JSON on stdout.
+A report's domain format is separate from the application protocol. For example,
+`report create --format junit --json` returns a JSON command result whose
+`artefacts` array identifies the JUnit file. It does not place XML beside JSON
+on stdout.
 
 ### 8.3 JSON envelope
 
 All application JSON documents use a versioned envelope. Command-specific data
-lives under `result` for successful commands only. Failure diagnostics live under
-`error` for failed commands only; the two fields are mutually exclusive.
+lives under `result` for successful commands only. Failure diagnostics live
+under `error` for failed commands only; the two fields are mutually exclusive.
 
 ```json
 {
@@ -478,25 +478,25 @@ applicable:
 ```
 
 The application envelope and theorem run-record schema version independently.
-Changing report fields must not force a command-protocol version bump unless the
-application envelope itself changes incompatibly.
+Changing report fields must not force a command-protocol version bump unless
+the application envelope itself changes incompatibly.
 
 ### 8.4 Exit-code taxonomy
 
 The stable application exit codes are:
 
-| Code | Class | Meaning |
-| --- | --- | --- |
-| `0` | `success` | The command completed and all selected evidence matched policy |
-| `2` | `usage` | Arguments or a selected value were invalid |
-| `3` | `configuration` | Configuration could not be discovered, merged, or validated |
-| `4` | `project_state` | Cargo package or theoremc integration state was unsuitable |
-| `5` | `backend_unavailable` | A required backend was missing or did not match its pin |
-| `6` | `verification_mismatch` | Actual proof status differed from declared evidence policy |
-| `7` | `verification_incomplete` | A selected proof was unreachable, undetermined, timed out, or cancelled without an accepted expectation |
-| `8` | `external_tool_failure` | Cargo, Rustup, or a backend failed outside a parsed proof result |
-| `9` | `delivery_failure` | Execution succeeded but an explicitly requested delivery target failed |
-| `10` | `internal` | The CLI violated an invariant or encountered an unclassified failure |
+| Code | Class                     | Meaning                                                                                                 |
+| ---- | ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `0`  | `success`                 | The command completed and all selected evidence matched policy                                          |
+| `2`  | `usage`                   | Arguments or a selected value were invalid                                                              |
+| `3`  | `configuration`           | Configuration could not be discovered, merged, or validated                                             |
+| `4`  | `project_state`           | Cargo package or theoremc integration state was unsuitable                                              |
+| `5`  | `backend_unavailable`     | A required backend was missing or did not match its pin                                                 |
+| `6`  | `verification_mismatch`   | Actual proof status differed from declared evidence policy                                              |
+| `7`  | `verification_incomplete` | A selected proof was unreachable, undetermined, timed out, or cancelled without an accepted expectation |
+| `8`  | `external_tool_failure`   | Cargo, Rustup, or a backend failed outside a parsed proof result                                        |
+| `9`  | `delivery_failure`        | Execution succeeded but an explicitly requested delivery target failed                                  |
+| `10` | `internal`                | The CLI violated an invariant or encountered an unclassified failure                                    |
 
 *Table 3: Stable application exit classes and their process exit codes.*
 
@@ -531,19 +531,19 @@ changes this contract:
 - the run ledger retains at most 10,000 runs, 10 GiB, or 30 days, whichever is
   reached first;
 - each feedback record is limited to 8 KiB, each feedback file is limited to
-  1 MiB before rotation, and the complete rotated feedback set is limited to
-  64 MiB or 64 files, whichever is reached first; and
+  1 MiB before rotation, and the complete rotated feedback set is limited to 64
+  MiB or 64 files, whichever is reached first; and
 - the backend cache defaults to 10 GiB and evicts non-active entries by LRU or
   age.
 
 Bounded sinks stream backend stdout and stderr to files rather than buffering
-them without a limit. Every truncated stream or artefact records
-`bytes_seen`, `bytes_retained`, `limit_bytes`, and `truncated`. Parsers accept
-bounded, framed input and return a stable limit or partial-result diagnostic
-when a bound is reached. After preflight verifies the selection and retention
-limits, theorem selection and outcomes are persisted incrementally; a failed
-later job does not require retaining unbounded intermediate state. `jobs prune`
-uses these same retention rules and never removes active runs or records still
+them without a limit. Every truncated stream or artefact records `bytes_seen`,
+`bytes_retained`, `limit_bytes`, and `truncated`. Parsers accept bounded,
+framed input and return a stable limit or partial-result diagnostic when a
+bound is reached. After preflight verifies the selection and retention limits,
+theorem selection and outcomes are persisted incrementally; a failed later job
+does not require retaining unbounded intermediate state. `jobs prune` uses
+these same retention rules and never removes active runs or records still
 needed by an idempotency reservation. Feedback append, rotation, and deletion
 of rotated files all hold the feedback lock. Rotation deletes the oldest files
 only after the aggregate 64 MiB/64-file cap would otherwise be exceeded; the
@@ -567,8 +567,8 @@ plan may:
 The default is additive. Existing files are preserved unless theoremc can prove
 that a managed fragment can be updated safely. `--dry-run` returns a structured
 plan containing create, edit, unchanged, conflict, and manual-action entries.
-`--force` authorizes only the specific conflicts named in that plan; it does not
-turn arbitrary source rewriting into an accepted operation.
+`--force` authorizes only the specific conflicts named in that plan; it does
+not turn arbitrary source rewriting into an accepted operation.
 
 Applying the same plan twice must result in no content changes. All file writes
 use a temporary sibling, flush, and atomic rename. Multi-file changes acquire a
@@ -576,12 +576,12 @@ workspace-local lock and retain a recovery journal until all renames complete.
 
 ### 9.2 Theorem scaffolding
 
-`cargo theorem create <theorem-name>` creates one valid `.theorem` document. The
-positional value is the theorem's name (`T`), not its canonical external ID. It
-accepts `--about`, `--backend`, `--tag`, `--path`, and `--template`. Without an
-explicit path, it derives `theorems/<normalized-name>.theorem`. The canonical
-external ID is then `{normalized_path(P)}#<theorem-name>`, where `P` is the
-created path; callers use that ID with `get` and stable-ID selectors.
+`cargo theorem create <theorem-name>` creates one valid `.theorem` document.
+The positional value is the theorem's name (`T`), not its canonical external
+ID. It accepts `--about`, `--backend`, `--tag`, `--path`, and `--template`.
+Without an explicit path, it derives `theorems/<normalized-name>.theorem`. The
+canonical external ID is then `{normalized_path(P)}#<theorem-name>`, where `P`
+is the created path; callers use that ID with `get` and stable-ID selectors.
 
 An explicit `--path` is resolved relative to the selected workspace when it is
 not absolute. Before any file is written, theoremc canonicalizes the workspace
@@ -596,22 +596,22 @@ that a proof exists. `--template example` may create a complete pedagogical
 example, but ordinary creation does not generate assertions from the theorem
 name.
 
-`action create` can add a theorem-side signature declaration and a deterministic
-re-export entry for an existing Rust function. Function-body generation requires
-an explicit `--stub` mode and a complete parameter and return signature. The
-default does not add `todo!()`, panic stubs, or lint suppressions to consumer
-code.
+`action create` can add a theorem-side signature declaration and a
+deterministic re-export entry for an existing Rust function. Function-body
+generation requires an explicit `--stub` mode and a complete parameter and
+return signature. The default does not add `todo!()`, panic stubs, or lint
+suppressions to consumer code.
 
 ### 9.3 Inspection commands
 
-`list` returns stable theorem IDs, paths, tags, configured backends, and a short
-status summary. `get` returns one theorem's parsed document, canonical ID,
-aliases, generated harness names, referenced actions, and evidence policy.
+`list` returns stable theorem IDs, paths, tags, configured backends, and a
+short status summary. `get` returns one theorem's parsed document, canonical
+ID, aliases, generated harness names, referenced actions, and evidence policy.
 Source text is omitted from JSON unless `--include-source` is explicit.
 
-`action list` and `action get` expose canonical names, mangled exports, declared
-signatures, source theorems, and binding-probe status. They do not attempt Rust
-reflection beyond the compile-time contracts theoremc already owns.
+`action list` and `action get` expose canonical names, mangled exports,
+declared signatures, source theorems, and binding-probe status. They do not
+attempt Rust reflection beyond the compile-time contracts theoremc already owns.
 
 ## 10. Build-script integration
 
@@ -650,26 +650,26 @@ It supports `--dry-run` and is idempotent.
 - generated-suite inclusion exists in the target crate; and
 - a normal Cargo build will observe theorem source changes.
 
-`build-script run` calls the same fallible build service directly. By default it
-uses a temporary output directory and returns the rendered suite as an artefact.
-`--out-dir` is an advanced diagnostic option. This command never impersonates
-Cargo by mutating the caller's environment globally.
+`build-script run` calls the same fallible build service directly. By default
+it uses a temporary output directory and returns the rendered suite as an
+artefact. `--out-dir` is an advanced diagnostic option. This command never
+impersonates Cargo by mutating the caller's environment globally.
 
-`build-script delete` removes only theoremc-managed statements and dependencies.
-It requires `--force`, supports `--dry-run`, and refuses removal when another
-manifest entry or source reference still needs the dependency.
+`build-script delete` removes only theoremc-managed statements and
+dependencies. It requires `--force`, supports `--dry-run`, and refuses removal
+when another manifest entry or source reference still needs the dependency.
 
 ### 10.3 `check` and `generate`
 
-Top-level `check` composes schema validation, alias validation, action-signature
-checks, build-script checks, and non-installing backend pin checks. The default
-command is read-only. `check --compile` is an explicit effectful command
-boundary: Cargo may execute the package's arbitrary `build.rs`, so its plan and
-agent context classify it separately from read-only validation. Theoremc itself
-performs no network access or backend installation in either mode. A project
-`build.rs` invoked by `check --compile` may independently access the network or
-install tools; those effects are outside theoremc's control and are reported as
-project build effects.
+Top-level `check` composes schema validation, alias validation,
+action-signature checks, build-script checks, and non-installing backend pin
+checks. The default command is read-only. `check --compile` is an explicit
+effectful command boundary: Cargo may execute the package's arbitrary
+`build.rs`, so its plan and agent context classify it separately from read-only
+validation. Theoremc itself performs no network access or backend installation
+in either mode. A project `build.rs` invoked by `check --compile` may
+independently access the network or install tools; those effects are outside
+theoremc's control and are reported as project build effects.
 
 `generate` exposes deterministic internal artefacts for diagnosis and tooling:
 
@@ -729,27 +729,26 @@ execution. `--keep-going` and `--fail-fast` are mutually exclusive.
 
 An optional `--idempotency-key` prevents duplicate active submissions. Reusing
 a key with an identical input digest returns the existing job. Reusing it with
-different inputs fails and reports both digests. `--force-new` creates a new job
-while retaining the relationship to the prior run.
+different inputs fails and reports both digests. `--force-new` creates a new
+job while retaining the relationship to the prior run.
 
 #### Concurrency and task ownership
 
-The persistence boundaries are the profile store, workspace run ledger,
-per-run directory, workspace feedback JSONL, and platform backend cache. The
-profile lock covers atomic profile read-modify-write transactions. The
-workspace lock covers mutation plans, idempotency reservations, the append-only
-run index, pruning, and index compaction. A per-run lock covers that run's
-plan, record, artefacts, and incremental outcome updates. The feedback lock
-covers complete-line append, rotation, and rotated-file deletion; delivery
-occurs outside that lock. The backend cache uses per-key and index locks for
-staging, checksum verification, atomic publication, and eviction; readers use
-immutable entries and an active-install lease prevents eviction while a tool is
-in use. Cache admission reserves the complete expected entry size under the
-index lock before staging starts. It may evict only unleased entries, and an
-installation is rejected with a bounded resource diagnostic if the reservation
-cannot fit. A caller may wait for active leases only up to the configured
-admission timeout; the cache never exceeds its configured limit, including
-staged bytes.
+The persistence boundaries are the profile store, workspace run ledger, per-run
+directory, workspace feedback JSONL, and platform backend cache. The profile
+lock covers atomic profile read-modify-write transactions. The workspace lock
+covers mutation plans, idempotency reservations, the append-only run index,
+pruning, and index compaction. A per-run lock covers that run's plan, record,
+artefacts, and incremental outcome updates. The feedback lock covers
+complete-line append, rotation, and rotated-file deletion; delivery occurs
+outside that lock. The backend cache uses per-key and index locks for staging,
+checksum verification, atomic publication, and eviction; readers use immutable
+entries and an active-install lease prevents eviction while a tool is in use.
+Cache admission reserves the complete expected entry size under the index lock
+before staging starts. It may evict only unleased entries, and an installation
+is rejected with a bounded resource diagnostic if the reservation cannot fit. A
+caller may wait for active leases only up to the configured admission timeout;
+the cache never exceeds its configured limit, including staged bytes.
 
 The cache lock protocol has one internal order: index lock before per-key lock.
 Staging and checksum verification hold only the per-key lock after admission
@@ -762,12 +761,12 @@ per-key lock; operations needing both release the first lock and reacquire in
 the stated order. This protocol covers staging, checksum verification,
 publication, and eviction without a lock cycle.
 
-When an operation genuinely needs more than one lock, acquisition has one
-total order—profile, workspace, run, feedback, then backend-cache—and code
-never acquires locks in reverse. Single-store operations acquire only their
-store's lock. Each acquisition has a bounded timeout and reports the current
-owner and lock path on timeout; a stale owner is recoverable only through
-startup reconciliation, not by silently breaking the lock.
+When an operation genuinely needs more than one lock, acquisition has one total
+order—profile, workspace, run, feedback, then backend-cache—and code never
+acquires locks in reverse. Single-store operations acquire only their store's
+lock. Each acquisition has a bounded timeout and reports the current owner and
+lock path on timeout; a stale owner is recoverable only through startup
+reconciliation, not by silently breaking the lock.
 
 Idempotency reservation and run creation are one atomic critical section. A
 reservation starts as `reserved` and stores the key, input digest, and job ID
@@ -831,11 +830,12 @@ The canonical record is deterministic apart from fields explicitly documented
 as run identity or wall-clock data. Report renderers consume it and never parse
 human terminal output.
 
-`--backend-arg NAME=VALUE` accepts public values only. Provider schemas classify
-known arguments, and undeclared or secret-typed arguments supplied through this
-option are rejected rather than guessed. Providers declare protected secret
-inputs separately; a configured secret provider or injected execution context
-supplies a protected input reference, never secret bytes as a CLI value.
+`--backend-arg NAME=VALUE` accepts public values only. Provider schemas
+classify known arguments, and undeclared or secret-typed arguments supplied
+through this option are rejected rather than guessed. Providers declare
+protected secret inputs separately; a configured secret provider or injected
+execution context supplies a protected input reference, never secret bytes as a
+CLI value.
 
 Typed `BackendArgument` entries therefore distinguish `Public { name, value }`
 from `ProtectedSecret { name, input_ref }`. Public entries may be placed in the
@@ -865,15 +865,15 @@ Multiple `--format` values require `--deliver` to a directory or a filename
 pattern. Machine-facing formats retain stable codes and English fallback text.
 Localized strings are optional projections and do not replace invariant fields.
 
-`replay <run-id>` selects a failed theorem and delegates to the owning backend's
-replay capability. With one replayable failure, the selector is implicit. When
-the source run has multiple replayable failures, `--id <theorem-id>` is
-required; omitting it fails with a bounded list of valid failed IDs. An ID that
-is not in that list is also a bounded usage diagnostic. Kani concrete playback
-is the first implementation. The result is a child run with links to the
-original counterexample, generated playback source, command line, and logs.
-Replaying never rewrites application source unless a future explicit `--apply`
-workflow is separately designed.
+`replay <run-id>` selects a failed theorem and delegates to the owning
+backend's replay capability. With one replayable failure, the selector is
+implicit. When the source run has multiple replayable failures,
+`--id <theorem-id>` is required; omitting it fails with a bounded list of valid
+failed IDs. An ID that is not in that list is also a bounded usage diagnostic.
+Kani concrete playback is the first implementation. The result is a child run
+with links to the original counterexample, generated playback source, command
+line, and logs. Replaying never rewrites application source unless a future
+explicit `--apply` workflow is separately designed.
 
 ## 12. Proof backend management
 
@@ -902,9 +902,9 @@ pub trait BackendReplay {
 ```
 
 These traits are illustrative rather than a frozen Rust API, but the separation
-is normative. Providers construct argument vectors, never shell command strings,
-and every operation that discovers, plans, executes, or parses remains fallible.
-The illustrative command boundary is:
+is normative. Providers construct argument vectors, never shell command
+strings, and every operation that discovers, plans, executes, or parses remains
+fallible. The illustrative command boundary is:
 
 ```rust
 pub struct CommandSpec {
@@ -927,8 +927,8 @@ Before creating a process, the runner resolves every entry in
 `ProtectedSecret::input_ref` is represented by a `ProtectedInputRef`, and the
 channel must provide an exact one-to-one mapping: every declared secret has one
 matching input, and no input is unclaimed. Missing, extra, duplicate, or
-unsupported references are rejected before process creation, without starting
-a child or writing execution artefacts. The `input_ref` used for this binding
+unsupported references are rejected before process creation, without starting a
+child or writing execution artefacts. The `input_ref` used for this binding
 remains an opaque, non-redeemable identifier at the command boundary; the
 channel, rather than a persisted run record, owns the protected value.
 
@@ -965,9 +965,9 @@ jobs = 2
 
 The paths above are examples, not defaults. `backend update` resolves an
 explicit version request and writes both project intent and `theoremc.lock`.
-The lock file records resolved versions, release source, checksum, required Rust
-toolchain, and provider schema version. It does not record machine-specific
-installation paths.
+The lock file records resolved versions, release source, checksum, required
+Rust toolchain, and provider schema version. It does not record
+machine-specific installation paths.
 
 Installations live in the platform cache directory by default and may be
 redirected with configuration. A cache entry is content-addressed by backend,
@@ -980,12 +980,12 @@ entry.
 `backend get` returns one descriptor, pin, installation, capability, and health
 record.
 
-`backend install <backend>` installs the locked or explicitly requested release.
-It never rewrites project pins unless `--update-lock` is explicit. It supports
-`--dry-run`, `--offline`, `--force`, and an explicit installation root.
+`backend install <backend>` installs the locked or explicitly requested
+release. It never rewrites project pins unless `--update-lock` is explicit. It
+supports `--dry-run`, `--offline`, `--force`, and an explicit installation root.
 
-`backend check <backend>` compares the installed tool with the resolved lock and
-runs provider-specific usability probes. It performs no installation.
+`backend check <backend>` compares the installed tool with the resolved lock
+and runs provider-specific usability probes. It performs no installation.
 
 `backend sync` checks every selected backend and installs only missing or
 mismatched locked releases. Its JSON plan lists each no-op and mutation.
@@ -1137,23 +1137,23 @@ requested explicitly with `--project`, in which case it adds configured backend
 and profile names without secrets.
 
 Long-form agent workflow material, including a future `SKILL.md`, is validated
-against the compact context rather than becoming another hand-maintained command
-schema.
+against the compact context rather than becoming another hand-maintained
+command schema.
 
 ## 15. Mapping to agent-native principles
 
-| Principle | `cargo theorem` contract |
-| --- | --- |
-| Non-interactive by default | No command requires prompts; `--no-input` makes the contract explicit; destructive bypass is `--force` |
-| Structured, parseable output | `--json` provides one versioned document; data uses stdout, diagnostics use stderr, subprocess streams become artefacts |
-| Errors that teach | Invalid values include `valid_values`; ambiguous packages and selectors enumerate bounded choices |
-| Safe retries and explicit mutation | Mutations support `--dry-run`; writes are atomic and idempotent; run submissions accept idempotency keys |
-| Bounded responses | List commands use `--limit` and `--cursor`; summaries and log previews have hard bounds |
-| Familiar vocabulary | Primary resources use `list`, `get`, `create`, `delete`; domain exceptions are declared in agent context |
-| Layered introspection | `--help`, `context --json`, and validated long-form workflow material share one metadata spine |
-| Async-aware execution | `run --no-wait` returns a durable job ID; `jobs` supports list, get, cancel, and prune |
-| Persistent profiles | Named overlays merge between project files and environment variables; secrets are redacted from context |
-| Two-way I/O | `--deliver` routes artefacts and `feedback` records friction through explicit, inspectable contracts |
+| Principle                          | `cargo theorem` contract                                                                                                |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Non-interactive by default         | No command requires prompts; `--no-input` makes the contract explicit; destructive bypass is `--force`                  |
+| Structured, parseable output       | `--json` provides one versioned document; data uses stdout, diagnostics use stderr, subprocess streams become artefacts |
+| Errors that teach                  | Invalid values include `valid_values`; ambiguous packages and selectors enumerate bounded choices                       |
+| Safe retries and explicit mutation | Mutations support `--dry-run`; writes are atomic and idempotent; run submissions accept idempotency keys                |
+| Bounded responses                  | List commands use `--limit` and `--cursor`; summaries and log previews have hard bounds                                 |
+| Familiar vocabulary                | Primary resources use `list`, `get`, `create`, `delete`; domain exceptions are declared in agent context                |
+| Layered introspection              | `--help`, `context --json`, and validated long-form workflow material share one metadata spine                          |
+| Async-aware execution              | `run --no-wait` returns a durable job ID; `jobs` supports list, get, cancel, and prune                                  |
+| Persistent profiles                | Named overlays merge between project files and environment variables; secrets are redacted from context                 |
+| Two-way I/O                        | `--deliver` routes artefacts and `feedback` records friction through explicit, inspectable contracts                    |
 
 *Table 4: Agent-native principles mapped to CLI contracts.*
 
@@ -1193,12 +1193,12 @@ state these boundaries.
 
 Application and library operations emit structured `tracing` spans for project
 resolution, plan construction, file mutation, backend discovery, installation,
-execution, parsing, report rendering, and delivery. Human and JSON renderers are
-subscribers to domain events and results, not the source of truth.
+execution, parsing, report rendering, and delivery. Human and JSON renderers
+are subscribers to domain events and results, not the source of truth.
 
 Metrics use low-cardinality labels such as command, backend, outcome class, and
-installation result. The CLI must not use theorem IDs, paths, run IDs, raw error
-text, or profile names as metric labels. Libraries do not install global
+installation result. The CLI must not use theorem IDs, paths, run IDs, raw
+error text, or profile names as metric labels. Libraries do not install global
 subscribers or recorders.
 
 ## 18. Test and release strategy
@@ -1224,8 +1224,8 @@ The CLI requires these test layers:
   references before process creation;
 - concurrency tests for simultaneous submissions, idempotency reservation
   success, failure, cancellation, and crash recovery, profile and feedback
-  contention, cache admission with active leases, cache lock ordering, and
-  lock timeout;
+  contention, cache admission with active leases, cache lock ordering, and lock
+  timeout;
 - resource overflow, stream and artefact truncation, run retention, the
   aggregate feedback byte/file cap and locked deletion during rotation, and
   bounded-parser tests;
@@ -1248,10 +1248,10 @@ A command does not become stable until its human help, agent context, JSON
 success and error forms, exit class, dry-run behaviour where relevant, and
 bounded-output contract have tests.
 
-The release that claims `rust-prover-tools` replacement must run parity fixtures
-for Kani installation/checking and Verus installation/execution on every
-supported host. The Python tool remains available until that release ships, then
-moves to maintenance-only status before archival.
+The release that claims `rust-prover-tools` replacement must run parity
+fixtures for Kani installation/checking and Verus installation/execution on
+every supported host. The Python tool remains available until that release
+ships, then moves to maintenance-only status before archival.
 
 ## 19. Delivery sequence and dependency gates
 

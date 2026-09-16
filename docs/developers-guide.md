@@ -365,8 +365,9 @@ The planned CLI package has a separate MSRV from the libraries because
 OrthoConfig 0.9.0 requires Rust 1.89. That package is not in the workspace yet:
 all current packages, including the root `theoremc` crate, use Rust 1.88.
 Validate the current workspace with `cargo +1.88 check --workspace`. After the
-CLI package lands, introduce split validation with `cargo +1.88 check
---workspace --exclude cargo-theorem` and `cargo +1.89 check -p cargo-theorem`.
+CLI package lands, introduce split validation with
+`cargo +1.88 check --workspace --exclude cargo-theorem` and
+`cargo +1.89 check -p cargo-theorem`.
 
 Backend integration uses narrow ports. Backend lifecycle concerns (discovery,
 resolution, installation, and health checks) must remain separate from backend
