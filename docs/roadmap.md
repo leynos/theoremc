@@ -330,9 +330,9 @@ Out of scope: theorem execution and project mutation.
   Signposts: `CLI-DES`.
 - [ ] Adopt `ortho_config` for CLI, environment, file, selected-profile, and
   selected-subcommand merging, using `SelectedSubcommandMerge` and
-  `OrthoConfigSubcommandDocs`. Acceptance: precedence tests prove
-  defaults < files < profile < environment < flags, and generated recursive
-  documentation matches the Clap command tree. Signposts: `CLI-DES`.
+  `OrthoConfigSubcommandDocs`. Acceptance: precedence tests prove defaults <
+  files < profile < environment < flags, and generated recursive documentation
+  matches the Clap command tree. Signposts: `CLI-DES`.
 - [ ] Establish the mixed-MSRV policy required by `ortho_config` 0.9.0: retain
   Rust 1.88 for library packages and declare Rust 1.89 for `cargo-theorem`.
   Acceptance: CI tests the library workspace excluding the CLI on 1.88 and the
@@ -389,16 +389,15 @@ Out of scope: arbitrary Rust source repair and proof generation from prose.
   script and direct CLI path use the same discovery and rendering fixtures.
   Signposts: `CLI-DES`, `DES-7`.
 - [ ] Implement an immutable project mutation plan with create, edit,
-  unchanged, conflict, and manual-action entries. Apply plans under a
-  workspace lock with temporary siblings, flush, atomic rename, and a recovery
-  journal. Acceptance: property tests prove repeat application is idempotent,
-  and failure-injection tests leave either the old or complete new state.
-  Signposts: `CLI-DES`.
+  unchanged, conflict, and manual-action entries. Apply plans under a workspace
+  lock with temporary siblings, flush, atomic rename, and a recovery journal.
+  Acceptance: property tests prove repeat application is idempotent, and
+  failure-injection tests leave either the old or complete new state. Signposts:
+  `CLI-DES`.
 - [ ] Implement `init`, top-level `create`, and `action create` with `--dry-run`
   and narrowly scoped `--force` handling. Acceptance: scaffolds are schema
   valid, do not invent assertions, do not generate panic or `todo!()` stubs by
-  default, and refuse unsafe overwrites. Signposts: `CLI-DES`, `TFS-1`,
-  `DES-5`.
+  default, and refuse unsafe overwrites. Signposts: `CLI-DES`, `TFS-1`, `DES-5`.
 - [ ] Implement `build-script install`, `check`, `run`, and `delete` using
   parsed Rust source spans and managed calls rather than blind string
   replacement. Acceptance: fixtures cover absent, generated, already managed,
@@ -431,10 +430,10 @@ Out of scope: backend-neutral theorem lowering beyond Kani.
   installation mutations support `--dry-run`, pin checks never install, and the
   lock omits machine-specific paths. Signposts: `CLI-DES`.
 - [ ] Port Kani installation, setup, semantic-version checking, command
-  override, harness execution, and concrete playback from
-  `rust-prover-tools`. Acceptance: parity scenarios cover matching and
-  mismatched pins, missing installations, setup failure, and version parsing.
-  Signposts: `CLI-DES`, `DES-8`.
+  override, harness execution, and concrete playback from `rust-prover-tools`.
+  Acceptance: parity scenarios cover matching and mismatched pins, missing
+  installations, setup failure, and version parsing. Signposts: `CLI-DES`,
+  `DES-8`.
 - [ ] Port Verus release-target selection, bounded download, checksum
   verification, safe extraction, binary discovery, Rust toolchain preparation,
   and raw proof-file execution from `rust-prover-tools`. Acceptance: default
@@ -581,10 +580,10 @@ Out of scope: dashboard hosting.
 
 - [ ] Implement a canonical theorem run record that includes theorem ID,
   metadata, assumptions, step outcomes, assertion outcomes, witness outcomes,
-  evidence config, backend provenance, diagnostics, artefacts, and final status.
-  Acceptance: serialized fixtures round-trip without field loss and distinguish
-  invariant fields from wall-clock or run-identity fields. Signposts: `DES-9`,
-  `TFS-1`, `TFS-6`, `CLI-DES`.
+  evidence config, backend provenance, diagnostics, artefacts, and final
+  status. Acceptance: serialized fixtures round-trip without field loss and
+  distinguish invariant fields from wall-clock or run-identity fields.
+  Signposts: `DES-9`, `TFS-1`, `TFS-6`, `CLI-DES`.
 - [ ] Implement Markdown/HTML report rendering from the canonical run record.
   Acceptance: golden snapshots cover pass, fail, unreachable, undetermined,
   timeout, cancellation, and expected-failure examples. Signposts: `DES-9`,
@@ -638,8 +637,9 @@ Out of scope: automated source rewriting workflows.
 
 ### Step 5.4: implement profiles, delivery, feedback, and migration completion
 
-Dependencies: steps 3.1.5 and 5.1. Reusable OrthoConfig contracts are preferred;
-tracked temporary adapters may cover soft dependencies until they ship.
+Dependencies: steps 3.1.5 and 5.1. Reusable OrthoConfig contracts are
+preferred; tracked temporary adapters may cover soft dependencies until they
+ship.
 
 In scope: persistent configuration overlays, artefact routing, local feedback,
 legacy command migration, and retirement gates.
@@ -649,8 +649,8 @@ Out of scope: mandatory network services.
 - [ ] Implement named profiles with secret redaction and precedence between
   project files and environment variables, plus bounded `profile list`, `get`,
   `save`, and guarded `delete`. Acceptance: context exposes profile names and
-  non-secret fields only, and profile mutations support `--dry-run`.
-  Signposts: `CLI-DES`.
+  non-secret fields only, and profile mutations support `--dry-run`. Signposts:
+  `CLI-DES`.
 - [ ] Implement atomic `stdout` and `file:<path>` delivery, leaving
   `webhook:<url>` behind an explicit later capability. Acceptance: unknown
   schemes enumerate valid choices and JSON mode returns delivery metadata
