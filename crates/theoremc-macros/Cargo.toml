@@ -11,7 +11,7 @@ proc-macro = true
 camino = "1.2.2"
 proc-macro2 = "1.0.106"
 quote = "1.0.45"
-syn = { version = "2.0.117", default-features = false, features = ["parsing", "full", "clone-impls", "printing", "proc-macro"] }
+syn = { version = "3.0.3", default-features = false, features = ["parsing", "full", "clone-impls", "printing", "proc-macro"] }
 theoremc-core = { version = "0.1.0", path = "../theoremc-core" }
 thiserror = "2.0.18"
 
