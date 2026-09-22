@@ -16,10 +16,29 @@
   enforcement for schema layers](adr-003-architectural-boundary-enforcement.md)
   - Decision record for schema layering constraints, module boundary policy,
     and an incremental architecture-enforcement stack.
-- [Architecture Decision Record (ADR) 004: theorem-side action signatures](adr-004-action-signature-specification.md)
+- [Architecture Decision Record (ADR) 004: theorem-side action
+  signatures](adr-004-action-signature-specification.md)
   - Decision record for explicit theorem-side action signatures used by typed
     action probes and future argument shaping.
-- [Navigating code complexity: a guide for implementers and maintainers](complexity-antipatterns-and-refactoring-strategies.md)
+- [Architecture Decision Record (ADR) 005: vertical-slice-first roadmap
+  sequencing](adr-005-vertical-slice-first-roadmap-sequencing.md)
+  - Decision record for making a real Kani proof and counterexample the next
+    release gate, before semantic laws or rich reporting.
+- [Architecture Decision Record (ADR) 006: backend-neutral harness planning
+  boundary](adr-006-backend-neutral-harness-planning-boundary.md)
+  - Decision record for the shared harness plan that supports the Kani
+    vertical slice and later RFC 0001 law lowering without direct
+    schema-to-Kani coupling.
+- [Architecture Decision Record (ADR) 007: Verus backend preservation
+  invariants](adr-007-verus-backend-preservation-invariants.md)
+  - Decision record for keeping law meaning, primary identity, backend
+    bindings, evidence, and Verus mode distinctions separate.
+- [Request for Comments (RFC) 0001: semantic law templates over composable
+  primaries](rfcs/0001-semantic-law-templates.md)
+  - Accepted proposal for schema version 2 structured laws, composable
+    primaries, semantic Law IR, and staged Kani lowering.
+- [Navigating code complexity: a guide for implementers and
+  maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring
     strategies for long-lived codebases.
 - [Developer's guide](developers-guide.md) - Maintainer-oriented manual
@@ -31,7 +50,8 @@
 - [Name mangling rules](name-mangling-rules.md) - Normative mapping rules for
   theorem action names, generated Kani harness symbols, and external theorem
   identifiers.
-- [Reliable testing in Rust via dependency injection](reliable-testing-in-rust-via-dependency-injection.md)
+- [Reliable testing in Rust via dependency
+  injection](reliable-testing-in-rust-via-dependency-injection.md)
   - Patterns for testable Rust design using dependency injection to avoid
     global-state coupling.
 - [Repository layout](repository-layout.md) - Map of top-level files,
@@ -40,7 +60,8 @@
   (DRY) doctests in Rust](rust-doctest-dry-guide.md)
   - Detailed reference for writing maintainable Rust doctests with minimal
     duplication.
-- [Mastering test fixtures in Rust with `rstest`](rust-testing-with-rstest-fixtures.md)
+- [Mastering test fixtures in Rust with
+  `rstest`](rust-testing-with-rstest-fixtures.md)
   - Comprehensive reference for fixture design, parametrization, and best
     practices with `rstest`.
 - [Scripting standards](scripting-standards.md) - Standards for project
@@ -57,23 +78,30 @@
 - [User's guide](users-guide.md) - Guide for library consumers covering schema
   types, loading API, identifier rules, and value forms.
 - [Execution plans](execplans/) - Implementation plans for roadmap steps.
-- [Step 1.1: `TheoremDoc` and subordinate schema types](execplans/1-1-1-theorem-doc-and-subordinate-schema-types.md)
-  - ExecPlan for strict theorem document deserialisation.
-- [Step 1.2.1: Validate required fields and non-empty constraints](execplans/1-2-1-validate-required-fields-and-non-empty-constraints.md)
-  - ExecPlan for post-deserialisation semantic validation rules.
-- [Step 1.2.2: Parse expression fields as `syn::Expr`](execplans/1-2-2-parse-assume-prove-and-witness-expressions.md)
-  - ExecPlan for expression syntax validation and statement block
-      rejection.
-- [Step 1.2.3: Enforce `Step` and `LetBinding` shape rules](execplans/1-2-3-enforce-step-and-let-binding.md)
+- [RFCs](rfcs/) - Accepted and proposed requests for comments that define
+  substantial language and architecture changes before implementation.
+- [Step 1.1: `TheoremDoc` and subordinate schema
+  types](execplans/1-1-1-theorem-doc-and-subordinate-schema-types.md)
+  - ExecPlan for strict theorem document deserialization.
+- [Step 1.2.1: Validate required fields and non-empty
+  constraints](execplans/1-2-1-validate-required-fields-and-non-empty-constraints.md)
+  - ExecPlan for post-deserialization semantic validation rules.
+- [Step 1.2.2: Parse expression fields as
+  `syn::Expr`](execplans/1-2-2-parse-assume-prove-and-witness-expressions.md)
+  - ExecPlan for expression syntax validation and statement block rejection.
+- [Step 1.2.3: Enforce `Step` and `LetBinding` shape
+  rules](execplans/1-2-3-enforce-step-and-let-binding.md)
   - ExecPlan for step and let-binding structural validation.
-- [Step 1.2.4: Enforce non-vacuity defaults](execplans/1-2-4-enforce-non-vacuity-defaults.md)
+- [Step 1.2.4: Enforce non-vacuity
+  defaults](execplans/1-2-4-enforce-non-vacuity-defaults.md)
   - ExecPlan for vacuity policy defaults and override validation.
-- [Step 1.3.1: Structured diagnostics for parser failures](execplans/1-3-1-structured-diagnostics-for-parser-failures.md)
-  - ExecPlan for source-located diagnostics and parser regression
-      fixtures.
-- [Step 2.1.1: Canonical action-name validation](execplans/2-1-1-canonical-action-name-validation.md)
-  - ExecPlan for dot-separated action-name grammar and keyword
-      validation.
-- [Resolve the 2026-06-14 codebase audit](execplans/codebase-audit-2026-06-14.md)
-  - ExecPlan for resolving audit findings across diagnostics,
-      validation, tests, documentation, and dependency policy.
+- [Step 1.3.1: Structured diagnostics for parser
+  failures](execplans/1-3-1-structured-diagnostics-for-parser-failures.md)
+  - ExecPlan for source-located diagnostics and parser regression fixtures.
+- [Step 2.1.1: Canonical action-name
+  validation](execplans/2-1-1-canonical-action-name-validation.md)
+  - ExecPlan for dot-separated action-name grammar and keyword validation.
+- [Resolve the 2026-06-14 codebase
+  audit](execplans/codebase-audit-2026-06-14.md)
+  - ExecPlan for resolving audit findings across diagnostics, validation,
+    tests, documentation, and dependency policy.
