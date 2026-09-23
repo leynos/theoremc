@@ -376,10 +376,12 @@ call to `main` keeps such a change off every pull request's critical path.
   to the nested steps it runs.
 - The publisher's concurrency group is
   `${{ github.workflow }}-${{ github.ref }}`, never cancelled. Runs for `main`
-  never overlap, and the newest trigger survives any replacement, so triggered
-  runs (push and dispatch) upload in commit order. A manual re-run of an older
-  run keeps its original SHA; it is an operator action that republishes that
-  commit's coverage and baseline until the next push supersedes it.
+  never overlap, and a newer trigger replaces an older pending run rather than
+  queueing behind it. GitHub does not promise to start runs in trigger order,
+  so this does not guarantee commit order. A manual re-run of an older run
+  keeps its SHA and its run id: it republishes that commit's coverage to
+  CodeScene, but replaces no ratchet baseline unless the original run saved
+  none.
 - No workflow names the retired installer digest, `installer-checksum` or
   `CODESCENE_CLI_SHA256`.
 - Merges made by the Dependabot automerge workflow with `GITHUB_TOKEN` fire no
