@@ -80,57 +80,71 @@ pub(super) const GUARD: &str =
 /// second ref) and a negated group that carries the ref conjunct while
 /// uploading everywhere but `main`.
 ///
-/// The binding cases delete or move the token's `env` binding. The guard
-/// `steps.codescene-token.outputs.available == 'true'` reads a missing binding as empty and skips
-/// the upload forever, so the binding is asserted rather than inferred.
+/// The guard reads the token check step's output, which a deleted or
+/// rewritten check leaves empty, so the upload would skip forever; the
+/// check step itself is asserted by `guard_cases`.
 #[rstest]
 #[case::complies(NEVER_CANCEL, GUARD, "", None)]
 #[case::disjunction_appended(
     NEVER_CANCEL,
-    "${{ steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main' || \
-     github.event_name == 'workflow_dispatch' }}",
+    concat!(
+        "${{ steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main' || ",
+        "github.event_name == 'workflow_dispatch' }}"
+    ),
     "",
     Some("not guarded")
 )]
 #[case::disjunction_prepended(
     NEVER_CANCEL,
-    "${{ github.event_name == 'workflow_dispatch' || steps.codescene-token.outputs.available == \
-     'true' && github.ref == 'refs/heads/main' }}",
+    concat!(
+        "${{ github.event_name == 'workflow_dispatch' || steps.codescene-token.outputs.available == ",
+        "'true' && github.ref == 'refs/heads/main' }}"
+    ),
     "",
     Some("not guarded")
 )]
 #[case::disjunction_in_extra_conjunct(
     NEVER_CANCEL,
-    "${{ steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main' && \
-     github.actor != 'x' || github.event_name == 'workflow_dispatch' }}",
+    concat!(
+        "${{ steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main' && ",
+        "github.actor != 'x' || github.event_name == 'workflow_dispatch' }}"
+    ),
     "",
     Some("not guarded")
 )]
 #[case::narrowing_conjunct(
     NEVER_CANCEL,
-    "${{ steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main' && \
-     github.actor != 'x' }}",
+    concat!(
+        "${{ steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main' && ",
+        "github.actor != 'x' }}"
+    ),
     "",
     Some("not guarded")
 )]
 #[case::never_true(
     NEVER_CANCEL,
-    "${{ steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main' && \
-     false }}",
+    concat!(
+        "${{ steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main' && ",
+        "false }}"
+    ),
     "",
     Some("not guarded")
 )]
 #[case::second_ref(
     NEVER_CANCEL,
-    "${{ steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main' && \
-     github.ref == 'refs/heads/develop' }}",
+    concat!(
+        "${{ steps.codescene-token.outputs.available == 'true' && github.ref == 'refs/heads/main' && ",
+        "github.ref == 'refs/heads/develop' }}"
+    ),
     "",
     Some("not guarded")
 )]
 #[case::negated_group(
     NEVER_CANCEL,
-    "${{ steps.codescene-token.outputs.available == 'true' && !(github.actor == 'x' && github.ref \
-     == 'refs/heads/main' && true) }}",
+    concat!(
+        "${{ steps.codescene-token.outputs.available == 'true' && !(github.actor == 'x' && github.ref ",
+        "== 'refs/heads/main' && true) }}"
+    ),
     "",
     Some("not guarded")
 )]
@@ -147,8 +161,10 @@ pub(super) const GUARD: &str =
     Some("cancel")
 )]
 #[case::cancels_by_expression(
-    "concurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: ${{ \
-     true }}",
+    concat!(
+        "concurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: ${{ ",
+        "true }}"
+    ),
     GUARD,
     "",
     Some("cancel")
@@ -161,15 +177,19 @@ pub(super) const GUARD: &str =
     Some("not exactly")
 )]
 #[case::keyed_on_the_event_too(
-    "concurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}\n  \
-     cancel-in-progress: false",
+    concat!(
+        "concurrency:\n  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}\n  ",
+        "cancel-in-progress: false"
+    ),
     GUARD,
     "",
     Some("not exactly")
 )]
 #[case::keyed_on_the_event_only(
-    "concurrency:\n  group: ${{ github.workflow }}-${{ github.event_name }}\n  \
-     cancel-in-progress: false",
+    concat!(
+        "concurrency:\n  group: ${{ github.workflow }}-${{ github.event_name }}\n  ",
+        "cancel-in-progress: false"
+    ),
     GUARD,
     "",
     Some("not exactly")
@@ -254,8 +274,8 @@ const REUSABLE: &str = "  forward:\n    uses: ./.github/workflows/elsewhere.yml\
 /// satisfies "some step holds it" while the check reports it unset and
 /// publishing silently stops; a workflow- or job-level `env` hands it to every
 /// step; and the upload step's own `env` hands it to the composite action's
-/// nested `upload-artifact` and cache steps, so only the check step's `env` and
-/// the upload's `access-token` input may carry it.
+/// nested `upload-artifact` and cache steps, so only the check step's `run`
+/// expression and the upload's `access-token` input may name the secret.
 #[rstest]
 #[case::moved_to_coverage(
     |source: String| source.replace("        with:\n          with-ratchet", &format!("{STEP_BINDING}        with:\n          with-ratchet")),

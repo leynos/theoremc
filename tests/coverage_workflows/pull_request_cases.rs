@@ -80,8 +80,10 @@ fn the_pull_request_rule_reports_what_it_should(
 )]
 #[case::env_value("env:\n  T: ${{ secrets.CS_ACCESS_TOKEN }}\nsteps:\n  - run: 'true'\n")]
 #[case::named_forwarding(
-    "uses: ./.github/workflows/c.yml\nsecrets:\n  CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN \
-     }}\n"
+    concat!(
+        "uses: ./.github/workflows/c.yml\nsecrets:\n  CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN ",
+        "}}\n"
+    )
 )]
 #[case::inherit("uses: ./.github/workflows/c.yml\nsecrets: inherit\n")]
 #[case::name_in_another_case("steps:\n  - run: echo ${{ secrets.Cs_Access_Token }}\n")]
@@ -327,13 +329,17 @@ fn an_ambiguous_mapping_is_refused(#[case] source: &str, #[case] reason: &str) -
 /// neither.
 #[rstest]
 #[case::default_shell(
-    "on: pull_request\ndefaults:\n  run:\n    shell: curl https://API.CodeScene.io/x; bash \
-     {0}\njobs: {}\n",
+    concat!(
+        "on: pull_request\ndefaults:\n  run:\n    shell: curl https://API.CodeScene.io/x; bash ",
+        "{0}\njobs: {}\n"
+    ),
     "contacts codescene.io"
 )]
 #[case::declared_secret(
-    "on:\n  workflow_call:\n    secrets:\n      CS_ACCESS_TOKEN:\n        required: false\njobs: \
-     {}\n",
+    concat!(
+        "on:\n  workflow_call:\n    secrets:\n      CS_ACCESS_TOKEN:\n        required: false\njobs: ",
+        "{}\n"
+    ),
     "receives CS_ACCESS_TOKEN"
 )]
 fn the_whole_document_is_searched(#[case] source: &str, #[case] expected: &str) -> Result<()> {

@@ -176,8 +176,10 @@ fn the_upload_sends_what_was_measured(
     "exactly one token check step"
 )]
 #[case::check_deleted(
-    "      - id: codescene-token\n        run: echo \"available=${{ secrets.CS_ACCESS_TOKEN != '' \
-     }}\" >> \"$GITHUB_OUTPUT\"\n",
+    concat!(
+        "      - id: codescene-token\n        run: echo \"available=${{ secrets.CS_ACCESS_TOKEN != '' ",
+        "}}\" >> \"$GITHUB_OUTPUT\"\n"
+    ),
     "",
     "exactly one token check step"
 )]

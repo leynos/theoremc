@@ -34,7 +34,7 @@
 
 use std::collections::BTreeMap;
 
-use anyhow::{Result, bail, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use serde_norway::Value;
 
 #[path = "coverage_workflows/closure_properties.rs"]
@@ -183,26 +183,42 @@ const COVERAGE_SELECTION: [(&str, &str); 4] = [
     ("with-ratchet", "true"),
 ];
 
-/// Returns a coverage step's `with` inputs, less the lane-local ones, and its
-/// `env`, as strings.
-fn selection(step: &serde_norway::Mapping) -> (BTreeMap<String, String>, String) {
-    let inputs = reader::get(step, "with")
+/// A coverage step's `with` inputs, less the lane-local ones, and its `env`,
+/// as strings.
+type Selection = (BTreeMap<String, String>, String);
+
+/// Returns a coverage step's [`Selection`].
+///
+/// An absent `env` reads as the empty string; a value that cannot be written
+/// back as YAML is an error rather than an empty string, since two such values
+/// would otherwise compare equal.
+///
+/// # Errors
+///
+/// Returns an error when an input or the `env` cannot be serialized.
+fn selection(step: &serde_norway::Mapping) -> Result<Selection> {
+    let mut inputs = BTreeMap::new();
+    for (key, value) in reader::get(step, "with")
         .and_then(Value::as_mapping)
         .into_iter()
         .flatten()
-        .filter_map(|(key, value)| {
-            let name = key.as_str()?;
-            let text = value.as_str().map_or_else(
-                || serde_norway::to_string(value).unwrap_or_default(),
-                str::to_owned,
-            );
-            (name != "publish-artefact").then(|| (name.to_owned(), text.trim().to_owned()))
-        })
-        .collect();
+    {
+        let Some(name) = key.as_str().filter(|name| *name != "publish-artefact") else {
+            continue;
+        };
+        let text = match value.as_str() {
+            Some(text) => text.to_owned(),
+            None => serde_norway::to_string(value)
+                .with_context(|| format!("serialize the {name} input"))?,
+        };
+        inputs.insert(name.to_owned(), text.trim().to_owned());
+    }
     let env = reader::get(step, "env")
-        .map(|value| serde_norway::to_string(value).unwrap_or_default())
+        .map(serde_norway::to_string)
+        .transpose()
+        .context("serialize the coverage step's env")?
         .unwrap_or_default();
-    (inputs, env)
+    Ok((inputs, env))
 }
 
 /// Scenario: the publisher's coverage step and each pull-request lane's are
@@ -214,13 +230,13 @@ fn selection(step: &serde_norway::Mapping) -> (BTreeMap<String, String>, String)
 #[test]
 fn the_coverage_selection_is_pinned() -> Result<()> {
     let all = reader::workflows()?;
-    let published: Vec<_> = all
+    let published: Vec<Selection> = all
         .values()
         .filter(|workflow| publisher_rules::publishes_from_main(workflow))
         .flat_map(reader::steps)
         .filter(|step| rules::is_coverage(step))
         .map(selection)
-        .collect();
+        .collect::<Result<_>>()?;
     let [(inputs, env)] = published.as_slice() else {
         bail!("expected one publisher coverage step, saw {published:?}");
     };
@@ -240,11 +256,10 @@ fn the_coverage_selection_is_pinned() -> Result<()> {
             .into_iter()
             .filter(|step| rules::is_coverage(step))
         {
-            let (lane_inputs, lane_env) = selection(lane);
+            let (lane_inputs, lane_env) = selection(lane)?;
             ensure!(
                 (&lane_inputs, &lane_env) == (inputs, env),
-                "{name} measures {lane_inputs:?} with env {lane_env:?}; the publisher {inputs:?} \
-                 with {env:?}"
+                "{name} measures {lane_inputs:?} with env {lane_env:?}; the publisher {inputs:?} with {env:?}"
             );
         }
     }

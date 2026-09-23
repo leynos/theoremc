@@ -49,8 +49,10 @@ fn a_lane_on_push_keeps_its_ratchet_off_the_push(
 /// `workflow_call`, yet runs with its caller's push.
 #[test]
 fn a_callee_of_a_push_lane_is_a_second_writer() -> Result<()> {
-    let push_lane = "on:\n  push:\n    branches: ['**']\njobs:\n  call:\n    uses: \
-                     ./.github/workflows/cov.yml\n";
+    let push_lane = concat!(
+        "on:\n  push:\n    branches: ['**']\njobs:\n  call:\n    uses: ",
+        "./.github/workflows/cov.yml\n"
+    );
     let reusable = PUSH_AND_PULL_REQUEST
         .replace(
             "on:\n  push:\n    branches: [main]\n  pull_request:\n",
@@ -84,6 +86,9 @@ fn a_callee_of_a_push_lane_is_a_second_writer() -> Result<()> {
 #[case::push_every_branch("on: push\njobs: {}\n")]
 #[case::push_glob("on:\n  push:\n    branches: ['**']\njobs: {}\n")]
 #[case::push_ignoring("on:\n  push:\n    branches-ignore: [gh-pages]\njobs: {}\n")]
+#[case::push_tags_and_ignoring(
+    "on:\n  push:\n    tags: ['v*']\n    branches-ignore: [gh-pages]\njobs: {}\n"
+)]
 #[case::push_main_and_more("on:\n  push:\n    branches: [main, 'feature/*']\njobs: {}\n")]
 fn every_pull_request_event_seeds_the_closure(#[case] source: &str) -> Result<()> {
     ensure!(

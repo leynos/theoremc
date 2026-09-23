@@ -176,8 +176,7 @@ fn token_findings(workflow: &Value) -> Vec<String> {
         let is_exempt = is_upload(step) || checks.iter().any(|check| std::ptr::eq(*check, step));
         if get(step, "env").is_some_and(|env| folded(env).contains("cs_access_token")) {
             findings.push(format!(
-                "a publisher step holds {ACCESS_TOKEN} in its env, which the upload's nested \
-                 steps would inherit"
+                "a publisher step holds {ACCESS_TOKEN} in its env, which the upload's nested steps would inherit"
             ));
         }
         if !is_exempt && holds {
@@ -235,9 +234,11 @@ fn concurrency_findings(workflow: &Value) -> Vec<String> {
         .iter()
         .filter(|block| !is_keyed_on_the_ref(block))
         .map(|_| {
-            "the publisher's concurrency group is not exactly `${{ github.workflow }}-${{ \
-             github.ref }}`"
-                .to_owned()
+            concat!(
+                "the publisher's concurrency group is not exactly `${{ github.workflow }}-${{ ",
+                "github.ref }}`"
+            )
+            .to_owned()
         });
     missing.into_iter().chain(cancels).chain(shared).collect()
 }
@@ -320,8 +321,7 @@ pub fn publisher_findings(workflow: &Value) -> Vec<String> {
     let check = check_id(workflow);
     if uploads.iter().any(|step| !guarded_to_main(step, check)) {
         findings.push(format!(
-            "an upload step is not guarded by exactly the token check's answer and \
-             `{MAIN_REF_GUARD}`"
+            "an upload step is not guarded by exactly the token check's answer and `{MAIN_REF_GUARD}`"
         ));
     }
     findings.extend(token_findings(workflow));
