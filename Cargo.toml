@@ -21,6 +21,8 @@ cap-std = { version = "4.0.2", features = ["fs_utf8"] }
 thiserror = "2.0.18"
 
 [dev-dependencies]
+anyhow = "1.0.104"
+proptest = { version = "1.11.0", default-features = false, features = ["std"] }
 rstest = "0.27.0"
 rstest-bdd = "0.5.0"
 rstest-bdd-macros = "0.5.0"
@@ -31,6 +33,7 @@ filetime = "0.2.29"
 indexmap = { version = "2.13.0", features = ["serde"] }
 proc-macro2 = "1.0.106"
 quote = "1.0.45"
+serde_norway = "0.9.42"
 syn = { version = "2.0.117", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
 test-helpers = { path = "crates/test-helpers" }
 thiserror = "2.0.18"

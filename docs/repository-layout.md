@@ -39,14 +39,15 @@ owned by the workspace crates.
 
 **Table:** Test layout
 
-| Path                            | Responsibility                                                                     |
-| ------------------------------- | ---------------------------------------------------------------------------------- |
-| `tests/*.rs`                    | Integration and behaviour-driven development (BDD) test entrypoints                |
-| `tests/features/*.feature`      | `rstest-bdd` feature specifications                                                |
-| `tests/fixtures/*.theorem`      | Valid and invalid theorem documents used by schema and macro tests                 |
-| `tests/common/`                 | Shared integration-test support for fixture crates, schema loading, and assertions |
-| `crates/*/src/*_tests.rs`       | Unit tests colocated with the crate that owns the implementation                   |
-| `crates/theoremc-macros/tests/` | Proc-macro compile-pass and compile-fail fixtures                                  |
+| Path                            | Responsibility                                                                                      |
+| ------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `tests/*.rs`                    | Integration and behaviour-driven development (BDD) test entrypoints                                 |
+| `tests/features/*.feature`      | `rstest-bdd` feature specifications                                                                 |
+| `tests/fixtures/*.theorem`      | Valid and invalid theorem documents used by schema and macro tests                                  |
+| `tests/common/`                 | Shared integration-test support for fixture crates, schema loading, and assertions                  |
+| `tests/coverage_workflows/`     | Rules and fixture cases for the CV-005 CodeScene workflow contract in `tests/coverage_workflows.rs` |
+| `crates/*/src/*_tests.rs`       | Unit tests colocated with the crate that owns the implementation                                    |
+| `crates/theoremc-macros/tests/` | Proc-macro compile-pass and compile-fail fixtures                                                   |
 
 ## Documentation
 
