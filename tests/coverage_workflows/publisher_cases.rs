@@ -36,6 +36,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+permissions: {}
 @CONCURRENCY@
 jobs:
   coverage:

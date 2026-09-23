@@ -149,6 +149,22 @@ fn the_upload_sends_what_was_measured(
     "      - id: codescene-token\n        continue-on-error: true\n",
     "declares `continue-on-error`"
 )]
+#[case::workflow_default_shell(
+    "jobs:\n",
+    "defaults:\n  run:\n    shell: bash -c 'exit 0; {0}'\njobs:\n",
+    "the workflow sets `defaults.run`"
+)]
+#[case::job_default_shell(
+    "  coverage:\n",
+    "  coverage:\n    defaults:\n      run:\n        shell: bash -c 'exit 0; {0}'\n",
+    "a job sets `defaults.run`"
+)]
+#[case::workflow_scope_granted(
+    "permissions: {}\n",
+    "permissions:\n  contents: write\n",
+    "workflow permissions"
+)]
+#[case::workflow_scope_undeclared("permissions: {}\n", "", "workflow permissions")]
 #[case::check_without_an_id(
     "      - id: codescene-token\n        run:",
     "      - run:",

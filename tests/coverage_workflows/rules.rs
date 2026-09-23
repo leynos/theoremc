@@ -40,6 +40,26 @@ pub(super) fn names_the_retired_digest(workflow: &Value) -> bool {
     text.contains(CLI_DIGEST_VARIABLE) || text.contains(INSTALLER_CHECKSUM)
 }
 
+/// Returns the reasons the publisher's workflow-level token holds a scope.
+///
+/// Each job opts in to what it needs; a scope granted at workflow level
+/// reaches every job, the check and upload steps included.
+pub(super) fn permission_findings(workflow: &Value) -> Vec<String> {
+    let declared = workflow
+        .as_mapping()
+        .and_then(|root| reader::get(root, "permissions"));
+    let is_empty = declared
+        .and_then(Value::as_mapping)
+        .is_some_and(Mapping::is_empty);
+    if is_empty {
+        Vec::new()
+    } else {
+        vec![format!(
+            "the publisher's workflow permissions are {declared:?}, not an empty mapping"
+        )]
+    }
+}
+
 /// Collapses every run of whitespace to one space.
 pub(super) fn normalized(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")

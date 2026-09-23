@@ -42,6 +42,30 @@ pub(super) fn check_id(workflow: &Value) -> Option<&str> {
     }
 }
 
+/// Returns the reasons a `defaults.run` could reshape the token check step.
+///
+/// A default shell or working directory, on the workflow or on any job,
+/// applies to the check step as a step-level `shell` would: `bash -c 'exit 0;
+/// {0}'` skips its command, the answer is never written, and the upload skips
+/// forever.
+pub(super) fn run_defaults_findings(workflow: &Value) -> Vec<String> {
+    let root = workflow
+        .as_mapping()
+        .into_iter()
+        .map(|root| ("the workflow", root));
+    let jobs = reader::jobs(workflow)
+        .into_iter()
+        .map(|(_, job)| ("a job", job));
+    root.chain(jobs)
+        .filter(|(_, holder)| {
+            get(holder, "defaults")
+                .and_then(Value::as_mapping)
+                .is_some_and(|defaults| get(defaults, "run").is_some())
+        })
+        .map(|(scope, _)| format!("{scope} sets `defaults.run`, which reshapes the token check"))
+        .collect()
+}
+
 /// Returns the reasons the token check step is missing or cannot be trusted.
 ///
 /// The check must exist exactly once (deleted, the upload skips forever),

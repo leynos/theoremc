@@ -12,10 +12,10 @@ use super::{
     reader::{self, get},
     rules::{
         ACCESS_TOKEN, COVERAGE_CLI, input_is, input_str, is_coverage, is_upload, is_upload_action,
-        names_the_retired_digest, normalized, runs_the_cli,
+        names_the_retired_digest, normalized, permission_findings, runs_the_cli,
     },
     text::{computes_a_secret, folded, folded_mapping},
-    token_check::{check_findings, check_id, check_steps},
+    token_check::{check_findings, check_id, check_steps, run_defaults_findings},
 };
 
 /// The expression that hands a step the secret itself.
@@ -330,6 +330,8 @@ pub fn publisher_findings(workflow: &Value) -> Vec<String> {
     if names_the_retired_digest(workflow) {
         findings.push("the publisher names the retired installer digest".to_owned());
     }
+    findings.extend(run_defaults_findings(workflow));
+    findings.extend(permission_findings(workflow));
     findings
 }
 
