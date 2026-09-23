@@ -376,8 +376,10 @@ call to `main` keeps such a change off every pull request's critical path.
   to the nested steps it runs.
 - The publisher's concurrency group is
   `${{ github.workflow }}-${{ github.ref }}`, never cancelled. Runs for `main`
-  never overlap, and the newest trigger survives any replacement, so uploads
-  land in commit order.
+  never overlap, and the newest trigger survives any replacement, so triggered
+  runs (push and dispatch) upload in commit order. A manual re-run of an older
+  run keeps its original SHA; it is an operator action that republishes that
+  commit's coverage and baseline until the next push supersedes it.
 - No workflow names the retired installer digest, `installer-checksum` or
   `CODESCENE_CLI_SHA256`.
 - Merges made by the Dependabot automerge workflow with `GITHUB_TOKEN` fire no
