@@ -37,14 +37,27 @@ fn the_publisher_group_and_triggers_are_pinned(
     #[case] expected: &str,
 ) -> Result<()> {
     let complying = publisher(NEVER_CANCEL, GUARD, "");
-    let source = complying.replacen(from, to, 1);
-    ensure!(source != complying, "the case changed nothing");
+    let source = mutate_once(&complying, from, to)?;
     let findings = rules::publisher_findings(&parse(&source)?);
     ensure!(
         findings.len() == 1 && findings.iter().all(|f| f.contains(expected)),
         "expected one finding naming {expected:?}, saw {findings:?}"
     );
     Ok(())
+}
+
+/// Returns `text` with its one occurrence of `from` replaced by `to`.
+///
+/// A case whose anchor is absent changes nothing, and one whose anchor
+/// occurs twice can pass on the change it does not name, so both are
+/// refused before the rule is asked anything.
+pub(super) fn mutate_once(text: &str, from: &str, to: &str) -> Result<String> {
+    let count = text.matches(from).count();
+    ensure!(
+        count == 1,
+        "{from:?} occurs {count} times; a case must change exactly one thing"
+    );
+    Ok(text.replacen(from, to, 1))
 }
 
 /// A publisher wired as this repository wires it: the upload reads what the
@@ -76,8 +89,8 @@ jobs:
 #[rstest]
 #[case::wired("", "", None)]
 #[case::other_path(
-    "path: lcov.info",
-    "path: other.info",
+    "          path: lcov.info",
+    "          path: other.info",
     Some("which no coverage step writes")
 )]
 #[case::other_format(
@@ -108,12 +121,8 @@ fn the_upload_sends_what_was_measured(
     let source = if from.is_empty() {
         WIRED.to_owned()
     } else {
-        WIRED.replacen(from, to, 1)
+        mutate_once(WIRED, from, to)?
     };
-    ensure!(
-        source != WIRED || from.is_empty(),
-        "the case changed nothing"
-    );
     let findings = rules::wiring_findings(&parse(&source)?);
     match expected {
         None => ensure!(findings.is_empty(), "unexpected findings: {findings:?}"),
@@ -122,6 +131,37 @@ fn the_upload_sends_what_was_measured(
             "expected one finding naming {clause:?}, saw {findings:?}"
         ),
     }
+    Ok(())
+}
+
+/// Scenario: neither the upload nor the coverage step names the report.
+///
+/// Invariant: the upload is refused. Two absent inputs compare equal, and the
+/// actions' defaults are not read here, so an empty reading must not pass.
+#[test]
+fn an_unnamed_report_is_refused() -> Result<()> {
+    let unnamed = mutate_once(WIRED, "          path: lcov.info\n", "")?;
+    let source = mutate_once(&unnamed, "          output-path: lcov.info\n", "")?;
+    let findings = rules::wiring_findings(&parse(&source)?);
+    ensure!(
+        findings.len() == 1 && findings.iter().all(|f| f.contains("names no report")),
+        "expected one finding naming the missing report, saw {findings:?}"
+    );
+    Ok(())
+}
+
+/// Scenario: a case's anchor is absent, or occurs more than once.
+///
+/// Invariant: the case is refused, since it would change nothing or could
+/// pass on a change it does not name.
+#[rstest]
+#[case::absent("no such text")]
+#[case::repeated("lcov.info")]
+fn a_case_changes_exactly_one_place(#[case] from: &str) -> Result<()> {
+    ensure!(
+        mutate_once(WIRED, from, "other").is_err(),
+        "{from:?} was accepted"
+    );
     Ok(())
 }
 
@@ -199,8 +239,7 @@ fn the_token_check_is_exact(
     #[case] expected: &str,
 ) -> Result<()> {
     let complying = publisher(NEVER_CANCEL, GUARD, "");
-    let source = complying.replacen(from, to, 1);
-    ensure!(source != complying, "the case changed nothing");
+    let source = mutate_once(&complying, from, to)?;
     let findings = rules::publisher_findings(&parse(&source)?);
     ensure!(
         findings.iter().any(|f| f.contains(expected)),

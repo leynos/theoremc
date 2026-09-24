@@ -72,6 +72,37 @@ fn a_callee_of_a_push_lane_is_a_second_writer() -> Result<()> {
     Ok(())
 }
 
+/// Scenario: a pull-request lane, and a push lane, each run a local composite
+/// action, spelled with `./` or `$/`.
+///
+/// Invariant: the step is reported from both closures. The action runs in its
+/// caller's job with the caller's secrets, but this contract reads workflow
+/// files only, so its steps must not be read as compliant.
+#[rstest]
+#[case::pull_request_dot("pull_request", "./")]
+#[case::pull_request_dollar("pull_request", "$/")]
+#[case::push_dot("push", "./")]
+#[case::push_dollar("push", "$/")]
+fn a_local_action_in_a_closure_is_reported(
+    #[case] event: &str,
+    #[case] spelling: &str,
+) -> Result<()> {
+    let lane = format!(
+        "on: {event}\njobs:\n  build:\n    steps:\n      - uses: {spelling}.github/actions/measure\n"
+    );
+    let all: reader::Workflows = [("lane.yml".to_owned(), parse(&lane)?)].into();
+    let reported = if event == "push" {
+        writer_rules::second_writers(&all)
+    } else {
+        reader::local_actions(&all, &reader::pull_request_closure(&all))
+    };
+    ensure!(
+        reported.len() == 1 && reported.iter().all(|r| r.contains("local action")),
+        "expected the local action alone, saw {reported:?}"
+    );
+    Ok(())
+}
+
 /// Scenario: a workflow starts on each event that runs it for a pull request.
 ///
 /// Invariant: each seeds the pull-request closure. A queued merge and a review

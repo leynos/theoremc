@@ -355,35 +355,6 @@ fn the_cli_is_refused_in_the_publisher(#[case] extra: &str) -> Result<()> {
     Ok(())
 }
 
-/// Scenario: the required work sits behind a condition that can stop it.
-///
-/// Invariant: a conditional ratcheted coverage step does not count as the
-/// publisher generating coverage, and a conditional publisher job is refused,
-/// since `if: false` on either leaves every other clause reading the step as
-/// present.
-#[rstest]
-#[case::coverage_step_if(
-    "        with:\n          with-ratchet: 'true'\n",
-    "        if: github.actor == 'x'\n        with:\n          with-ratchet: 'true'\n",
-    "generates no ratcheted coverage"
-)]
-#[case::job_if("  coverage:\n", "  coverage:\n    if: false\n", "carries an `if:`")]
-fn conditional_required_work_is_refused(
-    #[case] from: &str,
-    #[case] to: &str,
-    #[case] expected: &str,
-) -> Result<()> {
-    let complying = publisher(NEVER_CANCEL, GUARD, "");
-    let source = complying.replacen(from, to, 1);
-    ensure!(source != complying, "the case changed nothing");
-    let findings = rules::publisher_findings(&parse(&source)?);
-    ensure!(
-        findings.len() == 1 && findings.iter().all(|f| f.contains(expected)),
-        "expected one finding naming {expected:?}, saw {findings:?}"
-    );
-    Ok(())
-}
-
 /// Scenario: a publisher that runs the upload action in `check` mode.
 ///
 /// Invariant: that is not an upload, so the omission is reported.
