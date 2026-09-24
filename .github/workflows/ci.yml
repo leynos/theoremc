@@ -42,14 +42,7 @@ jobs:
           output-path: lcov.info
           format: lcov
           with-ratchet: "true"
-      - name: Check coverage against CodeScene gates
-        env:
-          CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
-        if: env.CS_ACCESS_TOKEN != '' && github.event_name == 'pull_request'
-        uses: leynos/shared-actions/.github/actions/upload-codescene-coverage@82feb2b7aac45b7efff40c9c4bb632551b14521c
-        with:
-          format: lcov
-          mode: check
-          project-url: https://api.codescene.io/v2/projects/76770
-          access-token: ${{ env.CS_ACCESS_TOKEN }}
-          installer-checksum: ${{ vars.CODESCENE_CLI_SHA256 }}
+          # Pull requests ratchet against the baseline coverage-main.yml
+          # writes on main and never contact CodeScene; that workflow is the
+          # one publisher. tests/coverage_workflows.rs holds the shape.
+          publish-artefact: "false"
