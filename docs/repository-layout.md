@@ -53,15 +53,17 @@ owned by the workspace crates.
 
 **Table:** Documentation entrypoints
 
-| Path                                 | Responsibility                                                          |
-| ------------------------------------ | ----------------------------------------------------------------------- |
-| `docs/contents.md`                   | Index of repository documentation                                       |
-| `docs/users-guide.md`                | User-facing API and theorem-file behaviour guide                        |
-| `docs/developers-guide.md`           | Maintainer workflows, quality gates, and internal conventions           |
-| `docs/theorem-file-specification.md` | Normative `.theorem` schema and semantics reference                     |
-| `docs/theoremc-design.md`            | Architecture, design rationale, and current versus planned system shape |
-| `docs/adr-*.md`                      | Architecture Decision Records (ADRs)                                    |
-| `docs/execplans/`                    | Living implementation plans and milestone records                       |
+| Path                                    | Responsibility                                                          |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| `docs/contents.md`                      | Index of repository documentation                                       |
+| `docs/users-guide.md`                   | User-facing API and theorem-file behaviour guide                        |
+| `docs/developers-guide.md`              | Maintainer workflows, quality gates, and internal conventions           |
+| `docs/theorem-file-specification.md`    | Normative `.theorem` schema and semantics reference                     |
+| `docs/theoremc-design.md`               | Architecture, design rationale, and current versus planned system shape |
+| `docs/cargo-theorem-cli-design.md`      | `cargo theorem` CLI contract, boundaries, and implementation sequence   |
+| `docs/cargo-theorem-cli-users-guide.md` | Task-oriented guide for callers of the planned `cargo theorem` CLI      |
+| `docs/adr-*.md`                         | Architecture Decision Records (ADRs)                                    |
+| `docs/execplans/`                       | Living implementation plans and milestone records                       |
 
 Update this file and `docs/contents.md` when a directory gains a new durable
 responsibility or when documentation moves.

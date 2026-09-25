@@ -397,6 +397,55 @@ pass. Workflows are parsed with `serde_norway`, which refuses a duplicate key,
 and a workflow declaring both a quoted and an unquoted `on` key is refused
 rather than read either way. The suite runs under `make test`.
 
+### 3.8 `cargo theorem` application boundary
+
+The planned [`cargo theorem` CLI design](cargo-theorem-cli-design.md) adds a
+dedicated `crates/cargo-theorem/` application package. It owns the Cargo
+external-subcommand entry point, OrthoConfig command and configuration types,
+dispatch, application rendering, and exit-code mapping. Reusable theorem,
+project, execution, and report services remain in library packages rather than
+moving into the CLI.
+
+The planned CLI package has a separate MSRV from the libraries because
+OrthoConfig 0.9.0 requires Rust 1.89. That package is not in the workspace yet:
+all current packages, including the root `theoremc` crate, use Rust 1.88.
+Validate the current workspace with `cargo +1.88 check --workspace`. After the
+CLI package lands, introduce split validation with
+`cargo +1.88 check --workspace --exclude cargo-theorem` and
+`cargo +1.89 check -p cargo-theorem`.
+
+Backend integration uses narrow ports. Backend lifecycle concerns (discovery,
+resolution, installation, and health checks) must remain separate from backend
+execution and replay concerns. A shared command-runner abstraction owns
+argument-vector process creation, timeout and cancellation handling, output
+capture, and test doubles; providers supply backend-specific plans and parsers.
+Public backend arguments remain ordinary argument-vector values. Secret inputs
+must not be accepted through CLI input or placed in process argv: providers
+declare them separately and supply them through an injected protected channel.
+Only redacted references to those inputs may be displayed, logged, or persisted.
+
+Build integration belongs to the reusable `theoremc-build` boundary. It owns
+theorem discovery, suite rendering, and the planned Cargo manifest and
+`build.rs` integration services. The injector may update a project, while
+`build-script run` calls the reusable service directly. Commands that invoke
+Cargo, such as `check --compile` and `run`, execute the package's normal
+`build.rs`; their plans and context must make that side effect explicit.
+
+The CLI's caller-facing contract is documented separately from its design. The
+[`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md) is the
+task-oriented guide for installation, project initialisation, theorem creation,
+checking, backend management, execution, reports, JSON output, exit classes,
+and migration from `rust-prover-tools`. It states its proposed status until the
+commands it describes ship. The design document remains the normative source,
+and the guide defers to it on any conflict.
+
+Observability follows the workspace-wide `metrics` and `tracing` policy. The
+CLI design fixes the metric names, kinds, and label sets, and requires a
+matching `describe_*` declaration for each. Metric labels are drawn only from
+closed enumerations the CLI or a provider descriptor controls; run IDs, paths,
+theorem IDs, and raw error text are event fields, never labels. Libraries emit
+instrumentation but never install global subscribers or recorders.
+
 ## 4. Filesystem and path conventions
 
 The crate uses `cap_std` and `camino` in place of `std::fs` and `std::path` for

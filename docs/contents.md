@@ -19,6 +19,14 @@
 - [Architecture Decision Record (ADR) 004: theorem-side action signatures](adr-004-action-signature-specification.md)
   - Decision record for explicit theorem-side action signatures used by typed
     action probes and future argument shaping.
+- [`cargo theorem` CLI design](cargo-theorem-cli-design.md) - Cargo-native,
+  agent-readable entry point for project scaffolding, build integration,
+  backend management, theorem execution, reporting, and migration from
+  `rust-prover-tools`.
+- [`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md) -
+  Task-oriented guide for callers of the planned CLI, covering installation,
+  project initialisation, theorem creation, checking, backend management,
+  execution, reports, JSON output, exit classes, and migration.
 - [Navigating code complexity: a guide for implementers and maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring
     strategies for long-lived codebases.
