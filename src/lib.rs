@@ -22,16 +22,6 @@ pub use theoremc_macros::theorem_file;
 #[doc(hidden)]
 pub(crate) mod arg_lowering;
 
-/// Build-time theorem discovery shared with the Cargo build script.
-#[cfg(test)]
-#[doc(hidden)]
-pub(crate) mod build_discovery;
-
-/// Theorem suite generation for Cargo build integration.
-#[cfg(test)]
-#[doc(hidden)]
-pub(crate) mod build_suite;
-
 #[doc(hidden)]
 mod __theoremc_generated_suite {
     //! Generated theorem suite integration.
