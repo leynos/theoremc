@@ -23,6 +23,10 @@
   agent-readable entry point for project scaffolding, build integration,
   backend management, theorem execution, reporting, and migration from
   `rust-prover-tools`.
+- [`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md) -
+  Task-oriented guide for callers of the planned CLI, covering installation,
+  project initialisation, theorem creation, checking, backend management,
+  execution, reports, JSON output, exit classes, and migration.
 - [Navigating code complexity: a guide for implementers and maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring
     strategies for long-lived codebases.

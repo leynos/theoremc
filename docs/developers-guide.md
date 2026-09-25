@@ -431,6 +431,21 @@ theorem discovery, suite rendering, and the planned Cargo manifest and
 Cargo, such as `check --compile` and `run`, execute the package's normal
 `build.rs`; their plans and context must make that side effect explicit.
 
+The CLI's caller-facing contract is documented separately from its design. The
+[`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md) is the
+task-oriented guide for installation, project initialisation, theorem creation,
+checking, backend management, execution, reports, JSON output, exit classes,
+and migration from `rust-prover-tools`. It states its proposed status until the
+commands it describes ship. The design document remains the normative source,
+and the guide defers to it on any conflict.
+
+Observability follows the workspace-wide `metrics` and `tracing` policy. The
+CLI design fixes the metric names, kinds, and label sets, and requires a
+matching `describe_*` declaration for each. Metric labels are drawn only from
+closed enumerations the CLI or a provider descriptor controls; run IDs, paths,
+theorem IDs, and raw error text are event fields, never labels. Libraries emit
+instrumentation but never install global subscribers or recorders.
+
 ## 4. Filesystem and path conventions
 
 The crate uses `cap_std` and `camino` in place of `std::fs` and `std::path` for

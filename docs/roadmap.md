@@ -465,6 +465,11 @@ Out of scope: full theorem-suite execution, reports, and detached run jobs.
   `rust-prover-tools` workflows. Acceptance: each legacy invocation has a
   documented `cargo theorem` equivalent and equivalent externally observable
   backend behaviour. Signposts: `CLI-DES`.
+- [ ] Implement the metric registry from `CLI-DES` §17.1 and its emitted
+  structured events. Acceptance: tests assert every registered metric is
+  emitted with its documented kind and label set, every metric carries a
+  `describe_*` declaration, and no unbounded value reaches a label. Signposts:
+  `CLI-DES`.
 
 ## Phase 4: Kani backend semantics and safety policy
 
@@ -651,10 +656,13 @@ Out of scope: mandatory network services.
   `save`, and guarded `delete`. Acceptance: context exposes profile names and
   non-secret fields only, and profile mutations support `--dry-run`. Signposts:
   `CLI-DES`.
-- [ ] Implement atomic `stdout` and `file:<path>` delivery, leaving
-  `webhook:<url>` behind an explicit later capability. Acceptance: unknown
-  schemes enumerate valid choices and JSON mode returns delivery metadata
-  rather than mixed payloads. Signposts: `CLI-DES`.
+- [ ] Implement `stdout` and `file:<path>` delivery, leaving `webhook:<url>`
+  behind an explicit later capability. Acceptance: `stdout` is validated before
+  the first byte is written and carries partial-write semantics, while
+  `file:<path>` is atomic through a temporary sibling and rename; callers that
+  need atomic bytes use file delivery. Unknown schemes enumerate valid choices
+  and JSON mode returns delivery metadata rather than mixed payloads. Signposts:
+  `CLI-DES`.
 - [ ] Implement privacy-bounded local JSON Lines feedback with optional
   diagnostic attachment and no implicit source, environment, proof, or log
   capture. Acceptance: tests prove sensitive fields remain absent unless
@@ -734,6 +742,13 @@ Out of scope: production deployment templates.
   project initialization, backend pins, and run artefacts. Acceptance: docs
   contain copy-paste-ready examples that match implementation semantics.
   Signposts: `TFS-5`, `ADR-3`, `ADR-4`, `DES-4`, `CLI-DES`.
+- [ ] Keep the [`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md)
+  aligned with each shipped command, including installation and first use,
+  project initialisation, theorem creation, checking, backend installation
+  rules, execution, reports, jobs, profiles, JSON output, exit classes, bounded
+  results, and migration from `rust-prover-tools`. Acceptance: every released
+  command has a documented task path, and the guide states its proposed status
+  until the corresponding command is stable. Signposts: `CLI-DES`.
 - [ ] Add a contributor checklist that requires parser fixtures, codegen
   snapshots, command-context snapshots, run-record fixtures, and report
   snapshots for behavioural changes. Acceptance: pull request template and

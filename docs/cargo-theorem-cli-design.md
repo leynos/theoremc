@@ -2,7 +2,10 @@
 
 Status: proposed. This document defines the target command-line interface and
 its implementation boundaries. The implementation sequence lives in
-[the roadmap](roadmap.md).
+[the roadmap](roadmap.md). Task-oriented usage guidance for the eventual
+command surface lives in the
+[`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md), which
+describes the same contract from the caller's side.
 
 ## 1. Decision summary
 
@@ -727,8 +730,15 @@ canonical positive flag in metadata and may be set explicitly by automation.
 `--timeout`, `--jobs`, `--keep-going`, and `--fail-fast` control bounded
 execution. `--keep-going` and `--fail-fast` are mutually exclusive.
 
-An optional `--idempotency-key` prevents duplicate active submissions. Reusing
-a key with an identical input digest returns the existing job. Reusing it with
+An optional `--idempotency-key` prevents duplicate active submissions. The
+input digest covers the execution plan and the protected provider state each
+`ProtectedSecret` binds to. Because a protected value is never persisted, that
+state contributes a stable, non-redeemable one-way fingerprint, or an explicit
+provider-state version when the provider supplies one, and never the value, a
+lookup key, or a capability. Reusing a key returns the existing job only when
+the input digest and the protected provider state both match. When the provider
+state behind a reference is rotatable and neither a fingerprint nor a version
+can be derived, reuse is rejected rather than assumed. Reusing a key with
 different inputs fails and reports both digests. `--force-new` creates a new
 job while retaining the relationship to the prior run.
 
@@ -749,6 +759,21 @@ before staging starts. It may evict only unleased entries, and an installation
 is rejected with a bounded resource diagnostic if the reservation cannot fit. A
 caller may wait for active leases only up to the configured admission timeout;
 the cache never exceeds its configured limit, including staged bytes.
+
+A reservation is held from admission until it commits or is reclaimed, and
+every outcome is recorded under the index lock. Publication revalidates the
+reservation and converts it to the immutable entry in one step, so capacity
+stays charged against the committed entry rather than being released and
+reacquired. Denied admission records no reservation. A failed install, a
+cancelled install, and a rejected or interrupted install all release the
+reservation under the index lock, whether the failure is detected in-process or
+by a later startup reconciliation. In-process cleanup covers the ordinary
+failure and cancellation paths; startup reconciliation reclaims the residue
+that a crash left behind, because a process that dies mid-install cannot run
+its own cleanup. Every reservation carries a bounded expiry, refreshed only
+while its owning install is provably alive. Startup reconciliation reclaims any
+expired reservation whose owner is gone, so a failed or crashed installation
+cannot retain capacity indefinitely.
 
 The cache lock protocol has one internal order: index lock before per-key lock.
 Staging and checksum verification hold only the per-key lock after admission
@@ -994,7 +1019,13 @@ mismatched locked releases. Its JSON plan lists each no-op and mutation.
 
 `backend update <backend>` changes a project pin and lock entry. It does not
 install unless `--install` is supplied. `backend delete <backend>` removes a
-specific theoremc-managed cache entry and requires `--force`.
+specific theoremc-managed cache entry and requires `--force`. Forced deletion
+still acquires the backend-cache locks in the §11.2 order and still observes
+active-install leases: while any process holds a lease on the target entry,
+deletion is refused, or waits only up to the configured admission timeout and
+then fails with the same bounded diagnostic as a timed-out admission. `--force`
+never bypasses an active lease, so deletion cannot remove an entry that an
+in-flight `backend run` or top-level `run` is currently using.
 
 `backend run <backend>` is the low-level compatibility and diagnostics path. It
 accepts a proof file or harness plus typed common options and repeated
@@ -1099,10 +1130,14 @@ Commands that create artefacts accept:
 JSON document; JSON callers must select `file:<path>` or another supported
 non-stdout target.
 
-The local implementation must ship before webhook delivery. File delivery is
-atomic. Unknown schemes enumerate supported values. Webhook delivery, when
-implemented, reports HTTP status, retryability, and whether the local canonical
-artefact remains available.
+The local implementation must ship before webhook delivery. `stdout` is a
+validated stream with partial-write semantics: the artefact is fully validated
+before the first byte is written, and an interrupted terminal or pipe write
+leaves a truncated stream that cannot be rolled back. File delivery is atomic,
+using a temporary sibling, a flush, and a rename; callers that require atomic
+bytes use file delivery. Unknown schemes enumerate supported values. Webhook
+delivery, when implemented, reports HTTP status, retryability, and whether the
+local canonical artefact remains available.
 
 Large reports never default to stdout in JSON mode. The JSON result points to
 the delivered or local artefact.
@@ -1200,6 +1235,66 @@ Metrics use low-cardinality labels such as command, backend, outcome class, and
 installation result. The CLI must not use theorem IDs, paths, run IDs, raw
 error text, or profile names as metric labels. Libraries do not install global
 subscribers or recorders.
+
+### 17.1 Metric registry
+
+Emission follows the repository-wide `metrics` policy: counters for cumulative
+events, gauges for values that rise and fall, and histograms for distributions.
+Names are stable, prefixed `theoremc_`, and each is declared with a matching
+`describe_counter!`, `describe_gauge!`, or `describe_histogram!`.
+
+**Table:** Metric registry
+
+| Metric                               | Kind      | Labels                 | Meaning                                              |
+| ------------------------------------ | --------- | ---------------------- | ---------------------------------------------------- |
+| `theoremc_command_total`             | counter   | `command`, `outcome`   | Completed invocations by terminal outcome            |
+| `theoremc_command_duration_seconds`  | histogram | `command`, `outcome`   | End-to-end command latency                           |
+| `theoremc_jobs_active`               | gauge     | `state`                | Runs currently queued, running, or awaiting delivery |
+| `theoremc_job_retries_total`         | counter   | `backend`, `reason`    | Backend job retries by reason                        |
+| `theoremc_lock_wait_seconds`         | histogram | `store`                | Time spent waiting for a persistence lock            |
+| `theoremc_lock_timeouts_total`       | counter   | `store`, `owner_alive` | Acquisitions that reached the bounded timeout        |
+| `theoremc_backend_cache_bytes`       | gauge     | `state`                | Cache bytes held as reserved, staged, or committed   |
+| `theoremc_backend_cache_entries`     | gauge     | `state`                | Cache entries in the same three states               |
+| `theoremc_backend_cache_total`       | counter   | `event`                | Cache decisions and admissions                       |
+| `theoremc_output_truncated_total`    | counter   | `scope`                | Streams, artefacts, or records truncated at a bound  |
+| `theoremc_recovery_total`            | counter   | `action`, `result`     | Startup-reconciliation decisions and outcomes        |
+| `theoremc_delivery_total`            | counter   | `scheme`, `outcome`    | Delivery attempts by scheme and result               |
+| `theoremc_delivery_duration_seconds` | histogram | `scheme`, `outcome`    | Delivery latency                                     |
+| `theoremc_feedback_total`            | counter   | `outcome`, `mode`      | Feedback records accepted, written, or delivered     |
+
+*Table 5: Stable metric names, kinds, label sets, and meanings.*
+
+Label values are drawn from closed sets the CLI controls. `command`, `outcome`,
+`store`, `state`, `event`, `scope`, `action`, `result`, `scheme`, `mode`,
+`reason`, and `backend` are enumerations named by this design or by a provider
+descriptor; none carries caller text. `theoremc_backend_cache_total` uses
+`event` values `hit`, `miss`, `admission_denied`, `evicted`, `reclaimed`, and
+`rejected`; `theoremc_recovery_total` uses `action` values `adopt`,
+`terminate`, and `fence`, with `result` values `completed` and `failed`.
+
+### 17.2 Structured events and correlation
+
+Command submission, state transitions, retries, cancellation, crash recovery,
+lock failure, cache decisions, resource truncation, and delivery each emit a
+structured event carrying `command`, a `run_id` or `job_id` correlation,
+`backend`, `attempt`, `elapsed`, `state`, and a categorised error. Events
+exclude secrets, payloads, paths, theorem IDs, and raw error text, in line with
+§16. Correlation identifiers are event fields and never metric labels.
+
+Spans cover child-process execution, storage access, job handling, network
+delivery, and asynchronous task boundaries, with bounded timing attributes for
+the process, storage, queue, and delivery edges. A `Span::enter()` guard is
+never held across `.await`; asynchronous work uses `Instrument::instrument`.
+
+### 17.3 Verification and alerting
+
+Tests assert that every registered metric is emitted with its documented kind
+and label set, that each has a description, and that no unbounded value ever
+reaches a label. Alerting acts on a sustained rise in `theoremc_command_total`
+failures, `theoremc_jobs_active` queue growth, `theoremc_lock_timeouts_total`,
+cache `admission_denied` and `reclaimed` events,
+`theoremc_output_truncated_total` for artefact and stream scopes, and
+`theoremc_recovery_total` interruptions.
 
 ## 18. Test and release strategy
 
