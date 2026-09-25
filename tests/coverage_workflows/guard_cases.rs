@@ -134,14 +134,18 @@ fn the_upload_sends_what_was_measured(
     Ok(())
 }
 
-/// Scenario: neither the upload nor the coverage step names the report.
+/// Scenario: neither the upload nor the coverage step names the report, with
+/// both inputs deleted or both set to an empty string.
 ///
-/// Invariant: the upload is refused. Two absent inputs compare equal, and the
-/// actions' defaults are not read here, so an empty reading must not pass.
-#[test]
-fn an_unnamed_report_is_refused() -> Result<()> {
-    let unnamed = mutate_once(WIRED, "          path: lcov.info\n", "")?;
-    let source = mutate_once(&unnamed, "          output-path: lcov.info\n", "")?;
+/// Invariant: the upload is refused. Two absent or empty inputs compare equal,
+/// and the actions' defaults are not read here, so an empty reading must not
+/// pass.
+#[rstest]
+#[case::deleted("", "")]
+#[case::empty("          path: \"\"\n", "          output-path: \"\"\n")]
+fn an_unnamed_report_is_refused(#[case] path: &str, #[case] output_path: &str) -> Result<()> {
+    let unnamed = mutate_once(WIRED, "          path: lcov.info\n", path)?;
+    let source = mutate_once(&unnamed, "          output-path: lcov.info\n", output_path)?;
     let findings = rules::wiring_findings(&parse(&source)?);
     ensure!(
         findings.len() == 1 && findings.iter().all(|f| f.contains("names no report")),
