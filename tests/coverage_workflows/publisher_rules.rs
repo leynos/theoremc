@@ -339,7 +339,8 @@ pub fn publisher_findings(workflow: &Value) -> Vec<String> {
 /// Kept apart from [`publisher_findings`] because it compares two steps of a
 /// complete publisher: each upload must read the file, in the format, that a
 /// coverage step writes, or it uploads nothing useful while every other
-/// clause passes; and it must pass the secret itself as its
+/// clause passes. Two absent inputs would compare equal, so the upload must
+/// name its report. It must also pass the secret itself as its
 /// `access-token`, or its own guard holds while the action runs
 /// unauthenticated.
 pub fn wiring_findings(workflow: &Value) -> Vec<String> {
@@ -352,7 +353,9 @@ pub fn wiring_findings(workflow: &Value) -> Vec<String> {
     let mut findings = Vec::new();
     for upload in steps.iter().filter(|step| is_upload_action(step)) {
         let read = (input_str(upload, "path"), input_str(upload, "format"));
-        if !written.contains(&read) {
+        if read.0.is_none_or(str::is_empty) {
+            findings.push("the upload names no report; it needs an explicit `path`".to_owned());
+        } else if !written.contains(&read) {
             findings.push(format!(
                 "the upload reads {read:?}, which no coverage step writes; written: {written:?}"
             ));
