@@ -72,12 +72,22 @@ fn a_callee_of_a_push_lane_is_a_second_writer() -> Result<()> {
     Ok(())
 }
 
+/// Returns what the closure for `event` reports about local actions.
+fn local_actions_reported(all: &reader::Workflows, event: &str) -> Vec<String> {
+    if event == "push" {
+        writer_rules::second_writers(all)
+    } else {
+        reader::local_actions(all, &reader::pull_request_closure(all))
+    }
+}
+
 /// Scenario: a pull-request lane, and a push lane, each run a local composite
 /// action, spelled with `./` or `$/`.
 ///
-/// Invariant: the step is reported from both closures. The action runs in its
-/// caller's job with the caller's secrets, but this contract reads workflow
-/// files only, so its steps must not be read as compliant.
+/// Invariant: the step is reported from both closures, naming the workflow and
+/// the reference as written. The action runs in its caller's job with the
+/// caller's secrets, but this contract reads workflow files only, so its steps
+/// must not be read as compliant.
 #[rstest]
 #[case::pull_request_dot("pull_request", "./")]
 #[case::pull_request_dollar("pull_request", "$/")]
@@ -91,15 +101,58 @@ fn a_local_action_in_a_closure_is_reported(
         "on: {event}\njobs:\n  build:\n    steps:\n      - uses: {spelling}.github/actions/measure\n"
     );
     let all: reader::Workflows = [("lane.yml".to_owned(), parse(&lane)?)].into();
-    let reported = if event == "push" {
-        writer_rules::second_writers(&all)
-    } else {
-        reader::local_actions(&all, &reader::pull_request_closure(&all))
-    };
+    let reported = local_actions_reported(&all, event);
+    let expected = format!(
+        "lane.yml runs local action `{spelling}.github/actions/measure`, which is not read"
+    );
     ensure!(
-        reported.len() == 1 && reported.iter().all(|r| r.contains("local action")),
+        reported == [expected],
         "expected the local action alone, saw {reported:?}"
     );
+    Ok(())
+}
+
+/// Scenario: a lane calls a local reusable workflow, and the callee's step runs
+/// a local composite action.
+///
+/// Invariant: the callee's step is reported from both closures, since a called
+/// workflow runs with its caller's event and secrets.
+#[rstest]
+#[case::pull_request("pull_request")]
+#[case::push("push")]
+fn a_local_action_in_a_called_workflow_is_reported(#[case] event: &str) -> Result<()> {
+    let lane = format!("on: {event}\njobs:\n  call:\n    uses: ./.github/workflows/called.yml\n");
+    let called =
+        "on: workflow_call\njobs:\n  build:\n    steps:\n      - uses: ./.github/actions/measure\n";
+    let all: reader::Workflows = [
+        ("lane.yml".to_owned(), parse(&lane)?),
+        ("called.yml".to_owned(), parse(called)?),
+    ]
+    .into();
+    let reported = local_actions_reported(&all, event);
+    let expected = "called.yml runs local action `./.github/actions/measure`, which is not read";
+    ensure!(
+        reported == [expected],
+        "expected the callee's action alone, saw {reported:?}"
+    );
+    Ok(())
+}
+
+/// Scenario: a lane runs only remote actions, including this owner's other
+/// repository.
+///
+/// Invariant: nothing is reported. The rule must be narrow as well as
+/// sufficient: a remote action is read where it is pinned, not here.
+#[rstest]
+#[case::pull_request("pull_request")]
+#[case::push("push")]
+fn a_remote_action_is_not_reported(#[case] event: &str) -> Result<()> {
+    let lane = format!(
+        "on: {event}\njobs:\n  build:\n    steps:\n      - uses: actions/checkout@v4\n      - uses: leynos/other/.github/actions/x@v1\n"
+    );
+    let all: reader::Workflows = [("lane.yml".to_owned(), parse(&lane)?)].into();
+    let reported = local_actions_reported(&all, event);
+    ensure!(reported.is_empty(), "unexpected reports: {reported:?}");
     Ok(())
 }
 
