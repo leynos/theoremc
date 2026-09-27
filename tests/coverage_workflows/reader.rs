@@ -317,6 +317,28 @@ pub fn closure_from(all: &Workflows, seeds: BTreeSet<String>) -> BTreeSet<String
     reached
 }
 
+/// Returns each local composite action the named workflows' steps run.
+///
+/// A step's `./` or `$/` action runs in its caller's job with the caller's
+/// secrets, but this contract reads workflow files only, so the action's
+/// steps would sit outside every clause. Each such step is reported rather
+/// than read as compliant. Each entry names the workflow and the reference.
+pub fn local_actions(all: &Workflows, names: &BTreeSet<String>) -> Vec<String> {
+    names
+        .iter()
+        .filter_map(|name| Some((name, all.get(name)?)))
+        .flat_map(|(name, workflow)| {
+            steps(workflow)
+                .into_iter()
+                .filter_map(uses)
+                .filter(|reference| reference.starts_with("./") || reference.starts_with("$/"))
+                .map(move |reference| {
+                    format!("{name} runs local action `{reference}`, which is not read")
+                })
+        })
+        .collect()
+}
+
 /// Returns each local call, from the named workflows, to a file that is not there.
 ///
 /// The closure can only follow a call to a workflow it has read, so a call

@@ -41,7 +41,9 @@ pub fn second_writer_findings(workflow: &Value) -> Vec<String> {
 ///
 /// Seeds are the workflows a push starts, other than the publisher; the
 /// closure then takes in every local workflow they call, since a callee runs
-/// with its caller's push. Each entry names the workflow and the finding.
+/// with its caller's push. Each entry names the workflow and the finding. A
+/// local action one of them runs is reported too, since its steps are not
+/// read.
 pub fn second_writers(all: &reader::Workflows) -> Vec<String> {
     let is_push_lane = |workflow: &Value| {
         reader::trigger_names(workflow)
@@ -54,7 +56,8 @@ pub fn second_writers(all: &reader::Workflows) -> Vec<String> {
         .filter(|(_, workflow)| is_push_lane(workflow))
         .map(|(name, _)| name.clone())
         .collect();
-    reader::closure_from(all, seeds)
+    let closure = reader::closure_from(all, seeds);
+    closure
         .iter()
         .filter_map(|name| Some((name, all.get(name)?)))
         .filter(|(_, workflow)| !publishes_from_main(workflow))
@@ -63,5 +66,6 @@ pub fn second_writers(all: &reader::Workflows) -> Vec<String> {
                 .into_iter()
                 .map(move |finding| format!("{name}: {finding}"))
         })
+        .chain(reader::local_actions(all, &closure))
         .collect()
 }

@@ -366,7 +366,10 @@ call to `main` keeps such a change off every pull request's critical path.
 - The pull-request lane sets `with-ratchet: "true"` and
   `publish-artefact: "false"`, and holds no CodeScene step, client, host, or
   credential. The rule covers every workflow a pull request can start,
-  including local reusable workflows those workflows call.
+  including local reusable workflows those workflows call. A local composite
+  action runs in its caller's job, but the contract reads workflow files only,
+  so any step running one in either closure is reported rather than read as
+  compliant.
 - The publisher's check step runs one exact command,
   `echo "available=${{ secrets.CS_ACCESS_TOKEN != '' }}" >> "$GITHUB_OUTPUT"`,
   and carries nothing but a name and an id. The upload step runs only when that
