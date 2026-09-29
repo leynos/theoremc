@@ -7,7 +7,7 @@ name: Coverage (main)
 # baseline: caches saved on main are readable by every pull-request run,
 # so the baseline written here is the one each pull request is compared
 # against, and ci.yml's generate-coverage selection has to match the one
-# below field for field. tests/coverage_workflows.rs holds that shape.
+# below field for field. `make test-workflow-contracts` holds that shape.
 #
 # Known exceptions. Merges the Dependabot automerge workflow makes with
 # GITHUB_TOKEN fire no push event, so they reach this workflow only through
@@ -49,6 +49,8 @@ jobs:
       BUILD_PROFILE: debug
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@4fb8eb7ad52454678a0662865d81d3cd17aa6e0e
       - name: Generate coverage

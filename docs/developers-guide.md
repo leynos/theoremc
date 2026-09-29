@@ -393,12 +393,20 @@ call to `main` keeps such a change off every pull request's critical path.
   generate-coverage saves the baseline only on a push, so the baseline can lag
   by more than one commit until a later push saves it.
 
-`tests/coverage_workflows.rs` holds this shape over the repository's own
-workflows, and the modules under `tests/coverage_workflows/` drive each rule
-against complying and breaching fixtures, so a rule that detects nothing cannot
-pass. Workflows are parsed with `serde_norway`, which refuses a duplicate key,
-and a workflow declaring both a quoted and an unquoted `on` key is refused
-rather than read either way. The suite runs under `make test`.
+`make test-workflow-contracts` holds this shape over the repository's own
+workflows by running `cv005-contracts check`, the shared contract library in
+`leynos/shared-actions` (`packages/cv005-contracts`), from a full commit named
+by `CV005_CONTRACTS_REF` in the Makefile; CI runs it in a "Check the CV-005
+contracts" step after setting up uv. A fix to the rules is therefore a pin
+bump. The target needs `uv`, which fetches the Python 3.13 the library runs
+under. The repository's parameters are in `.github/cv005.toml`: its
+`repository` name and the `[selection]` the baseline measures, which the
+publisher's generator must carry and every pull-request lane must match. The
+library's own suite proves each rule refuses the shape it exists to refuse, so
+this repository keeps no copy of the readers or the refusal cases. Workflows
+are read strictly: a duplicate key, or a workflow declaring both a quoted and
+an unquoted `on` key, is refused rather than silently resolved, and a reading
+failure exits 2 rather than passing.
 
 ### 3.8 `cargo theorem` application boundary
 
