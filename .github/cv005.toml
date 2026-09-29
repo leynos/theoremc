@@ -1,0 +1,9 @@
+repository = "leynos/theoremc"
+
+# What the ratchet baseline measures: the publisher's generator must carry
+# exactly these inputs, and every lane must measure the same selection.
+[selection]
+format = "lcov"
+output-path = "lcov.info"
+use-cargo-nextest = "true"
+with-ratchet = "true"
