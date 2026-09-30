@@ -40,7 +40,7 @@ jobs:
       - name: Lint
         run: make lint
       - name: Test and Measure Coverage
-        uses: leynos/shared-actions/.github/actions/generate-coverage@4fb8eb7ad52454678a0662865d81d3cd17aa6e0e
+        uses: leynos/shared-actions/.github/actions/generate-coverage@c4ed5ffaf0640b1907d5359a87fd1677034eec27
         with:
           use-cargo-nextest: "true"
           output-path: lcov.info
