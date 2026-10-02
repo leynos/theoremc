@@ -1,0 +1,17 @@
+[package]
+name = "theoremc-build-support"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+
+[dependencies]
+camino = "1.2.2"
+cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+thiserror = "2.0.18"
+
+[dev-dependencies]
+rstest = "0.26.1"
+tempfile = "3.27.0"
+
+[lints]
+workspace = true
