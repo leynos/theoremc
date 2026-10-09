@@ -780,5 +780,10 @@ build with the platform linker directly, assign an empty `RUSTFLAGS`:
 RUSTFLAGS="" cargo build --release
 ```
 
+The decision is recorded in [ADR 005](adr-005-rust-build-standard.md). The
+contract tests that guard these defaults run `make -n`, so a direct
+`cargo test` needs GNU make on the `PATH`. The tests fail when `make` is
+missing instead of skipping, so a missing tool cannot read as a pass.
+
 See the [0.2.0 migration guide](v0-2-0-migration-guide.md) for what the new
 build defaults change for an existing checkout.
