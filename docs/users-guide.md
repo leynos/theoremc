@@ -764,3 +764,26 @@ The loader returns `SchemaError::DuplicateTheoremKey` with:
 - structured collision diagnostics naming every duplicate theorem-key
   occurrence in deterministic order, and
 - a structured diagnostic pointing at the duplicate theorem field.
+
+## Building from source
+
+The repository's Cargo defaults and the Makefile development targets
+(`make test`, `make lint`, `make typecheck` and the debug build) use the
+parallel `rustc` frontend (`-Zthreads=8`) and, on Linux, the `mold` linker. On
+Linux, install `mold` before building, because the configuration names it and a
+build without it fails at link time. A release build (`make release`) and the
+coverage build use neither: they assign their own `RUSTFLAGS`, which displaces
+the configuration's flags, so a shipped artefact keeps the platform linker. To
+build with the platform linker directly, assign an empty `RUSTFLAGS`:
+
+```bash
+RUSTFLAGS="" cargo build --release
+```
+
+The decision is recorded in [ADR 005](adr-005-rust-build-standard.md). The
+contract tests that guard these defaults run `make -n`, so a direct
+`cargo test` needs GNU make on the `PATH`. The tests fail when `make` is
+missing instead of skipping, so a missing tool cannot read as a pass.
+
+See the [0.2.0 migration guide](v0-2-0-migration-guide.md) for what the new
+build defaults change for an existing checkout.

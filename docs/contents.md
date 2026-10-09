@@ -64,6 +64,8 @@
   generation, backend, and reporting design.
 - [User's guide](users-guide.md) - Guide for library consumers covering schema
   types, loading API, identifier rules, and value forms.
+- [0.2.0 migration guide](v0-2-0-migration-guide.md) - What the new build
+  defaults change for an existing checkout.
 - [Execution plans](execplans/) - Implementation plans for roadmap steps.
 - [Step 1.1: `TheoremDoc` and subordinate schema types](execplans/1-1-1-theorem-doc-and-subordinate-schema-types.md)
   - ExecPlan for strict theorem document deserialisation.
