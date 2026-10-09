@@ -52,7 +52,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@7d751eded578e48dacf43ab173d5820e6437c474
+        uses: leynos/shared-actions/.github/actions/setup-rust@2f47859bcf82ae8b5bc10b457683fbd589ca2e41
         with:
           install-mold: 'true'
       - name: Generate coverage
