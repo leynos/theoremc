@@ -229,6 +229,7 @@ where available, and run the direct Cargo invocations for specialized checks:
 | -------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | Formatting           | `make check-fmt`                                                                                   | `cargo fmt --all -- --check`                                       |
 | Linting              | `make lint`                                                                                        | Clippy with `-D warnings` plus rustdoc                             |
+| Type checking        | `make typecheck`                                                                                   | `cargo check --all-targets --all-features`                         |
 | Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                           |
 | Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit           |
 | Architecture linting | `cargo dylint theoremc_arch_lint --all -- -D warnings`                                             | Flags schema layer boundary and other architecture rule violations |
@@ -246,6 +247,10 @@ Cargo doctest pass for Rustdoc examples. It runs
 `cargo test --workspace --all-features --doc`. Override `NEXTEST_FLAGS` only
 with options supported by cargo-nextest, and use `DOCTEST_FLAGS` for doctest
 scope.
+
+CI runs `make check-fmt`, `make lint`, `make typecheck`, and `make test`. A
+separate coverage measurement step precedes `make test` and installs
+`cargo-nextest`.
 
 Capture long command output through `tee` with `set -o pipefail` to avoid
 losing truncated results:
