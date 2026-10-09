@@ -1,14 +1,16 @@
 # Request for Comments (RFC) 0001: semantic law templates over composable primaries
 
-- Status: accepted
+## Preamble
+
+- RFC number: 0001
+- Status: Accepted
 - Date: 2026-08-19
 - Schema version: 2
 - Initial backend: Kani
 - Future backend considered: Verus
 - Related decisions:
-  [ADR 005](../adr-005-vertical-slice-first-roadmap-sequencing.md),
-  [ADR 006](../adr-006-backend-neutral-harness-planning-boundary.md), and
-  [ADR 007](../adr-007-verus-backend-preservation-invariants.md)
+  [ADR 005](../adr-005-vertical-slice-first-roadmap-sequencing.md), [ADR 006](../adr-006-backend-neutral-harness-planning-boundary.md),
+  and [ADR 007](../adr-007-verus-backend-preservation-invariants.md)
 - Originating proposal:
   [GitHub issue 80](https://github.com/leynos/theoremc/issues/80)
 
@@ -20,6 +22,10 @@ to write an explicit Rust assertion, or may instantiate a named law such as
 `homomorphism`.
 
 A law remains a proof obligation inside `Prove`:
+
+**Screen reader description:** The example keeps an opaque assertion alongside
+a structured idempotence law inside one schema version 2 theorem, showing that
+both obligation forms remain available.
 
 ```yaml
 Schema: 2
@@ -39,8 +45,8 @@ Prove:
     because: "normalization reaches a fixed point after one application"
 ```
 
-Law instances lower into a typed semantic law intermediate representation
-(IR), then into the backend-neutral harness plan defined by ADR 006. The first
+Law instances lower into a typed semantic law intermediate representation (IR),
+then into the backend-neutral harness plan defined by ADR 006. The first
 implementation targets Kani. A later Verus backend may consume the same law
 semantics through explicit Verus bindings, subject to ADR 007.
 
@@ -75,8 +81,8 @@ Second, theoremc can validate only the syntax of an opaque assertion before
 generated Rust reaches rustc. It cannot distinguish the intended law from a
 plausible but subtly different assertion.
 
-Third, opaque Rust expressions weaken the planned multi-backend architecture.
-A Kani renderer can embed a Rust expression in `assert!`, but a Verus renderer
+Third, opaque Rust expressions weaken the planned multi-backend architecture. A
+Kani renderer can embed a Rust expression in `assert!`, but a Verus renderer
 cannot generally reinterpret arbitrary executable Rust as a `spec` expression
 or proof obligation.
 
@@ -85,8 +91,8 @@ can require a small operation, relation, invariant, or combiner with a precise
 signature. That encourages production code and proof adapters to expose
 composable semantic units rather than one large, stateful procedure.
 
-The problem is not a shortage of assertion syntax. It is the absence of a
-small semantic vocabulary between human intent and backend mechanics.
+The problem is not a shortage of assertion syntax. It is the absence of a small
+semantic vocabulary between human intent and backend mechanics.
 
 ## Goals
 
@@ -172,20 +178,22 @@ Schema: 2
 
 The version rules are:
 
-| Source form | Interpretation |
-| --- | --- |
-| `Schema` omitted | Parse using the version 1 compatibility profile |
-| `Schema: 1` | Parse using schema version 1 |
-| `Schema: 2` | Parse using schema version 2 |
+| Source form           | Interpretation                                       |
+| --------------------- | ---------------------------------------------------- |
+| `Schema` omitted      | Parse using the version 1 compatibility profile      |
+| `Schema: 1`           | Parse using schema version 1                         |
+| `Schema: 2`           | Parse using schema version 2                         |
 | Any unsupported value | Emit a source-located unsupported-version diagnostic |
+
+_Table 1: How omitted and explicit schema versions select document semantics._
 
 Omission permanently means version 1. An unchanged file must not acquire new
 semantics because a newer theoremc happens to read it.
 
-Version 1 permits opaque assertions only. Version 2 permits both opaque
-assertions and structured laws. A law inside an unversioned or `Schema: 1`
-document produces a targeted diagnostic rather than silently upgrading the
-document.
+The version 1 `Prove` obligation form permits opaque assertions only. Version 2
+permits both opaque assertions and structured laws. A structured law inside an
+unversioned or `Schema: 1` document produces a targeted diagnostic rather than
+silently upgrading the document.
 
 A future Verus binding schema must be additive. ADR 007 permits a later schema
 version, such as version 3, or an external binding registry, but it forbids
@@ -274,11 +282,13 @@ The fields mean:
 
 The selected law and primary position define the permitted roles:
 
-| Primary shape | Required roles |
-| --- | --- |
-| Unary operation, invariant, or mapping | `input` |
-| Binary combiner or relation | `left`, `right` |
-| Fully specified invocation | none |
+| Primary shape                          | Required roles  |
+| -------------------------------------- | --------------- |
+| Unary operation, invariant, or mapping | `input`         |
+| Binary combiner or relation            | `left`, `right` |
+| Fully specified invocation             | none            |
+
+_Table 2: Semantic roles required by each primary invocation shape._
 
 The values of `bind` are actual parameter identifiers from the corresponding
 `Actions` declaration. A bound parameter must not also appear in `args`.
@@ -332,6 +342,10 @@ f(f(x)) R f(x)
 
 `R` defaults to equality.
 
+**Screen reader description:** The example binds one input and one fixed policy
+argument, then applies the normalization action twice through the idempotence
+template.
+
 ```yaml
 - law:
     idempotent:
@@ -354,6 +368,10 @@ backward(forward(x)) R x
 
 This law is deliberately one directional. A bidirectional codec requires two
 law instances.
+
+**Screen reader description:** The example encodes a document and decodes the
+resulting bytes, using `must` to require a successful decode before comparing
+it with the original input.
 
 ```yaml
 - law:
@@ -383,6 +401,10 @@ left(x) R right(x)
 
 `R` defaults to equality.
 
+**Screen reader description:** The example compares reference and optimized
+search actions over the same haystack and needle using the default equality
+relation.
+
 ```yaml
 - law:
     equivalent:
@@ -409,6 +431,10 @@ relation(implementation(x), specification(x))
 ```
 
 Refinement is directional and requires a custom relation.
+
+**Screen reader description:** The example compares optimized and reference
+plans through a custom relation that receives their results as its left and
+right inputs.
 
 ```yaml
 - law:
@@ -441,6 +467,10 @@ invariant(state) implies invariant(transition(state))
 
 The transition is a model operation that returns a new state.
 
+**Screen reader description:** The example checks that a model update preserves
+graph bidirectionality, requiring the update operation to succeed before
+checking the new state.
+
 ```yaml
 - law:
     preserves:
@@ -472,6 +502,10 @@ map(combine_input(x, y)) R combine_output(map(x), map(y))
 ```
 
 `R` defaults to equality.
+
+**Screen reader description:** The example maps each input collection to a
+count, combines the inputs, and compares that result with the combination of
+their individual counts.
 
 ```yaml
 - law:
@@ -521,7 +555,11 @@ important custom relations should receive independent verification.
 
 ## Lowering architecture
 
-The pipeline is:
+The pipeline is shown below.
+
+**Screen reader description:** A versioned raw schema becomes a validated
+domain model, then either an opaque obligation or semantic Law IR; both paths
+join at HarnessPlan before backend renderers run.
 
 ```text
 versioned raw schema
@@ -545,6 +583,8 @@ opaque schema 1/2 obligation    semantic Law IR
          Kani renderer     future Verus renderer
 ```
 
+_Figure 1: Schema and law lowering converge at the shared harness plan._
+
 ADR 006 owns the harness-plan boundary. The plan contains semantic operations,
 resolved invocations, stable obligation identities, source provenance, and
 explicit opaque-expression nodes. It contains no Kani token streams or Kani
@@ -563,14 +603,16 @@ become portable merely because they share a container with law obligations.
 A backend must reject unsupported obligations before emitting partial output.
 The initial capability expectations are:
 
-| Obligation | Kani MVP | Future Verus |
-| --- | --- | --- |
-| Structured laws in this RFC | required | intended after binding design |
-| Opaque Rust assertion | required | not guaranteed |
-| Opaque Rust assumption | required | not guaranteed |
-| Opaque Rust witness | required | not guaranteed |
-| Stateful `Do` sequence | required | requires separate design |
-| `must` over `Result` or `Option` | required | requires explicit mapping |
+| Obligation                       | Kani MVP | Future Verus                  |
+| -------------------------------- | -------- | ----------------------------- |
+| Structured laws in this RFC      | required | intended after binding design |
+| Opaque Rust assertion            | required | not guaranteed                |
+| Opaque Rust assumption           | required | not guaranteed                |
+| Opaque Rust witness              | required | not guaranteed                |
+| Stateful `Do` sequence           | required | requires separate design      |
+| `must` over `Result` or `Option` | required | requires explicit mapping     |
+
+_Table 3: Initial obligation support expectations for Kani and future Verus._
 
 Kani lowers structured laws into proof-harness calls, assumptions, covers, and
 assertions. Kani remains bounded by its configured unwind and resource limits.
@@ -597,9 +639,25 @@ A generated cover for a law precondition does not satisfy the document witness
 requirement. The witness records the theorem author's intended nontrivial path;
 the generated cover checks an operational precondition.
 
+### Run-status contract
+
 A future backend may implement reachability differently, but the semantic run
-record must preserve the distinction between proved, falsified, unreachable,
-undetermined, and unsupported obligations.
+record must preserve a complete terminal-status contract:
+
+- `proved`: the backend established the obligation under its recorded evidence
+  configuration;
+- `falsified`: the backend produced evidence that the obligation does not
+  hold;
+- `unreachable`: the required state or path could not be reached;
+- `undetermined`: the backend ran but could not establish proof or
+  falsification;
+- `unsupported`: capability checking rejected an obligation before emission;
+- `execution_error`: the verifier or runner failed operationally, so no proof
+  outcome is available.
+
+Verifier resource exhaustion maps to `undetermined` with reason
+`resource_exhaustion`. This reason preserves the cause without presenting a
+resource limit as proof or falsification.
 
 ## Stable sub-obligation identities
 

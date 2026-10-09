@@ -1,9 +1,19 @@
 # Architectural Decision Record (ADR) 006: backend-neutral harness planning boundary
 
-- Status: accepted
-- Date: 2026-08-19
+## Status
+
+Accepted. Normalize validated theorem meaning into an internal harness plan
+before rendering backend code.
+
+## Date
+
+2026-08-19
+
+## Decision metadata
+
 - Deciders: theoremc maintainers
-- Technical story: accommodate RFC 0001 without delaying the Kani vertical slice
+- Technical story: accommodate Request for Comments (RFC) 0001 without delaying
+  the Kani vertical slice
 
 ## Context
 
@@ -61,6 +71,10 @@ validated theorem semantics and generated backend code.
 
 The exact Rust names may evolve, but the conceptual shape is:
 
+**Screen reader description:** The Rust sketch lists a plan with theorem and
+evidence identities plus operations for symbolic values, assumptions,
+invocations, branches, comparisons, assertions, and covers.
+
 ```rust,no_run
 struct HarnessPlan {
     theorem: TheoremIdentity,
@@ -78,6 +92,8 @@ enum Operation {
     Cover(PredicateObligation),
 }
 ```
+
+_Code example: The backend-neutral harness plan and its operation variants._
 
 The plan records meaning needed by renderers:
 
@@ -190,7 +206,8 @@ adapters.
 ### 6. Give every generated check a stable obligation identity
 
 The plan assigns deterministic structural identities before backend rendering.
-Schema version 1 examples include:
+**Screen reader description:** These code examples name the stable identities
+assigned to version 1 assumptions, steps, assertions, and witnesses.
 
 ```text
 assume[0]
@@ -198,6 +215,11 @@ let[1].must
 prove[0]
 witness[0]
 ```
+
+_Code example: Stable identities for version 1 proof obligations._
+
+**Screen reader description:** The structured law example adds stable child
+identities for its first and second applications and its relation check.
 
 RFC 0001 may add children such as:
 
@@ -207,13 +229,17 @@ prove[2].law.idempotent.second_application
 prove[2].law.idempotent.relation
 ```
 
+_Code example: Stable child identities for a structured law._
+
 Backend-generated local names must not define report identity. Renderers may
 include obligation identities in assertion messages or backend metadata, but
 the semantic identity exists first.
 
 ### 7. Lower laws through semantic Law IR into the same plan
 
-RFC 0001 adds this path:
+**Screen reader description:** A version 2 law lowers through its validated
+domain model and semantic intermediate representation into the shared plan and
+Kani renderer. RFC 0001 adds this path:
 
 ```text
 schema version 2 law
@@ -223,8 +249,13 @@ schema version 2 law
     -> Kani renderer
 ```
 
+_Figure 1: The schema version 2 law path into backend rendering._
+
 The Law IR retains the law kind, role bindings, relation choice, source
 rationale, and primary invocations. It does not contain Kani syntax.
+
+**Screen reader description:** A version 1 theorem lowers into the shared plan
+before Kani rendering.
 
 The schema version 1 path remains:
 
@@ -235,8 +266,10 @@ schema version 1 theorem
     -> Kani renderer
 ```
 
-The Kani renderer is therefore completed once for the vertical slice and
-reused by RFC 0001.
+_Figure 2: The schema version 1 theorem path into backend rendering._
+
+The Kani renderer is therefore completed once for the vertical slice and reused
+by RFC 0001.
 
 ### 8. Require longhand-versus-law equivalence fixtures
 

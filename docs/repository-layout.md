@@ -62,7 +62,7 @@ owned by the workspace crates.
 | `docs/cargo-theorem-cli-design.md`      | `cargo theorem` CLI contract, boundaries, and implementation sequence   |
 | `docs/cargo-theorem-cli-users-guide.md` | Task-oriented guide for callers of the planned `cargo theorem` CLI      |
 | `docs/adr-*.md`                         | Architecture Decision Records (ADRs)                                    |
-| `docs/rfcs/`                         | Language and architecture Requests for Comments (RFCs)                  |
+| `docs/rfcs/`                            | Language and architecture Requests for Comments (RFCs)                  |
 | `docs/execplans/`                       | Living implementation plans and milestone records                       |
 
 An RFC defines a substantial proposed or accepted language and architecture

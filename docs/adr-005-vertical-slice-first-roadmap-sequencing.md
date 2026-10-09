@@ -1,7 +1,16 @@
 # Architectural Decision Record (ADR) 005: vertical-slice-first roadmap sequencing
 
-- Status: accepted
-- Date: 2026-08-19
+## Status
+
+Accepted. Deliver a working Kani proof and counterexample before expanding
+semantic-law breadth or rich reporting.
+
+## Date
+
+2026-08-19
+
+## Decision metadata
+
 - Deciders: theoremc maintainers
 - Technical story: move from generated Kani stubs to a working proof path
 
@@ -9,8 +18,8 @@
 
 Theoremc has completed the first three roadmap phases. It can discover theorem
 files, validate their schema, generate stable per-file modules and Kani harness
-names, attach Kani proof metadata, and emit compile-time action and type probes.
-The generated proof functions still have empty bodies.
+names, attach Kani proof metadata, and emit compile-time action and type
+probes. The generated proof functions still have empty bodies.
 
 The current roadmap completes the remaining work horizontally:
 
@@ -25,11 +34,12 @@ That order delays the first answer to theoremc's central product question:
 > Can an engineer place a readable `.theorem` file beside real Rust code and
 > have Kani prove or falsify its claim through the normal build integration?
 
-RFC 0001 also proposes schema version 2, structured semantic laws, a public
-proof-obligation API change, semantic validation, and law lowering. Those
-features are valuable, but placing them before the first working proof path
-would increase the distance to a vertical slice and make it harder to tell
-whether failures belong to the basic verifier pipeline or the law layer.
+Request for Comments (RFC) 0001 also proposes schema version 2, structured
+semantic laws, a public proof-obligation API change, semantic validation, and
+law lowering. Those features are valuable, but placing them before the first
+working proof path would increase the distance to a vertical slice and make it
+harder to tell whether failures belong to the basic verifier pipeline or the
+law layer.
 
 A vertical slice must therefore come first, but it must not hard-code an
 assertion-only, Kani-specific architecture that RFC 0001 or a future Verus
@@ -60,7 +70,10 @@ backend would immediately have to dismantle.
 ### 1. Make the working vertical slice the next release gate
 
 The next implementation milestone is not "all Kani semantics". It is one
-complete, representative route through the system:
+complete, representative route through the system.
+
+**Screen reader description:** The pipeline traces a theorem from schema
+validation through planning and Kani execution to a proof outcome.
 
 ```text
 .theorem source
@@ -70,6 +83,8 @@ complete, representative route through the system:
     -> cargo kani execution
     -> proved or falsified result
 ```
+
+_Figure 1: The vertical-slice path from theorem source to Kani result._
 
 The slice must include:
 
@@ -115,8 +130,8 @@ independently testable increments:
 5. infallible documentary `must`;
 6. symbolic `maybe` with nested steps.
 
-Every increment lowers through the same resolved-invocation representation.
-No construct receives a second, direct Kani renderer.
+Every increment lowers through the same resolved-invocation representation. No
+construct receives a second, direct Kani renderer.
 
 ### 4. Split execution policy from rich reporting
 
@@ -124,8 +139,8 @@ Roadmap Step 4.3 becomes a minimal Kani runner and evidence-policy milestone.
 It may invoke Kani, associate outcomes with stable obligation identities, and
 compare actual status with `Evidence.kani.expect`.
 
-It does not need to render Markdown, HTML, JUnit XML, Cucumber JSON, or concrete
-playback artefacts. Those remain in Phase 5.
+It does not need to render Markdown, HTML, JUnit XML, Cucumber JSON, or
+concrete playback artefacts. Those remain in Phase 5.
 
 The minimal runner must distinguish:
 
@@ -161,9 +176,10 @@ The small vertical-slice example moves from the late examples phase into Step
 4.1. It should use a pure, shared-reference primary with an owned result, such
 as normalization of a bounded integer or compact configuration value.
 
-The richer `account` and HNSW examples remain later. They should validate
-stateful workflows, realistic data shaping, reporting, and developer guidance
-once the minimal execution model has stabilized.
+The richer `account` and Hierarchical Navigable Small World (HNSW) examples
+remain later. They should validate stateful workflows, realistic data shaping,
+reporting, and developer guidance once the minimal execution model has
+stabilized.
 
 ### 7. Keep noncritical work off the vertical-slice path
 
@@ -175,7 +191,7 @@ The following work remains deferred unless it directly blocks the slice:
 - Dylint enforcement;
 - localization and Fluent integration;
 - build-support crate extraction;
-- placeholder CLI resolution;
+- placeholder command-line interface (CLI) resolution;
 - schema module housekeeping unrelated to touched code;
 - the full six-law RFC 0001 catalogue;
 - Verus bindings or a Verus runner.
@@ -187,16 +203,18 @@ prove a theorem.
 
 The roadmap should make the following textual and dependency changes.
 
-| Existing area | Amendment |
-| --- | --- |
-| Phase 4 outcome | Name a working Kani proof path as the primary outcome |
-| Step 4.1 | Add the harness plan, real fixture execution, and pass/fail slice |
-| Step 4.2 | Retain breadth work for `call`, `must`, and `maybe` |
-| Step 4.3 | Add a minimal runner; move rich formats to Phase 5 |
-| New Step 4.4 | Integrate RFC 0001 only after the slice works |
-| Step 5.1 | Model generic obligations and backend-indexed evidence |
-| Step 6.3 | Keep broad examples, but remove the first-slice dependency |
-| Sequencing summary | Make the vertical slice the gate before laws or reports |
+| Existing area      | Amendment                                                         |
+| ------------------ | ----------------------------------------------------------------- |
+| Phase 4 outcome    | Name a working Kani proof path as the primary outcome             |
+| Step 4.1           | Add the harness plan, real fixture execution, and pass/fail slice |
+| Step 4.2           | Retain breadth work for `call`, `must`, and `maybe`               |
+| Step 4.3           | Add a minimal runner; move rich formats to Phase 5                |
+| New Step 4.4       | Integrate RFC 0001 only after the slice works                     |
+| Step 5.1           | Model generic obligations and backend-indexed evidence            |
+| Step 6.3           | Keep broad examples, but remove the first-slice dependency        |
+| Sequencing summary | Make the vertical slice the gate before laws or reports           |
+
+_Table 1: Required roadmap changes to put the working proof path first._
 
 The implementation plan for Step 4.1 must cite ADR 006. Work on Step 5.1 and
 RFC 0001 must cite ADR 007.
@@ -257,7 +275,7 @@ work, and backend lowering before the existing language has proved one theorem.
 Rejected. A polished report over an unproven execution model would optimize the
 least certain part of the system last.
 
-### Use HNSW as the first slice
+### Use Hierarchical Navigable Small World (HNSW) as the first slice
 
 Rejected for the first milestone. HNSW remains an excellent realistic example,
 but its state, bounds, graph mutation, and counterexample complexity would make
