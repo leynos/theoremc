@@ -26,7 +26,7 @@ jobs:
         # first release with `--check` and `--git`.
         uses: leynos/shared-actions/.github/actions/install-mdtablefix@2f47859bcf82ae8b5bc10b457683fbd589ca2e41
         with:
-          version: "0.6.0"
+          version: "0.6.1"
       - name: Setup uv
         uses: astral-sh/setup-uv@b3c9b5fc56ebc90760c43b1ac9552c0d1705d3ca
       - name: Check the CV-005 contracts
