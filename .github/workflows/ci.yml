@@ -41,6 +41,8 @@ jobs:
           globs: '**/*.md'
       - name: Lint
         run: make lint
+      - name: Typecheck
+        run: make typecheck
       - name: Test and Measure Coverage
         env:
           # One of the two exclusions from the build standard: a coverage build is a
@@ -57,3 +59,6 @@ jobs:
           # writes on main and never contact CodeScene; that workflow is the
           # one publisher. `make test-workflow-contracts` holds the shape.
           publish-artefact: "false"
+      - name: Test
+        # Coverage installs cargo-nextest, which this target requires.
+        run: make test
