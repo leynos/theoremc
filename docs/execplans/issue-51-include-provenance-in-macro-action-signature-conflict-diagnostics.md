@@ -5,7 +5,8 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & Retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS
+Status: IN PROGRESS (EP-M1 to EP-M3 complete; EP-M4 review and PR close-out
+remaining)
 
 ## Purpose / big picture
 
@@ -716,7 +717,8 @@ Behaviour to observe, in order:
    `crates/theoremc-macros/src/action_probe_tests.rs`) fails before the
    `lib.rs` change with a compile error on the missing fields, and passes
    afterwards for both the parameter-drift and return-drift cases.
-2. `action_signature_index_rejects_conflicting_signatures` (extended in
+2. `action_signature_index_reports_conflicting_signatures_with_provenance`
+   (extended in
    `crates/theoremc-macros/src/action_probe_tests/action_signature_index.rs`)
    asserts both theorem names and both summaries for both conflict kinds.
 3. `cargo nextest run -p theoremc-macros --test expand` passes against the
