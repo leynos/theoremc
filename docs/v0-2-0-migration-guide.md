@@ -35,3 +35,36 @@ refuses `-Zthreads=8`:
 ```bash
 RUSTFLAGS="" cargo +1.88 check --workspace
 ```
+
+## Borrowed-string newtypes
+
+0.2.0 adds `theoremc::schema::StrNewtype`, a public trait supplying `new` and
+`as_str` for `&'a str`-backed newtypes. It is additive: no existing public type
+changed shape, so an upgrading caller needs no code change.
+
+It matters if you define your own borrowed-string wrapper. Such a wrapper now
+derives its conversions instead of writing the pair out, and callers must bring
+the trait into scope to reach the two methods:
+
+```rust
+use derive_more::{From, Into};
+use theoremc::schema::StrNewtype;
+use the_newtype::Newtype;
+
+#[derive(Newtype, From, Into, Copy, Clone)]
+struct Marker<'a>(&'a str);
+
+let marker = Marker::new("witness");
+```
+
+Defining a wrapper this way requires `the-newtype` and `derive_more` as direct
+dependencies of the defining crate, because Cargo does not re-export them. The
+[trait bounds and wrapper recipe](developers-guide.md) and the
+[wrapper API contract](users-guide.md) are documented in full.
+
+Two consequences worth knowing before you adopt it. `as_str` takes `&self`
+rather than `self` by value, because Clippy's `wrong_self_convention` rejects a
+by-value receiver on a trait method; `Copy` wrappers are unaffected. And the
+methods are not `const`, so a wrapper that needs `const` construction or access
+must keep an inherent `const fn` pair alongside the derive — a blanket trait
+method cannot be `const`.

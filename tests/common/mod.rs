@@ -21,12 +21,25 @@ pub use schema_fixtures::{
 /// The constructor and accessor come from [`StrNewtype`]; the trait is
 /// re-exported through `test_helpers` so integration binaries can import it
 /// alongside this type.
+///
+/// These two methods were `pub const fn` before the trait existed. Routing
+/// them through `StrNewtype` gives up `const`-callability, because a blanket
+/// trait method cannot be `const` (trait `const fn` is unstable and `const
+/// Trait` for the bound is unstable too). No `const`, `static`, `const fn`,
+/// array-length, or const-generic context in this workspace constructs or
+/// reads either wrapper, and `test-helpers` is a workspace-internal path
+/// dependency rather than a published crate, so the capability is unused and
+/// unobservable here. If that ever changes, restore an inherent `const` pair
+/// on the affected wrapper — the precedent recorded for the const-capable
+/// siblings in `docs/theoremc-design.md` §6.7.11 — rather than giving up the
+/// deduplication for the other wrappers.
 #[derive(Debug, Clone, Copy, Newtype, From, Into)]
 pub struct FixtureName<'a>(&'a str);
 
 /// Identifies an expected substring in fixture diagnostics or build logs.
 ///
 /// Shares [`StrNewtype`] with [`FixtureName`] rather than repeating the
-/// `new`/`as_str` pair.
+/// `new`/`as_str` pair, and gives up `const`-callability on the same terms
+/// documented above.
 #[derive(Debug, Clone, Copy, Newtype, From, Into)]
 pub struct ExpectedFragment<'a>(&'a str);

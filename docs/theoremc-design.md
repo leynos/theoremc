@@ -1134,6 +1134,21 @@ boilerplate across the schema and test-support wrappers:
   `use super::str_newtype::StrNewtype as _;`. Its `new` and `as_str` lose their
   `const fn` qualifier, which the type never needed: it is crate-private, and no
   `const` context, upstream or downstream, constructs one.
+- The two test-support wrappers,
+  `test_helpers::{FixtureName, ExpectedFragment}`, also lose their previous
+  `pub const fn` qualifier. The loss is accepted deliberately rather than by
+  omission. Making `new`/`as_str` callable in a `const` context again is
+  currently impossible while keeping one shared implementation: a trait method
+  cannot be `const`, and `const Trait` bounds for the blanket implementation
+  are unstable. Restoring an inherent `const fn` pair beside the trait methods
+  would reinstate exactly the duplicated pair this issue removes and would
+  shadow the trait on ordinary calls, so it would satisfy the const requirement
+  at the cost of the objective. The capability is also unused and unobservable
+  within this workspace: no `const`, `static`, `const fn`, array-length, or
+  const-generic context constructs or reads either wrapper, and `test-helpers`
+  is a workspace-internal path dependency, not a published crate. Should such a
+  context appear later, restore an inherent `const` pair on the affected
+  wrapper alone — the same trade the three siblings below already make.
 - Three further `&'a str` wrappers keep their hand-written pairs:
   `schema::loader_message::{FieldName, ErrorMessage}` and
   `schema::arg_value::ParamName`. Their `new`/`as_str` are `const fn`, and a

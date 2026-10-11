@@ -152,14 +152,19 @@ impl<'a> YamlLine<'a> {
         }
 
         *current_step += 1;
-        if *current_step == target_step {
+        if Self::is_target_step(*current_step, target_step) {
             *selected_indent = Some(self.indent_width());
-            StepScope::SelectedStart
-        } else if selected_indent.is_some() {
-            StepScope::PastSelected
-        } else {
-            StepScope::OutsideSelected
+            return StepScope::SelectedStart;
         }
+        if selected_indent.is_some() {
+            return StepScope::PastSelected;
+        }
+        StepScope::OutsideSelected
+    }
+
+    /// True when the counter has reached the step the scan is looking for.
+    const fn is_target_step(current_step: usize, target_step: usize) -> bool {
+        current_step == target_step
     }
 }
 
