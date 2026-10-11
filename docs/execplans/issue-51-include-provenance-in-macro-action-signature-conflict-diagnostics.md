@@ -200,6 +200,18 @@ Observable success:
       `1562b5c..9eac73c` is byte-for-byte equal to `41fd07a..140837b`, and every
       path changed by `main` is byte-identical to its `origin/main` version in
       the result.
+- [x] (2026-10-11T13:55Z) Re-established every gate against the rebased head,
+      `118508f`. `make check-fmt`, `make typecheck`, `make lint`,
+      `make markdownlint`, `make nixie`, and
+      `cargo test --workspace --all-features --doc` (24 passed, 0 failed) all
+      pass. `make test` reports 783/784 with the same single documented Kani
+      failure. The doctest suite had to be run on its own because `make test`
+      aborts at its nextest recipe before reaching the doctest recipe. The
+      rebased head was then force-pushed with lease, and GitHub CI confirmed
+      it: run `38144307816` passed `build-test` in 8m43s, and the CI log shows
+      `PASS theoremc::theorem_file_macro_bdd
+      a_valid_theorem_file_exposes_a_kani_proof_harness` for `118508f`, so the
+      local Kani failure remains environmental on the rebased head too.
 
 ## Surprises & Discoveries
 
