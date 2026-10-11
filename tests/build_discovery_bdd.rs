@@ -2,7 +2,7 @@
 
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{ExpectedFragment, FixtureCrate, TRIVIAL_THEOREM, toml_section};
+use test_helpers::{ExpectedFragment, FixtureCrate, StrNewtype, TRIVIAL_THEOREM, toml_section};
 
 const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
 const FIXTURE_LIB_RS: &str = "//! Fixture crate for build discovery behavioural tests.\n";

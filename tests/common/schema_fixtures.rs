@@ -2,7 +2,8 @@
 
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use theoremc_core::schema::{
-    SchemaDiagnosticCode, SourceId, TheoremDoc, load_theorem_docs, load_theorem_docs_with_source,
+    SchemaDiagnosticCode, SourceId, StrNewtype, TheoremDoc, load_theorem_docs,
+    load_theorem_docs_with_source,
 };
 
 use super::{ExpectedFragment, FixtureName};

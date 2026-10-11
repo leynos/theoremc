@@ -1,5 +1,8 @@
 //! Shared test helpers for integration tests.
 
+use derive_more::{From, Into};
+use the_newtype::Newtype;
+
 mod fixture_crate;
 mod schema_fixtures;
 
@@ -14,37 +17,16 @@ pub use schema_fixtures::{
 };
 
 /// Identifies a fixture file under `tests/fixtures/`.
-#[derive(Debug, Clone, Copy)]
+///
+/// The constructor and accessor come from [`StrNewtype`]; the trait is
+/// re-exported through `test_helpers` so integration binaries can import it
+/// alongside this type.
+#[derive(Debug, Clone, Copy, Newtype, From, Into)]
 pub struct FixtureName<'a>(&'a str);
 
-impl<'a> FixtureName<'a> {
-    /// Creates a fixture-name wrapper.
-    #[must_use]
-    pub const fn new(value: &'a str) -> Self {
-        Self(value)
-    }
-
-    /// Returns the wrapped fixture name.
-    #[must_use]
-    pub const fn as_str(self) -> &'a str {
-        self.0
-    }
-}
-
 /// Identifies an expected substring in fixture diagnostics or build logs.
-#[derive(Debug, Clone, Copy)]
+///
+/// Shares [`StrNewtype`] with [`FixtureName`] rather than repeating the
+/// `new`/`as_str` pair.
+#[derive(Debug, Clone, Copy, Newtype, From, Into)]
 pub struct ExpectedFragment<'a>(&'a str);
-
-impl<'a> ExpectedFragment<'a> {
-    /// Creates an expected-fragment wrapper.
-    #[must_use]
-    pub const fn new(value: &'a str) -> Self {
-        Self(value)
-    }
-
-    /// Returns the wrapped expected fragment.
-    #[must_use]
-    pub const fn as_str(self) -> &'a str {
-        self.0
-    }
-}
