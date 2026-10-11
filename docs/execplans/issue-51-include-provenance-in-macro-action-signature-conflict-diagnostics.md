@@ -402,8 +402,10 @@ ordered slice, and every obligation is decidable by example with a finite,
 enumerable case set. Bounded model checking and formal proof are therefore not
 proportionate; parameterized tests plus a compile-fail golden file discharge
 every obligation. Each confirmation names the fixtures that *do* reach the
-conflict path, and the equivalent-signature case acts as the negative control
-that must be rejected as a conflict.
+conflict path. The equivalent-signature case acts as the negative control: it
+must be accepted, with no conflict reported, while still generating the action
+probe for the agreed signature. Together the two directions show the check is
+not passing everything or rejecting everything.
 
 Claims under test:
 
