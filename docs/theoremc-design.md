@@ -103,7 +103,10 @@ workspace members: non-Kani backend emitter crates, a reporter CLI (`theoremd`)
 to run verification and produce human/CI reports, and optional enforcement lints
 (`theoremc-dylint`) to discourage bypassing. Kani body/step emission —
 symbolic bindings, assumptions, invocations, assertions, and witnesses — is
-planned as well.
+planned as well;
+[ADR 006](adr-006-backend-neutral-harness-planning-boundary.md) fixes the
+harness-planning seam it must land behind, and
+[ADR 005](adr-005-vertical-slice-first-roadmap-sequencing.md) sequences it.
 
 The “compile-time theorem loader” pattern uses proc-macro expansion each build
 to generate harness code. Kani harnesses are functions annotated with
