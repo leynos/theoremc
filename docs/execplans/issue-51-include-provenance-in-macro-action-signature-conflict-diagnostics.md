@@ -118,18 +118,33 @@ Observable success:
       `compile_error!` rendering of long single-line messages.
 - [x] (2026-10-11T02:12Z) Wrote this ExecPlan; branch renamed and Lody session
       title set.
-- [ ] EP-M1 red: failing tests for provenance fields and rendered message;
-      record the failure.
-- [ ] EP-M1 green: implementation in
-      `crates/theoremc-macros/src/lib.rs` (`DeclaredSignature`,
-      `render_signature_summary`, extended error variant).
-- [ ] EP-M2: `rstest` provenance case in
-      `crates/theoremc-macros/src/action_probe_tests.rs`.
-- [ ] EP-M2: strengthened index test with `googletest` field matchers over both
-      conflict kinds.
-- [ ] EP-M2: regenerated trybuild golden `.stderr`, reviewed by eye.
-- [ ] EP-M3: macro rustdoc table row, users' guide paragraph,
-      `make fmt`, deterministic gates.
+- [x] (2026-10-11T02:14Z) EP-M1 red: the tests for the four provenance fields
+      failed with `variant MacroExpansionError::ConflictingActionSignature does
+      not have fields named first_theorem, conflicting_theorem,
+      first_signature, conflicting_signature` (`E0026`), which is the expected
+      red failure.
+- [x] (2026-10-11T02:20Z) EP-M1 green: implementation committed as `2f67bef`.
+      It landed in `crates/theoremc-macros/src/lib.rs` and now lives, after the
+      split below, in `crates/theoremc-macros/src/action_signature_index.rs`
+      (`DeclaredSignature`, `render_signature_summary`,
+      `conflicting_signature_error`, extended error variant).
+- [x] (2026-10-11T02:20Z) EP-M2: `rstest` provenance case
+      (`expansion_names_both_declaring_theorems`) with parameter-type and
+      return-type drift cases.
+- [x] (2026-10-11T02:20Z) EP-M2: strengthened index test
+      (`action_signature_index_reports_conflicting_signatures_with_provenance`)
+      with `googletest` field matchers over both conflict kinds, plus a
+      message-substring assertion.
+- [x] (2026-10-11T02:20Z) EP-M2: regenerated trybuild golden `.stderr`,
+      reviewed by eye; the only change is the extended message, and the span
+      `tests/expand/conflicting_action_signatures.rs:5:15` is unchanged.
+- [x] (2026-10-11T02:27Z) Refactor: extracted
+      `crates/theoremc-macros/src/action_signature_index.rs` and
+      `crates/theoremc-macros/src/action_probe_tests/conflicting_signatures.rs`
+      to restore the 400-line file cap. Commit `bcaf572`.
+- [x] (2026-10-11T02:28Z) EP-M3: macro rustdoc table row, users' guide
+      paragraph, and ADR-004 rule update.
+- [ ] EP-M3: `make fmt`, deterministic gates after the documentation edits.
 - [ ] EP-M3: `scrutineer` commit-gate run.
 - [ ] EP-M4: CodeRabbit `--agent` review passes; findings addressed.
 - [ ] EP-M4: push and open the draft PR.
@@ -195,6 +210,16 @@ Observable success:
   within direct substring assertions, so a snapshot would duplicate the
   trybuild golden file without adding review value. Recorded here per the
   issue's "use snapshot tests if the format becomes substantial" guidance.
+  Date/Author: 2026-10-11, implementation agent.
+- Decision: extract the index and its provenance into
+  `crates/theoremc-macros/src/action_signature_index.rs`, and the conflict
+  tests into
+  `crates/theoremc-macros/src/action_probe_tests/conflicting_signatures.rs`,
+  rather than growing `lib.rs` and `action_probe_tests.rs` past the 400-line
+  cap. Rationale: the cap is a hard repository rule in `AGENTS.md`, and the
+  extracted index is a coherent unit ("first-seen signatures with provenance")
+  that reads better on its own than as a section of the macro entry point.
+  `lib.rs` is 379 lines and `action_probe_tests.rs` 135 after the split.
   Date/Author: 2026-10-11, implementation agent.
 
 ## Outcomes & Retrospective
@@ -416,7 +441,9 @@ be a compile error on the missing struct fields, not an assertion failure, and
 the red stage is therefore enforced by the type system rather than an
 expected-failure marker.
 
-Stage C (green): change `crates/theoremc-macros/src/lib.rs` only.
+Stage C (green): change `crates/theoremc-macros/src/lib.rs`, moving the index
+into `crates/theoremc-macros/src/action_signature_index.rs` as steps 1 to 8 are
+completed, because `lib.rs` was already near the 400-line cap before this work.
 
 1. Add `TheoremName` to the `use theoremc_core::{...}` block, following the
    existing `ActionSignature` entry. `TheoremName` is re-exported from
@@ -649,8 +676,9 @@ error: referenced action `account.deposit` has conflicting Actions signatures
 
 ## Interfaces and dependencies
 
-No new dependency. In `crates/theoremc-macros/src/lib.rs`, the following
-private items must exist at the end of EP-M1:
+No new dependency. The provenance items live in
+`crates/theoremc-macros/src/action_signature_index.rs`, added to keep `lib.rs`
+under the 400-line file cap. That module declares:
 
 ```rust
 #[derive(Debug, Clone, Copy)]
@@ -668,13 +696,23 @@ fn conflicting_signature_error(
 ) -> MacroExpansionError;
 ```
 
-and `MacroExpansionError::ConflictingActionSignature` becomes a struct variant
-with the fields `action`, `first_theorem`, `conflicting_theorem`,
-`first_signature`, and `conflicting_signature`, all `String`.
+`MacroExpansionError` itself stays in `lib.rs` (it is the crate's shared error
+type), and `ConflictingActionSignature` is a struct variant with the fields
+`action`, `first_theorem`, `conflicting_theorem`, `first_signature`, and
+`conflicting_signature`, all `String`. The index module reaches the error type
+through `use super::MacroExpansionError`, so the variant and its
+`#[error(...)]` attribute remain in one place.
 
 `ActionSignatureIndex::signature_for` keeps its signature
 `fn signature_for(&self, canonical: &str) -> Result<&'a ActionSignature, MacroExpansionError>`
 so `generated_action_probes` and `action_probe` are untouched.
+
+The provenance unit tests live in
+`crates/theoremc-macros/src/action_probe_tests/conflicting_signatures.rs`, and
+the focused index tests in
+`crates/theoremc-macros/src/action_probe_tests/action_signature_index.rs`, both
+reached from `crates/theoremc-macros/src/action_probe_tests.rs` by `#[path]`
+module declarations.
 
 ## Revision note (2026-10-11)
 
@@ -682,3 +720,12 @@ Initial draft, written after reconnaissance and two throwaway probes
 (`thiserror` attribute forms; rustc rendering of a long `compile_error!`). Sets
 the design decisions that stage C implements and records why no `insta`
 snapshot is added.
+
+Revision (2026-10-11T02:28Z): the provenance implementation first landed inside
+`crates/theoremc-macros/src/lib.rs`, which grew to 478 lines and breached the
+400-line file cap in `AGENTS.md`; `action_probe_tests.rs` reached 413 lines for
+the same reason. The implementation and its tests were extracted into the two
+new modules named above, and `lib.rs` returned to 379 lines. This section now
+describes the delivered layout rather than the drafted one. No design decision
+changed: the error type, the message format, the span, and the absence of an
+`insta` snapshot are all as originally recorded in `Decision Log`.
