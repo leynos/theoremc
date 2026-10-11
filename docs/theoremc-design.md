@@ -93,10 +93,17 @@ ______________________________________________________________________
   normal Rust builds, and
 - a small shared test-support crate (`test-helpers`).
 
+Kani harness-stub emission is implemented today inside `theoremc-macros`: the
+crate emits the `#[cfg(kani)]` harness module, the `#[kani::proof]` and
+`#[kani::unwind(n)]` attributes, and the compile-time action and type probes.
+The generated harness bodies remain empty.
+
 Planned components remain in this design as target architecture, not current
-workspace members: backend emitter crates, a reporter CLI (`theoremd`) to run
-verification and produce human/CI reports, and optional enforcement lints
-(`theoremc-dylint`) to discourage bypassing.
+workspace members: non-Kani backend emitter crates, a reporter CLI
+(`theoremd`) to run verification and produce human/CI reports, and optional
+enforcement lints (`theoremc-dylint`) to discourage bypassing. Kani body/step
+emission — symbolic bindings, assumptions, invocations, assertions, and
+witnesses — is planned as well.
 
 The “compile-time theorem loader” pattern uses proc-macro expansion each build
 to generate harness code. Kani harnesses are functions annotated with
@@ -105,10 +112,11 @@ to generate harness code. Kani harnesses are functions annotated with
 ### 3.1 Pipeline diagram
 
 The implemented build flow starts with `.theorem` sources and Rust action
-modules, passes through Cargo discovery and macro expansion, and parses and
-validates YAML into core schema types. The diagram's action resolution,
-backend-ready IR lowering, harness emission, and verification reporting stages
-remain planned architecture.
+modules, passes through Cargo discovery and macro expansion, parses and
+validates YAML into core schema types, and emits gated Kani harness stubs,
+action probes, and referenced-type probes. The diagram's action resolution,
+backend-ready IR lowering, Kani body/step emission, and verification reporting
+stages remain planned architecture.
 
 ```mermaid
 flowchart TD
@@ -130,15 +138,17 @@ flowchart TD
     IR["Backend-agnostic IR (planned)"]
   end
 
-  subgraph Emit["Backend emitters"]
-    K["Kani emitter (MVP)"]
+  subgraph Emit["Backend emission"]
+    KS["Kani harness-stub emission (implemented in theoremc-macros)"]
+    KB["Kani body/step emission (planned)"]
     V2["Verus emitter (future)"]
     S["Stateright emitter (future)"]
   end
 
   subgraph Gen["Generated Rust"]
-    H["#[cfg(kani)] #[kani::proof] harnesses"]
-    M["Marker attributes + probes"]
+    H["#[cfg(kani)] #[kani::proof] harness stubs"]
+    P2["Action + type probes (implemented)"]
+    MA["Marker attributes (planned)"]
   end
 
   subgraph Run["Verification"]
@@ -148,10 +158,16 @@ flowchart TD
 
   T --> BS --> INC --> PM
   A --> PM
-  PM --> P --> V --> R --> IR
-  IR --> K --> H --> CK --> REP
+  PM --> P --> V
+  PM --> KS
+  PM --> P2
+  PM --> MA
+  V --> R --> IR
+  KS --> H
+  IR --> KB --> H
   IR --> V2
   IR --> S
+  H --> CK --> REP
 ```
 
 (Adapted from the attached exploration’s architecture sketch, updated to match
@@ -1450,7 +1466,18 @@ ______________________________________________________________________
 
 ## 8. Kani backend (MVP)
 
+Status: Kani harness-stub emission is implemented today inside
+`theoremc-macros`. Kani body/step emission — symbolic bindings, assumptions,
+invocations, assertions, and witnesses — remains planned. Only the harness
+function skeleton in §8.1 is emitted today; the body/step semantics described
+in the remaining subsections are the planned target.
+
 ### 8.1 Harness generation strategy
+
+Steps 1 and 6 are partly realized today: `theoremc-macros` emits one
+parameterless `pub(crate)` harness per theorem, carrying `#[kani::proof]` and
+`#[kani::unwind(n)]`, with an empty body. Steps 2 to 5, and the assertion
+bodies of step 6, are the planned Kani body/step emission.
 
 For each theorem:
 
@@ -1603,9 +1630,10 @@ ______________________________________________________________________
 The canonical path map is maintained in
 [repository layout](repository-layout.md). The current workspace contains the
 root facade package, `crates/theoremc-core`, `crates/theoremc-macros`, and
-`crates/test-helpers`. Planned components such as backend crates, `theoremd`,
-and `theoremc-dylint` are part of the target architecture but are not current
-workspace members.
+`crates/test-helpers`. Planned components such as non-Kani backend crates,
+`theoremd`, and `theoremc-dylint` are part of the target architecture but are
+not current workspace members. Kani harness-stub emission is implemented today
+inside `theoremc-macros`, which is a current workspace member.
 
 ```plaintext
 /
