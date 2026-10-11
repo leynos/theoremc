@@ -289,6 +289,33 @@ tightening a manifest requirement to match this policy, prefer the version
 already resolved in `Cargo.lock` and avoid `cargo update` unless Cargo requires
 the lockfile to change.
 
+There is no `[workspace.dependencies]` table. Each manifest declares its own
+pinned version, and shared third-party crates repeat the same version string
+across the manifests that need them.
+
+#### 3.5.1 `&str`-backed newtype wrappers
+
+Thin `&'a str` wrappers such as `FixtureName`, `ExpectedFragment`, and
+`YamlKey` derive `the_newtype::Newtype` plus `derive_more`'s `From` and `Into`
+rather than repeating a `new`/`as_str` pair. The shared `schema::StrNewtype`
+trait carries one blanket implementation over
+`Newtype<Inner = &'a str> + From<&'a str> + Into<&'a str> + Copy`, so a new
+wrapper needs three derives and nothing else:
+
+```rust
+#[derive(Debug, Clone, Copy, Newtype, From, Into)]
+pub struct MyWrapper<'a>(&'a str);
+```
+
+Bring `StrNewtype` into scope wherever `new` or `as_str` is called. Because
+`the-newtype-macros` resolves the trait path through `proc-macro-crate`, any
+crate that derives `Newtype` must also depend on `the-newtype` directly; a
+transitive dependency is not enough.
+
+`newt-hype` is not suitable for these wrappers. Its `newtype!` macro emits a
+type alias for a shared generic base struct, which collapses distinct wrappers
+into one type and exposes `inner` instead of `as_str`.
+
 ### 3.6 Extending the build system
 
 To add new build-time discovery or generation:
