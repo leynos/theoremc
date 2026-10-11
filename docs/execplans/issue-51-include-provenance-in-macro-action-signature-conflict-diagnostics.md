@@ -175,7 +175,19 @@ Observable success:
       (now pinned at the macro layer by the `parameter_name_drift` case).
       Round 8 raised the EP-M3 acceptance evidence below, which was corrected
       to record the environmental Kani exception explicitly rather than
-      asserting a blanket gate pass.
+      asserting a blanket gate pass. Round 9 asked for the two stale-conflict
+      expansion tests to be parameterised; they are now one `#[rstest]` with
+      two cases over shared `#[fixture]` YAML builders, preserving both the
+      called-action and never-called-action scenarios.
+- [x] (2026-10-11T06:35Z) EP-M4: GitHub CI confirms the Kani failure is
+      environmental. The `build-test` required check passed on `aee5edf` in
+      16m52s (`gh run watch 38111445315 --exit-status`, conclusion `success`),
+      and that job runs the same `theorem_file_macro_bdd` scenario that fails
+      locally. CI does not set `RUSTC_WRAPPER`, so the local failure is
+      attributable to compile admission rather than to the product. CodeRabbit
+      then rate-limited the tenth review pass (10 included reviews used,
+      `waitTime: 10 minutes`); the prescribed `vsleep $(shuf -i 45-90 -n 1)m`
+      backoff was applied before retrying.
 
 ## Surprises & Discoveries
 
