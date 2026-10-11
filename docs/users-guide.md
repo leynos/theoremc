@@ -562,11 +562,13 @@ theorem `FirstConflict` declares `fn(account: u64) -> bool`, but theorem
  --> src/lib.rs:3:1
 ```
 
-Semantic equivalence is decided on the type's parsed tokens, so insignificant
-whitespace such as `Vec<u8>` versus `Vec <u8>` does not cause a conflict.
-Parenthesized types are not normalized: `(u64)` and `u64` parse to different
-tokens and are reported as conflicting, so write the grouped and ungrouped
-forms consistently.
+Equivalence requires the same parameter names in the same order as well as
+equivalent types, so a declaration that renames or reorders a parameter
+conflicts even when the parameter and return types are unchanged. Types are
+compared by their parsed tokens, so insignificant whitespace such as `Vec<u8>`
+versus `Vec < u8>` does not cause a conflict. Parenthesized types are not
+normalized: `(u64)` and `u64` parse to different tokens and are reported as
+conflicting, so write the grouped and ungrouped forms consistently.
 
 The macro also emits referenced-type probes for every distinct type named by
 `Forall`, `Actions.params`, and `Actions.returns`. These probes are ordinary

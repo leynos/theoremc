@@ -12,7 +12,15 @@ use rstest::rstest;
 use theoremc_core::mangle::mangle_action_name;
 
 /// Builds a two-document fixture whose documents disagree on `account.deposit`.
-fn provenance_conflict_fixture(first: (&str, &str), conflicting: (&str, &str)) -> TheoremFixture {
+///
+/// Each declaration is a `(parameter name, parameter type, return type)`
+/// triple. Only the second document may rename its parameter: the first
+/// document's `Do` section passes its arguments by name, so its parameter name
+/// must stay `account` for the fixture to parse.
+fn provenance_conflict_fixture(
+    first: (&str, &str, &str),
+    conflicting: (&str, &str, &str),
+) -> TheoremFixture {
     TheoremFixture(format!(
         concat!(
             "Theorem: FirstProvenanceThesis\n",
@@ -20,13 +28,13 @@ fn provenance_conflict_fixture(first: (&str, &str), conflicting: (&str, &str)) -
             "Actions:\n",
             "  account.deposit:\n",
             "    params:\n",
-            "      account: {first_param}\n",
+            "      {first_name}: {first_param}\n",
             "    returns: {first_return}\n",
             "Do:\n",
             "  - call:\n",
             "      action: account.deposit\n",
             "      args:\n",
-            "        account: 1\n",
+            "        {first_name}: 1\n",
             "Witness:\n",
             "  - cover: \"true\"\n",
             "    because: \"reachable\"\n",
@@ -43,7 +51,7 @@ fn provenance_conflict_fixture(first: (&str, &str), conflicting: (&str, &str)) -
             "Actions:\n",
             "  account.deposit:\n",
             "    params:\n",
-            "      account: {conflicting_param}\n",
+            "      {conflicting_name}: {conflicting_param}\n",
             "    returns: {conflicting_return}\n",
             "Witness:\n",
             "  - cover: \"true\"\n",
@@ -56,23 +64,29 @@ fn provenance_conflict_fixture(first: (&str, &str), conflicting: (&str, &str)) -
             "    unwind: 1\n",
             "    expect: SUCCESS\n",
         ),
-        first_param = first.0,
-        first_return = first.1,
-        conflicting_param = conflicting.0,
-        conflicting_return = conflicting.1,
+        first_name = first.0,
+        first_param = first.1,
+        first_return = first.2,
+        conflicting_name = conflicting.0,
+        conflicting_param = conflicting.1,
+        conflicting_return = conflicting.2,
     ))
 }
 
 #[rstest]
-#[case::parameter_type_drift(("u64", "bool"), ("u32", "bool"))]
-#[case::return_type_drift(("u64", "bool"), ("u64", "u32"))]
+#[case::parameter_type_drift(("account", "u64", "bool"), ("account", "u32", "bool"))]
+#[case::return_type_drift(("account", "u64", "bool"), ("account", "u64", "u32"))]
+#[case::parameter_name_drift(("account", "u64", "bool"), ("wallet", "u64", "bool"))]
 fn expansion_names_both_declaring_theorems(
-    #[case] first: (&str, &str),
-    #[case] conflicting: (&str, &str),
+    #[case] first: (&str, &str, &str),
+    #[case] conflicting: (&str, &str, &str),
 ) -> Result<(), Box<dyn std::error::Error>> {
     let theorem = provenance_conflict_fixture(first, conflicting);
-    let expected_first = format!("fn(account: {}) -> {}", first.0, first.1);
-    let expected_conflicting = format!("fn(account: {}) -> {}", conflicting.0, conflicting.1);
+    let expected_first = format!("fn({}: {}) -> {}", first.0, first.1, first.2);
+    let expected_conflicting = format!(
+        "fn({}: {}) -> {}",
+        conflicting.0, conflicting.1, conflicting.2
+    );
 
     let expansion = expand_fixture(Utf8Path::new("theorems/provenance.theorem"), &theorem)
         .expect_err("conflicting action signatures should fail expansion");
