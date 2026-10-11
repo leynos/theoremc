@@ -37,20 +37,22 @@ in the design specification take precedence if wording diverges.
 
 ### 1.1 Build dependencies
 
-The root-level `build.rs` script runs during `cargo build` and depends on three
-crates declared under `[build-dependencies]` in `Cargo.toml`:
+The root-level `build.rs` script runs during `cargo build`. Its only direct
+build dependency is the workspace-internal `theoremc-build-support` crate,
+declared under `[build-dependencies]` in the root `Cargo.toml`:
 
 **Table:** Build dependencies
 
-| Crate       | Purpose                                                      |
-| ----------- | ------------------------------------------------------------ |
-| `camino`    | UTF-8 path types for cross-platform path handling            |
-| `cap-std`   | Capability-oriented filesystem access                        |
-| `thiserror` | Derive macro for `BuildDiscoveryError` and `BuildSuiteError` |
+| Crate                    | Purpose                                               |
+| ------------------------ | ----------------------------------------------------- |
+| `theoremc-build-support` | Discovery, suite generation, and Cargo rerun metadata |
 
-These are separate from the library's `[dependencies]` and the test-only
-`[dev-dependencies]`. Cargo compiles them for the host toolchain, not the
-target.
+The support crate owns its build implementation dependencies: `camino`,
+`cap-std`, and `thiserror` are in its `[dependencies]`; `rstest` and `tempfile`
+are test-only `[dev-dependencies]`. Some of these crates also appear in the
+root package's `[dev-dependencies]` for root tests; that does not make them
+direct dependencies of `build.rs`. Cargo compiles the support crate and its
+normal dependencies for the host toolchain, not the target.
 
 ### 1.2 Build script entrypoint (`build.rs`)
 
@@ -95,7 +97,8 @@ consumers must not depend on it.
 
 #### Error handling
 
-`BuildDiscoveryError` is an internal `thiserror`-derived enum with two variants:
+`BuildDiscoveryError` is a workspace-internal, `thiserror`-derived error enum
+with two variants:
 
 - `Io` — wraps a `std::io::Error` together with a human-readable
   operation label and the path that failed.
@@ -184,35 +187,40 @@ Macro tests should keep the layers distinct:
 
 ### 2.2 Build system API
 
-Contributors extending the build system should note the following internal API
-surface:
+The support crate exposes this API across a Cargo crate boundary to the root
+build script and fixture crates:
 
 ```rust
-pub(crate) struct BuildDiscovery {
-    theorem_files: Vec<Utf8PathBuf>,
-    watched_directories: Vec<Utf8PathBuf>,
-}
+pub fn prepare_build_script() -> Result<BuildScriptOutput, BuildScriptError>;
 
-pub(crate) fn discover_theorem_inputs(
+pub fn discover_theorem_inputs(
     manifest_dir: &Utf8Path,
 ) -> Result<BuildDiscovery, BuildDiscoveryError>;
 
-pub(crate) fn render_theorem_suite<'a>(
-    theorem_files: impl IntoIterator<Item = &'a Utf8Path>,
-) -> String;
-
-pub(crate) fn write_theorem_suite(
+pub fn write_theorem_suite(
     out_dir: &Utf8Dir,
     discovery: &BuildDiscovery,
 ) -> Result<(), BuildSuiteError>;
 ```
 
-Accessors return iterators over `&Utf8Path`:
+These items are `pub` in `theoremc-build-support` because callers are in
+separate crates. `BuildScriptOutput` also exposes `has_theorems()` and
+`rerun_paths()` accessors; its fields remain private. The public visibility
+does not make the support crate part of the public `theoremc` library API.
+
+`BuildDiscovery` keeps its fields private and provides iterators over
+`&Utf8Path`:
 
 - `theorem_files()` — discovered `.theorem` files in sorted order.
 - `watched_directories()` — directories emitted for Cargo invalidation.
 - `rerun_paths()` — watched directories followed by theorem files, in the
   exact order emitted by `build.rs`.
+
+These public items support workspace build integration, the support crate's own
+unit tests, and fixture crates that verify the same boundary. They are not a
+downstream dependency contract. Do not include support source with `#[path]` or
+depend directly on private implementation details such as
+`render_theorem_suite`.
 
 ## 3. Contributor workflows
 
