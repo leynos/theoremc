@@ -1,9 +1,6 @@
 //! Proc-macro expansion for compile-time theorem integration.
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    env,
-};
+use std::env;
 
 use camino::{Utf8Path, Utf8PathBuf};
 use proc_macro::TokenStream;
@@ -16,8 +13,13 @@ use theoremc_core::{
     load_theorem_file_from_manifest_dir,
     mangle::{mangle_action_name, mangle_module_path, mangle_theorem_harness},
     path_format::normalize_path_separators,
-    schema::{ActionSignature, SchemaDiagnostic},
+    schema::{ActionSignature, SchemaDiagnostic, TheoremDoc},
 };
+
+/// First-seen action signature index with conflict provenance.
+mod action_signature_index;
+
+use action_signature_index::ActionSignatureIndex;
 
 /// Expands a crate-relative `.theorem` file into a stable private module.
 ///
@@ -62,6 +64,7 @@ use theoremc_core::{
 /// | File contains no theorem documents | `EmptyTheoremFile` message |
 /// | Schema parsing or validation fails | rendered `SchemaDiagnostic` (includes source location) |
 /// | A theorem omits `Evidence.kani` | theorem `<name>` does not declare required `Evidence.kani` configuration |
+/// | Two theorems declare one action with inequivalent signatures | both theorem names and both signature summaries |
 ///
 /// # Panics
 ///
@@ -147,7 +150,7 @@ fn expand_theorem_file_at(
 fn render_expansion(
     path_literal: &LitStr,
     theorem_path: &str,
-    theorem_docs: &[theoremc_core::schema::TheoremDoc],
+    theorem_docs: &[TheoremDoc],
 ) -> Result<TokenStream2, MacroExpansionError> {
     let module_ident = identifier(mangle_module_path(theorem_path).module_name());
     let harnesses = generated_harnesses(theorem_path, theorem_docs)?;
@@ -190,7 +193,7 @@ fn render_expansion(
 }
 
 fn generated_referenced_type_probes(
-    theorem_docs: &[theoremc_core::schema::TheoremDoc],
+    theorem_docs: &[TheoremDoc],
 ) -> Result<Vec<syn::Type>, MacroExpansionError> {
     referenced_types(theorem_docs)
         .into_iter()
@@ -206,7 +209,7 @@ fn parse_referenced_type(ty: &str) -> Result<syn::Type, MacroExpansionError> {
 }
 fn generated_harnesses(
     theorem_path: &str,
-    theorem_docs: &[theoremc_core::schema::TheoremDoc],
+    theorem_docs: &[TheoremDoc],
 ) -> Result<Vec<GeneratedHarness>, MacroExpansionError> {
     theorem_docs
         .iter()
@@ -227,7 +230,7 @@ fn generated_harnesses(
 }
 
 fn generated_action_probes(
-    theorem_docs: &[theoremc_core::schema::TheoremDoc],
+    theorem_docs: &[TheoremDoc],
 ) -> Result<Vec<GeneratedActionProbe>, MacroExpansionError> {
     let referenced = referenced_actions(theorem_docs);
     let signature_index = ActionSignatureIndex::for_actions(theorem_docs, &referenced)?;
@@ -238,62 +241,6 @@ fn generated_action_probes(
             action_probe(canonical, signature)
         })
         .collect()
-}
-
-#[derive(Debug)]
-struct ActionSignatureIndex<'a> {
-    signatures: BTreeMap<&'a str, &'a ActionSignature>,
-}
-
-impl<'a> ActionSignatureIndex<'a> {
-    fn for_actions(
-        theorem_docs: &'a [theoremc_core::schema::TheoremDoc],
-        canonical_actions: &[&str],
-    ) -> Result<Self, MacroExpansionError> {
-        let selected = canonical_actions.iter().copied().collect::<BTreeSet<_>>();
-        let mut declared_signatures: BTreeMap<&'a str, &'a ActionSignature> = BTreeMap::new();
-
-        for doc in theorem_docs {
-            for (action, signature) in &doc.actions {
-                let canonical = action.as_str();
-                Self::insert_signature(&mut declared_signatures, canonical, signature)?;
-            }
-        }
-
-        let signatures = declared_signatures
-            .into_iter()
-            .filter(|(action, _)| selected.contains(action))
-            .collect();
-
-        Ok(Self { signatures })
-    }
-
-    fn insert_signature(
-        signatures: &mut BTreeMap<&'a str, &'a ActionSignature>,
-        canonical: &'a str,
-        signature: &'a ActionSignature,
-    ) -> Result<(), MacroExpansionError> {
-        let Some(first) = signatures.get(canonical) else {
-            signatures.insert(canonical, signature);
-            return Ok(());
-        };
-
-        if signature.is_semantically_equivalent(first) {
-            return Ok(());
-        }
-
-        Err(MacroExpansionError::ConflictingActionSignature {
-            action: canonical.to_owned(),
-        })
-    }
-
-    fn signature_for(&self, canonical: &str) -> Result<&'a ActionSignature, MacroExpansionError> {
-        self.signatures.get(canonical).copied().ok_or_else(|| {
-            MacroExpansionError::MissingActionSignature {
-                action: canonical.to_owned(),
-            }
-        })
-    }
 }
 
 fn action_probe(
@@ -379,8 +326,16 @@ enum MacroExpansionError {
     MissingKaniEvidence { theorem: String },
     #[error("referenced action `{action}` is missing an Actions signature entry")]
     MissingActionSignature { action: String },
-    #[error("referenced action `{action}` has conflicting Actions signatures")]
-    ConflictingActionSignature { action: String },
+    #[error(
+        "referenced action `{action}` has conflicting Actions signatures: theorem `{first_theorem}` declares `{first_signature}`, but theorem `{conflicting_theorem}` declares `{conflicting_signature}`"
+    )]
+    ConflictingActionSignature {
+        action: String,
+        first_theorem: String,
+        conflicting_theorem: String,
+        first_signature: String,
+        conflicting_signature: String,
+    },
     #[error("referenced action `{action}` has an invalid Actions signature: {message}")]
     InvalidActionSignature { action: String, message: String },
     #[error("referenced type `{ty}` is invalid: {message}")]
