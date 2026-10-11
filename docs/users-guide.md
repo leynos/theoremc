@@ -516,6 +516,23 @@ const _: fn(&mut crate::account::Account, u64) -> Result<(), crate::account::Dep
 If the `crate::theorem_actions` export is missing, renamed, or has a different
 signature, the theorem owner crate fails to compile.
 
+A theorem file may hold several documents, and more than one of them may
+declare the same action. Repeated declarations are expected and need not be
+identical character for character, but they must describe the same Rust
+signature. The first declaration in document order is the reference; a later
+declaration that is not semantically equivalent is rejected. The diagnostic
+names the action, both declaring theorems, and both signatures:
+
+```text
+error: referenced action `account.deposit` has conflicting Actions signatures:
+theorem `FirstConflict` declares `fn(account: u64) -> bool`, but theorem
+`SecondConflict` declares `fn(account: u32) -> bool`
+ --> src/lib.rs:3:1
+```
+
+Semantic equivalence is decided on the parsed Rust type, so whitespace and
+grouping differences such as `Vec<u8>` versus `Vec <u8>` do not conflict.
+
 The macro also emits referenced-type probes for every distinct type named by
 `Forall`, `Actions.params`, and `Actions.returns`. These probes are ordinary
 Rust items outside the Kani-only module, so missing or moved type paths fail in

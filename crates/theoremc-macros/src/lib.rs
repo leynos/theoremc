@@ -64,6 +64,7 @@ use action_signature_index::ActionSignatureIndex;
 /// | File contains no theorem documents | `EmptyTheoremFile` message |
 /// | Schema parsing or validation fails | rendered `SchemaDiagnostic` (includes source location) |
 /// | A theorem omits `Evidence.kani` | theorem `<name>` does not declare required `Evidence.kani` configuration |
+/// | Two theorems declare one action with inequivalent signatures | both theorem names and both signature summaries |
 ///
 /// # Panics
 ///

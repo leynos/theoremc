@@ -102,7 +102,11 @@ Rules:
 - The action name key must satisfy the canonical action-name grammar already
   defined for `ActionCall.action`.
 - If the same action is declared more than once within one
-  `theorem_file!` expansion, all declarations must be identical.
+  `theorem_file!` expansion, all declarations must describe the same Rust
+  signature. Identical text is not required: the check compares parsed
+  `syn::Type`s, so `Vec<u8>` and `Vec <u8>` do not conflict. The first
+  declaration in document order is the reference, and a rejection names both
+  declaring theorems and both signature summaries.
 - Different `.theorem` files may temporarily declare different expectations
   for the same action. Ordinary Rust type checking will then reject any file
   whose expected signature no longer matches the exported function.
