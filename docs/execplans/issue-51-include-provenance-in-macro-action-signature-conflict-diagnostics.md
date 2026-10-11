@@ -144,8 +144,17 @@ Observable success:
       to restore the 400-line file cap. Commit `bcaf572`.
 - [x] (2026-10-11T02:28Z) EP-M3: macro rustdoc table row, users' guide
       paragraph, and ADR-004 rule update.
-- [ ] EP-M3: `make fmt`, deterministic gates after the documentation edits.
-- [ ] EP-M3: `scrutineer` commit-gate run.
+- [x] (2026-10-11T02:34Z) EP-M3: `make fmt`, then `make check-fmt`,
+      `make markdownlint`, `make nixie` all passed on the documentation commit
+      `2fd8213`.
+- [x] (2026-10-11T02:41Z) EP-M3: `scrutineer` commit-gate run. Four of five
+      gates passed (`check-fmt`, `lint` 281s, `markdownlint`, `nixie`).
+      `make test` reported 781/782 with
+      `a_valid_theorem_file_exposes_a_kani_proof_harness` failing, which is the
+      documented `RUSTC_WRAPPER`/Kani environment interaction, not a product
+      defect; a focused re-run reproduced the identical `rustversion` error.
+      The doctest half was re-run on its own and passed (5 binaries, 0 failed),
+      since `make` had aborted before reaching it.
 - [ ] EP-M4: CodeRabbit `--agent` review passes; findings addressed.
 - [ ] EP-M4: push and open the draft PR.
 
@@ -171,6 +180,25 @@ Observable success:
   `/tmp/ghclean.sh /usr/bin/gh api user` returned HTTP 403; the same script's
   `ssh -T git@github.com` returned `Hi leynos!`. Impact: PR creation may need
   `gh` to be retried after the rate limit window; SSH push is unaffected.
+- Observation: `make test` reports one failure on this machine that is not a
+  product defect.
+  `theoremc::theorem_file_macro_bdd::a_valid_theorem_file_exposes_a_kani_proof_harness`
+  fails because Kani's nested toolchain build invokes `rustc --version` through
+  `RUSTC_WRAPPER=build-limits-rustc`, receives an empty string, and aborts in
+  `rustversion`'s build script with `Error: unexpected output from`rustc
+  --version`: ""`. The scenario's own skip guard,
+  `is_unusable_kani_environment` in `tests/theorem_file_macro_bdd.rs`, matches
+  only `error while loading shared libraries`,
+  `cannot open shared object file`, and `Broken pipe`, so it does not cover
+  this case. Evidence: `/tmp/test-...-issue-51-...out` and the focused re-run
+  `/tmp/kani-focused-issue-51.out`, which reproduced the identical error in
+  8.8s. Impact: `make test` cannot be made green locally without unsetting
+  `RUSTC_WRAPPER`, which the compile-admission policy forbids; CI does not set
+  this wrapper, and every other test passes. Recorded so the next reader does
+  not misdiagnose it as a regression from this change. The Kani-related
+  scenario is untouched by this work: the change affects the conflict
+  diagnostic only, and the failing fixture is `theorems/single.theorem` with no
+  conflicting actions.
 
 ## Decision Log
 
@@ -224,10 +252,62 @@ Observable success:
 
 ## Outcomes & Retrospective
 
-Not yet recorded; this section is completed at Milestone EP-M3, once the
-deterministic gates have passed and the trybuild golden file has been reviewed.
-It will compare the delivered diagnostic against the purpose above, note what
-was deliberately left out of scope, and record lessons for similar work.
+The purpose above is met. A theorem author who declares one action differently
+in two documents of the same `.theorem` file now reads, at the macro call site:
+
+```plaintext
+error: referenced action `account.deposit` has conflicting Actions signatures:
+theorem `FirstConflict` declares `fn(account: u64) -> bool`, but theorem
+`SecondConflict` declares `fn(account: u32) -> bool`
+```
+
+That message names the action, both declaring theorems, and both signatures, so
+the author can go straight to the disagreement. Before this change the message
+stopped after "conflicting Actions signatures" and named only the action; in a
+file with several documents and several actions, locating the two declarations
+meant searching the file by hand.
+
+The typed data behind the message is asserted directly. Unit tests in
+`crates/theoremc-macros/src/action_probe_tests/action_signature_index.rs` and
+`conflicting_signatures.rs` match all five fields for both conflict kinds
+(parameter-type drift and return-type drift) and assert the same five values
+appear in the rendered message, so the typed error and what the user sees
+cannot drift apart silently. The public compile error is pinned by the trybuild
+golden file
+`crates/theoremc-macros/tests/expand/conflicting_action_signatures.stderr`,
+whose only change is the extended message; the recorded span
+`tests/expand/conflicting_action_signatures.rs:5:15` did not move.
+
+Deliberately out of scope, and recorded rather than silently dropped:
+
+- No source span inside the `.theorem` file. No `Span` survives the load path,
+  so every failure in `theorem_file!` still points at the macro call site; this
+  change carries provenance in the message text instead. A schema-level
+  location facility would be a separate piece of work.
+- No shared cross-file signature manifest or import mechanism. A conflict is
+  defined within one `theorem_file!` expansion; two different `.theorem` files
+  may still disagree, and ordinary Rust type checking rejects whichever file no
+  longer matches the export. ADR-004 records this.
+- No `insta` snapshot, per the `Decision Log` entry above.
+
+Lessons for similar work:
+
+- The 400-line cap is easy to breach when a diagnostic grows typed fields,
+  because the fields, the renderer, and the constructor all land near the
+  existing error type. Check `wc -l` on the touched code files before running
+  the gates, not after they fail. The split here also improved the design: the
+  index is a coherent unit that reads better on its own.
+- `thiserror` refuses `concat!` inside `#[error(...)]`, so a long message must
+  be a single literal. Rustfmt leaves a long single-string attribute alone, so
+  no formatting conflict arises — but this could only be established by
+  probing, and the discrepancy between the plan's assumption and the
+  attribute's actual behaviour is worth remembering.
+- A trybuild golden file couples the diagnostic text to the source line of the
+  macro call site. Regenerating it is safe, but the diff must be read by eye to
+  confirm the span did not move while the message was extended.
+- On this machine, `make test` is red for reasons unrelated to any change: the
+  Kani BDD scenario cannot survive `RUSTC_WRAPPER`. Confirm that failure
+  reproduces identically in isolation before attributing it to the diff.
 
 ## Context and orientation
 
