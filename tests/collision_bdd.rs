@@ -1,7 +1,7 @@
 //! Behavioural tests for mangled-identifier collision detection.
 
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{FixtureName, load_fixture};
+use test_helpers::{FixtureName, StrNewtype, load_fixture};
 use theoremc::collision::check_action_collisions;
 use theoremc::schema::load_theorem_docs;
 

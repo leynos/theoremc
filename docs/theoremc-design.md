@@ -176,7 +176,7 @@ Table 1: Current schema layer to module mapping (informative).
 | Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier`       |
 | Raw anti-corruption adapter | `schema::raw` (planned extraction from current loader-side deserialization path) |
 | Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                               |
-| Loader orchestration        | `schema::loader`                                                                 |
+| Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::str_newtype`        |
 | Diagnostic infrastructure   | `schema::diagnostic` (currently `schema::error`)                                 |
 
 ______________________________________________________________________
@@ -1105,6 +1105,65 @@ roadmap):
   theorem-to-harness lowering requires proc-macro infrastructure not yet
   implemented. The current lowering module is internal and will be consumed by
   the Phase 3 `theorem_file!` macro.
+
+### 6.7.11 Implementation decisions (issue #60)
+
+The following decisions were taken when deduplicating `&str`-backed newtype
+boilerplate across the schema and test-support wrappers:
+
+- `newt-hype` was evaluated and rejected. Its `newtype!` macro expands to a
+  type alias for a shared generic base struct, so the distinct wrapper types
+  would collapse into one indistinguishable type, and its accessor is `inner`
+  rather than the required `as_str`.
+- `the-newtype` (`#[derive(Newtype)]`) is adopted instead. It records the
+  private `Inner` type for each existing tuple struct without changing their
+  shape, visibility, or documented behaviour.
+- `derive_more` with only the `from` and `into` features supplies the
+  `From<&'a str>` and `Into<&'a str>` conversions that make the wrappers
+  ergonomic and that bound the shared trait.
+- `schema::StrNewtype` is a documented public trait with exactly one blanket
+  implementation over
+  `Newtype<Inner = &'a str> + From<&'a str> + Into<&'a str> + Copy`. It supplies
+  `new` and `as_str` for any wrapper that derives the three macros, so the
+  boilerplate is written once.
+- The `StrNewtype::as_str` receiver is `&self`, not `self` by value. Clippy's
+  `wrong_self_convention` rejects by-value receivers on a trait method, and
+  `Copy` wrappers are unaffected by the change.
+- One wrapper, `YamlKey`, lives outside the public API in a crate-private
+  module. It derives the same macros and uses the trait through an anonymous
+  `use super::str_newtype::StrNewtype as _;`. Its `new` and `as_str` lose their
+  `const fn` qualifier, which the type never needed: it is crate-private, and no
+  `const` context, upstream or downstream, constructs one.
+- The two test-support wrappers,
+  `test_helpers::{FixtureName, ExpectedFragment}`, also lose their previous
+  `pub const fn` qualifier. The loss is accepted deliberately rather than by
+  omission. Making `new`/`as_str` callable in a `const` context again is
+  currently impossible while keeping one shared implementation: a trait method
+  cannot be `const`, and `const Trait` bounds for the blanket implementation
+  are unstable. Restoring an inherent `const fn` pair beside the trait methods
+  would reinstate exactly the duplicated pair this issue removes and would
+  shadow the trait on ordinary calls, so it would satisfy the const requirement
+  at the cost of the objective. The capability is also unused and unobservable
+  within this workspace: no `const`, `static`, `const fn`, array-length, or
+  const-generic context constructs or reads either wrapper, and `test-helpers`
+  is a workspace-internal path dependency, not a published crate. Should such a
+  context appear later, restore an inherent `const` pair on the affected
+  wrapper alone — the same trade the three siblings below already make.
+- Three further `&'a str` wrappers keep their hand-written pairs:
+  `schema::loader_message::{FieldName, ErrorMessage}` and
+  `schema::arg_value::ParamName`. Their `new`/`as_str` are `const fn`, and a
+  blanket trait implementation cannot be `const`, so adopting the trait would
+  remove const-callability rather than remove duplication. They are left as-is
+  rather than trading a capability for a stylistic gain.
+- `schema::loader_decode_location` gains a second wrapper, `YamlLine<'a>`, over
+  a single line of the source document. The module previously threaded a bare
+  `line: &str` through a dozen free functions and helpers (`indent_width`,
+  `exits_scope`, `is_list_item`, `is_theorem_header`, `is_top_level_section`,
+  `section_line`, `mapping_key_line`, `locate_argument_line`,
+  `scan_binding_line`, `scan_do_step_line`, `update_step_scope`). Moving those
+  predicates onto `YamlLine` methods replaces the free-function layer with one
+  cohesive line vocabulary and keeps the module's string-argument ratio below
+  the CodeScene advisory threshold it would otherwise cross.
 
 ### 6.8 Localized diagnostics contract (ADR 002)
 

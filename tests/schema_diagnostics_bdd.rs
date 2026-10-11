@@ -1,7 +1,7 @@
 //! Behavioural tests for structured diagnostics using `rstest-bdd`.
 
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{FixtureName, assert_diagnostic_failure, load_fixture_text};
+use test_helpers::{FixtureName, StrNewtype, assert_diagnostic_failure, load_fixture_text};
 use theoremc::schema::{SchemaDiagnosticCode, SourceId, load_theorem_docs_with_source};
 
 #[given("a parser-invalid theorem fixture")]

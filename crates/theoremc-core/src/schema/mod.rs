@@ -20,6 +20,7 @@ mod raw_action;
 pub(crate) mod rust_type;
 mod source_id;
 mod step;
+mod str_newtype;
 #[cfg(test)]
 mod test_support;
 mod types;
@@ -38,6 +39,7 @@ pub use identifier::validate_identifier;
 pub use loader::{load_theorem_docs, load_theorem_docs_with_source};
 pub use newtypes::{ForallVar, TheoremName};
 pub use source_id::SourceId;
+pub use str_newtype::StrNewtype;
 pub use types::{
     ActionCall, ActionSignature, Assertion, Assumption, Evidence, KaniEvidence, KaniExpectation,
     LetBinding, LetCall, LetMust, MaybeBlock, Step, StepCall, StepMaybe, StepMust, TheoremDoc,
