@@ -1,0 +1,684 @@
+# Include provenance in macro action-signature conflict diagnostics
+
+This ExecPlan (execution plan) is a living document. The sections `Constraints`,
+`Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
+`Outcomes & Retrospective`, `Conformance basis`, and `Verification plan` must
+be kept up to date as work proceeds.
+
+Status: IN PROGRESS
+
+## Purpose / big picture
+
+A `.theorem` file may hold several theorem documents separated by `---`, and
+each document declares the Rust signatures it expects for the actions it calls.
+Two documents may legitimately repeat the same action; when their declarations
+disagree, `theorem_file!` refuses to expand and the crate fails to compile.
+
+Today that failure says only which action disagreed:
+
+```plaintext
+error: referenced action `account.deposit` has conflicting Actions signatures
+```
+
+A theorem author working in a multi-document file cannot tell which two
+documents disagree, nor how their signatures differ, without reading every
+`Actions` block in the file by hand.
+
+After this change the same failure names both disagreeing documents and renders
+both declared signatures:
+
+```plaintext
+error: referenced action `account.deposit` has conflicting Actions signatures:
+theorem `FirstConflict` declares `fn(account: u64) -> bool`, but theorem
+`SecondConflict` declares `fn(account: u32) -> bool`
+```
+
+Observable success:
+
+1. Expanding a `.theorem` file whose documents declare incompatible signatures
+   for one action fails with a diagnostic naming both theorem names and both
+   signature summaries.
+2. The diagnostic also covers conflicts between declarations that are not
+   referenced by any `Let` or `Do` step, because the index still reports them.
+3. Files whose repeated declarations are semantically equivalent (differing
+   only in insignificant whitespace, such as `Vec<u8>` versus `Vec <u8>`)
+   continue to expand without error.
+4. Every existing deterministic gate (`make check-fmt`, `make lint`,
+   `make test`) passes.
+
+## Constraints
+
+- `crates/theoremc-macros/src/lib.rs` must not exceed 400 lines; the repository
+  caps code files at that length (`AGENTS.md`, "Keep file size manageable").
+- `MacroExpansionError::ConflictingActionSignature` is private to the
+  `theoremc-macros` crate, so this is an internal change with no public API
+  compatibility obligation. No compatibility shim is introduced.
+- The diagnostic span must stay at the macro call-site string literal.
+  `MacroExpansionError::to_compile_error` receives a `Span`, and `theorem_file`
+  already passes `path_literal.span()`; no source span survives from the
+  `.theorem` load path, so nothing else is available.
+- The rendered message must be deterministic: fixed clause order, no
+  iteration over unordered collections, so the trybuild golden file is stable.
+- Comments and documentation use en-GB-oxendict spelling.
+- Markdown paragraphs are wrapped at 80 columns; code blocks at 120.
+- Do not change `equivalent_action_signatures` or `signature_drift` snapshot
+  fixtures: the equivalence path and the rustc `E0308` backstop are out of
+  scope.
+- Do not silence lints. `clippy.toml` caps function arguments at four and sets
+  a cognitive-complexity ceiling of nine.
+
+## Tolerances (exception triggers)
+
+- Scope: if implementation requires changes to more than eight files or 250
+  net lines of code, stop and escalate.
+- Interface: if a public API signature of `theoremc-core` must change, stop and
+  escalate. (The planned change touches only private items in
+  `theoremc-macros`.)
+- Dependencies: if a new external dependency is required, stop and escalate.
+- Iterations: if the trybuild golden file still mismatches after three
+  regeneration attempts, stop and escalate.
+- Rustfmt: if the rendered signature summary cannot be written without
+  rustfmt splitting `#[error(...)]` into a form that fails `make check-fmt`,
+  shorten the summary (drop parameter names) before escalating; if a second
+  rewrite is still needed, stop and escalate.
+- Ambiguity: if the conflict message format materially changes the evidence
+  required by issue #51, stop and present options.
+- Time: if a milestone takes more than four hours of wall-clock work, stop and
+  escalate.
+
+## Risks
+
+- Risk: `#[error(...)]` line-breaking fights rustfmt, making `make check-fmt`
+  fail while the code still compiles. Severity: medium. Likelihood: medium.
+  Mitigation: the long literal shares one source line with `#[error(` and ends
+  at a `"` before the closing `)]`, so rustfmt leaves the attribute alone;
+  verified by running `make check-fmt` before the trybuild regeneration. If it
+  fights, drop parameter names from the summary to shorten it.
+- Risk: the trybuild golden `.stderr` is brittle and the message length may
+  produce an unstable render. Severity: low. Likelihood: low. Mitigation: keep
+  the message a single deterministic clause, and regenerate with
+  `TRYBUILD=overwrite` then review the diff by eye.
+- Risk: carrying the declaring `TheoremName` changes the `ActionSignatureIndex`
+  map value type and could disturb probe generation ordering. Severity: medium.
+  Likelihood: low. Mitigation: the index remains a `BTreeMap<&str, _>` filtered
+  by the same `referenced_actions` order; the
+  `expansion_emits_typed_action_probe_for_referenced_action` assertion pins the
+  exact generated probe tokens.
+- Risk: a build queued behind the shared compile-slot pool makes gates look
+  slow. Severity: low. Likelihood: high. Mitigation: expect the
+  `[build-limits] CRATE: waiting for a compile slot` line and allow for it; do
+  not start parallel builds.
+
+## Progress
+
+- [x] (2026-10-11T02:07Z) Reconnaissance: read the macro expansion pipeline,
+      the action-signature index, the trybuild fixtures, the snapshot pattern,
+      `clippy.toml`, the `Makefile` gates, and ADR-004.
+- [x] (2026-10-11T02:07Z) Probed `thiserror` attribute forms and rustc
+      `compile_error!` rendering of long single-line messages.
+- [x] (2026-10-11T02:12Z) Wrote this ExecPlan; branch renamed and Lody session
+      title set.
+- [ ] EP-M1 red: failing tests for provenance fields and rendered message;
+      record the failure.
+- [ ] EP-M1 green: implementation in
+      `crates/theoremc-macros/src/lib.rs` (`DeclaredSignature`,
+      `render_signature_summary`, extended error variant).
+- [ ] EP-M2: `rstest` provenance case in
+      `crates/theoremc-macros/src/action_probe_tests.rs`.
+- [ ] EP-M2: strengthened index test with `googletest` field matchers over both
+      conflict kinds.
+- [ ] EP-M2: regenerated trybuild golden `.stderr`, reviewed by eye.
+- [ ] EP-M3: macro rustdoc table row, users' guide paragraph,
+      `make fmt`, deterministic gates.
+- [ ] EP-M3: `scrutineer` commit-gate run.
+- [ ] EP-M4: CodeRabbit `--agent` review passes; findings addressed.
+- [ ] EP-M4: push and open the draft PR.
+
+## Surprises & Discoveries
+
+- Observation: `thiserror` rejects `#[error(concat!(...))]`; it requires a
+  literal, `transparent`, or `fmt`. Evidence:
+  `error: expected one of: string literal, transparent, fmt` from a throwaway
+  crate under `/tmp/terrprobe`. Impact: the long message needs a backslash
+  continuation inside the literal, not a `concat!` expression. Rustfmt leaves
+  long single-string attributes alone; this was confirmed at Milestone 3.
+- Observation: repo-level `clippy::cognitive_complexity` is denied at a
+  threshold of nine, and source positions in the generated `.stderr` change
+  whenever lines are added above the error construction in `lib.rs`. Evidence:
+  `clippy.toml`; the golden file records
+  `--> tests/expand/conflicting_action_signature.rs:5:15` and the trybuild
+  fixture's own line numbers. Impact: `lib.rs` edits shift the
+  `Span::call_site()` position, so the golden `.stderr` must be regenerated and
+  reviewed after implementation, not crafted by hand.
+- Observation: at the time of implementation, GitHub REST (`gh api`) was
+  returning `API rate limit exceeded` for the token identity, while SSH
+  authenticated as `leynos` and could fetch and push. Evidence:
+  `/tmp/ghclean.sh /usr/bin/gh api user` returned HTTP 403; the same script's
+  `ssh -T git@github.com` returned `Hi leynos!`. Impact: PR creation may need
+  `gh` to be retried after the rate limit window; SSH push is unaffected.
+
+## Decision Log
+
+- Decision: carry the declaring `TheoremName` through the index as a private
+  `DeclaredSignature { theorem, signature }` value type rather than a tuple.
+  Rationale: the named struct keeps `insert_signature` and
+  `conflicting_signature_error` at three parameters each, inside the
+  `too-many-arguments-threshold = 4` ceiling, and names the two fields at use
+  sites. The signature index is built once per expansion inside
+  `ActionSignatureIndex::for_actions`, so the extra struct costs nothing at
+  runtime. Date/Author: 2026-10-11, implementation agent.
+- Decision: render a signature summary as
+  `fn(<name>: <type>, ...) -> <return>`, reusing the declared parameter names.
+  Rationale: those names are exactly the keys the author wrote under
+  `Actions.params`, so the summary maps onto the YAML the user edits, and
+  ADR-004's documented probe shape shows parameter names. Parameter order is
+  the YAML order, which is already significant for the generated probe.
+  Date/Author: 2026-10-11, implementation agent.
+- Decision: keep `ConflictingActionSignature` as a struct variant with five
+  `String` fields and put the rendered message in `#[error(...)]`, adding
+  `#[error("{}", .message)]`-style indirection only if the attribute fails to
+  format. Rationale: the message is short enough to read from the attribute,
+  and the verified probe shows the attribute accepts a long single-line
+  literal. The structured fields carry all typed data the tests assert on.
+  Date/Author: 2026-10-11, implementation agent.
+- Decision: keep the diagnostic span at the macro call site.
+  Rationale: no `Span` for a `.theorem` document survives loading;
+  `SchemaDiagnostic` renders locations into message text instead, and only
+  schema failures use that path. Issue #51 asks for provenance in the message,
+  not a new span source. Date/Author: 2026-10-11, implementation agent.
+- Decision: `insert_signature` reports the fully populated error variant, so
+  `to_compile_error` and its `path_literal.span()` call site stay unchanged.
+  Rationale: minimal blast radius, and the type stays the single source of
+  truth for the conflict message. Date/Author: 2026-10-11, implementation agent.
+- Decision: no `insta` snapshot test for the message.
+  Rationale: the message is two clauses and one rendered signature pair, well
+  within direct substring assertions, so a snapshot would duplicate the
+  trybuild golden file without adding review value. Recorded here per the
+  issue's "use snapshot tests if the format becomes substantial" guidance.
+  Date/Author: 2026-10-11, implementation agent.
+
+## Outcomes & Retrospective
+
+Not yet recorded; this section is completed at Milestone EP-M3, once the
+deterministic gates have passed and the trybuild golden file has been reviewed.
+It will compare the delivered diagnostic against the purpose above, note what
+was deliberately left out of scope, and record lessons for similar work.
+
+## Context and orientation
+
+`theorem_file!` is a procedural macro crate:
+`crates/theoremc-macros/src/lib.rs`. Given a crate-relative path such as
+`"theorems/account.theorem"`, it loads the file through `theoremc_core`, then
+emits a private module containing `include_str!` anchoring, compile-time action
+probes, referenced-type probes, and `#[cfg(kani)]` harness stubs. Any failure
+becomes a `compile_error!` invocation at the macro call site.
+
+The relevant pipeline inside `lib.rs`:
+
+- `theorem_file` (proc-macro entry) → `expand_theorem_file` →
+  `expand_theorem_file_at` (loads documents) → `render_expansion` →
+  `generated_action_probes` → `ActionSignatureIndex::for_actions`.
+- `ActionSignatureIndex` is a private `BTreeMap` wrapper built once per
+  expansion. `for_actions` takes the loaded `TheoremDoc` slice and the ordered
+  list of referenced canonical action names from `theoremc_core::collision`,
+  walks every document and every declared action in document order, and records
+  the first declaration of each action. `insert_signature` compares each later
+  declaration with the recorded one using
+  `ActionSignature::is_semantically_equivalent` (which canonicalises Rust type
+  strings through `syn::Type`, so `Vec<u8>` and `Vec <u8>` compare equal) and
+  raises `MacroExpansionError::ConflictingActionSignature` when they differ.
+  `signature_for` then serves the recorded signature for probe generation and
+  raises `MissingActionSignature` for unreferenced actions that were never
+  declared.
+- `MacroExpansionError` is a private `thiserror` enum. `to_compile_error`
+  converts any variant to a `compile_error!` at a caller-supplied span.
+
+Tests live in three places: focused unit tests under
+`crates/theoremc-macros/src/`, trybuild compile-fail fixtures under
+`crates/theoremc-macros/tests/expand/` driven by
+`crates/theoremc-macros/tests/expand.rs`, and behavioural tests at the
+repository root under `tests/` driven by `rstest-bdd`. The behavioural suite
+covers fixture-crate builds and schema diagnostics; it does not currently
+exercise action-signature conflicts, and this plan does not add such a scenario
+because the conflict is pure in-process data with no observerable build
+behaviour beyond the compile error, which trybuild already pins.
+
+Key terms:
+
+- *Canonical action name*: the dot-separated key written under `Actions`, for
+  example `account.deposit`.
+- *Signature summary*: the rendered, function-signature-like string this plan
+  introduces, for example `fn(account: u64) -> bool`.
+- *Trybuild golden file*: the committed `.stderr` file that records expected
+  compiler output for a compile-fail fixture.
+- *Span*: the source region rustc highlights for a diagnostic.
+- *Red-Green-Refactor*: write the failing test first, make it pass, then tidy.
+
+## Conformance basis
+
+Upstream artefacts:
+
+- Issue #51, "Include provenance in macro action-signature conflict
+  diagnostics" (leynos/theoremc). Its "Proposed resolution" is "carry the first
+  and conflicting declaration provenance through the macro query layer and
+  render both theorem names and relevant signature summaries in the compile
+  error"; its "Validation expectations" are unit tests for the typed conflict
+  data, trybuild coverage for the public compile error, and snapshot tests only
+  if the format becomes substantial.
+- `docs/adr-004-action-signature-specification.md` (ADR-004), which rules that
+  a signature declared more than once within one `theorem_file!` expansion must
+  be identical, and that probes are emitted as anonymous `const _` items.
+- `docs/reviews/rfc-0001-selective-adoption-and-vertical-slice-preservation.md`
+  and `docs/rfcs/` for repository governance style.
+- `AGENTS.md` (code style, doc maintenance, committing, Rust guidance) and
+  `docs/documentation-style-guide.md`.
+
+There is no Terms of Reference revision or technical-design revision that names
+this diagnostic; the repository's plan set under `docs/execplans/` tracks
+roadmap steps, and issue #51 is a post-roadmap quality item. That is stated
+here rather than inventing an identifier.
+
+Trace links:
+
+```plaintext
+ISSUE-51-PROPOSED-RESOLUTION -> EP-M1 (typed provenance in the index and error)
+ISSUE-51-VALIDATION-UNIT    -> EP-M2 (rstest cases and index field assertions)
+ISSUE-51-VALIDATION-TRYBUILD-> EP-M2 (regenerated golden .stderr)
+ADR-004-RULE-IDENTICAL      -> EP-M1 (equivalence path unchanged)
+AGENTS-DOC-MAINTENANCE      -> EP-M3 (macro rustdoc table row, users' guide)
+```
+
+## Verification plan
+
+This change introduces one non-trivial cross-cutting invariant and no lemmas
+requiring a formal prover: the data flow is a straight-line walk over an
+ordered slice, and every obligation is decidable by example with a finite,
+enumerable case set. Bounded model checking and formal proof are therefore not
+proportionate; parameterized tests plus a compile-fail golden file discharge
+every obligation. Each confirmation names the fixtures that *do* reach the
+conflict path, and the equivalent-signature case acts as the negative control
+that must be rejected as a conflict.
+
+Claims under test:
+
+- C1 (data propagation): the index stores the declaring `TheoremName` with the
+  first-seen signature, so a conflict can name both documents.
+- C2 (case identity): both named documents are the two that declared the
+  action.
+- C3 (summary fidelity): the rendered summaries describe the two disagreeing
+  declarations, parameter names in declaration order.
+- C4 (bare insertion): a conflict between two declarations with no `Let` or
+  `Do` reference is still reported.
+- C5 (position independence): moving the conflict to deeper references in the
+  later document leaves both the error and the success path unchanged.
+- C6 (non-equivalence fidelity): the reported message matches the state of the
+  underlying signature data.
+
+Obligation V1 — conflict provenance names both declarations.
+
+- Method: `rstest` parameterized unit test over the two conflict kinds
+  (parameter-type drift and return-type drift), each with distinct theorem
+  names on either side.
+- Rationale: the case set is finite and semantic, and the parameterization is
+  what proves the provenance is not accidentally position-specific.
+- Domain: two `TheoremDoc`s per expansion, sharing `account.deposit`; cases
+  `(u64, bool) vs (u32, bool)` and `(u64, bool) vs (u64, u32)`, first theorem
+  `FirstProvenanceThesis`, second `SecondProvenanceThesis`.
+- Artefact: `crates/theoremc-macros/src/action_probe_tests.rs`.
+- Evidence: `cargo nextest run -p theoremc-macros expansion_names_both`.
+  Initially fails: `ConflictingActionSignature` is a unit-shaped variant with
+  no provenance field, so the pattern cannot compile. Discharge condition:
+  `first_theorem`, `conflicting_theorem`, `first_signature`, and
+  `conflicting_signature` hold the expected values for both cases.
+- Non-vacuity: each case constructs a real conflict, evidenced by the
+  pre-change `expansion_rejects_conflicting_signatures_for_shared_action`
+  reaching the same error variant; the case input must match the reported
+  summaries, or the test fails.
+
+Obligation V2 — the index reports both conflict kinds with provenance.
+
+- Method: parameterized `#[rstest]` cases with `googletest` field matchers.
+- Rationale: this is the layer below the macro entry point, so failures here
+  separate index logic from expansion plumbing.
+- Domain: `ActionSignatureIndex::for_actions` over the parameter-drift case
+  (`account.deposit`, `u64` vs `u32`) and a return-drift case on a different
+  action (`payload.write`, `u64` vs `String`) so the file does not encode one
+  fixture twice.
+- Artefact:
+  `crates/theoremc-macros/src/action_probe_tests/action_signature_index.rs`.
+- Evidence: `cargo nextest run -p theoremc-macros action_signature_index`.
+  Discharge condition: the pattern matches and each field equals the expected
+  string, and `error.to_string()` contains both theorem names and both
+  summaries.
+- Non-vacuity: the pre-existing test at the same location already reaches this
+  variant; the added assertions are what the pre-change code cannot satisfy.
+
+Obligation V3 — the public compile error renders both declarations.
+
+- Method: trybuild compile-fail fixture with a regenerated golden `.stderr`.
+- Rationale: only a real rustc run proves that the rendered message reaches the
+  user unchanged through `syn::Error::to_compile_error` and `compile_error!`.
+- Domain: `crates/theoremc-macros/tests/expand/conflicting_action_signature.rs`
+  plus its `.theorem` fixture (`FirstConflict` with `account: u64`,
+  `SecondConflict` with `account: u32`).
+- Artefact:
+  `crates/theoremc-macros/tests/expand/conflicting_action_signature.stderr`.
+- Evidence: `cargo nextest run -p theoremc-macros --test expand`. Discharge
+  condition: the golden file records one `error:` line naming both
+  `FirstConflict` and `SecondConflict` with `fn(account: u64) -> bool` and
+  `fn(account: u32) -> bool`, and the run passes.
+- Non-vacuity: the golden file is regenerated from the new output and reviewed
+  by eye against the compiled message; a stale golden file fails the run.
+
+Obligation V4 — typed fields and rendered message agree.
+
+- Method: direct assertion on `error.to_string()` alongside the field
+  assertions in V1 and V2.
+- Rationale: the message is derived from the fields; a disagreement between
+  them would be a defect a field-only test would miss.
+- Domain: the V1 and V2 fixtures.
+- Artefact: the two test modules named above.
+- Evidence: substring assertions for both theorem names and both summaries.
+- Non-vacuity: parameter names are removed from the expected values, so a
+  mismatch in type strings still fails.
+
+Non-trivial axioms:
+
+- `ActionSignature::is_semantically_equivalent` is the repository's canonical
+  equivalence test; this plan does not re-verify `syn`-based type comparison.
+- `CompileError::to_compile_error` renders the message via
+  `Display` on the error, which `thiserror` derives; formatting fidelity
+  therefore reduces to the `#[error(...)]` literal, which the trybuild golden
+  file pins.
+- rustc renders a long `compile_error!` message on one line regardless of
+  length; verified once during reconnaissance with a standalone `rustc` run.
+
+Negative control: the unchanged
+`whitespace_only_signature_drift_does_not_conflict` test asserts that `Vec<u8>`
+versus `Vec <u8>` does **not** produce "conflicting Actions signatures". It
+must keep passing, proving the new provenance path did not turn equivalence
+into conflict.
+
+Residual gaps: neither the unit tests nor the golden file can prove that the
+provenance survives into every editor's diagnostic rendering; rustc's own
+message rendering is axiomatic here.
+
+## Plan of work
+
+Stage A (no code changes): reconnaissance, reported in `Progress`.
+
+Stage B (red): extend the two test modules so they fail for the expected
+reason, and add the `rstest` provenance case in
+`crates/theoremc-macros/src/action_probe_tests.rs` next to the existing
+`expansion_rejects_conflicting_signatures_for_shared_action`, then run
+`cargo nextest run -p theoremc-macros` and record the failure. The failure must
+be a compile error on the missing struct fields, not an assertion failure, and
+the red stage is therefore enforced by the type system rather than an
+expected-failure marker.
+
+Stage C (green): change `crates/theoremc-macros/src/lib.rs` only.
+
+1. Add `TheoremName` to the `use theoremc_core::{...}` block, following the
+   existing `ActionSignature` entry. `TheoremName` is re-exported from
+   `theoremc_core::schema`.
+2. Add a private `DeclaredSignature<'a>` struct holding
+   `theorem: &'a TheoremName` and `signature: &'a ActionSignature`, deriving
+   `Debug, Clone, Copy`.
+3. Change `ActionSignatureIndex::signatures` to
+   `BTreeMap<&'a str, DeclaredSignature<'a>>`.
+4. Change `for_actions` to build each `DeclaredSignature` from `doc.theorem`
+   and the current pair, preserving document and declaration order.
+5. Change `insert_signature` to take a `DeclaredSignature` and compare
+   `incoming.signature` against `first.signature`; on a non-equivalent
+   signature, build the error from both declarations.
+6. Change `signature_for` to return `declared.signature`, leaving
+   `MissingActionSignature` unchanged.
+7. Add `fn render_signature_summary(signature: &ActionSignature) -> String`
+   rendering `fn(<name>: <type>, ...) -> <return>` in declared parameter order.
+8. Add `fn conflicting_signature_error(...)` taking the action name and both
+   `DeclaredSignature`s, returning the populated variant (see
+   `Interfaces and dependencies` for the exact signature).
+9. Extend the `ConflictingActionSignature` variant with `action`,
+   `first_theorem`, `conflicting_theorem`, `first_signature`, and
+   `conflicting_signature`, and write the message in `#[error(...)]` with a
+   backslash continuation so the literal stays on one source line.
+10. Leave `to_compile_error` and its `path_literal.span()` call site unchanged.
+
+Stage D (refactor, documentation, wider validation): add the conflicting-action
+row to the `theorem_file` rustdoc diagnostic table in `lib.rs`, and document
+the diagnostic in `docs/users-guide.md`. Regenerate the trybuild golden file
+with `TRYBUILD=overwrite cargo nextest run -p theoremc-macros --test expand`,
+review the diff by eye, then run the full deterministic gates.
+
+## Milestones and plateaus
+
+Milestone EP-M1: the index and error type carry provenance.
+
+- Identifier and outcome: EP-M1 leaves the workspace compiling with the typed
+  provenance in place and the red tests turning green; no user-visible change
+  yet.
+- Requirements and gaps: discharges `ISSUE-51-PROPOSED-RESOLUTION` and
+  `ADR-004-RULE-IDENTICAL`.
+- Acceptance evidence: `cargo nextest run -p theoremc-macros` passes, including
+  the new provenance case and the unchanged whitespace-equivalence control.
+- Conformance check:
+  - Requirements satisfied: provenance is carried and rendered.
+  - Design still followed: the index remains a single-pass build over
+    document order, and probes are still anonymous `const _` items.
+  - Upstream assumptions still valid: ADR-004's "identical declarations"
+    rule is unchanged; equivalence still uses
+    `is_semantically_equivalent`.
+  - No unapproved public interface or dependency change: the variant is
+    private to `theoremc-macros`; no dependency is added.
+  - No trust boundary or persisted-format change.
+  - Trace links current.
+- Recovery: revert the single `lib.rs` commit; the tests fail again as
+  expected.
+- Remaining gaps: the trybuild golden file and the documentation.
+- Compatibility decision: none — the type is private and pre-1.0.
+
+Milestone EP-M2: tests and compile-fail coverage pin the new behaviour.
+
+- Identifier and outcome: EP-M2 leaves the test suite proving both conflict
+  kinds, the provenance fields, the rendered message, and the public compile
+  error.
+- Requirements and gaps: discharges `ISSUE-51-VALIDATION-UNIT` and
+  `ISSUE-51-VALIDATION-TRYBUILD`.
+- Acceptance evidence: `cargo nextest run -p theoremc-macros` passes and the
+  regenerated golden file names both documents and both summaries.
+- Conformance check:
+  - Requirements satisfied: unit and trybuild expectations met; the snapshot
+    option is deliberately not used (see `Decision Log`).
+  - Design still followed: tests stay in the existing locations.
+  - Upstream assumptions still valid: the trybuild golden file remains the
+    single source of truth for the public message.
+  - No unapproved public interface, dependency, trust-boundary, or persisted
+    format change.
+  - Trace links current.
+- Recovery: `TRYBUILD=overwrite` re-derives the golden file from the
+  implementation; the fixture `.rs` and `.theorem` files are untouched.
+- Remaining gaps: documentation and the full gate run.
+- Compatibility decision: none.
+
+Milestone EP-M3: documentation and deterministic gates are green.
+
+- Identifier and outcome: EP-M3 leaves documentation describing the diagnostic
+  and every deterministic gate passing.
+- Requirements and gaps: discharges `AGENTS-DOC-MAINTENANCE`.
+- Acceptance evidence: `make check-fmt`, `make lint`, `make test`,
+  `make markdownlint`, and `make nixie` all pass, with logs under `/tmp`.
+- Conformance check:
+  - Requirements satisfied: docs updated.
+  - Design still followed.
+  - Upstream assumptions still valid.
+  - No unapproved public interface, dependency, trust-boundary, or persisted
+    format change.
+  - Trace links current.
+- Recovery: documentation commits are independent of the code commits.
+- Remaining gaps: CodeRabbit review and PR creation.
+- Compatibility decision: none.
+
+Milestone EP-M4: CodeRabbit review and draft PR.
+
+- Identifier and outcome: EP-M4 leaves the branch pushed with a draft pull
+  request titled with `(#51)`, a body stating `Closes #51`, and a clean
+  CodeRabbit `--agent` result.
+- Requirements and gaps: delivers the change for review.
+- Acceptance evidence: `coderabbit review --agent` reports no unresolved
+  concerns, and the PR exists as a draft.
+- Conformance check: the PR references issue #51 and the Lody session.
+- Recovery: the branch is pushed only after the deterministic gates pass.
+- Remaining gaps: none.
+- Compatibility decision: none.
+
+## Concrete steps
+
+All commands run from the worktree root
+`/home/leynos/.lody/repos/github---leynos---theoremc/worktrees/f007b632-b9ef-4d68-b617-b879d0bb1900`.
+
+Red stage:
+
+```sh
+cargo nextest run -p theoremc-macros 2>&1 | tee /tmp/nextest-issue-51-red.out
+```
+
+Expected: compile errors in the two test modules on missing struct-variant
+fields such as `first_theorem`.
+
+Green stage:
+
+```sh
+cargo build -p theoremc-macros 2>&1 | tee /tmp/build-issue-51.out
+cargo nextest run -p theoremc-macros 2>&1 | tee /tmp/nextest-issue-51-green.out
+```
+
+Expected: the build succeeds, and the trybuild test fails only on the golden
+file mismatch.
+
+Golden-file regeneration:
+
+```sh
+TRYBUILD=overwrite cargo nextest run -p theoremc-macros --test expand 2>&1 \
+  | tee /tmp/nextest-issue-51-trybuild.out
+git diff -- crates/theoremc-macros/tests/expand/
+```
+
+Expected diff (shape; the wrapped diagnostic text is one `error:` line):
+
+```plaintext
+ error: referenced action `account.deposit` has conflicting Actions signatures:
+ theorem `FirstConflict` declares `fn(account: u64) -> bool`, but theorem
+ `SecondConflict` declares `fn(account: u32) -> bool`
+```
+
+Gates:
+
+```sh
+make fmt                     2>&1 | tee /tmp/fmt-issue-51.out
+make check-fmt               2>&1 | tee /tmp/check-fmt-issue-51.out
+make lint                    2>&1 | tee /tmp/lint-issue-51.out
+make test                    2>&1 | tee /tmp/test-issue-51.out
+make markdownlint            2>&1 | tee /tmp/markdownlint-issue-51.out
+make nixie                   2>&1 | tee /tmp/nixie-issue-51.out
+```
+
+Run them sequentially, never in parallel: the machine shares a compile-slot
+pool and a Cargo package-cache lock.
+
+CodeRabbit:
+
+```sh
+coderabbit review --agent 2>&1 | tee /tmp/coderabbit-issue-51-pass1.out
+```
+
+If the rate limit is exceeded, wait with `vsleep $(shuf -i 45-90 -n 1)m` and
+retry.
+
+## Validation and acceptance
+
+Behaviour to observe, in order:
+
+1. `expansion_names_both_declaring_theorems` (new, in
+   `crates/theoremc-macros/src/action_probe_tests.rs`) fails before the
+   `lib.rs` change with a compile error on the missing fields, and passes
+   afterwards for both the parameter-drift and return-drift cases.
+2. `action_signature_index_rejects_conflicting_signatures` (extended in
+   `crates/theoremc-macros/src/action_probe_tests/action_signature_index.rs`)
+   asserts both theorem names and both summaries for both conflict kinds.
+3. `cargo nextest run -p theoremc-macros --test expand` passes against the
+   regenerated golden file.
+4. `make test` passes workspace-wide;
+   `whitespace_only_signature_drift_does_not_conflict` still passes as the
+   negative control.
+5. `make check-fmt` and `make lint` pass with no new warnings.
+
+Quality criteria:
+
+- Tests: every `theoremc-macros` test passes, including the new cases.
+- Verification: obligations V1–V4 discharged as described in
+  `Verification plan`.
+- Lint/typecheck: `make lint` and `make check-fmt` clean.
+- Performance: not applicable; the index is built once per expansion and the
+  added allocation is two `String`s per conflict.
+- Security: not applicable; no new input surface.
+
+## Idempotence and recovery
+
+Every step is repeatable. The trybuild golden file is regenerated from the
+implementation, so re-running `TRYBUILD=overwrite` after a further change is
+safe and produces a fresh, reviewable diff. Nothing here writes outside the
+worktree except the `/tmp` logs. If a gate fails, fix the cause and re-run that
+gate; do not re-run gates in parallel.
+
+## Artefacts and notes
+
+Rendered conflict message, to be confirmed against the golden file:
+
+```plaintext
+error: referenced action `account.deposit` has conflicting Actions signatures:
+theorem `FirstConflict` declares `fn(account: u64) -> bool`, but theorem
+`SecondConflict` declares `fn(account: u32) -> bool`
+```
+
+Pre-change golden file, for comparison:
+
+```plaintext
+error: referenced action `account.deposit` has conflicting Actions signatures
+ --> tests/expand/conflicting_action_signature.rs:5:15
+```
+
+## Interfaces and dependencies
+
+No new dependency. In `crates/theoremc-macros/src/lib.rs`, the following
+private items must exist at the end of EP-M1:
+
+```rust
+#[derive(Debug, Clone, Copy)]
+struct DeclaredSignature<'a> {
+    theorem: &'a TheoremName,
+    signature: &'a ActionSignature,
+}
+
+fn render_signature_summary(signature: &ActionSignature) -> String;
+
+fn conflicting_signature_error(
+    action: &str,
+    first: DeclaredSignature<'_>,
+    conflicting: DeclaredSignature<'_>,
+) -> MacroExpansionError;
+```
+
+and `MacroExpansionError::ConflictingActionSignature` becomes a struct variant
+with the fields `action`, `first_theorem`, `conflicting_theorem`,
+`first_signature`, and `conflicting_signature`, all `String`.
+
+`ActionSignatureIndex::signature_for` keeps its signature
+`fn signature_for(&self, canonical: &str) -> Result<&'a ActionSignature, MacroExpansionError>`
+so `generated_action_probes` and `action_probe` are untouched.
+
+## Revision note (2026-10-11)
+
+Initial draft, written after reconnaissance and two throwaway probes
+(`thiserror` attribute forms; rustc rendering of a long `compile_error!`). Sets
+the design decisions that stage C implements and records why no `insta`
+snapshot is added.
