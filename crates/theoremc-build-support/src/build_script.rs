@@ -17,12 +17,41 @@ pub struct BuildScriptOutput {
 
 impl BuildScriptOutput {
     /// Returns whether the generated suite contains at least one theorem.
+    ///
+    /// # Examples
+    ///
+    /// A build script can enable the generated-suite lint configuration only
+    /// when theorem files are present:
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), theoremc_build_support::BuildScriptError> {
+    /// let output = theoremc_build_support::prepare_build_script()?;
+    /// if output.has_theorems() {
+    ///     println!("cargo::rustc-cfg=theoremc_has_theorems");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     #[must_use]
     pub const fn has_theorems(&self) -> bool {
         self.has_theorems
     }
 
     /// Returns the crate-relative paths that Cargo must watch for changes.
+    ///
+    /// # Examples
+    ///
+    /// A build script emits one Cargo rerun directive for each returned path:
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), theoremc_build_support::BuildScriptError> {
+    /// let output = theoremc_build_support::prepare_build_script()?;
+    /// for path in output.rerun_paths() {
+    ///     println!("cargo::rerun-if-changed={path}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn rerun_paths(&self) -> impl Iterator<Item = &Utf8PathBuf> {
         self.rerun_paths.iter()
     }
@@ -58,6 +87,24 @@ pub enum BuildScriptError {
 }
 
 /// Prepares theorem discovery, generated-suite output, and Cargo rerun metadata.
+///
+/// # Examples
+///
+/// A root `build.rs` can delegate preparation and emit the Cargo metadata it
+/// owns:
+///
+/// ```no_run
+/// fn main() -> Result<(), theoremc_build_support::BuildScriptError> {
+///     let output = theoremc_build_support::prepare_build_script()?;
+///     if output.has_theorems() {
+///         println!("cargo::rustc-cfg=theoremc_has_theorems");
+///     }
+///     for path in output.rerun_paths() {
+///         println!("cargo::rerun-if-changed={path}");
+///     }
+///     Ok(())
+/// }
+/// ```
 ///
 /// # Errors
 ///

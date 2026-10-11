@@ -42,6 +42,8 @@ fn escape_rust_string(s: &str) -> String {
 }
 
 mod build_only {
+    //! Build-only errors and writing API around the parent module's renderer.
+
     use std::io;
 
     use cap_std::fs_utf8::Dir as Utf8Dir;
@@ -61,6 +63,35 @@ mod build_only {
     }
 
     /// Writes `theorem_suite.rs` when its rendered contents changed.
+    ///
+    /// # Examples
+    ///
+    /// Discover a fixture's theorem inputs and write their generated macro
+    /// callsites into an output directory:
+    ///
+    /// ```
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// use camino::Utf8Path;
+    /// use cap_std::{ambient_authority, fs_utf8::Dir};
+    /// use theoremc_build_support::{discover_theorem_inputs, write_theorem_suite};
+    ///
+    /// let crate_root = tempfile::tempdir()?;
+    /// let output_root = tempfile::tempdir()?;
+    /// let crate_root_path = Utf8Path::from_path(crate_root.path())
+    ///     .ok_or_else(|| std::io::Error::other("temporary path is not UTF-8"))?;
+    /// let output_root_path = Utf8Path::from_path(output_root.path())
+    ///     .ok_or_else(|| std::io::Error::other("temporary path is not UTF-8"))?;
+    /// let crate_root_dir = Dir::open_ambient_dir(crate_root_path, ambient_authority())?;
+    /// crate_root_dir.create_dir_all("theorems")?;
+    /// crate_root_dir.write("theorems/example.theorem", "")?;
+    /// let discovery = discover_theorem_inputs(crate_root_path)?;
+    /// let output_dir = Dir::open_ambient_dir(output_root_path, ambient_authority())?;
+    /// write_theorem_suite(&output_dir, &discovery)?;
+    /// let generated = output_dir.read_to_string("theorem_suite.rs")?;
+    /// assert!(generated.contains("theorems/example.theorem"));
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///

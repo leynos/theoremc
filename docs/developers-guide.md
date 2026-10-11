@@ -22,6 +22,9 @@ erode these boundaries and make the codebase harder to reason about.
 - [ADR-003: Architectural boundary
   enforcement](adr-003-architectural-boundary-enforcement.md) — enforces
   layered schema boundaries and anti-corruption constraints
+- [ADR-008: Workspace build-support
+  boundary](adr-008-workspace-build-support-boundary.md) — assigns discovery
+  and generated-suite writing to the internal build-support crate
 
 ## Scope
 
@@ -57,8 +60,7 @@ normal dependencies for the host toolchain, not the target.
 ### 1.2 Build script entrypoint (`build.rs`)
 
 The minimal build-script entrypoint calls
-`theoremc_build_support::prepare_build_script()`. That internal adapter
-performs discovery and suite generation:
+`theoremc_build_support::prepare_build_script()`. The support crate:
 
 1. reads `CARGO_MANIFEST_DIR` and `OUT_DIR` from Cargo's environment,
 2. delegates to `theoremc_build_support::discover_theorem_inputs()`,
@@ -66,11 +68,12 @@ performs discovery and suite generation:
    `theoremc_build_support::write_theorem_suite()`, containing
    `theorem_file!("path/to/file.theorem");` invocations for each discovered
    theorem,
-4. emits `cargo::rustc-cfg=theoremc_has_theorems` when any theorems are
-   discovered (used by conditional lint expectations in the generated suite
-   bridge), and
-5. prints `cargo::rerun-if-changed=` lines for each watched directory and
-   discovered theorem file.
+4. returns `BuildScriptOutput` with theorem presence and ordered rerun paths.
+
+The root `build.rs` adapter registers the theorem cfg with
+`cargo::rustc-check-cfg`, emits `cargo::rustc-cfg=theoremc_has_theorems` when
+the support output contains theorems, and prints `cargo::rerun-if-changed=`
+lines from the returned paths.
 
 Discovery and suite generation belong to the workspace-internal
 `theoremc-build-support` crate. `build.rs` uses this crate as a build
@@ -112,15 +115,15 @@ set so Cargo can detect when the directory is created later.
 
 Step 3.1.1 (see
 [`execplans/3-1-1-build-rs-scanning-of-theorems.md`](execplans/3-1-1-build-rs-scanning-of-theorems.md))
-owns discovery and Cargo invalidation. Step 3.1.2 adds suite generation via
-`build_suite::write_theorem_suite()`, which writes `OUT_DIR/theorem_suite.rs`
-containing `theorem_file!("...")` invocations. The handoff is deliberately
-narrow: `build.rs` produces an ordered crate-relative file list plus rerun
-metadata; `build_suite` renders deterministic suite contents; and the hidden
-`__theoremc_generated_suite` module in `src/lib.rs` imports the real
-`theorem_file!` proc macro before including the generated suite. Step 3.2.1
-keeps the generated callsites unchanged while moving the per-file expansion
-logic into `crates/theoremc-macros`.
+introduced discovery and Cargo invalidation; Step 3.1.2 added generated-suite
+writing. ADR-008 records the current ownership boundary: the
+`theoremc-build-support` crate performs discovery and writes
+`OUT_DIR/theorem_suite.rs` with `theorem_file!("...")` invocations. The root
+`build.rs` adapter emits the cfg and rerun metadata from the returned
+`BuildScriptOutput`. The hidden `__theoremc_generated_suite` module in
+`src/lib.rs` imports the real `theorem_file!` proc macro before including the
+generated suite. Step 3.2.1 keeps the generated callsites unchanged while the
+per-file expansion logic belongs to `crates/theoremc-macros`.
 
 ## 2. Module architecture
 
@@ -382,11 +385,12 @@ To add new build-time discovery or generation:
    the feature interacts with Cargo's build-script protocol.
 5. Update `docs/theoremc-design.md` §7 and this guide.
 
-Step 3.1.2 extends this pattern by adding suite generation
-(`crates/theoremc-build-support/src/suite.rs`) to the build script. Step 3.2.1
-keeps that generated `theorem_file!("...")` callsite unchanged, but the hidden
-`__theoremc_generated_suite` module in `src/lib.rs` now imports the real proc
-macro re-exported by the root facade.
+The current implementation keeps discovery and suite writing in
+`crates/theoremc-build-support`; the root `build.rs` adapter emits cfg and
+rerun metadata from `BuildScriptOutput`. Step 3.2.1 keeps the generated
+`theorem_file!("...")` callsite unchanged, while the hidden
+`__theoremc_generated_suite` module in `src/lib.rs` imports the real proc macro
+re-exported by the root facade.
 
 The live workspace split is:
 
