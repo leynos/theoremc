@@ -564,7 +564,7 @@ theorem `FirstConflict` declares `fn(account: u64) -> bool`, but theorem
 
 Semantic equivalence is decided on the type's parsed tokens, so insignificant
 whitespace such as `Vec<u8>` versus `Vec <u8>` does not cause a conflict.
-Parenthesized types are not normalised: `(u64)` and `u64` parse to different
+Parenthesized types are not normalized: `(u64)` and `u64` parse to different
 tokens and are reported as conflicting, so write the grouped and ungrouped
 forms consistently.
 

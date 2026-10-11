@@ -25,7 +25,7 @@ fn whitespace_only_difference_is_equivalent() {
 
 #[test]
 fn parenthesized_type_is_not_equivalent_to_bare_type() {
-    // Canonicalisation serialises the parsed tokens, and `syn` retains the
+    // Canonicalization serializes the parsed tokens, and `syn` retains the
     // parentheses, so `(u64)` is a distinct type from `u64` here even though
     // the two are interchangeable to rustc. The users' guide documents this;
     // this test is what keeps that statement honest.

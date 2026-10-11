@@ -186,12 +186,13 @@ Observable success:
   `theoremc::theorem_file_macro_bdd::a_valid_theorem_file_exposes_a_kani_proof_harness`
   fails because Kani's nested toolchain build invokes `rustc --version` through
   `RUSTC_WRAPPER=build-limits-rustc`, receives an empty string, and aborts in
-  `rustversion`'s build script with `Error: unexpected output from`rustc
-  --version`: ""`. The scenario's own skip guard,
-  `is_unusable_kani_environment` in `tests/theorem_file_macro_bdd.rs`, matches
-  only `error while loading shared libraries`,
-  `cannot open shared object file`, and `Broken pipe`, so it does not cover
-  this case. Evidence: `/tmp/test-...-issue-51-...out` and the focused re-run
+  `rustversion`'s build script with
+  ``Error: unexpected output from `rustc --version`: ""``. The scenario's own
+  skip guard, `is_unusable_kani_environment` in
+  `tests/theorem_file_macro_bdd.rs`, matches only
+  `error while loading shared libraries`, `cannot open shared object file`, and
+  `Broken pipe`, so it does not cover this case. Evidence:
+  `/tmp/test-...-issue-51-...out` and the focused re-run
   `/tmp/kani-focused-issue-51.out`, which reproduced the identical error in
   8.8s. Impact: `make test` cannot be made green locally without unsetting
   `RUSTC_WRAPPER`, which the compile-admission policy forbids; CI does not set
