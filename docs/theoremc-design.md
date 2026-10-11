@@ -99,11 +99,11 @@ crate emits the `#[cfg(kani)]` harness module, the `#[kani::proof]` and
 The generated harness bodies remain empty.
 
 Planned components remain in this design as target architecture, not current
-workspace members: non-Kani backend emitter crates, a reporter CLI
-(`theoremd`) to run verification and produce human/CI reports, and optional
-enforcement lints (`theoremc-dylint`) to discourage bypassing. Kani body/step
-emission — symbolic bindings, assumptions, invocations, assertions, and
-witnesses — is planned as well.
+workspace members: non-Kani backend emitter crates, a reporter CLI (`theoremd`)
+to run verification and produce human/CI reports, and optional enforcement lints
+(`theoremc-dylint`) to discourage bypassing. Kani body/step emission —
+symbolic bindings, assumptions, invocations, assertions, and witnesses — is
+planned as well.
 
 The “compile-time theorem loader” pattern uses proc-macro expansion each build
 to generate harness code. Kani harnesses are functions annotated with
