@@ -8,7 +8,7 @@ use super::super::MacroExpansionError;
 use super::super::tests_support::{TheoremFixture, expand_fixture};
 use camino::Utf8Path;
 use googletest::prelude::*;
-use rstest::rstest;
+use rstest::{fixture, rstest};
 use theoremc_core::mangle::mangle_action_name;
 
 /// Builds a two-document fixture whose documents disagree on `account.deposit`.
@@ -138,17 +138,26 @@ fn assert_conflicting_action_signature(
     Ok(())
 }
 
-#[test]
-fn expansion_rejects_stale_unreferenced_conflicting_action_signature()
--> Result<(), Box<dyn std::error::Error>> {
-    let theorem_source = concat!(
+/// The opening of the first document in the stale-conflict fixtures: it
+/// declares `account.deposit` with a parameter its `Do` section then passes.
+#[fixture]
+fn first_document_head() -> &'static str {
+    concat!(
         "Theorem: ReferencedActionProbe\n",
-        "About: Referenced action with stale declaration\n",
+        "About: Referenced action probe\n",
         "Actions:\n",
         "  account.deposit:\n",
         "    params:\n",
         "      account: u64\n",
         "    returns: bool\n",
+    )
+}
+
+/// Everything from the first document's `Do` section through the `---`
+/// separator that opens the second document.
+#[fixture]
+fn first_document_tail() -> &'static str {
+    concat!(
         "Do:\n",
         "  - call:\n",
         "      action: account.deposit\n",
@@ -165,81 +174,97 @@ fn expansion_rejects_stale_unreferenced_conflicting_action_signature()
         "    unwind: 1\n",
         "    expect: SUCCESS\n",
         "---\n",
-        "Theorem: StaleActionDeclaration\n",
-        "About: Stale conflicting declaration\n",
-        "Actions:\n",
+    )
+}
+
+/// Everything that follows the second document's `Actions` mapping. The second
+/// document never calls anything, so its declarations are unreachable within
+/// its own `Do` section.
+#[fixture]
+fn second_document_tail() -> &'static str {
+    concat!(
+        "Witness:\n",
+        "  - cover: \"true\"\n",
+        "    because: \"reachable\"\n",
+        "Prove:\n",
+        "  - assert: \"true\"\n",
+        "    because: \"trivial\"\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+    )
+}
+
+/// One stale-conflict scenario. The two cases agree on everything except which
+/// action conflicts, and consequently whether that action is called anywhere:
+/// `account.deposit` is called by the first document, while `inventory.reserve`
+/// is declared by both documents and called by neither.
+struct StaleConflictCase {
+    fixture_path: &'static str,
+    /// An additional `Actions` entry the first document declares for the
+    /// conflicting action, so both documents declare it.
+    first_extra_entry: &'static str,
+    second_theorem: &'static str,
+    second_about: &'static str,
+    /// The second document's conflicting `Actions` entry.
+    conflicting_entry: &'static str,
+}
+
+#[rstest]
+#[case::conflict_on_a_called_action(StaleConflictCase {
+    fixture_path: "theorems/stale-conflict.theorem",
+    first_extra_entry: "",
+    second_theorem: "StaleActionDeclaration",
+    second_about: "Stale conflicting declaration",
+    conflicting_entry: concat!(
         "  account.deposit:\n",
         "    params:\n",
         "      account: u32\n",
         "    returns: bool\n",
-        "Witness:\n",
-        "  - cover: \"true\"\n",
-        "    because: \"reachable\"\n",
-        "Prove:\n",
-        "  - assert: \"true\"\n",
-        "    because: \"trivial\"\n",
-        "Evidence:\n",
-        "  kani:\n",
-        "    unwind: 1\n",
-        "    expect: SUCCESS\n",
-    )
-    .to_owned();
-
-    assert_conflicting_action_signature("theorems/stale-conflict.theorem", theorem_source)
-}
-
-#[test]
-fn expansion_rejects_conflicting_unreferenced_action_signature()
--> Result<(), Box<dyn std::error::Error>> {
-    let theorem_source = concat!(
-        "Theorem: ReferencedActionProbe\n",
-        "About: Referenced action with stale unreferenced declaration\n",
-        "Actions:\n",
-        "  account.deposit:\n",
-        "    params:\n",
-        "      account: u64\n",
-        "    returns: bool\n",
+    ),
+})]
+#[case::conflict_on_a_never_called_action(StaleConflictCase {
+    fixture_path: "theorems/unreferenced-conflict.theorem",
+    first_extra_entry: concat!(
         "  inventory.reserve:\n",
         "    params:\n",
         "      sku: u64\n",
         "    returns: bool\n",
-        "Do:\n",
-        "  - call:\n",
-        "      action: account.deposit\n",
-        "      args:\n",
-        "        account: 1\n",
-        "Witness:\n",
-        "  - cover: \"true\"\n",
-        "    because: \"reachable\"\n",
-        "Prove:\n",
-        "  - assert: \"true\"\n",
-        "    because: \"trivial\"\n",
-        "Evidence:\n",
-        "  kani:\n",
-        "    unwind: 1\n",
-        "    expect: SUCCESS\n",
-        "---\n",
-        "Theorem: StaleUnreferencedActionDeclaration\n",
-        "About: Stale unreferenced conflicting declaration\n",
-        "Actions:\n",
+    ),
+    second_theorem: "StaleUnreferencedActionDeclaration",
+    second_about: "Stale unreferenced conflicting declaration",
+    conflicting_entry: concat!(
         "  inventory.reserve:\n",
         "    params:\n",
         "      sku: String\n",
         "    returns: bool\n",
-        "Witness:\n",
-        "  - cover: \"true\"\n",
-        "    because: \"reachable\"\n",
-        "Prove:\n",
-        "  - assert: \"true\"\n",
-        "    because: \"trivial\"\n",
-        "Evidence:\n",
-        "  kani:\n",
-        "    unwind: 1\n",
-        "    expect: SUCCESS\n",
-    )
-    .to_owned();
+    ),
+})]
+fn expansion_rejects_conflicting_action_signature_regardless_of_reachability(
+    #[case] case: StaleConflictCase,
+    first_document_head: &str,
+    first_document_tail: &str,
+    second_document_tail: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let theorem_source = format!(
+        concat!(
+            "{head}{extra}{tail}",
+            "Theorem: {second_theorem}\n",
+            "About: {second_about}\n",
+            "Actions:\n",
+            "{conflicting_entry}{second_tail}",
+        ),
+        head = first_document_head,
+        extra = case.first_extra_entry,
+        tail = first_document_tail,
+        second_theorem = case.second_theorem,
+        second_about = case.second_about,
+        conflicting_entry = case.conflicting_entry,
+        second_tail = second_document_tail,
+    );
 
-    assert_conflicting_action_signature("theorems/unreferenced-conflict.theorem", theorem_source)
+    assert_conflicting_action_signature(case.fixture_path, theorem_source)
 }
 
 #[test]
