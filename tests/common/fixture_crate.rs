@@ -81,7 +81,7 @@ impl FixtureCrate {
         fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
         fixture.write(
             Utf8Path::new("build-support/Cargo.toml"),
-            &fixture_build_support_cargo_toml(),
+            &fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?,
         )?;
         fixture.write(
             Utf8Path::new("build-support/src/lib.rs"),
@@ -284,8 +284,32 @@ impl FixtureCrate {
     }
 }
 
-fn fixture_build_support_cargo_toml() -> String {
-    BUILD_SUPPORT_CARGO_TOML.replace("\n[lints]\nworkspace = true\n", "\n")
+fn fixture_build_support_cargo_toml(manifest: &str) -> Result<String, String> {
+    let mut removed_lints = false;
+    let mut inside_lints = false;
+    let mut retained_lines = Vec::new();
+
+    for line in manifest.lines() {
+        let trimmed_line = line.trim();
+        let is_section_header = trimmed_line.starts_with('[') && trimmed_line.ends_with(']');
+        if is_section_header {
+            inside_lints = false;
+            if trimmed_line == "[lints]" {
+                removed_lints = true;
+                inside_lints = true;
+                continue;
+            }
+        }
+        if !inside_lints {
+            retained_lines.push(line);
+        }
+    }
+
+    if removed_lints {
+        Ok(format!("{}\n", retained_lines.join("\n")))
+    } else {
+        Err("build-support manifest must contain a [lints] table".to_owned())
+    }
 }
 
 /// Combined stdout and stderr emitted by a fixture `cargo build` run.
@@ -365,3 +389,7 @@ pub fn toml_section(document: &str, section_name: &str) -> Option<String> {
 
     in_section.then(|| format!("{}\n", body_lines.join("\n")))
 }
+
+#[cfg(test)]
+#[path = "fixture_crate_tests.rs"]
+mod tests;

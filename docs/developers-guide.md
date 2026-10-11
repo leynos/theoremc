@@ -58,7 +58,7 @@ The minimal build-script entrypoint calls
 `theoremc_build_support::prepare_build_script()`. That internal adapter
 performs discovery and suite generation:
 
-1. reads `CARGO_MANIFEST_DIR` from the environment (set by Cargo),
+1. reads `CARGO_MANIFEST_DIR` and `OUT_DIR` from Cargo's environment,
 2. delegates to `theoremc_build_support::discover_theorem_inputs()`,
 3. writes `OUT_DIR/theorem_suite.rs` via
    `theoremc_build_support::write_theorem_suite()`, containing
@@ -374,10 +374,11 @@ To add new build-time discovery or generation:
    the feature interacts with Cargo's build-script protocol.
 5. Update `docs/theoremc-design.md` §7 and this guide.
 
-Step 3.1.2 extends this pattern by adding suite generation (`suite.rs`) to the
-build script. Step 3.2.1 keeps that generated `theorem_file!("...")` callsite
-unchanged, but the hidden `__theoremc_generated_suite` module in `src/lib.rs`
-now imports the real proc macro re-exported by the root facade.
+Step 3.1.2 extends this pattern by adding suite generation
+(`crates/theoremc-build-support/src/suite.rs`) to the build script. Step 3.2.1
+keeps that generated `theorem_file!("...")` callsite unchanged, but the hidden
+`__theoremc_generated_suite` module in `src/lib.rs` now imports the real proc
+macro re-exported by the root facade.
 
 The live workspace split is:
 

@@ -9,6 +9,9 @@ mod cargo_runner;
 /// Temporary crate builder that lets these BDD scenarios compile real macros.
 #[path = "theorem_file_macro_bdd/fixture_crate.rs"]
 mod fixture_crate;
+/// Kani availability and harness-output checks for the optional proof probe.
+#[path = "theorem_file_macro_bdd/kani_support.rs"]
+mod kani_support;
 /// Fixture inputs for referenced-type macro scenarios.
 #[path = "theorem_file_macro_bdd/referenced_type_fixtures.rs"]
 mod referenced_type_fixtures;
@@ -148,7 +151,7 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
         content: VALID_SINGLE_THEOREM,
     }) {
         Ok(output) => output,
-        Err(error) if is_unusable_kani_environment(&error) => {
+        Err(error) if kani_support::is_unusable_environment(&error) => {
             eprintln!("cargo-kani is installed but unusable; skipping Kani harness listing check");
             return Ok(());
         }
@@ -157,28 +160,13 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     let expected_mangled_harness = mangle_theorem_harness("theorems/single.theorem", "SmokeMacro");
     let expected_harness_identifier = expected_mangled_harness.identifier();
 
-    if !is_expected_single_harness_listing(&output, expected_harness_identifier) {
+    if !kani_support::is_expected_single_harness_listing(&output, expected_harness_identifier) {
         return Err(format!(
             "expected Kani list output to contain exactly the SmokeMacro harness, got:\n{output}"
         ));
     }
 
     Ok(())
-}
-
-fn is_unusable_kani_environment(error: &str) -> bool {
-    error.contains("error while loading shared libraries")
-        || error.contains("cannot open shared object file")
-        || error.contains("Broken pipe")
-}
-
-fn is_expected_single_harness_listing(output: &str, expected_harness_identifier: &str) -> bool {
-    output.contains("Standard Harnesses (#[kani::proof]):")
-        && output.contains("No contracts or contract harnesses found.")
-        && output.contains(expected_harness_identifier)
-        && output.matches("theorem__").count() == 1
-        && output.contains("| Total |")
-        && output.contains("| 1")
 }
 
 #[given("a fixture crate with one valid multi-document theorem file")]

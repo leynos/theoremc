@@ -2,7 +2,7 @@
 
 use std::{env, io};
 
-use camino::Utf8PathBuf;
+use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::fs_utf8::Dir as Utf8Dir;
 use thiserror::Error;
 
@@ -64,12 +64,25 @@ pub enum BuildScriptError {
 /// Returns [`BuildScriptError`] when Cargo's environment is incomplete, the
 /// theorem tree cannot be inspected, or the generated suite cannot be written.
 pub fn prepare_build_script() -> Result<BuildScriptOutput, BuildScriptError> {
-    let manifest_dir = required_cargo_path("CARGO_MANIFEST_DIR")?;
-    let out_dir_path = required_cargo_path("OUT_DIR")?;
-    let discovery = discover_theorem_inputs(&manifest_dir)?;
-    let out_dir = Utf8Dir::open_ambient_dir(&out_dir_path, cap_std::ambient_authority()).map_err(
+    prepare_build_script_with_env(env::var)
+}
+
+fn prepare_build_script_with_env(
+    read_cargo_variable: impl Fn(&'static str) -> Result<String, env::VarError>,
+) -> Result<BuildScriptOutput, BuildScriptError> {
+    let manifest_dir = required_cargo_path("CARGO_MANIFEST_DIR", &read_cargo_variable)?;
+    let out_dir_path = required_cargo_path("OUT_DIR", &read_cargo_variable)?;
+    prepare_build_script_at(&manifest_dir, &out_dir_path)
+}
+
+fn prepare_build_script_at(
+    manifest_dir: &Utf8Path,
+    out_dir_path: &Utf8Path,
+) -> Result<BuildScriptOutput, BuildScriptError> {
+    let discovery = discover_theorem_inputs(manifest_dir)?;
+    let out_dir = Utf8Dir::open_ambient_dir(out_dir_path, cap_std::ambient_authority()).map_err(
         |source| BuildScriptError::OpenOutputDirectory {
-            path: out_dir_path,
+            path: out_dir_path.to_path_buf(),
             source,
         },
     )?;
@@ -82,8 +95,15 @@ pub fn prepare_build_script() -> Result<BuildScriptOutput, BuildScriptError> {
     })
 }
 
-fn required_cargo_path(variable: &'static str) -> Result<Utf8PathBuf, BuildScriptError> {
-    env::var(variable)
+fn required_cargo_path(
+    variable: &'static str,
+    read_cargo_variable: &impl Fn(&'static str) -> Result<String, env::VarError>,
+) -> Result<Utf8PathBuf, BuildScriptError> {
+    read_cargo_variable(variable)
         .map(Utf8PathBuf::from)
         .map_err(|source| BuildScriptError::Environment { variable, source })
 }
+
+#[cfg(test)]
+#[path = "build_script_tests.rs"]
+mod tests;
