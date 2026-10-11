@@ -1131,7 +1131,9 @@ boilerplate across the schema and test-support wrappers:
   `Copy` wrappers are unaffected by the change.
 - One wrapper, `YamlKey`, lives outside the public API in a crate-private
   module. It derives the same macros and uses the trait through an anonymous
-  `use super::str_newtype::StrNewtype as _;`.
+  `use super::str_newtype::StrNewtype as _;`. Its `new` and `as_str` lose their
+  `const fn` qualifier, which the type never needed: it is crate-private, and no
+  `const` context, upstream or downstream, constructs one.
 - Three further `&'a str` wrappers keep their hand-written pairs:
   `schema::loader_message::{FieldName, ErrorMessage}` and
   `schema::arg_value::ParamName`. Their `new`/`as_str` are `const fn`, and a
