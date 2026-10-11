@@ -316,6 +316,14 @@ transitive dependency is not enough.
 type alias for a shared generic base struct, which collapses distinct wrappers
 into one type and exposes `inner` instead of `as_str`.
 
+Wrappers over other borrowed text work the same way. `YamlLine` in
+`schema::loader_decode_location` wraps one line of the source document and
+carries the line classifiers (indentation, section headers, mapping keys) as
+methods. Where a module threads the same `&str` parameter through many helpers,
+prefer a wrapper whose methods answer the questions the module keeps asking;
+this both names the domain concept and keeps the module's string-argument ratio
+low enough for the CodeScene advisory gate.
+
 ### 3.6 Extending the build system
 
 To add new build-time discovery or generation:

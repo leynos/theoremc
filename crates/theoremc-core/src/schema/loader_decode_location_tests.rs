@@ -19,36 +19,41 @@ fn argument_and_mapping_lines_require_complete_yaml_keys() {
     let argument = YamlKey::new("target");
 
     assert_eq!(
-        locate_argument_line(3, "    target: value", argument),
+        YamlLine::new("    target: value").locate_argument(3, argument),
         Some((4, 5))
     );
     assert_eq!(
-        locate_argument_line(3, "    target_value: value", argument),
+        YamlLine::new("    target_value: value").locate_argument(3, argument),
         None
     );
-    assert_eq!(locate_argument_line(3, "    target", argument), None);
-    assert!(mapping_key_line("  target:", argument));
-    assert!(!mapping_key_line("  target_value:", argument));
+    assert_eq!(
+        YamlLine::new("    target").locate_argument(3, argument),
+        None
+    );
+    assert!(YamlLine::new("  target:").opens_mapping_key(argument));
+    assert!(!YamlLine::new("  target_value:").opens_mapping_key(argument));
 }
 
 #[test]
 fn line_classifiers_distinguish_sections_headers_and_scope_boundaries() {
-    assert!(section_line("  Let:", YamlKey::new("Let")));
-    assert!(!section_line("Let: nested", YamlKey::new("Let")));
-    assert!(is_top_level_section("Evidence:"));
-    assert!(!is_top_level_section("  Evidence:"));
-    assert!(is_theorem_header("theorem:"));
-    assert!(is_list_item("  - call:"));
-    assert!(exits_scope("  next:", 2));
-    assert!(!exits_scope("    nested:", 2));
-    assert_eq!(indent_width("    nested:"), 4);
+    assert!(YamlLine::new("  Let:").is_section_line(YamlKey::new("Let")));
+    assert!(!YamlLine::new("Let: nested").is_section_line(YamlKey::new("Let")));
+    assert!(YamlLine::new("Evidence:").is_top_level_section());
+    assert!(!YamlLine::new("  Evidence:").is_top_level_section());
+    assert!(YamlLine::new("theorem:").is_theorem_header());
+    assert!(YamlLine::new("  - call:").is_list_item());
+    assert!(YamlLine::new("  next:").exits_scope(2));
+    assert!(!YamlLine::new("    nested:").exits_scope(2));
+    assert_eq!(YamlLine::new("    nested:").indent_width(), 4);
 }
 
 #[test]
 fn document_lines_stop_before_theorem_header_marker() {
     let input = concat!("Theorem: First\n", "Let:\n", "Theorem:\n", "Let:\n");
 
-    let lines = document_lines(input, 0).collect::<Vec<_>>();
+    let lines = document_lines(input, 0)
+        .map(|(index, line)| (index, line.as_str()))
+        .collect::<Vec<_>>();
 
     assert_eq!(lines, vec![(0, "Theorem: First"), (1, "Let:")]);
 }
@@ -82,15 +87,15 @@ fn binding_line_scan_reports_all_outcomes() {
     let argument = YamlKey::new("target");
 
     assert_eq!(
-        scan_binding_line(4, "    target: source", 2, argument),
+        YamlLine::new("    target: source").scan_binding(4, 2, argument),
         BindingLineOutcome::Found(5, 5)
     );
     assert_eq!(
-        scan_binding_line(4, "  next:", 2, argument),
+        YamlLine::new("  next:").scan_binding(4, 2, argument),
         BindingLineOutcome::ExitScope
     );
     assert_eq!(
-        scan_binding_line(4, "    other: source", 2, argument),
+        YamlLine::new("    other: source").scan_binding(4, 2, argument),
         BindingLineOutcome::Continue
     );
 }
@@ -132,15 +137,15 @@ fn do_step_line_scan_reports_all_outcomes() {
     };
 
     assert_eq!(
-        scan_do_step_line(4, "    target: source", selected_context),
+        YamlLine::new("    target: source").scan_do_step(4, selected_context),
         DoStepLineOutcome::Found(5, 5)
     );
     assert_eq!(
-        scan_do_step_line(4, "  next:", inside_context),
+        YamlLine::new("  next:").scan_do_step(4, inside_context),
         DoStepLineOutcome::ExitScope
     );
     assert_eq!(
-        scan_do_step_line(4, "    other: source", inside_context),
+        YamlLine::new("    other: source").scan_do_step(4, inside_context),
         DoStepLineOutcome::Continue
     );
 }
@@ -151,8 +156,7 @@ fn step_scope_tracks_selected_and_subsequent_list_items() {
     let mut selected_indent = None;
 
     assert_eq!(
-        update_step_scope(
-            "  detail: value",
+        YamlLine::new("  detail: value").update_step_scope(
             2,
             &mut current_step,
             &mut selected_indent
@@ -160,19 +164,19 @@ fn step_scope_tracks_selected_and_subsequent_list_items() {
         StepScope::OutsideSelected
     );
     assert_eq!(
-        update_step_scope("  - call:", 2, &mut current_step, &mut selected_indent),
+        YamlLine::new("  - call:").update_step_scope(2, &mut current_step, &mut selected_indent),
         StepScope::OutsideSelected
     );
     assert_eq!(
-        update_step_scope("  - call:", 2, &mut current_step, &mut selected_indent),
+        YamlLine::new("  - call:").update_step_scope(2, &mut current_step, &mut selected_indent),
         StepScope::SelectedStart
     );
     assert_eq!(
-        update_step_scope("    args:", 2, &mut current_step, &mut selected_indent),
+        YamlLine::new("    args:").update_step_scope(2, &mut current_step, &mut selected_indent),
         StepScope::InsideSelected
     );
     assert_eq!(
-        update_step_scope("  - call:", 2, &mut current_step, &mut selected_indent),
+        YamlLine::new("  - call:").update_step_scope(2, &mut current_step, &mut selected_indent),
         StepScope::PastSelected
     );
 }

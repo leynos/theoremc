@@ -1140,6 +1140,15 @@ boilerplate across the schema and test-support wrappers:
   blanket trait implementation cannot be `const`, so adopting the trait would
   remove const-callability rather than remove duplication. They are left as-is
   rather than trading a capability for a stylistic gain.
+- `schema::loader_decode_location` gains a second wrapper, `YamlLine<'a>`, over
+  a single line of the source document. The module previously threaded a bare
+  `line: &str` through a dozen free functions and helpers (`indent_width`,
+  `exits_scope`, `is_list_item`, `is_theorem_header`, `is_top_level_section`,
+  `section_line`, `mapping_key_line`, `locate_argument_line`,
+  `scan_binding_line`, `scan_do_step_line`, `update_step_scope`). Moving those
+  predicates onto `YamlLine` methods replaces the free-function layer with one
+  cohesive line vocabulary and keeps the module's string-argument ratio below
+  the CodeScene advisory threshold it would otherwise cross.
 
 ### 6.8 Localized diagnostics contract (ADR 002)
 
