@@ -188,6 +188,18 @@ Observable success:
       then rate-limited the tenth review pass (10 included reviews used,
       `waitTime: 10 minutes`); the prescribed `vsleep $(shuf -i 45-90 -n 1)m`
       backoff was applied before retrying.
+- [x] (2026-10-11T11:52Z) Rebased the branch onto the PR target branch.
+      `origin/main` had moved from `1562b5c` to `41fd07a`; the replay boundary
+      was the branch's original fork point `1562b5c`, so the series replayed is
+      all 16 child commits and nothing of `main`. The rebase ran with
+      `--merge`, `merge.conflictStyle=zdiff3`, and the estate-baseline
+      `core.attributesFile=/dev/null` override, because Weave was selected only
+      by the ambient global attributes file. It completed in one pass with zero
+      conflicts and no rerere or driver intervention. `git range-diff` reports
+      all 16 commits as patch-identical (`=`), the child-owned diff
+      `1562b5c..9eac73c` is byte-for-byte equal to `41fd07a..140837b`, and every
+      path changed by `main` is byte-identical to its `origin/main` version in
+      the result.
 
 ## Surprises & Discoveries
 
@@ -281,6 +293,26 @@ Observable success:
   that reads better on its own than as a section of the macro entry point.
   `lib.rs` is 379 lines and `action_probe_tests.rs` 135 after the split.
   Date/Author: 2026-10-11, implementation agent.
+- Decision: rebase the branch onto `origin/main` rather than merging it, so the
+  PR stays a fast-forwardable linear series. Rationale: the branch is a stack
+  of 16 atomic commits that reviewers read in order; a merge commit would add a
+  second parent with no content of its own, and the repository's history is
+  linear apart from squash-merge landings. Date/Author: 2026-10-11,
+  implementation agent.
+- Decision: route the rebase through Git's own merge machinery with the
+  command-scoped override
+  `git -c core.attributesFile=/dev/null -c merge.conflictStyle=zdiff3 rebase`,
+  and do not engage the Weave merge driver. Rationale: Weave was selected for
+  `*.rs` paths only by the user-wide ambient rule in
+  `~/.config/git/attributes`; this repository has no tracked `.gitattributes`
+  and no clone-local attributes, so the selection is ambient rather than
+  repository policy. The estate baseline routes an unattended multi-commit
+  rebase through Git's text merge in exactly that situation. The override was
+  verified before use: `git -c core.attributesFile=/dev/null check-attr merge`
+  reports `unspecified` for both a `.rs` path and a `.md` path. The decision
+  was borne out — the child and target changes share no paths, so no merge
+  driver had anything to reconcile and the replay was exact. Date/Author:
+  2026-10-11, implementation agent.
 
 ## Outcomes & Retrospective
 
@@ -748,6 +780,23 @@ coderabbit review --agent 2>&1 | tee /tmp/coderabbit-issue-51-pass1.out
 If the rate limit is exceeded, wait with `vsleep $(shuf -i 45-90 -n 1)m` and
 retry.
 
+Rebase onto the PR target branch, with the estate-baseline Weave bypass:
+
+```sh
+git -c core.attributesFile=/dev/null -c merge.conflictStyle=zdiff3 rebase \
+  --merge --no-fork-point --no-update-refs --no-autostash \
+  --reapply-cherry-picks --keep-empty --empty=stop \
+  --onto origin/main <original-fork-point> <branch>
+```
+
+The `core.attributesFile=/dev/null` override suppresses the user-wide
+`*.rs merge=weave` rule in `~/.config/git/attributes`. This repository carries
+no tracked `.gitattributes` and no clone-local attributes, so Weave selection
+is ambient rather than repository policy and an unattended rebase should use
+Git's text merge. Verify the override before relying on it with
+`git -c core.attributesFile=/dev/null check-attr merge -- <path>`, which must
+print `unspecified`.
+
 ## Validation and acceptance
 
 Behaviour to observe, in order:
@@ -857,3 +906,16 @@ new modules named above, and `lib.rs` returned to 379 lines. This section now
 describes the delivered layout rather than the drafted one. No design decision
 changed: the error type, the message format, the span, and the absence of an
 `insta` snapshot are all as originally recorded in `Decision Log`.
+
+Revision (2026-10-11T11:52Z): the branch was rebased onto `origin/main` after
+`main` advanced from `1562b5c` to `41fd07a`. The replay boundary stayed at the
+branch's original fork point, so all 16 child commits were replayed and
+`main`'s two new commits (`8aa9f21`, `41fd07a`, both confined to `.github/`)
+were inherited untouched. The rebase used zdiff3 with the estate-baseline
+`core.attributesFile=/dev/null` Weave bypass and completed with zero conflicts
+and an exact replay: `range-diff` shows all 16 commits patch-identical, the
+child-owned diff is byte-identical before and after, and every `main`-owned
+path matches `origin/main` byte for byte. No lock file is involved, because
+neither side touches one. The rebase command block and the surrounding note in
+`Concrete steps` were added in this revision; the `Progress` and `Decision Log`
+entries record the identities and the reasoning.
