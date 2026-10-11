@@ -9,6 +9,7 @@ use super::super::tests_support::{TheoremFixture, expand_fixture};
 use camino::Utf8Path;
 use googletest::prelude::*;
 use rstest::rstest;
+use theoremc_core::mangle::mangle_action_name;
 
 /// Builds a two-document fixture whose documents disagree on `account.deposit`.
 fn provenance_conflict_fixture(first: (&str, &str), conflicting: (&str, &str)) -> TheoremFixture {
@@ -283,10 +284,15 @@ fn whitespace_only_signature_drift_does_not_conflict() -> Result<(), Box<dyn std
         .to_owned(),
     );
 
+    // The `?` is the negative control: a spurious conflict would return `Err`
+    // here. What remains to check is that accepting the pair did not silently
+    // drop the action, so assert the probe was actually generated.
     let expanded = expand_fixture(Utf8Path::new("theorems/whitespace-drift.theorem"), &theorem)?;
+    let mangled_action = mangle_action_name("payload.write");
+    let probe_identifier = mangled_action.identifier();
     assert!(
-        !expanded.contains("conflicting Actions signatures"),
-        "whitespace-only differences must not trigger conflict, got: {expanded}",
+        expanded.contains(&format!("crate::theorem_actions::{probe_identifier}")),
+        "expected the payload.write probe in the expansion, got: {expanded}",
     );
     Ok(())
 }
