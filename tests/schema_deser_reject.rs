@@ -5,7 +5,7 @@
 //! for unknown keys in subordinate structures.
 
 use rstest::rstest;
-use test_helpers::{FixtureName, fixture_error_message};
+use test_helpers::{FixtureName, StrNewtype, fixture_error_message};
 use theoremc::schema::{KaniExpectation, load_theorem_docs};
 
 fn require_message_contains(message: &str, expected: &str) -> Result<(), String> {

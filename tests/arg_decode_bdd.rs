@@ -1,7 +1,7 @@
 //! Behavioural tests for argument value decoding.
 
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{FixtureName, load_fixture};
+use test_helpers::{FixtureName, StrNewtype, load_fixture};
 use theoremc::schema::{ArgValue, LiteralValue, load_theorem_docs};
 
 // ── Helpers ─────────────────────────────────────────────────────────

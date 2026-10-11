@@ -6,7 +6,7 @@
 
 use rstest::rstest;
 use test_helpers::{
-    ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_fails,
+    ExpectedFragment, FixtureName, StrNewtype, assert_fixture_error_contains, assert_fixture_fails,
     assert_fixture_loads, load_fixture_docs,
 };
 use theoremc::schema::load_theorem_docs;

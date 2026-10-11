@@ -6,6 +6,7 @@ use std::time::{Duration, SystemTime};
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use filetime::FileTime;
+use theoremc_core::schema::StrNewtype;
 
 use super::ExpectedFragment;
 

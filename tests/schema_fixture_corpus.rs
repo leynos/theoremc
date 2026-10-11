@@ -1,7 +1,7 @@
 //! Regression corpus tests for parser and validator fixtures.
 
 use rstest::rstest;
-use test_helpers::{FIXTURES_DIR, FixtureName, load_fixture};
+use test_helpers::{FIXTURES_DIR, FixtureName, StrNewtype, load_fixture};
 use theoremc::schema::{SourceId, load_theorem_docs_with_source};
 
 fn fixture_source(fixture_name: &str) -> String {

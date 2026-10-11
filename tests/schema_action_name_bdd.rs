@@ -2,7 +2,7 @@
 
 use rstest_bdd_macros::{given, scenario, then};
 use test_helpers::{
-    ExpectedFragment, FixtureName, assert_fixture_error_contains, assert_fixture_loads,
+    ExpectedFragment, FixtureName, StrNewtype, assert_fixture_error_contains, assert_fixture_loads,
 };
 
 /// Helper to assert multiple fixtures fail with expected error messages.
