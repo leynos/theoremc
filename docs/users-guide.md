@@ -562,8 +562,11 @@ theorem `FirstConflict` declares `fn(account: u64) -> bool`, but theorem
  --> src/lib.rs:3:1
 ```
 
-Semantic equivalence is decided on the parsed Rust type, so whitespace and
-grouping differences such as `Vec<u8>` versus `Vec <u8>` do not conflict.
+Semantic equivalence is decided on the type's parsed tokens, so insignificant
+whitespace such as `Vec<u8>` versus `Vec <u8>` does not cause a conflict.
+Parenthesized types are not normalised: `(u64)` and `u64` parse to different
+tokens and are reported as conflicting, so write the grouped and ungrouped
+forms consistently.
 
 The macro also emits referenced-type probes for every distinct type named by
 `Forall`, `Actions.params`, and `Actions.returns`. These probes are ordinary
