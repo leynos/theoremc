@@ -5,8 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & Retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (EP-M1 to EP-M3 complete; EP-M4 review and PR close-out
-remaining)
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -45,7 +44,11 @@ Observable success:
    only in insignificant whitespace, such as `Vec<u8>` versus `Vec <u8>`)
    continue to expand without error.
 4. Every existing deterministic gate (`make check-fmt`, `make lint`,
-   `make test`) passes.
+   `make test`) passes, with one documented exception: on this machine
+   `make test` reports a single pre-existing Kani environment failure that
+   predates and is untouched by this change (see `Surprises & discoveries` and
+   `Progress`). Every other test passes; CI does not set the wrapper that
+   triggers it.
 
 ## Constraints
 
@@ -156,8 +159,23 @@ Observable success:
       defect; a focused re-run reproduced the identical `rustversion` error.
       The doctest half was re-run on its own and passed (5 binaries, 0 failed),
       since `make` had aborted before reaching it.
-- [ ] EP-M4: CodeRabbit `--agent` review passes; findings addressed.
-- [ ] EP-M4: push and open the draft PR.
+- [x] (2026-10-11T03:05Z) EP-M4: pushed the branch and opened draft PR #164
+      with a title carrying `(#51)`, a body stating `Closes #51`, and the
+      Lody session link in `## References`.
+- [x] (2026-10-11T03:50Z) EP-M4: `coderabbit review --agent` passes. Seven
+      review rounds to date; every finding was verified against the code
+      before being accepted, and each was fixed in its own commit with a
+      pushed evidence comment on the PR. Rounds 1-2 covered the message
+      wording and fixture paths, round 3 a vacuous negative-control assertion,
+      round 4 a reversed criterion in this plan, round 5 an incorrect
+      users'-guide grouping claim (corrected and pinned by
+      `parenthesized_type_is_not_equivalent_to_bare_type`), round 6 the `-ize`
+      spelling and a broken Markdown code span, and round 7 the omitted
+      parameter-name-and-order requirement in the repeated-signature rule
+      (now pinned at the macro layer by the `parameter_name_drift` case).
+      Round 8 raised the EP-M3 acceptance evidence below, which was corrected
+      to record the environmental Kani exception explicitly rather than
+      asserting a blanket gate pass.
 
 ## Surprises & Discoveries
 
@@ -616,8 +634,14 @@ Milestone EP-M3: documentation and deterministic gates are green.
 - Identifier and outcome: EP-M3 leaves documentation describing the diagnostic
   and every deterministic gate passing.
 - Requirements and gaps: discharges `AGENTS-DOC-MAINTENANCE`.
-- Acceptance evidence: `make check-fmt`, `make lint`, `make test`,
-  `make markdownlint`, and `make nixie` all pass, with logs under `/tmp`.
+- Acceptance evidence: `make check-fmt`, `make lint`, `make markdownlint`,
+  and `make nixie` all pass, with logs under `/tmp`. `make test` passes except
+  for the single documented Kani environment failure
+  (`a_valid_theorem_file_exposes_a_kani_proof_harness`, 782 of 783 tests
+  passing), which is pre-existing, unrelated to this change, and unavoidable
+  under the compile-admission policy that forbids unsetting `RUSTC_WRAPPER`.
+  `make test` aborts before its doctest recipe on such a run, so
+  `cargo test --workspace --all-features --doc` is run separately and passes.
 - Conformance check:
   - Requirements satisfied: docs updated.
   - Design still followed.
@@ -726,9 +750,9 @@ Behaviour to observe, in order:
    asserts both theorem names and both summaries for both conflict kinds.
 3. `cargo nextest run -p theoremc-macros --test expand` passes against the
    regenerated golden file.
-4. `make test` passes workspace-wide;
-   `whitespace_only_signature_drift_does_not_conflict` still passes as the
-   negative control.
+4. `make test` passes workspace-wide apart from the one documented Kani
+   environment failure; `whitespace_only_signature_drift_does_not_conflict`
+   still passes as the negative control.
 5. `make check-fmt` and `make lint` pass with no new warnings.
 
 Quality criteria:
