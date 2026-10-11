@@ -485,6 +485,38 @@ Evidence:
     expect: SUCCESS
 ```
 
+### Shared `&str` wrapper API
+
+Theoremc uses thin `&'a str` wrappers internally, and exposes the constructor
+and accessor they share as `theoremc::schema::StrNewtype`:
+
+- `StrNewtype::new` wraps a `&str` in the wrapper type.
+- `StrNewtype::as_str` borrows the wrapped slice back out.
+
+The trait has a single blanket implementation over any wrapper whose inner type
+is `&'a str`, so a newtype gains both methods by deriving its conversions
+rather than writing them out:
+
+```rust
+use derive_more::{From, Into};
+use theoremc::schema::StrNewtype;
+use the_newtype::Newtype;
+
+#[derive(Newtype, From, Into, Copy, Clone)]
+struct Marker<'a>(&'a str);
+
+let marker = Marker::new("witness");
+assert_eq!(marker.as_str(), "witness");
+```
+
+Defining a wrapper this way requires `the-newtype` and `derive_more` as direct
+dependencies of the defining crate; Cargo does not re-export them. Both methods
+keep the names used before the trait existed, so existing callers only need to
+import `StrNewtype` where the methods are called. The
+[developer's guide](developers-guide.md) documents the trait bounds that make
+the blanket implementation apply and how wrappers are added inside this
+workspace.
+
 ## Declaring action signatures
 
 Theorem files that reference actions in `Let` or `Do` must declare the expected

@@ -5,7 +5,7 @@
 //! `schema_deser_reject.rs`.
 
 use rstest::rstest;
-use test_helpers::{FixtureName, load_fixture};
+use test_helpers::{FixtureName, StrNewtype, load_fixture};
 use theoremc::schema::{LetBinding, Step, load_theorem_docs};
 
 #[rstest::fixture]

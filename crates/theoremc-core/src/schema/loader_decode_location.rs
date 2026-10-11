@@ -5,21 +5,18 @@
 //! the original YAML text so loader diagnostics can point at the failing
 //! argument field instead of the theorem header.
 
-/// Newtype representing a YAML key used for decode-location matching.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct YamlKey<'a>(&'a str);
-
-impl<'a> YamlKey<'a> {
-    pub(crate) const fn new(key: &'a str) -> Self {
-        Self(key)
-    }
-
-    pub(crate) const fn as_str(self) -> &'a str {
-        self.0
-    }
-}
+use derive_more::{From, Into};
+use the_newtype::Newtype;
 
 use super::raw::{RawDocDecodeError, RawTheoremDoc};
+use super::str_newtype::StrNewtype as _;
+
+/// Newtype representing a YAML key used for decode-location matching.
+///
+/// The constructor and accessor come from [`super::str_newtype::StrNewtype`],
+/// imported anonymously above so in-module call sites stay terse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Newtype, From, Into)]
+pub(crate) struct YamlKey<'a>(&'a str);
 
 pub(crate) fn locate_decode_failure(
     input: &str,

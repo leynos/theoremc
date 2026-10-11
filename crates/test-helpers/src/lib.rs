@@ -13,6 +13,7 @@ pub use integration::{
     assert_fixture_error_contains, assert_fixture_fails, assert_fixture_loads,
     fixture_error_message, load_fixture, load_fixture_docs, load_fixture_text, toml_section,
 };
+pub use theoremc_core::schema::StrNewtype;
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
 

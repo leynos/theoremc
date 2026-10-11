@@ -176,7 +176,7 @@ Table 1: Current schema layer to module mapping (informative).
 | Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier`       |
 | Raw anti-corruption adapter | `schema::raw` (planned extraction from current loader-side deserialization path) |
 | Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                               |
-| Loader orchestration        | `schema::loader`                                                                 |
+| Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::str_newtype`        |
 | Diagnostic infrastructure   | `schema::diagnostic` (currently `schema::error`)                                 |
 
 ______________________________________________________________________
@@ -1105,6 +1105,41 @@ roadmap):
   theorem-to-harness lowering requires proc-macro infrastructure not yet
   implemented. The current lowering module is internal and will be consumed by
   the Phase 3 `theorem_file!` macro.
+
+### 6.7.11 Implementation decisions (issue #60)
+
+The following decisions were taken when deduplicating `&str`-backed newtype
+boilerplate across the schema and test-support wrappers:
+
+- `newt-hype` was evaluated and rejected. Its `newtype!` macro expands to a
+  type alias for a shared generic base struct, so the distinct wrapper types
+  would collapse into one indistinguishable type, and its accessor is `inner`
+  rather than the required `as_str`.
+- `the-newtype` (`#[derive(Newtype)]`) is adopted instead. It records the
+  private `Inner` type for each existing tuple struct without changing their
+  shape, visibility, or documented behaviour.
+- `derive_more` with only the `from` and `into` features supplies the
+  `From<&'a str>` and `Into<&'a str>` conversions that make the wrappers
+  ergonomic and that bound the shared trait.
+- `schema::StrNewtype` is a documented public trait with exactly one blanket
+  implementation over
+  `Newtype<Inner = &'a str> + From<&'a str> + Into<&'a str> + Copy`. It supplies
+  `new` and `as_str` for any wrapper that derives the three macros, so the
+  boilerplate is written once.
+- The `StrNewtype::as_str` receiver is `&self`, not `self` by value. Clippy's
+  `wrong_self_convention` rejects by-value receivers on a trait method, and
+  `Copy` wrappers are unaffected by the change.
+- One wrapper, `YamlKey`, lives outside the public API in a crate-private
+  module. It derives the same macros and uses the trait through an anonymous
+  `use super::str_newtype::StrNewtype as _;`. Its `new` and `as_str` lose their
+  `const fn` qualifier, which the type never needed: it is crate-private, and no
+  `const` context, upstream or downstream, constructs one.
+- Three further `&'a str` wrappers keep their hand-written pairs:
+  `schema::loader_message::{FieldName, ErrorMessage}` and
+  `schema::arg_value::ParamName`. Their `new`/`as_str` are `const fn`, and a
+  blanket trait implementation cannot be `const`, so adopting the trait would
+  remove const-callability rather than remove duplication. They are left as-is
+  rather than trading a capability for a stylistic gain.
 
 ### 6.8 Localized diagnostics contract (ADR 002)
 
