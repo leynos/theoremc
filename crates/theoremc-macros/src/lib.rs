@@ -16,7 +16,7 @@ use theoremc_core::{
     load_theorem_file_from_manifest_dir,
     mangle::{mangle_action_name, mangle_module_path, mangle_theorem_harness},
     path_format::normalize_path_separators,
-    schema::{ActionSignature, SchemaDiagnostic},
+    schema::{ActionSignature, SchemaDiagnostic, TheoremName},
 };
 
 /// Expands a crate-relative `.theorem` file into a stable private module.
@@ -240,9 +240,19 @@ fn generated_action_probes(
         .collect()
 }
 
+/// One declared action signature together with the theorem that declared it.
+///
+/// The declaring theorem is what makes a conflict diagnosable: without it the
+/// error can name the action but not the two documents that disagree.
+#[derive(Debug, Clone, Copy)]
+struct DeclaredSignature<'a> {
+    theorem: &'a TheoremName,
+    signature: &'a ActionSignature,
+}
+
 #[derive(Debug)]
 struct ActionSignatureIndex<'a> {
-    signatures: BTreeMap<&'a str, &'a ActionSignature>,
+    signatures: BTreeMap<&'a str, DeclaredSignature<'a>>,
 }
 
 impl<'a> ActionSignatureIndex<'a> {
@@ -251,12 +261,15 @@ impl<'a> ActionSignatureIndex<'a> {
         canonical_actions: &[&str],
     ) -> Result<Self, MacroExpansionError> {
         let selected = canonical_actions.iter().copied().collect::<BTreeSet<_>>();
-        let mut declared_signatures: BTreeMap<&'a str, &'a ActionSignature> = BTreeMap::new();
+        let mut declared_signatures: BTreeMap<&'a str, DeclaredSignature<'a>> = BTreeMap::new();
 
         for doc in theorem_docs {
             for (action, signature) in &doc.actions {
-                let canonical = action.as_str();
-                Self::insert_signature(&mut declared_signatures, canonical, signature)?;
+                let declared = DeclaredSignature {
+                    theorem: &doc.theorem,
+                    signature,
+                };
+                Self::insert_signature(&mut declared_signatures, action.as_str(), declared)?;
             }
         }
 
@@ -269,30 +282,62 @@ impl<'a> ActionSignatureIndex<'a> {
     }
 
     fn insert_signature(
-        signatures: &mut BTreeMap<&'a str, &'a ActionSignature>,
+        signatures: &mut BTreeMap<&'a str, DeclaredSignature<'a>>,
         canonical: &'a str,
-        signature: &'a ActionSignature,
+        declared: DeclaredSignature<'a>,
     ) -> Result<(), MacroExpansionError> {
         let Some(first) = signatures.get(canonical) else {
-            signatures.insert(canonical, signature);
+            signatures.insert(canonical, declared);
             return Ok(());
         };
 
-        if signature.is_semantically_equivalent(first) {
+        if declared
+            .signature
+            .is_semantically_equivalent(first.signature)
+        {
             return Ok(());
         }
 
-        Err(MacroExpansionError::ConflictingActionSignature {
-            action: canonical.to_owned(),
-        })
+        Err(conflicting_signature_error(canonical, *first, declared))
     }
 
     fn signature_for(&self, canonical: &str) -> Result<&'a ActionSignature, MacroExpansionError> {
-        self.signatures.get(canonical).copied().ok_or_else(|| {
-            MacroExpansionError::MissingActionSignature {
+        self.signatures
+            .get(canonical)
+            .map(|declared| declared.signature)
+            .ok_or_else(|| MacroExpansionError::MissingActionSignature {
                 action: canonical.to_owned(),
-            }
-        })
+            })
+    }
+}
+
+/// Renders a declared signature the way a theorem author writes it in YAML.
+///
+/// Parameter names are kept, because they are exactly the keys the author
+/// writes under `Actions.params`, and their order is the declaration order
+/// that already governs the generated probe.
+fn render_signature_summary(signature: &ActionSignature) -> String {
+    let params = signature
+        .params
+        .iter()
+        .map(|(name, ty)| format!("{name}: {ty}"))
+        .collect::<Vec<String>>()
+        .join(", ");
+    format!("fn({params}) -> {}", signature.returns)
+}
+
+/// Builds the diagnostic for two theorems that disagree about one action.
+fn conflicting_signature_error(
+    action: &str,
+    first: DeclaredSignature<'_>,
+    conflicting: DeclaredSignature<'_>,
+) -> MacroExpansionError {
+    MacroExpansionError::ConflictingActionSignature {
+        action: action.to_owned(),
+        first_theorem: first.theorem.as_str().to_owned(),
+        conflicting_theorem: conflicting.theorem.as_str().to_owned(),
+        first_signature: render_signature_summary(first.signature),
+        conflicting_signature: render_signature_summary(conflicting.signature),
     }
 }
 
@@ -379,8 +424,16 @@ enum MacroExpansionError {
     MissingKaniEvidence { theorem: String },
     #[error("referenced action `{action}` is missing an Actions signature entry")]
     MissingActionSignature { action: String },
-    #[error("referenced action `{action}` has conflicting Actions signatures")]
-    ConflictingActionSignature { action: String },
+    #[error(
+        "referenced action `{action}` has conflicting Actions signatures: theorem `{first_theorem}` declares `{first_signature}`, but theorem `{conflicting_theorem}` declares `{conflicting_signature}`"
+    )]
+    ConflictingActionSignature {
+        action: String,
+        first_theorem: String,
+        conflicting_theorem: String,
+        first_signature: String,
+        conflicting_signature: String,
+    },
     #[error("referenced action `{action}` has an invalid Actions signature: {message}")]
     InvalidActionSignature { action: String, message: String },
     #[error("referenced type `{ty}` is invalid: {message}")]

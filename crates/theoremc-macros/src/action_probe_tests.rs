@@ -147,6 +147,100 @@ fn assert_conflicting_action_signature(
     Ok(())
 }
 
+/// Builds a two-document fixture whose documents disagree on `account.deposit`.
+fn provenance_conflict_fixture(first: (&str, &str), conflicting: (&str, &str)) -> TheoremFixture {
+    TheoremFixture(format!(
+        concat!(
+            "Theorem: FirstProvenanceThesis\n",
+            "About: First provenance thesis\n",
+            "Actions:\n",
+            "  account.deposit:\n",
+            "    params:\n",
+            "      account: {first_param}\n",
+            "    returns: {first_return}\n",
+            "Do:\n",
+            "  - call:\n",
+            "      action: account.deposit\n",
+            "      args:\n",
+            "        account: 1\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+            "---\n",
+            "Theorem: SecondProvenanceThesis\n",
+            "About: Second provenance thesis\n",
+            "Actions:\n",
+            "  account.deposit:\n",
+            "    params:\n",
+            "      account: {conflicting_param}\n",
+            "    returns: {conflicting_return}\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+        ),
+        first_param = first.0,
+        first_return = first.1,
+        conflicting_param = conflicting.0,
+        conflicting_return = conflicting.1,
+    ))
+}
+
+#[rstest]
+#[case::parameter_type_drift(("u64", "bool"), ("u32", "bool"))]
+#[case::return_type_drift(("u64", "bool"), ("u64", "u32"))]
+fn expansion_names_both_declaring_theorems(
+    #[case] first: (&str, &str),
+    #[case] conflicting: (&str, &str),
+) -> Result<(), Box<dyn std::error::Error>> {
+    let theorem = provenance_conflict_fixture(first, conflicting);
+    let expected_first = format!("fn(account: {}) -> {}", first.0, first.1);
+    let expected_conflicting = format!("fn(account: {}) -> {}", conflicting.0, conflicting.1);
+
+    let expansion = expand_fixture(Utf8Path::new("theorems/provenance.theorem"), &theorem)
+        .expect_err("conflicting action signatures should fail expansion");
+    let error = expansion
+        .downcast_ref::<MacroExpansionError>()
+        .ok_or_else(|| std::io::Error::other("expected macro expansion error"))?;
+
+    assert_that!(
+        error,
+        matches_pattern!(MacroExpansionError::ConflictingActionSignature {
+            action: eq("account.deposit"),
+            first_theorem: eq("FirstProvenanceThesis"),
+            conflicting_theorem: eq("SecondProvenanceThesis"),
+            first_signature: eq(expected_first.as_str()),
+            conflicting_signature: eq(expected_conflicting.as_str()),
+        })
+    );
+
+    // A user only ever sees the rendered message, so assert the provenance
+    // reaches it rather than trusting the typed fields alone.
+    let message = error.to_string();
+    for fragment in [
+        "FirstProvenanceThesis",
+        "SecondProvenanceThesis",
+        expected_first.as_str(),
+        expected_conflicting.as_str(),
+    ] {
+        assert_that!(message.as_str(), contains_substring(fragment));
+    }
+    Ok(())
+}
+
 #[test]
 fn expansion_rejects_stale_unreferenced_conflicting_action_signature()
 -> Result<(), Box<dyn std::error::Error>> {
