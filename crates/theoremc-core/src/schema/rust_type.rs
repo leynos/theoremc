@@ -3,7 +3,7 @@
 use quote::ToTokens;
 use syn::{
     AngleBracketedGenericArguments, BoundLifetimes, GenericArgument, GenericParam,
-    ParenthesizedGenericArguments, PathArguments, ReturnType, Type, TypeArray, TypeBareFn,
+    ParenthesizedGenericArguments, PathArguments, ReturnType, Type, TypeArray, TypeFnPtr,
     TypeGroup, TypeImplTrait, TypeMacro, TypeParen, TypePath, TypePtr, TypeReference, TypeSlice,
     TypeTraitObject, TypeTuple,
 };
@@ -48,7 +48,7 @@ pub(crate) fn free_named_lifetime(ty: &str) -> Option<String> {
 fn free_named_lifetime_in_type(ty: &Type, scope: LifetimeScope<'_>) -> Option<String> {
     match ty {
         Type::Array(array) => free_named_lifetime_in_array(array, scope),
-        Type::BareFn(bare_fn) => free_named_lifetime_in_bare_fn(bare_fn, scope),
+        Type::FnPtr(fn_ptr) => free_named_lifetime_in_fn_ptr(fn_ptr, scope),
         Type::Group(group) => free_named_lifetime_in_group(group, scope),
         Type::ImplTrait(impl_trait) => free_named_lifetime_in_impl_trait(impl_trait, scope),
         Type::Macro(type_macro) => free_named_lifetime_in_macro(type_macro, scope),
@@ -67,18 +67,18 @@ fn free_named_lifetime_in_array(ty: &TypeArray, scope: LifetimeScope<'_>) -> Opt
     free_named_lifetime_in_type(&ty.elem, scope)
 }
 
-fn free_named_lifetime_in_bare_fn(ty: &TypeBareFn, scope: LifetimeScope<'_>) -> Option<String> {
+fn free_named_lifetime_in_fn_ptr(ty: &TypeFnPtr, scope: LifetimeScope<'_>) -> Option<String> {
     ty.lifetimes.as_ref().map_or_else(
-        || free_named_lifetime_in_bare_fn_signature(ty, scope),
+        || free_named_lifetime_in_fn_ptr_signature(ty, scope),
         |lifetimes| {
             let scoped_lifetimes = scoped_lifetimes(scope, Some(lifetimes));
-            free_named_lifetime_in_bare_fn_signature(ty, LifetimeScope(&scoped_lifetimes))
+            free_named_lifetime_in_fn_ptr_signature(ty, LifetimeScope(&scoped_lifetimes))
         },
     )
 }
 
-fn free_named_lifetime_in_bare_fn_signature(
-    ty: &TypeBareFn,
+fn free_named_lifetime_in_fn_ptr_signature(
+    ty: &TypeFnPtr,
     scope: LifetimeScope<'_>,
 ) -> Option<String> {
     ty.inputs
@@ -226,7 +226,7 @@ fn free_named_lifetime_in_parenthesized_arguments(
     arguments
         .inputs
         .iter()
-        .find_map(|ty| free_named_lifetime_in_type(ty, scope))
+        .find_map(|arg| free_named_lifetime_in_type(&arg.ty, scope))
         .or_else(|| free_named_lifetime_in_return_type(&arguments.output, scope))
 }
 
