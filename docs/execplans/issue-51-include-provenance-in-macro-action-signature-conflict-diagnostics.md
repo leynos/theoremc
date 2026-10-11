@@ -176,7 +176,7 @@ Observable success:
       Round 8 raised the EP-M3 acceptance evidence below, which was corrected
       to record the environmental Kani exception explicitly rather than
       asserting a blanket gate pass. Round 9 asked for the two stale-conflict
-      expansion tests to be parameterised; they are now one `#[rstest]` with
+      expansion tests to be parameterized; they are now one `#[rstest]` with
       two cases over shared `#[fixture]` YAML builders, preserving both the
       called-action and never-called-action scenarios.
 - [x] (2026-10-11T06:35Z) EP-M4: GitHub CI confirms the Kani failure is
@@ -365,7 +365,7 @@ The relevant pipeline inside `lib.rs`:
   strings through `syn::Type`, so `Vec<u8>` and `Vec <u8>` compare equal) and
   raises `MacroExpansionError::ConflictingActionSignature` when they differ.
   `signature_for` then serves the recorded signature for probe generation and
-  raises `MissingActionSignature` for unreferenced actions that were never
+  raises `MissingActionSignature` for referenced actions that were never
   declared.
 - `MacroExpansionError` is a private `thiserror` enum. `to_compile_error`
   converts any variant to a `compile_error!` at a caller-supplied span.
@@ -404,7 +404,8 @@ Upstream artefacts:
   if the format becomes substantial.
 - `docs/adr-004-action-signature-specification.md` (ADR-004), which rules that
   a signature declared more than once within one `theorem_file!` expansion must
-  be identical, and that probes are emitted as anonymous `const _` items.
+  be semantically equivalent, and that probes are emitted as anonymous
+  `const _` items.
 - `docs/reviews/rfc-0001-selective-adoption-and-vertical-slice-preservation.md`
   and `docs/rfcs/` for repository governance style.
 - `AGENTS.md` (code style, doc maintenance, committing, Rust guidance) and
@@ -606,9 +607,8 @@ Milestone EP-M1: the index and error type carry provenance.
   - Requirements satisfied: provenance is carried and rendered.
   - Design still followed: the index remains a single-pass build over
     document order, and probes are still anonymous `const _` items.
-  - Upstream assumptions still valid: ADR-004's "identical declarations"
-    rule is unchanged; equivalence still uses
-    `is_semantically_equivalent`.
+  - Upstream assumptions still valid: ADR-004's semantic-equivalence rule is
+    unchanged, and equivalence still uses `is_semantically_equivalent`.
   - No unapproved public interface or dependency change: the variant is
     private to `theoremc-macros`; no dependency is added.
   - No trust boundary or persisted-format change.
