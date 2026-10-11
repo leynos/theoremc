@@ -170,7 +170,7 @@ Observable success:
   threshold of nine, and source positions in the generated `.stderr` change
   whenever lines are added above the error construction in `lib.rs`. Evidence:
   `clippy.toml`; the golden file records
-  `--> tests/expand/conflicting_action_signature.rs:5:15` and the trybuild
+  `--> tests/expand/conflicting_action_signatures.rs:5:15` and the trybuild
   fixture's own line numbers. Impact: `lib.rs` edits shift the
   `Span::call_site()` position, so the golden `.stderr` must be regenerated and
   reviewed after implementation, not crafted by hand.
@@ -329,7 +329,7 @@ The relevant pipeline inside `lib.rs`:
   walks every document and every declared action in document order, and records
   the first declaration of each action. `insert_signature` compares each later
   declaration with the recorded one using
-  `ActionSignature::is_semantically_equivalent` (which canonicalises Rust type
+  `ActionSignature::is_semantically_equivalent` (which canonicalizes Rust type
   strings through `syn::Type`, so `Vec<u8>` and `Vec <u8>` compare equal) and
   raises `MacroExpansionError::ConflictingActionSignature` when they differ.
   `signature_for` then serves the recorded signature for probe generation and
@@ -345,8 +345,8 @@ Tests live in three places: focused unit tests under
 repository root under `tests/` driven by `rstest-bdd`. The behavioural suite
 covers fixture-crate builds and schema diagnostics; it does not currently
 exercise action-signature conflicts, and this plan does not add such a scenario
-because the conflict is pure in-process data with no observerable build
-behaviour beyond the compile error, which trybuild already pins.
+because the conflict is pure in-process data with no observable build behaviour
+beyond the compile error, which trybuild already pins.
 
 Key terms:
 
@@ -463,11 +463,11 @@ Obligation V3 — the public compile error renders both declarations.
 - Method: trybuild compile-fail fixture with a regenerated golden `.stderr`.
 - Rationale: only a real rustc run proves that the rendered message reaches the
   user unchanged through `syn::Error::to_compile_error` and `compile_error!`.
-- Domain: `crates/theoremc-macros/tests/expand/conflicting_action_signature.rs`
+- Domain: `crates/theoremc-macros/tests/expand/conflicting_action_signatures.rs`
   plus its `.theorem` fixture (`FirstConflict` with `account: u64`,
   `SecondConflict` with `account: u32`).
 - Artefact:
-  `crates/theoremc-macros/tests/expand/conflicting_action_signature.stderr`.
+  `crates/theoremc-macros/tests/expand/conflicting_action_signatures.stderr`.
 - Evidence: `cargo nextest run -p theoremc-macros --test expand`. Discharge
   condition: the golden file records one `error:` line naming both
   `FirstConflict` and `SecondConflict` with `fn(account: u64) -> bool` and
@@ -643,6 +643,13 @@ Milestone EP-M4: CodeRabbit review and draft PR.
 All commands run from the worktree root
 `/home/leynos/.lody/repos/github---leynos---theoremc/worktrees/f007b632-b9ef-4d68-b617-b879d0bb1900`.
 
+Every command below is piped through `tee` so its output survives truncation. A
+pipeline's exit status is that of its last command, so `tee` would mask a
+failing gate. Run these snippets in a shell with `set -o pipefail` enabled, or
+inspect `${PIPESTATUS[0]}` afterwards, before treating a gate as passed. The
+gate results recorded in `Progress` and `Outcomes & Retrospective` were read
+that way.
+
 Red stage:
 
 ```sh
@@ -751,7 +758,7 @@ Pre-change golden file, for comparison:
 
 ```plaintext
 error: referenced action `account.deposit` has conflicting Actions signatures
- --> tests/expand/conflicting_action_signature.rs:5:15
+ --> tests/expand/conflicting_action_signatures.rs:5:15
 ```
 
 ## Interfaces and dependencies
