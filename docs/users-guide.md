@@ -153,6 +153,22 @@ Every theorem document is a YAML mapping with the following fields. Keys use
 | `Prove`    | list of `Assertion`                | **yes**                                    | —                   | Proof obligations.                                                                                                                                                  |
 | `Evidence` | `Evidence`                         | **yes**                                    | —                   | Backend configuration.                                                                                                                                              |
 
+### Accepted schema evolution (pending implementation)
+
+The table above describes the current assertion-only API. Accepted
+[RFC 0001](rfcs/0001-semantic-law-templates.md) fixes omitted `Schema` as
+version 1 permanently and adds explicit `Schema: 2` for mixed opaque assertions
+and structured laws. Merely setting `Schema: 2` does not enable law support in
+the current implementation.
+
+[Roadmap step 4.4](roadmap.md#step-44-integrate-rfc-0001-semantic-laws-through-the-proven-kani-path)
+tracks version validation, law parsing, and Kani lowering after the working
+version 1 proof path. The planned public `prove` field becomes
+`Vec<ProofObligation>` rather than `Vec<Assertion>` at a documented breaking
+release boundary. Existing version 1 files require no migration. The
+[theorem-file specification](theorem-file-specification.md#310-prove-required)
+defines the accepted target contract and links to law examples.
+
 ### Identifier rules
 
 Theorem names and `Forall` map keys must satisfy:
