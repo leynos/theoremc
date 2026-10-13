@@ -122,6 +122,14 @@ pub(crate) fn kani_is_installed() -> bool {
         .is_ok_and(|o| o.status.success())
 }
 
+/// Returns whether a Kani command failure indicates an unusable installation.
+pub(crate) fn is_unusable_kani_environment(error: &str) -> bool {
+    error.contains("error while loading shared libraries")
+        || error.contains("cannot open shared object file")
+        || error.contains("Broken pipe")
+        || error.contains("unexpected output from `rustc --version`: \"\"")
+}
+
 /// Returns `true` when the run must fail rather than skip without Kani.
 ///
 /// `make kani` and the proofs workflow set `THEOREMC_REQUIRE_KANI=1`, so a
@@ -154,4 +162,21 @@ fn command_result(
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for fixture cargo runner helpers.
+
+    use super::is_unusable_kani_environment;
+
+    #[test]
+    fn recognizes_kani_without_a_usable_rustc_version_probe() {
+        assert!(is_unusable_kani_environment(
+            "unexpected output from `rustc --version`: \"\""
+        ));
+        assert!(!is_unusable_kani_environment(
+            "harness listing was incorrect"
+        ));
+    }
 }
