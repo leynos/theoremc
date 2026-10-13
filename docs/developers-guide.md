@@ -205,6 +205,17 @@ the one deliberate exception: `TheoremName` and `ForallVar` implement
 `Deserialize` through a shared `impl_identifier_deserialize!` macro so
 validation happens during decoding and cannot be bypassed.
 
+Schema internals follow the same ownership boundaries. `raw.rs` and
+`raw_action.rs` own YAML aliases, defaults, source locations, and conversion
+from raw input; private `types_*.rs` modules own public data shapes and their
+model-local helpers, re-exported through `types.rs` and the `schema` facade.
+Private `validate_*.rs` modules hold validation concerns behind
+`validate_theorem_doc`, while that function owns validation order.
+`validation_reason.rs` models semantic failures; `loader.rs` and raw modules
+own diagnostics. `schema::rust_type` remains the shared Rust-type parser. This
+split is preventive modularization: put new responsibilities in focused private
+modules instead of growing `arg_value.rs`, `loader.rs`, or `raw.rs`.
+
 ### Accepted harness-planning boundary (pending implementation)
 
 [ADR-0011](adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md) makes a
