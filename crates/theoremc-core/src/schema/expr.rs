@@ -70,9 +70,9 @@ const fn is_statement_like(expr: &syn::Expr) -> bool {
 /// Returns `true` if `expr` is a compound assignment operator
 /// (`+=`, `-=`, `*=`, `/=`, `%=`, `^=`, `&=`, `|=`, `<<=`, `>>=`).
 ///
-/// In `syn` 2.x, compound assignments are represented as
-/// `Expr::Binary` with a `BinOp::*Assign` operator, unlike simple
-/// `=` which uses `Expr::Assign`.
+/// In `syn`, compound assignments are represented as `Expr::Binary`
+/// with a `BinOp::*Assign` operator, unlike simple `=` which uses
+/// `Expr::Assign`.
 const fn is_compound_assignment(expr: &syn::Expr) -> bool {
     matches!(
         expr,

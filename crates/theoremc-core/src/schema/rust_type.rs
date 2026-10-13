@@ -3,7 +3,7 @@
 use quote::ToTokens;
 use syn::{
     AngleBracketedGenericArguments, BoundLifetimes, GenericArgument, GenericParam,
-    ParenthesizedGenericArguments, PathArguments, ReturnType, Type, TypeArray, TypeBareFn,
+    ParenthesizedGenericArguments, PathArguments, ReturnType, Type, TypeArray, TypeFnPtr,
     TypeGroup, TypeImplTrait, TypeMacro, TypeParen, TypePath, TypePtr, TypeReference, TypeSlice,
     TypeTraitObject, TypeTuple,
 };
@@ -32,6 +32,11 @@ pub(crate) fn canonical_token_stream(ty: &str) -> Option<String> {
 }
 
 /// Parses a Rust type and returns its first free named lifetime.
+///
+/// A lifetime is "free" when it is named, is neither `'static` nor `'_`, and
+/// is not bound by a `for<..>` binder around the position it appears in.
+/// Parsing failures are reported as [`syn::Error`]; a type that parses but
+/// carries no free named lifetime yields `Ok(None)`.
 pub(crate) fn parse_with_free_named_lifetime(ty: &str) -> Result<Option<String>, syn::Error> {
     let parsed = parse(ty)?;
     Ok(free_named_lifetime_in_type(&parsed, LifetimeScope::EMPTY))
@@ -45,10 +50,15 @@ pub(crate) fn free_named_lifetime(ty: &str) -> Option<String> {
         .and_then(|parsed| free_named_lifetime_in_type(&parsed, LifetimeScope::EMPTY))
 }
 
+/// Scans one parsed type for a free named lifetime.
+///
+/// The scan recurses through the composite `syn::Type` variants that can
+/// contain a lifetime, including function pointers and `Fn`-family
+/// parenthesized arguments.
 fn free_named_lifetime_in_type(ty: &Type, scope: LifetimeScope<'_>) -> Option<String> {
     match ty {
         Type::Array(array) => free_named_lifetime_in_array(array, scope),
-        Type::BareFn(bare_fn) => free_named_lifetime_in_bare_fn(bare_fn, scope),
+        Type::FnPtr(fn_ptr) => free_named_lifetime_in_fn_ptr(fn_ptr, scope),
         Type::Group(group) => free_named_lifetime_in_group(group, scope),
         Type::ImplTrait(impl_trait) => free_named_lifetime_in_impl_trait(impl_trait, scope),
         Type::Macro(type_macro) => free_named_lifetime_in_macro(type_macro, scope),
@@ -67,18 +77,27 @@ fn free_named_lifetime_in_array(ty: &TypeArray, scope: LifetimeScope<'_>) -> Opt
     free_named_lifetime_in_type(&ty.elem, scope)
 }
 
-fn free_named_lifetime_in_bare_fn(ty: &TypeBareFn, scope: LifetimeScope<'_>) -> Option<String> {
+/// Scans a function-pointer type for a free named lifetime.
+///
+/// A `for<..>` binder written on the pointer introduces lifetimes that are
+/// bound across its whole signature, so the binder is added to the scope
+/// before the signature is scanned.
+fn free_named_lifetime_in_fn_ptr(ty: &TypeFnPtr, scope: LifetimeScope<'_>) -> Option<String> {
     ty.lifetimes.as_ref().map_or_else(
-        || free_named_lifetime_in_bare_fn_signature(ty, scope),
+        || free_named_lifetime_in_fn_ptr_signature(ty, scope),
         |lifetimes| {
             let scoped_lifetimes = scoped_lifetimes(scope, Some(lifetimes));
-            free_named_lifetime_in_bare_fn_signature(ty, LifetimeScope(&scoped_lifetimes))
+            free_named_lifetime_in_fn_ptr_signature(ty, LifetimeScope(&scoped_lifetimes))
         },
     )
 }
 
-fn free_named_lifetime_in_bare_fn_signature(
-    ty: &TypeBareFn,
+/// Scans the inputs and output of a function-pointer signature.
+///
+/// Earlier `syn` releases exposed each input as a bare type; `syn 3` wraps it
+/// in a [`NamedArg`], so the argument type is read from its `ty` field.
+fn free_named_lifetime_in_fn_ptr_signature(
+    ty: &TypeFnPtr,
     scope: LifetimeScope<'_>,
 ) -> Option<String> {
     ty.inputs
@@ -219,6 +238,11 @@ fn free_named_lifetime_in_angle_bracketed_arguments(
     })
 }
 
+/// Scans the inputs and output of parenthesized generic arguments.
+///
+/// This is the `(A) -> B` form of a `Fn`-family bound or path, such as
+/// `dyn Fn(&'a T)`. In `syn 3` each input is a [`NamedArg`] whose `ty` field
+/// holds the argument type.
 fn free_named_lifetime_in_parenthesized_arguments(
     arguments: &ParenthesizedGenericArguments,
     scope: LifetimeScope<'_>,
@@ -226,7 +250,7 @@ fn free_named_lifetime_in_parenthesized_arguments(
     arguments
         .inputs
         .iter()
-        .find_map(|ty| free_named_lifetime_in_type(ty, scope))
+        .find_map(|arg| free_named_lifetime_in_type(&arg.ty, scope))
         .or_else(|| free_named_lifetime_in_return_type(&arguments.output, scope))
 }
 
@@ -261,15 +285,23 @@ fn is_bound_lifetime(name: &str, scope: LifetimeScope<'_>) -> bool {
 }
 
 #[cfg(test)]
+#[path = "rust_type_property_tests.rs"]
+mod property_tests;
+
+#[cfg(test)]
 mod tests {
     //! Unit tests for Rust type lifetime detection.
 
     use super::free_named_lifetime;
     use rstest::rstest;
 
+    // `dyn for<'a> Fn(&'a crate::Account)` covers the parenthesized-input
+    // branch of the function-trait scan with an input binder, the mirror of
+    // the function-pointer binder above.
     #[rstest]
     #[case("for<'a> fn(&'a crate::Account)")]
     #[case("dyn for<'a> Trait<&'a crate::Account>")]
+    #[case("dyn for<'a> Fn(&'a crate::Account)")]
     fn bound_hrtb_lifetimes_are_not_free(#[case] ty: &str) {
         assert_eq!(free_named_lifetime(ty), None);
     }
@@ -301,6 +333,18 @@ mod tests {
     #[case("dyn Trait<Item = &'a crate::Account>")]
     #[case("dyn Trait<Assoc: Other<'a>>")]
     fn nested_named_lifetimes_are_free(#[case] ty: &str) {
+        assert_eq!(free_named_lifetime(ty), Some("a".to_owned()));
+    }
+
+    // Regression guard for the `syn 3` input-scanning paths: both the function
+    // pointer and the `Fn`-family parenthesized arguments now store their
+    // inputs as `NamedArg` rather than a bare `Type`, so a free lifetime in an
+    // input must still be reported. An implementation that dropped either input
+    // walk would pass every return-type case above and fail here.
+    #[rstest]
+    #[case("fn(&'a crate::Account)")]
+    #[case("dyn Fn(&'a crate::Account)")]
+    fn free_lifetime_in_callable_inputs_is_reported(#[case] ty: &str) {
         assert_eq!(free_named_lifetime(ty), Some("a".to_owned()));
     }
 

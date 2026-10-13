@@ -740,10 +740,12 @@ post-deserialization semantic validation (Step 1.2.1 of the roadmap):
 The following decisions were taken during the implementation of expression
 syntax validation (Step 1.2.2 of the roadmap):
 
-- `syn` 2.0.115 is added as a direct dependency with `parsing` and `full`
-  features (`default-features = false`). The `parsing` feature provides
-  `syn::parse_str::<Expr>` and `full` provides all `Expr` variant types needed
-  for the denylist check. Other features are not needed.
+- `syn` is added as a direct dependency with the `parsing`, `full`,
+  `clone-impls`, and `printing` features (`default-features = false`). The
+  `parsing` feature provides `syn::parse_str::<Expr>` and `full` provides all
+  `Expr` variant types needed for the denylist check. Issue #84 later aligned
+  every direct requirement on `syn 3.0.3`, the version required by
+  `prettyplease 0.3.0`; see §6.5.1.
 - A new `crates/theoremc-core/src/schema/expr.rs` module isolates expression
   parsing from structural validation in `validate.rs`, preserving the 400-line
   file limit and separation of concerns.
@@ -757,6 +759,36 @@ syntax validation (Step 1.2.2 of the roadmap):
 - Expression validation runs after non-blank field validation so that empty
   strings produce clear "must be non-empty" errors rather than confusing `syn`
   parse errors.
+
+### 6.5.1 Implementation decisions (issue #84)
+
+The following decisions were taken when aligning the workspace with `syn 3`
+after `prettyplease` moved to `0.3.0`, which requires `syn 3.0.3`:
+
+- The direct `syn` requirement moves from `2.0.117` to `3.0.3` in the root
+  manifest, `crates/theoremc-core`, and `crates/theoremc-macros`, and
+  `Cargo.lock` is regenerated. `prettyplease 0.3.0` reads a `syn 3::File`, so
+  the previous `syn 2` requirement put two incompatible `syn::File` types in
+  one dependency graph and the macro test failed with `E0308` at the
+  `prettyplease::unparse` call site. Transitive dependents keep their own `syn`
+  release — `derive_more-impl`, `thiserror-impl`, `rstest_macros`, and others
+  build against `syn 2`, `the-newtype-macros` against `syn 1` — but each copy
+  is internal to a proc macro that consumes and emits token streams, so no
+  second `syn::File` reaches our call site. See the developers' guide, §3.5.2.
+- `theoremc-macros` needs no source change. It uses `syn` opaquely: it parses
+  with `syn::parse2` into a `syn::File` and hands the value to
+  `prettyplease::unparse`. Once the manifest aligns on `syn 3`, the same code
+  compiles and the `insta` golden snapshot stays byte-identical.
+- In `crates/theoremc-core/src/schema/rust_type.rs`, `TypeBareFn` and
+  `Type::BareFn` are renamed to `TypeFnPtr` and `Type::FnPtr`. The lifetime
+  scan keeps its previous shape: a dispatcher adds any `for<..>` binder to the
+  scope, then a signature helper scans the inputs and the return type.
+- Function-input types are now read from the wrapping argument instead of
+  directly. `TypeFnPtr::inputs` holds `NamedArg` rather than the `BareFnArg` of
+  `syn 2`, and `ParenthesizedGenericArguments::inputs` holds `NamedArg` rather
+  than the bare `Type` of `syn 2`. Both walks therefore read the argument's
+  `ty` field. Tests cover a free lifetime in `fn(&'a crate::Account)` and
+  `dyn Fn(&'a crate::Account)` so a dropped input walk cannot pass unnoticed.
 
 ### 6.6 Implementation decisions (Step 1.1)
 

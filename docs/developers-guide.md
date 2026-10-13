@@ -324,6 +324,37 @@ prefer a wrapper whose methods answer the questions the module keeps asking;
 this both names the domain concept and keeps the module's string-argument ratio
 low enough for the CodeScene advisory gate.
 
+#### 3.5.2 `syn` version alignment
+
+Every direct `syn` requirement in the workspace is pinned to the same version,
+currently `3.0.3`, and the pinned `prettyplease` is the release built against
+it, currently `0.3.0`. The two move together: `prettyplease` is not a
+`syn`-generic library, so `prettyplease::unparse` accepts only the `syn::File`
+of the `syn` release it was compiled against. A workspace that satisfies the
+preprocessor with one major and the printer with another produces two distinct
+`syn::File` types and fails at the call site with
+`error[E0308]: mismatched types` and the note "there are multiple different
+versions of crate `syn` in the dependency graph". Bumping one without the other
+is therefore never a patch-level change.
+
+Alignment is a per-crate property, not a workspace-wide one. Transitive
+dependents still pull their own `syn` onto the graph, and that is expected:
+`derive_more-impl`, `thiserror-impl`, `rstest_macros`, `googletest_macro`,
+`rust-embed-impl`, `displaydoc`, and `tracing-attributes` all build against
+`syn 2`, while `the-newtype-macros` builds against `syn 1`. Those copies are
+internal to each proc macro, and their duplicate `syn::File` types never meet
+ours, because a proc macro consumes and emits token streams rather than sharing
+an AST with its caller. Only a direct `syn` requirement that meets
+`prettyplease::unparse` in the same crate has to agree with the pinned
+`prettyplease`.
+
+When changing the pinned versions, edit every direct requirement together,
+regenerate `Cargo.lock`, and rebuild. `cargo tree -i syn@<major>` reports which
+crates still resolve a `syn` major other than the pinned one, and confirms that
+the survivors are transitive; `cargo tree -i syn` alone is ambiguous while more
+than one major is present. The `theoremc-macros` `insta` golden snapshot
+catches an accidental change in printed output across the upgrade.
+
 ### 3.6 Extending the build system
 
 To add new build-time discovery or generation:

@@ -133,6 +133,44 @@ Witness:
     because: always reachable
 "#;
 
+const FREE_LIFETIME_ACTION_FN_PTR_PARAM_YAML: &str = r#"
+Theorem: InvalidActionFnPtrLifetime
+About: Declares an unbound lifetime inside a function-pointer parameter
+Actions:
+  account.deposit:
+    params:
+      account: "fn(&'a crate::Account)"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+"#;
+
+const FREE_LIFETIME_ACTION_FN_TRAIT_PARAM_YAML: &str = r#"
+Theorem: InvalidActionFnTraitLifetime
+About: Declares an unbound lifetime inside a parenthesized function-trait parameter
+Actions:
+  account.deposit:
+    params:
+      account: "dyn Fn(&'a crate::Account)"
+Prove:
+  - assert: 'true'
+    because: trivially true
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: always reachable
+"#;
+
 #[rstest]
 #[case(
     INVALID_ACTION_TYPE_YAML,
@@ -145,6 +183,14 @@ Witness:
 #[case(
     FREE_LIFETIME_ACTION_RETURN_YAML,
     "Actions entry 'account.deposit': returns type contains a free named lifetime parameter 'a'"
+)]
+#[case(
+    FREE_LIFETIME_ACTION_FN_PTR_PARAM_YAML,
+    "Actions entry 'account.deposit': account type contains a free named lifetime parameter 'a'"
+)]
+#[case(
+    FREE_LIFETIME_ACTION_FN_TRAIT_PARAM_YAML,
+    "Actions entry 'account.deposit': account type contains a free named lifetime parameter 'a'"
 )]
 fn invalid_action_type_or_free_lifetime_is_rejected(
     #[case] yaml: &str,
