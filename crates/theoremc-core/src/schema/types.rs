@@ -1,19 +1,28 @@
-//! Strongly-typed schema structs for `.theorem` documents.
+//! Public domain types for `.theorem` documents.
 //!
-//! These types mirror the YAML schema defined in
-//! `docs/theorem-file-specification.md` section 8. YAML is first
-//! deserialized into raw serde types (see `raw` and `raw_action`
-//! modules), then converted into these public domain types.
-//! Leaf types that are still directly deserialized use
-//! `serde(deny_unknown_fields)` and support both `TitleCase`
-//! (canonical) and lowercase key aliases.
+//! This module owns theorem documents and their conditions. Private child
+//! modules group action signature, evidence, and decoded invocation shapes;
+//! their public types are re-exported here for stable schema facade paths.
+//! YAML aliases, defaults, source locations, and raw-to-domain conversion
+//! belong to `raw` and `raw_action`.
 
 use indexmap::IndexMap;
 use serde::Deserialize;
 
-use super::arg_value::ArgValue;
 use super::newtypes::{ForallVar, TheoremName};
-use super::value::TheoremValue;
+
+#[path = "types_evidence.rs"]
+mod evidence;
+#[path = "types_invocation.rs"]
+mod invocation;
+#[path = "types_signature.rs"]
+mod signature;
+
+pub use evidence::{Evidence, KaniEvidence, KaniExpectation};
+pub use invocation::{
+    ActionCall, LetBinding, LetCall, LetMust, MaybeBlock, Step, StepCall, StepMaybe, StepMust,
+};
+pub use signature::ActionSignature;
 
 // ── Top-level document ──────────────────────────────────────────────
 
@@ -133,227 +142,6 @@ pub struct WitnessCheck {
     pub cover: String,
     /// Human-readable justification for this witness.
     pub because: String,
-}
-
-// ── Let bindings ────────────────────────────────────────────────────
-
-/// A named value binding computed before `Do` steps execute.
-///
-/// Only `call` and `must` forms are allowed in `Let` bindings. The
-/// `maybe` form is disallowed because conditional existence of
-/// bindings creates scoping complexity.
-#[derive(Debug, Clone, PartialEq)]
-pub enum LetBinding {
-    /// Invoke an action and bind the result.
-    Call(LetCall),
-    /// Invoke an action, prove it cannot fail, and bind the unwrapped
-    /// success value.
-    Must(LetMust),
-}
-
-/// Wrapper for a `call` variant in a `Let` binding.
-#[derive(Debug, Clone, PartialEq)]
-pub struct LetCall {
-    /// The action call to execute.
-    pub call: ActionCall,
-}
-
-/// Wrapper for a `must` variant in a `Let` binding.
-#[derive(Debug, Clone, PartialEq)]
-pub struct LetMust {
-    /// The action call to execute and prove infallible.
-    pub must: ActionCall,
-}
-
-// ── Steps ───────────────────────────────────────────────────────────
-
-/// A single step in a theorem's `Do` sequence.
-///
-/// Each step is exactly one of `call` (invoke), `must` (invoke and
-/// prove infallible), or `maybe` (symbolic branching).
-#[derive(Debug, Clone, PartialEq)]
-pub enum Step {
-    /// Invoke an action.
-    Call(StepCall),
-    /// Invoke an action and prove it cannot fail.
-    Must(StepMust),
-    /// Symbolic branching — both branches are explored by the model
-    /// checker.
-    Maybe(StepMaybe),
-}
-
-/// Wrapper for a `call` variant in a `Do` step.
-#[derive(Debug, Clone, PartialEq)]
-pub struct StepCall {
-    /// The action call to execute.
-    pub call: ActionCall,
-}
-
-/// Wrapper for a `must` variant in a `Do` step.
-#[derive(Debug, Clone, PartialEq)]
-pub struct StepMust {
-    /// The action call to execute and prove infallible.
-    pub must: ActionCall,
-}
-
-/// Wrapper for a `maybe` variant in a `Do` step.
-#[derive(Debug, Clone, PartialEq)]
-pub struct StepMaybe {
-    /// The maybe block with a reason and nested steps.
-    pub maybe: MaybeBlock,
-}
-
-// ── Maybe block ─────────────────────────────────────────────────────
-
-/// A symbolic branching block within a `Do` sequence.
-///
-/// The model checker explores both the branch where the nested steps
-/// execute and the branch where they do not.
-#[derive(Debug, Clone, PartialEq)]
-pub struct MaybeBlock {
-    /// Human-readable explanation of why this branch exists.
-    pub because: String,
-    /// The nested steps to execute in the "taken" branch.
-    pub do_steps: Vec<Step>,
-}
-
-// ── Action call ─────────────────────────────────────────────────────
-
-/// An invocation of a theorem action with semantically decoded
-/// arguments and optional result binding.
-///
-/// Arguments are decoded from raw YAML values into [`ArgValue`]
-/// variants during the raw-to-public conversion step. Plain YAML
-/// strings are always string literals; variable references require
-/// the explicit `{ ref: <name> }` wrapper (`TFS-5` section 5.2).
-#[derive(Debug, Clone, PartialEq)]
-pub struct ActionCall {
-    /// Dot-separated action name (e.g., `hnsw.attach_node`).
-    pub action: String,
-    /// Semantically decoded arguments, keyed by parameter name.
-    pub args: IndexMap<String, ArgValue>,
-    /// Optional binding name for the action's return value.
-    pub as_binding: Option<String>,
-}
-
-// ── Action signatures ──────────────────────────────────────────────
-
-/// A theorem-owned expected Rust signature for an action.
-///
-/// `params` preserves YAML insertion order because generated probes use this
-/// order for the bare function pointer parameter list.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ActionSignature {
-    /// Ordered parameter names and Rust type strings.
-    #[serde(default)]
-    pub params: IndexMap<String, String>,
-    /// Rust return type. Omitted declarations default to unit.
-    #[serde(default = "unit_return_type")]
-    pub returns: String,
-}
-
-impl ActionSignature {
-    /// Returns `true` when `self` and `other` describe the same Rust signature
-    /// once parameter and return types are canonicalised.
-    ///
-    /// Raw string equality treats `Vec<u8>` and `Vec <u8>` as distinct, which
-    /// is wrong: schema validation already accepts both as the same Rust type.
-    /// This helper round-trips each type through `syn::Type` so equivalent
-    /// signatures across multiple theorem documents compare equal.
-    #[must_use]
-    pub fn is_semantically_equivalent(&self, other: &Self) -> bool {
-        if self.params.len() != other.params.len() {
-            return false;
-        }
-        let params_match = self.params.iter().zip(other.params.iter()).all(
-            |((self_name, self_ty), (other_name, other_ty))| {
-                self_name == other_name && rust_types_equivalent(self_ty, other_ty)
-            },
-        );
-        params_match && rust_types_equivalent(&self.returns, &other.returns)
-    }
-}
-
-/// Compare two Rust type strings ignoring insignificant whitespace.
-///
-/// Malformed types are never semantically equivalent. Schema validation rejects
-/// them before this point in normal flows.
-fn rust_types_equivalent(left: &str, right: &str) -> bool {
-    match (
-        super::rust_type::canonical_token_stream(left),
-        super::rust_type::canonical_token_stream(right),
-    ) {
-        (Some(left_ty), Some(right_ty)) => left_ty == right_ty,
-        _ => false,
-    }
-}
-
-fn unit_return_type() -> String {
-    "()".to_owned()
-}
-
-// ── Evidence ────────────────────────────────────────────────────────
-
-/// Backend evidence configuration for a theorem.
-///
-/// At least one backend must be specified. For v1, Kani is the primary
-/// backend; `verus` and `stateright` are placeholders for future use.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct Evidence {
-    /// Kani model-checking backend configuration.
-    #[serde(default)]
-    pub kani: Option<KaniEvidence>,
-    /// Verus proof backend configuration (placeholder).
-    #[serde(default)]
-    pub verus: Option<TheoremValue>,
-    /// Stateright model-checking backend configuration (placeholder).
-    #[serde(default)]
-    pub stateright: Option<TheoremValue>,
-}
-
-impl Evidence {
-    /// Returns `true` if at least one backend is configured.
-    #[must_use]
-    pub const fn has_any_backend(&self) -> bool {
-        self.kani.is_some() || self.verus.is_some() || self.stateright.is_some()
-    }
-}
-
-// ── Kani evidence ───────────────────────────────────────────────────
-
-/// Configuration for the Kani model-checking backend.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct KaniEvidence {
-    /// Loop unwinding bound (`#[kani::unwind(n)]`).
-    pub unwind: u32,
-    /// Expected verification outcome.
-    pub expect: KaniExpectation,
-    /// Whether vacuous success is permitted (default: `false`).
-    #[serde(default)]
-    pub allow_vacuous: bool,
-    /// Justification required when `allow_vacuous` is `true`.
-    #[serde(default)]
-    pub vacuity_because: Option<String>,
-}
-
-/// Expected outcome of a Kani verification run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-pub enum KaniExpectation {
-    /// The proof harness is expected to succeed.
-    #[serde(rename = "SUCCESS")]
-    Success,
-    /// The proof harness is expected to find a counterexample.
-    #[serde(rename = "FAILURE")]
-    Failure,
-    /// The proof harness is expected to be unreachable.
-    #[serde(rename = "UNREACHABLE")]
-    Unreachable,
-    /// The verification outcome is undetermined.
-    #[serde(rename = "UNDETERMINED")]
-    Undetermined,
 }
 
 #[cfg(test)]
