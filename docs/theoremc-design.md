@@ -770,8 +770,11 @@ after `prettyplease` moved to `0.3.0`, which requires `syn 3.0.3`:
   `Cargo.lock` is regenerated. `prettyplease 0.3.0` reads a `syn 3::File`, so
   the previous `syn 2` requirement put two incompatible `syn::File` types in
   one dependency graph and the macro test failed with `E0308` at the
-  `prettyplease::unparse` call site. Only the derive crates that have not yet
-  migrated still pull `syn 2` onto the graph.
+  `prettyplease::unparse` call site. Transitive dependents keep their own `syn`
+  release — `derive_more-impl`, `thiserror-impl`, `rstest_macros`, and others
+  build against `syn 2`, `the-newtype-macros` against `syn 1` — but each copy
+  is internal to a proc macro that consumes and emits token streams, so no
+  second `syn::File` reaches our call site. See the developers' guide, §3.5.2.
 - `theoremc-macros` needs no source change. It uses `syn` opaquely: it parses
   with `syn::parse2` into a `syn::File` and hands the value to
   `prettyplease::unparse`. Once the manifest aligns on `syn 3`, the same code
@@ -781,11 +784,11 @@ after `prettyplease` moved to `0.3.0`, which requires `syn 3.0.3`:
   scan keeps its previous shape: a dispatcher adds any `for<..>` binder to the
   scope, then a signature helper scans the inputs and the return type.
 - Function-input types are now read from the wrapping argument instead of
-  directly. `TypeFnPtr::inputs` holds `NamedArg`, not a bare `Type`, and
-  `ParenthesizedGenericArguments::inputs` holds `NamedArg` rather than
-  `BareFnArg`. Both walks therefore read the argument's `ty` field. Tests cover
-  a free lifetime in `fn(&'a crate::Account)` and `dyn Fn(&'a crate::Account)`
-  so a dropped input walk cannot pass unnoticed.
+  directly. `TypeFnPtr::inputs` holds `NamedArg` rather than the `BareFnArg` of
+  `syn 2`, and `ParenthesizedGenericArguments::inputs` holds `NamedArg` rather
+  than the bare `Type` of `syn 2`. Both walks therefore read the argument's
+  `ty` field. Tests cover a free lifetime in `fn(&'a crate::Account)` and
+  `dyn Fn(&'a crate::Account)` so a dropped input walk cannot pass unnoticed.
 
 ### 6.6 Implementation decisions (Step 1.1)
 

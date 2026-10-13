@@ -285,6 +285,10 @@ fn is_bound_lifetime(name: &str, scope: LifetimeScope<'_>) -> bool {
 }
 
 #[cfg(test)]
+#[path = "rust_type_property_tests.rs"]
+mod property_tests;
+
+#[cfg(test)]
 mod tests {
     //! Unit tests for Rust type lifetime detection.
 
@@ -332,11 +336,11 @@ mod tests {
         assert_eq!(free_named_lifetime(ty), Some("a".to_owned()));
     }
 
-    // Regression guard for the `syn 3` input-scanning paths: the function
-    // pointer stores inputs as `NamedArg` and parenthesized arguments store
-    // them as `FnArg`, so a free lifetime in an input must still be reported.
-    // An implementation that dropped either input walk would pass every
-    // return-type case above and fail here.
+    // Regression guard for the `syn 3` input-scanning paths: both the function
+    // pointer and the `Fn`-family parenthesized arguments now store their
+    // inputs as `NamedArg` rather than a bare `Type`, so a free lifetime in an
+    // input must still be reported. An implementation that dropped either input
+    // walk would pass every return-type case above and fail here.
     #[rstest]
     #[case("fn(&'a crate::Account)")]
     #[case("dyn Fn(&'a crate::Account)")]
