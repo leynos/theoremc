@@ -13,7 +13,7 @@ mod fixture_crate;
 #[path = "theorem_file_macro_bdd/referenced_type_fixtures.rs"]
 mod referenced_type_fixtures;
 
-use cargo_runner::CargoGuard;
+use cargo_runner::{CargoGuard, is_unusable_kani_environment};
 use fixture_crate::{
     FIXTURE_LIB_RS, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses, run_fixture_build,
     run_valid_fixture_build,
@@ -164,12 +164,6 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     }
 
     Ok(())
-}
-
-fn is_unusable_kani_environment(error: &str) -> bool {
-    error.contains("error while loading shared libraries")
-        || error.contains("cannot open shared object file")
-        || error.contains("Broken pipe")
 }
 
 fn is_expected_single_harness_listing(output: &str, expected_harness_identifier: &str) -> bool {
