@@ -1,6 +1,7 @@
 //! Integration guards for public schema type paths and serde contracts.
 
 use indexmap::IndexMap;
+use rstest::{fixture, rstest};
 use theoremc_core::schema;
 
 #[test]
@@ -49,52 +50,35 @@ fn schema_facade_exposes_all_moved_type_shapes() {
     );
 }
 
-#[test]
-fn evidence_reports_each_supported_backend() {
-    let kani = schema::KaniEvidence {
+#[fixture]
+fn kani_evidence() -> schema::KaniEvidence {
+    schema::KaniEvidence {
         unwind: 1,
         expect: schema::KaniExpectation::Success,
         allow_vacuous: false,
         vacuity_because: None,
-    };
-    let cases = [
-        (
-            schema::Evidence {
-                kani: None,
-                verus: None,
-                stateright: None,
-            },
-            false,
-        ),
-        (
-            schema::Evidence {
-                kani: Some(kani),
-                verus: None,
-                stateright: None,
-            },
-            true,
-        ),
-        (
-            schema::Evidence {
-                kani: None,
-                verus: Some(schema::TheoremValue::Bool(true)),
-                stateright: None,
-            },
-            true,
-        ),
-        (
-            schema::Evidence {
-                kani: None,
-                verus: None,
-                stateright: Some(schema::TheoremValue::Bool(true)),
-            },
-            true,
-        ),
-    ];
-
-    for (evidence, expected) in cases {
-        assert_eq!(evidence.has_any_backend(), expected);
     }
+}
+
+#[rstest]
+#[case::no_backend(false, false, false, false)]
+#[case::kani_only(true, false, false, true)]
+#[case::verus_only(false, true, false, true)]
+#[case::stateright_only(false, false, true, true)]
+fn evidence_reports_each_supported_backend(
+    #[case] has_kani: bool,
+    #[case] has_verus: bool,
+    #[case] has_stateright: bool,
+    #[case] expected: bool,
+    kani_evidence: schema::KaniEvidence,
+) {
+    let evidence = schema::Evidence {
+        kani: has_kani.then_some(kani_evidence),
+        verus: has_verus.then_some(schema::TheoremValue::Bool(true)),
+        stateright: has_stateright.then_some(schema::TheoremValue::Bool(true)),
+    };
+
+    assert_eq!(evidence.has_any_backend(), expected);
 }
 
 #[test]
