@@ -1574,6 +1574,23 @@ invocations, assertions, and witnesses — remains planned. Only the harness
 function skeleton in §8.1 is emitted today; the body/step semantics described
 in the remaining subsections are the planned target.
 
+For screen readers: this flowchart shows `theoremc-macros` consuming `.theorem`
+sources and producing three outputs — Kani harness stubs, action and type
+probes, and the planned Kani body/step emission — of which only the harness
+stubs feed Kani execution.
+
+```mermaid
+flowchart TD
+  T[".theorem sources"] --> PM["theoremc-macros"]
+  PM --> H["Kani harness stubs"]
+  PM --> P["Action and type probes"]
+  PM --> KB["Kani body/step emission (planned)"]
+  H --> CK["Kani execution"]
+```
+
+Figure: emission paths from `.theorem` sources through `theoremc-macros`.
+Harness stubs and probes are implemented; body/step emission is planned.
+
 ### 8.1 Harness generation strategy
 
 Steps 1 and 6 are partly realized today: `theoremc-macros` emits one
