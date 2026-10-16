@@ -133,3 +133,6 @@ mod conflicting_signatures;
 
 #[path = "action_probe_tests/action_signature_index.rs"]
 mod action_signature_index;
+
+#[path = "action_probe_tests/reference_selection.rs"]
+mod reference_selection;

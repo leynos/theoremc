@@ -248,6 +248,16 @@ Observable success:
       and the `rust_type` proptest properties pass. The test count rose from
       783/784 to 792/791 because `main` added tests, not because this branch
       changed size.
+- [x] (2026-10-16T02:05Z) Closed C5's coverage gap and pinned the
+      reference-selection guarantees in a new module,
+      `crates/theoremc-macros/src/action_probe_tests/reference_selection.rs`
+      (wired in beside `conflicting_signatures` and `action_signature_index`).
+      Eight focused tests pass. A seeded-fault probe confirmed the
+      depth-sensitive assertions are not vacuous: neutering `Step::Maybe` in
+      `collect_step_actions` so it stops descending into nested `maybe` blocks
+      leaves the depth-0 cases green and fails both nested success-path cases.
+      `crates/theoremc-core/src/collision.rs` was restored byte-identically
+      afterwards and is unmodified in the final diff.
 
 ## Surprises & Discoveries
 
@@ -291,6 +301,21 @@ Observable success:
   scenario is untouched by this work: the change affects the conflict
   diagnostic only, and the failing fixture is `theorems/single.theorem` with no
   conflicting actions.
+- Observation: C5's two halves have different sensitivity to reference depth,
+  and only one of them can fail on depth. `ActionSignatureIndex::for_actions`
+  walks `doc.actions` and never consults `referenced_actions`, so the *error*
+  path cannot observe where a reference sits; conflict detection is settled
+  before the reference set is built. The *success* path is the depth-sensitive
+  half: the generated `crate::theorem_actions::<probe>` anchor exists only if
+  `collect_step_actions` reached the reference through
+  `Step::Maybe(s) => s.maybe.do_steps`. Evidence: the seeded-fault probe below
+  left all three `conflict_diagnostic_is_independent_of_reference_depth` cases
+  passing while failing both nested `equivalent_signature_reference_*` cases.
+  Impact: the depth-independence tests assert the error message is
+  byte-identical across depths (a guard against a future index change) and
+  assert the probe is generated at each depth (the live property). Recording
+  this avoids the false conclusion that the error cases are vacuous because
+  they keep passing under a mutation they cannot detect.
 
 ## Decision Log
 
@@ -378,6 +403,24 @@ Observable success:
   fact by running the full gate set: the trybuild test passes, typecheck and
   lint are clean, and no test regressed. Date/Author: 2026-10-16,
   implementation agent.
+- Decision: put the new coverage in a third module,
+  `action_probe_tests/reference_selection.rs`, rather than appending to
+  `action_probe_tests/conflicting_signatures.rs`. Rationale: that file was at
+  337 lines and this coverage would have pushed it past the 400-line cap
+  `AGENTS.md` sets for code files. The split is by concern rather than by size:
+  `conflicting_signatures` covers *what a conflict reports*, while
+  `reference_selection` covers *which declaration becomes the reference and how
+  its position and parameter order survive into the report*. Test-name and
+  module-level doc comments carry the distinction, so a reader looking for
+  "which signature wins" lands in the second file. Date/Author: 2026-10-16,
+  implementation agent.
+- Decision: assert depth independence against a single shared `Provenance`
+  expectation, and additionally diff the rendered message against the depth-0
+  baseline. Rationale: the shared expectation would silently stop constraining
+  anything if a future change made the summary depend on depth *and* the
+  expectation were recomputed per case. Comparing against depth 0 makes
+  "unchanged by position" the literal assertion. Date/Author: 2026-10-16,
+  implementation agent.
 
 ## Outcomes & Retrospective
 
@@ -437,6 +480,18 @@ Lessons for similar work:
 - On this machine, `make test` is red for reasons unrelated to any change: the
   Kani BDD scenario cannot survive `RUSTC_WRAPPER`. Confirm that failure
   reproduces identically in isolation before attributing it to the diff.
+- An invariant's two halves can have different fault sensitivity, and a test
+  pair that reads as symmetric may not be. Here, "position independence" splits
+  into an error path that cannot observe depth and a success path that can, so
+  a single seeded fault distinguishes them. When a plan claims an invariant,
+  identify which half can actually fail and aim the fault probe there; the
+  other half is still worth asserting, but as a guard against a different
+  regression, and saying so prevents the passing assertions from reading as
+  vacuous.
+- Claim identifiers in the `Verification plan` are only useful if each one
+  reaches an obligation and an artefact. C5 sat in the claim list with no
+  obligation mapping to it, which is exactly the gap a reviewer found. Walk the
+  claim list against the obligation list before declaring the plan complete.
 
 ## Context and orientation
 
@@ -521,6 +576,11 @@ ISSUE-51-VALIDATION-UNIT    -> EP-M2 (rstest cases and index field assertions)
 ISSUE-51-VALIDATION-TRYBUILD-> EP-M2 (regenerated golden .stderr)
 ADR-004-RULE-IDENTICAL      -> EP-M1 (equivalence path unchanged)
 AGENTS-DOC-MAINTENANCE      -> EP-M3 (macro rustdoc table row, users' guide)
+EP-C5-position-independence -> V5  (reference_selection::conflict_diagnostic_is_independent_of_reference_depth,
+                                     reference_selection::equivalent_signature_reference_expands_at_any_depth)
+EP-C7-reference-selection  -> V6  (reference_selection::first_declaration_supplies_the_reference_signature_spelling)
+EP-C8-declaration-order    -> V6  (reference_selection::conflict_summary_preserves_declaration_parameter_order)
+ADR-004-RULE-ORDER          -> V6  (parameter order is the generated probe order)
 ```
 
 ## Verification plan
@@ -550,6 +610,11 @@ Claims under test:
   later document leaves both the error and the success path unchanged.
 - C6 (non-equivalence fidelity): the reported message matches the state of the
   underlying signature data.
+- C7 (reference selection): the first declaration in document order supplies
+  the reference, including its original type spelling, even when semantically
+  equivalent re-declarations sit between it and the conflict.
+- C8 (declaration order in summaries): a summary lists parameters in declared
+  order, not a canonicalized or sorted order.
 
 Obligation V1 — conflict provenance names both declarations.
 
@@ -619,6 +684,60 @@ Obligation V4 — typed fields and rendered message agree.
 - Non-vacuity: parameter names are removed from the expected values, so a
   mismatch in type strings still fails.
 
+Obligation V5 — C5 position independence.
+
+- Method: `rstest` parameterized tests over three reference depths (0, 1, and 2
+  nested `maybe:` blocks), plus a seeded-fault probe.
+- Rationale: depth is the only degree of freedom that can move a reference out
+  of the walker's reach, and the parameterization states one expectation for
+  all three arrangements.
+- Domain: two fixtures, each with a later document that references
+  `account.deposit` only inside nested `maybe:` blocks — one pair that conflicts
+  (`u64` versus `u32`), and one pair that is semantically equivalent but
+  spelled differently (`u64` versus `"u64 "`). Every case's reference is
+  reachable, so no case is vacuous by unreachability.
+- Artefact:
+  `crates/theoremc-macros/src/action_probe_tests/reference_selection.rs`.
+- Evidence: `cargo nextest run -p theoremc-macros reference_selection`.
+  Discharge condition: the three conflict cases report one identical
+  `Provenance` (and, for depths 1 and 2, a message byte-identical to the
+  depth-0 baseline); the three equivalent cases expand successfully and still
+  emit the `account.deposit` probe anchor.
+- Non-vacuity: the two halves are sensitive to different faults, and the probe
+  measures both. Neuter `Step::Maybe` in `collect_step_actions`
+  (`crates/theoremc-core/src/collision.rs`) so it stops descending, and the
+  nested equivalent cases fail on the missing probe anchor while the depth-0
+  case and all three conflict cases still pass — the error path cannot observe
+  depth because `for_actions` reads `doc.actions` and never consults
+  `referenced_actions`. The seeded fault was applied, observed, and reverted;
+  the file is unmodified in the final diff. This is the evidence that the
+  success-path assertions are load-bearing and that the error-path assertions
+  guard against a *different* regression (a future index change that starts
+  consulting reference position) rather than duplicating them.
+
+Obligation V6 — C7 and C8 reference selection and summary order.
+
+- Method: two direct `#[test]` cases with `googletest` field matchers.
+- Rationale: these are single arrangements rather than a case table, and each
+  states one specific way the reference could be chosen wrongly.
+- Domain: C7 uses three documents — a first declaration
+  (`fn(account: u64) -> bool`), a semantically equivalent re-declaration spelled
+  `"u64 "` and `"bool "`, and a conflicting third declaration (`u32`). C8 uses
+  two documents whose parameter orders are `zeta, alpha` and `alpha, zeta`;
+  neither is alphabetical.
+- Artefact: `reference_selection.rs`.
+- Evidence: `cargo nextest run -p theoremc-macros reference_selection`.
+  Discharge condition: C7 reports `first_theorem: FirstOrderingThesis` with
+  `first_signature: fn(account: u64) -> bool` — the first spelling, not the
+  equivalent re-declaration's — and names the third document as the conflicting
+  party; C8 reports `fn(zeta: u64, alpha: u32) -> bool` for the first side and
+  `fn(alpha: u32, zeta: u64) -> bool` for the second.
+- Non-vacuity: C7 fails if the index adopts a later equivalent declaration's
+  spelling or provenance; C8's expected orders are not the sorted order, so a
+  summary built from a `BTreeMap` or a sorted iteration fails both expectations.
+  `ActionSignature::params` is an `IndexMap`, which is what makes declared
+  order observable at all.
+
 Non-trivial axioms:
 
 - `ActionSignature::is_semantically_equivalent` is the repository's canonical
@@ -634,7 +753,10 @@ Negative control: the unchanged
 `whitespace_only_signature_drift_does_not_conflict` test asserts that `Vec<u8>`
 versus `Vec <u8>` does **not** produce "conflicting Actions signatures". It
 must keep passing, proving the new provenance path did not turn equivalence
-into conflict.
+into conflict. The `equivalent_signature_reference_expands_at_any_depth` cases
+in `reference_selection.rs` repeat that control at each nesting depth and add
+the stronger check that the probe is still emitted, so "no conflict" cannot be
+satisfied by silently dropping the action from the reference set.
 
 Residual gaps: neither the unit tests nor the golden file can prove that the
 provenance survives into every editor's diagnostic rendering; rustc's own
@@ -746,10 +868,11 @@ Milestone EP-M3: documentation and deterministic gates are green.
 - Acceptance evidence: `make check-fmt`, `make lint`, `make markdownlint`,
   and `make nixie` all pass, with logs under `/tmp`. `make test` passes except
   for the single documented Kani environment failure
-  (`a_valid_theorem_file_exposes_a_kani_proof_harness`, 782 of 783 tests
-  passing), which is pre-existing, unrelated to this change, and unavoidable
-  under the compile-admission policy that forbids unsetting `RUSTC_WRAPPER`.
-  `make test` aborts before its doctest recipe on such a run, so
+  (`a_valid_theorem_file_exposes_a_kani_proof_harness`; the figure moved from
+  783/784 to 792/791 when `main` added tests during the rebases), which is
+  pre-existing, unrelated to this change, and unavoidable under the
+  compile-admission policy that forbids unsetting `RUSTC_WRAPPER`. `make test`
+  aborts before its doctest recipe on such a run, so
   `cargo test --workspace --all-features --doc` is run separately and passes.
 - Conformance check:
   - Requirements satisfied: docs updated.
@@ -773,6 +896,39 @@ Milestone EP-M4: CodeRabbit review and draft PR.
 - Conformance check: the PR references issue #51 and the Lody session.
 - Recovery: the branch is pushed only after the deterministic gates pass.
 - Remaining gaps: none.
+- Compatibility decision: none.
+
+Milestone EP-M5: review follow-up closes the C5 and ordering coverage gaps.
+
+- Identifier and outcome: EP-M5 leaves every claim in the `Verification plan`
+  mapped to an obligation and an artefact, with the two gaps a reviewer named
+  on the draft PR closed by tests rather than by argument. A reviewer had
+  observed that C5 was asserted in the claim list but exercised by no test, and
+  that no case pinned first-declaration retention or summary parameter order.
+- Requirements and gaps: discharges `EP-C5-position-independence`,
+  `EP-C7-reference-selection`, and `EP-C8-declaration-order`.
+- Acceptance evidence:
+  `cargo nextest run -p theoremc-macros reference_selection` passes eight cases
+  (obligations V5 and V6), and the seeded-fault probe described under V5 shows
+  the depth-sensitive assertions fail when nested traversal is neutered.
+- Conformance check:
+  - Requirements satisfied: C5 now has an obligation, and C7 and C8 are named
+    as claims with artefacts.
+  - Design still followed: no production code changed; the new coverage sits in
+    a third test module beside the two existing ones. The seeded fault touched
+    `crates/theoremc-core/src/collision.rs` and was reverted byte-identically,
+    so the deliverable diff remains code-unchanged from `3b45546`.
+  - Upstream assumptions still valid: ADR-004's rule that `params` order is the
+    generated probe order is now asserted end to end through the diagnostic,
+    and its rule that renames or reorderings conflict is what C8's two cases
+    rest on.
+  - No unapproved public interface, dependency, trust-boundary, or persisted
+    format change.
+  - Trace links current: `EP-C5`, `EP-C7`, and `EP-C8` are listed above.
+- Recovery: revert the test commit; the previously accepted head `3b45546`
+  remains green on its own, because EP-M5 adds coverage without changing
+  behaviour.
+- Remaining gaps: none in the plan's claim set.
 - Compatibility decision: none.
 
 ## Concrete steps
@@ -890,12 +1046,16 @@ Behaviour to observe, in order:
 4. `make test` passes workspace-wide apart from the one documented Kani
    environment failure; `whitespace_only_signature_drift_does_not_conflict`
    still passes as the negative control.
-5. `make check-fmt` and `make lint` pass with no new warnings.
+5. `cargo nextest run -p theoremc-macros reference_selection` passes: eight
+   cases covering reference depth 0, 1, and 2 for both the conflicting and the
+   equivalent pair, plus the three-document reference-selection case and the
+   parameter-order case.
+6. `make check-fmt` and `make lint` pass with no new warnings.
 
 Quality criteria:
 
 - Tests: every `theoremc-macros` test passes, including the new cases.
-- Verification: obligations V1–V4 discharged as described in
+- Verification: obligations V1–V6 discharged as described in
   `Verification plan`.
 - Lint/typecheck: `make lint` and `make check-fmt` clean.
 - Performance: not applicable; the index is built once per expansion and the
@@ -1016,3 +1176,20 @@ byte-identical post-images, with `docs/users-guide.md` differing only by the
 new head `ce6b2b0` except the single documented Kani environment failure. The
 `Progress` and `Decision Log` entries record the identities, the exactness
 evidence, and the reasoning for accepting the rename risk.
+
+Revision (2026-10-16, later): a reviewer's assessment of the draft PR found
+that C5 was asserted in the `Verification plan` claim list but discharged by no
+obligation, and that no test pinned first-declaration retention across a
+semantically equivalent re-declaration or the parameter order a summary is
+rendered in. Both are regression-coverage gaps rather than observed failures,
+and this revision closes them without touching production code.
+
+The new module
+`crates/theoremc-macros/src/action_probe_tests/reference_selection.rs` adds
+obligations V5 and V6, and claims C7 and C8 were named so the ordering
+guarantees have identifiers to trace. Trace links, `Milestones and plateaus`
+(EP-M5), `Progress`, `Surprises & Discoveries`, `Decision Log`,
+`Validation and acceptance`, and the negative-control note were all updated.
+The deliverable diff is otherwise unchanged: the seeded fault used to show the
+new assertions are not vacuous was applied to `collision.rs`, observed, and
+reverted byte-identically.
