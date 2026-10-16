@@ -725,8 +725,9 @@ Obligation V6 — C7 and C8 reference selection and summary order.
 - Domain: C7 uses three documents — a first declaration
   (`fn(account: u64) -> bool`), a semantically equivalent re-declaration spelled
   `"u64 "` and `"bool "`, and a conflicting third declaration (`u32`). C8 uses
-  two documents whose parameter orders are `zeta, alpha` and `alpha, zeta`;
-  neither is alphabetical.
+  two documents whose parameter orders are `zeta, alpha` and `alpha, zeta`. The
+  first declaration uses the non-alphabetical order `zeta, alpha`; the second
+  uses the alphabetical order `alpha, zeta`.
 - Artefact: `reference_selection.rs`.
 - Evidence: `cargo nextest run -p theoremc-macros reference_selection`.
   Discharge condition: C7 reports `first_theorem: FirstOrderingThesis` with
@@ -735,8 +736,8 @@ Obligation V6 — C7 and C8 reference selection and summary order.
   party; C8 reports `fn(zeta: u64, alpha: u32) -> bool` for the first side and
   `fn(alpha: u32, zeta: u64) -> bool` for the second.
 - Non-vacuity: C7 fails if the index adopts a later equivalent declaration's
-  spelling or provenance; C8's expected orders are not the sorted order, so a
-  summary built from a `BTreeMap` or a sorted iteration fails both expectations.
+  spelling or provenance. Sorting the summaries fails the first-signature
+  expectation, which is sufficient to detect loss of declaration order.
   `ActionSignature::params` is an `IndexMap`, which is what makes declared
   order observable at all.
 
