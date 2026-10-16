@@ -9,31 +9,32 @@ in the [developer's guide](developers-guide.md).
 
 **Table:** Repository root responsibilities
 
-| Path                     | Responsibility                                                                        |
-| ------------------------ | ------------------------------------------------------------------------------------- |
-| `Cargo.toml`             | Workspace membership, root package metadata, feature flags, and workspace lint policy |
-| `Cargo.lock`             | Locked dependency graph for reproducible workspace builds                             |
-| `Makefile`               | Canonical local quality gates and formatting commands                                 |
-| `build.rs`               | Root package build script that discovers theorem files and writes the generated suite |
-| `src/lib.rs`             | Public facade that re-exports `theoremc-core` and `theoremc-macros` APIs              |
-| `src/main.rs`            | Placeholder command entrypoint for the root package binary                            |
-| `src/build_discovery.rs` | Theorem file discovery used by the root build script                                  |
-| `src/build_suite.rs`     | Generated-suite rendering for build-script output                                     |
-| `src/arg_lowering.rs`    | Test-gated prototype for future argument-expression lowering                          |
+| Path                  | Responsibility                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| `Cargo.toml`          | Workspace membership, root package metadata, feature flags, and workspace lint policy |
+| `Cargo.lock`          | Locked dependency graph for reproducible workspace builds                             |
+| `Makefile`            | Canonical local quality gates and formatting commands                                 |
+| `build.rs`            | Root build-script adapter that emits cfg and rerun metadata from build-support output |
+| `src/lib.rs`          | Public facade that re-exports `theoremc-core` and `theoremc-macros` APIs              |
+| `src/main.rs`         | Placeholder command entrypoint for the root package binary                            |
+| `src/arg_lowering.rs` | Test-gated prototype for future argument-expression lowering                          |
 
 ## Workspace crates
 
 **Table:** Workspace crate responsibilities
 
-| Path                      | Responsibility                                                                                |
-| ------------------------- | --------------------------------------------------------------------------------------------- |
-| `crates/theoremc-core/`   | Schema loading, validation, diagnostics, name mangling, collision checks, and theorem-file IO |
-| `crates/theoremc-macros/` | `theorem_file!` proc-macro expansion, generated Kani harnesses, and typed action probes       |
-| `crates/test-helpers/`    | Shared test support crate for integration tests that need reusable helpers                    |
+| Path                             | Responsibility                                                                                |
+| -------------------------------- | --------------------------------------------------------------------------------------------- |
+| `crates/theoremc-build-support/` | Workspace-internal theorem discovery, generated-suite writing, and build-script preparation   |
+| `crates/theoremc-core/`          | Schema loading, validation, diagnostics, name mangling, collision checks, and theorem-file IO |
+| `crates/theoremc-macros/`        | `theorem_file!` proc-macro expansion, generated Kani harnesses, and typed action probes       |
+| `crates/test-helpers/`           | Shared test support crate for integration tests that need reusable helpers                    |
 
-The root `theoremc` package remains the consumer-facing facade and owns Cargo
-build integration. It should not duplicate core schema or macro expansion logic
-owned by the workspace crates.
+The root `theoremc` package remains the consumer-facing facade and owns the
+Cargo build-script adapter. `theoremc-build-support` owns discovery and suite
+writing behind a workspace-internal Cargo crate boundary. The root package
+should not duplicate core schema or macro expansion logic owned by the
+workspace crates.
 
 ## Tests and fixtures
 

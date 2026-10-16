@@ -22,6 +22,9 @@ erode these boundaries and make the codebase harder to reason about.
 - [ADR-003: Architectural boundary
   enforcement](adr-003-architectural-boundary-enforcement.md) — enforces
   layered schema boundaries and anti-corruption constraints
+- [ADR-008: Workspace build-support
+  boundary](adr-008-workspace-build-support-boundary.md) — assigns discovery
+  and generated-suite writing to the internal build-support crate
 
 ## Scope
 
@@ -37,44 +40,50 @@ in the design specification take precedence if wording diverges.
 
 ### 1.1 Build dependencies
 
-The root-level `build.rs` script runs during `cargo build` and depends on three
-crates declared under `[build-dependencies]` in `Cargo.toml`:
+The root-level `build.rs` script runs during `cargo build`. Its only direct
+build dependency is the workspace-internal `theoremc-build-support` crate,
+declared under `[build-dependencies]` in the root `Cargo.toml`:
 
 **Table:** Build dependencies
 
-| Crate       | Purpose                                                      |
-| ----------- | ------------------------------------------------------------ |
-| `camino`    | UTF-8 path types for cross-platform path handling            |
-| `cap-std`   | Capability-oriented filesystem access                        |
-| `thiserror` | Derive macro for `BuildDiscoveryError` and `BuildSuiteError` |
+| Crate                    | Purpose                                               |
+| ------------------------ | ----------------------------------------------------- |
+| `theoremc-build-support` | Discovery, suite generation, and Cargo rerun metadata |
 
-These are separate from the library's `[dependencies]` and the test-only
-`[dev-dependencies]`. Cargo compiles them for the host toolchain, not the
-target.
+The support crate owns its build implementation dependencies: `camino`,
+`cap-std`, and `thiserror` are in its `[dependencies]`; `rstest` and `tempfile`
+are test-only `[dev-dependencies]`. Some of these crates also appear in the
+root package's `[dev-dependencies]` for root tests; that does not make them
+direct dependencies of `build.rs`. Cargo compiles the support crate and its
+normal dependencies for the host toolchain, not the target.
 
 ### 1.2 Build script entrypoint (`build.rs`)
 
-The build script performs discovery and suite generation:
+The minimal build-script entrypoint calls
+`theoremc_build_support::prepare_build_script()`. The support crate:
 
-1. reads `CARGO_MANIFEST_DIR` from the environment (set by Cargo),
-2. delegates to `build_discovery::discover_theorem_inputs()`,
-3. writes `OUT_DIR/theorem_suite.rs` via `build_suite::write_theorem_suite()`,
-   containing `theorem_file!("path/to/file.theorem");` invocations for each
-   discovered theorem,
-4. emits `cargo::rustc-cfg=theoremc_has_theorems` when any theorems are
-   discovered (used by conditional lint expectations in the generated suite
-   bridge), and
-5. prints `cargo::rerun-if-changed=` lines for each watched directory and
-   discovered theorem file.
+1. reads `CARGO_MANIFEST_DIR` and `OUT_DIR` from Cargo's environment,
+2. delegates to `theoremc_build_support::discover_theorem_inputs()`,
+3. writes `OUT_DIR/theorem_suite.rs` via
+   `theoremc_build_support::write_theorem_suite()`, containing
+   `theorem_file!("path/to/file.theorem");` invocations for each discovered
+   theorem,
+4. returns `BuildScriptOutput` with theorem presence and ordered rerun paths.
 
-The discovery and suite modules are shared between `build.rs` and the library's
-test suite via separate `#[path = "..."]` attributes for each module
-(`#[path = "src/build_discovery.rs"]` for discovery and
-`#[path = "src/build_suite.rs"]` for suite generation). Rust does not support
-wildcards in `#[path]`, so multiple attributes must be listed. This keeps the
-build script small without exporting a new public API surface.
+The root `build.rs` adapter registers the theorem cfg with
+`cargo::rustc-check-cfg`, emits `cargo::rustc-cfg=theoremc_has_theorems` when
+the support output contains theorems, and prints `cargo::rerun-if-changed=`
+lines from the returned paths.
 
-### 1.3 Build discovery module (`src/build_discovery.rs`)
+Discovery and suite generation belong to the workspace-internal
+`theoremc-build-support` crate. `build.rs` uses this crate as a build
+dependency, and direct unit tests live with it. Root behavioural tests copy it
+as a path dependency into temporary fixture crates, so they exercise the same
+Cargo crate boundary as the production build script. Do not share build-support
+source via `#[path]`: build support may move internally without coupling the
+build script, the root library, and tests to file placement.
+
+### 1.3 Build-support discovery module (`crates/theoremc-build-support/src/discovery.rs`)
 
 The `BuildDiscovery` struct returned by `discover_theorem_inputs()` carries two
 ordered vectors:
@@ -85,12 +94,14 @@ ordered vectors:
   `cargo::rerun-if-changed` targets, including the root `theorems` directory
   and any nested subdirectories containing theorem files.
 
-The module exposes its API as `pub(crate)` only. It is not part of the public
-library surface.
+The build-support crate exposes this API only for workspace build integration.
+It is not re-exported from the public `theoremc` library surface, so downstream
+consumers must not depend on it.
 
 #### Error handling
 
-`BuildDiscoveryError` is an internal `thiserror`-derived enum with two variants:
+`BuildDiscoveryError` is a workspace-internal, `thiserror`-derived error enum
+with two variants:
 
 - `Io` — wraps a `std::io::Error` together with a human-readable
   operation label and the path that failed.
@@ -104,15 +115,15 @@ set so Cargo can detect when the directory is created later.
 
 Step 3.1.1 (see
 [`execplans/3-1-1-build-rs-scanning-of-theorems.md`](execplans/3-1-1-build-rs-scanning-of-theorems.md))
-owns discovery and Cargo invalidation. Step 3.1.2 adds suite generation via
-`build_suite::write_theorem_suite()`, which writes `OUT_DIR/theorem_suite.rs`
-containing `theorem_file!("...")` invocations. The handoff is deliberately
-narrow: `build.rs` produces an ordered crate-relative file list plus rerun
-metadata; `build_suite` renders deterministic suite contents; and the hidden
-`__theoremc_generated_suite` module in `src/lib.rs` imports the real
-`theorem_file!` proc macro before including the generated suite. Step 3.2.1
-keeps the generated callsites unchanged while moving the per-file expansion
-logic into `crates/theoremc-macros`.
+introduced discovery and Cargo invalidation; Step 3.1.2 added generated-suite
+writing. ADR-008 records the current ownership boundary: the
+`theoremc-build-support` crate performs discovery and writes
+`OUT_DIR/theorem_suite.rs` with `theorem_file!("...")` invocations. The root
+`build.rs` adapter emits the cfg and rerun metadata from the returned
+`BuildScriptOutput`. The hidden `__theoremc_generated_suite` module in
+`src/lib.rs` imports the real `theorem_file!` proc macro before including the
+generated suite. Step 3.2.1 keeps the generated callsites unchanged while the
+per-file expansion logic belongs to `crates/theoremc-macros`.
 
 ## 2. Module architecture
 
@@ -121,14 +132,14 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 
 **Table:** Module layers and responsibilities
 
-| Layer         | Crate             | Modules                                            | Responsibility                                                                |
-| ------------- | ----------------- | -------------------------------------------------- | ----------------------------------------------------------------------------- |
-| Schema        | `theoremc-core`   | `schema/`                                          | YAML deserialization and semantic validation                                  |
-| Mangle        | `theoremc-core`   | `mangle*.rs`                                       | Deterministic identifier generation                                           |
-| Cross-cutting | `theoremc-core`   | `collision.rs`                                     | Collision detection across schema and mangle                                  |
-| Proc-macro    | `theoremc-macros` | `lib.rs`                                           | Proc-macro entry points, theorem-file loading delegation, and code generation |
-| Lowering      | `theoremc`        | `arg_lowering.rs`                                  | Test-gated prototype for converting semantic values to Rust token trees       |
-| Build         | `theoremc`        | `build_discovery.rs`, `build_suite.rs`, `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking           |
+| Layer         | Crate                    | Modules                                     | Responsibility                                                                |
+| ------------- | ------------------------ | ------------------------------------------- | ----------------------------------------------------------------------------- |
+| Schema        | `theoremc-core`          | `schema/`                                   | YAML deserialization and semantic validation                                  |
+| Mangle        | `theoremc-core`          | `mangle*.rs`                                | Deterministic identifier generation                                           |
+| Cross-cutting | `theoremc-core`          | `collision.rs`                              | Collision detection across schema and mangle                                  |
+| Proc-macro    | `theoremc-macros`        | `lib.rs`                                    | Proc-macro entry points, theorem-file loading delegation, and code generation |
+| Lowering      | `theoremc`               | `arg_lowering.rs`                           | Test-gated prototype for converting semantic values to Rust token trees       |
+| Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking           |
 
 The schema layer must not import from `mangle`, and vice versa. The `collision`
 module exists as a separate top-level module specifically to orchestrate both
@@ -179,35 +190,40 @@ Macro tests should keep the layers distinct:
 
 ### 2.2 Build system API
 
-Contributors extending the build system should note the following internal API
-surface:
+The support crate exposes this API across a Cargo crate boundary to the root
+build script and fixture crates:
 
 ```rust
-pub(crate) struct BuildDiscovery {
-    theorem_files: Vec<Utf8PathBuf>,
-    watched_directories: Vec<Utf8PathBuf>,
-}
+pub fn prepare_build_script() -> Result<BuildScriptOutput, BuildScriptError>;
 
-pub(crate) fn discover_theorem_inputs(
+pub fn discover_theorem_inputs(
     manifest_dir: &Utf8Path,
 ) -> Result<BuildDiscovery, BuildDiscoveryError>;
 
-pub(crate) fn render_theorem_suite<'a>(
-    theorem_files: impl IntoIterator<Item = &'a Utf8Path>,
-) -> String;
-
-pub(crate) fn write_theorem_suite(
+pub fn write_theorem_suite(
     out_dir: &Utf8Dir,
     discovery: &BuildDiscovery,
 ) -> Result<(), BuildSuiteError>;
 ```
 
-Accessors return iterators over `&Utf8Path`:
+These items are `pub` in `theoremc-build-support` because callers are in
+separate crates. `BuildScriptOutput` also exposes `has_theorems()` and
+`rerun_paths()` accessors; its fields remain private. The public visibility
+does not make the support crate part of the public `theoremc` library API.
+
+`BuildDiscovery` keeps its fields private and provides iterators over
+`&Utf8Path`:
 
 - `theorem_files()` — discovered `.theorem` files in sorted order.
 - `watched_directories()` — directories emitted for Cargo invalidation.
 - `rerun_paths()` — watched directories followed by theorem files, in the
   exact order emitted by `build.rs`.
+
+These public items support workspace build integration, the support crate's own
+unit tests, and fixture crates that verify the same boundary. They are not a
+downstream dependency contract. Do not include support source with `#[path]` or
+depend directly on private implementation details such as
+`render_theorem_suite`.
 
 ## 3. Contributor workflows
 
@@ -359,24 +375,27 @@ catches an accidental change in printed output across the upgrade.
 
 To add new build-time discovery or generation:
 
-1. Add the logic to `src/build_discovery.rs` (or a new sibling module)
+1. Add the logic to `crates/theoremc-build-support` (or a new sibling module)
    and keep it testable without spawning Cargo.
-2. Wire the new logic into `build.rs` via the shared `#[path = ...]`
-   inclusion.
+2. Expose the narrow internal API from `theoremc-build-support` and wire it
+   into `build.rs` as a normal build dependency.
 3. Add direct unit tests covering edge cases (missing directories,
    permission errors, deterministic ordering).
 4. Add behavioural tests in `tests/` using temporary fixture crates when
    the feature interacts with Cargo's build-script protocol.
 5. Update `docs/theoremc-design.md` §7 and this guide.
 
-Step 3.1.2 extends this pattern by adding suite generation (`build_suite.rs`)
-to the build script. Step 3.2.1 keeps that generated `theorem_file!("...")`
-callsite unchanged, but the hidden `__theoremc_generated_suite` module in
-`src/lib.rs` now imports the real proc macro re-exported by the root facade.
+The current implementation keeps discovery and suite writing in
+`crates/theoremc-build-support`; the root `build.rs` adapter emits cfg and
+rerun metadata from `BuildScriptOutput`. Step 3.2.1 keeps the generated
+`theorem_file!("...")` callsite unchanged, while the hidden
+`__theoremc_generated_suite` module in `src/lib.rs` imports the real proc macro
+re-exported by the root facade.
 
 The live workspace split is:
 
 - `crates/theoremc-core` for shared schema, mangling, and collision logic,
+- `crates/theoremc-build-support` for build-time discovery and suite generation,
 - `crates/theoremc-macros` for proc-macro expansion, and
 - the root `theoremc` crate for the public API plus build integration.
 

@@ -5,9 +5,7 @@
 
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{FixtureCrate, TRIVIAL_THEOREM, toml_section};
-
-const ROOT_CARGO_TOML: &str = include_str!("../Cargo.toml");
+use test_helpers::{FixtureCrate, TRIVIAL_THEOREM, build_support_fixture_manifest};
 
 /// Fixture lib.rs that includes the generated suite wiring.
 const FIXTURE_LIB_RS: &str = concat!(
@@ -26,23 +24,6 @@ const FIXTURE_LIB_RS: &str = concat!(
     "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
     "}\n",
 );
-
-fn fixture_cargo_toml() -> Result<String, String> {
-    let build_dependencies = toml_section(ROOT_CARGO_TOML, "build-dependencies")
-        .ok_or_else(|| "root Cargo.toml is missing [build-dependencies]".to_owned())?;
-
-    Ok(format!(
-        concat!(
-            "[package]\n",
-            "name = \"build_suite_fixture\"\n",
-            "version = \"0.1.0\"\n",
-            "edition = \"2024\"\n\n",
-            "[build-dependencies]\n",
-            "{build_dependencies}",
-        ),
-        build_dependencies = build_dependencies
-    ))
-}
 
 fn generated_suite_contents(fixture: &FixtureCrate) -> Result<String, String> {
     fixture.generated_suite_contents()
@@ -74,7 +55,10 @@ fn given_a_crate_without_a_theorems_directory() {}
 
 #[then("the crate compiles successfully with the generated suite")]
 fn then_the_crate_compiles_successfully_with_the_generated_suite() -> Result<(), String> {
-    let fixture = FixtureCrate::new(&fixture_cargo_toml()?, FIXTURE_LIB_RS)?;
+    let fixture = FixtureCrate::new(
+        &build_support_fixture_manifest("build_suite_fixture"),
+        FIXTURE_LIB_RS,
+    )?;
     // No theorems directory created - testing empty suite case
     fixture.cargo_build()?;
     Ok(())
@@ -87,7 +71,10 @@ fn given_a_crate_with_one_theorem_file() {}
 #[then("the single theorem is included automatically and the crate compiles")]
 fn then_the_single_theorem_is_included_automatically_and_the_crate_compiles() -> Result<(), String>
 {
-    let fixture = FixtureCrate::new(&fixture_cargo_toml()?, FIXTURE_LIB_RS)?;
+    let fixture = FixtureCrate::new(
+        &build_support_fixture_manifest("build_suite_fixture"),
+        FIXTURE_LIB_RS,
+    )?;
     fixture.write(Utf8Path::new("theorems/single.theorem"), TRIVIAL_THEOREM)?;
 
     fixture.cargo_build()?;
@@ -100,7 +87,10 @@ fn given_a_crate_with_multiple_theorem_files_created_in_non_sorted_order() {}
 
 #[then("all theorems compile in deterministic suite order")]
 fn then_all_theorems_compile_in_deterministic_suite_order() -> Result<(), String> {
-    let fixture = FixtureCrate::new(&fixture_cargo_toml()?, FIXTURE_LIB_RS)?;
+    let fixture = FixtureCrate::new(
+        &build_support_fixture_manifest("build_suite_fixture"),
+        FIXTURE_LIB_RS,
+    )?;
     // Create theorems in non-sorted order (z, a, m)
     fixture.write(Utf8Path::new("theorems/z.theorem"), TRIVIAL_THEOREM)?;
     fixture.write(Utf8Path::new("theorems/a.theorem"), TRIVIAL_THEOREM)?;
