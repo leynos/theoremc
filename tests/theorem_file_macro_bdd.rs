@@ -13,7 +13,7 @@ mod fixture_crate;
 #[path = "theorem_file_macro_bdd/referenced_type_fixtures.rs"]
 mod referenced_type_fixtures;
 
-use cargo_runner::{CargoGuard, is_unusable_kani_environment};
+use cargo_runner::CargoGuard;
 use fixture_crate::{
     FIXTURE_LIB_RS, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses, run_fixture_build,
     run_valid_fixture_build,
@@ -143,17 +143,10 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
         return Ok(());
     }
 
-    let output = match build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
+    let output = build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
         path: "theorems/single.theorem",
         content: VALID_SINGLE_THEOREM,
-    }) {
-        Ok(output) => output,
-        Err(error) if is_unusable_kani_environment(&error) => {
-            eprintln!("cargo-kani is installed but unusable; skipping Kani harness listing check");
-            return Ok(());
-        }
-        Err(error) => return Err(error),
-    };
+    })?;
     let expected_mangled_harness = mangle_theorem_harness("theorems/single.theorem", "SmokeMacro");
     let expected_harness_identifier = expected_mangled_harness.identifier();
 
