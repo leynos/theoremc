@@ -1593,10 +1593,10 @@ Harness stubs and probes are implemented; body/step emission is planned.
 
 ### 8.1 Harness generation strategy
 
-Steps 1 and 6 are partly realized today: `theoremc-macros` emits one
-parameterless `pub(crate)` harness per theorem, carrying `#[kani::proof]` and
-`#[kani::unwind(n)]`, with an empty body. Steps 2 to 5, and the assertion
-bodies of step 6, are the planned Kani body/step emission.
+Step 1 is partly realized today: `theoremc-macros` emits one parameterless
+`pub(crate)` harness per theorem, carrying `#[kani::proof]` and
+`#[kani::unwind(n)]`, with an empty body. Steps 2 to 6 are the planned Kani
+body/step emission, including the `Prove` assertions of step 6.
 
 For each theorem:
 
