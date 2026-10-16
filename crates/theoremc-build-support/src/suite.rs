@@ -10,6 +10,16 @@ use camino::Utf8Path;
 ///
 /// Each theorem file produces one line: `theorem_file!("path/to/file.theorem");`
 /// The output always ends with a trailing newline, even for empty input.
+///
+/// # Examples
+///
+/// A discovered theorem path becomes a macro invocation in the generated
+/// module:
+///
+/// ```text
+/// render_theorem_suite([Utf8Path::new("theorems/example.theorem")])
+/// // returns: theorem_file!("theorems/example.theorem"); followed by a newline
+/// ```
 fn render_theorem_suite<'a>(theorem_files: impl IntoIterator<Item = &'a Utf8Path>) -> String {
     let mut output = String::new();
 
@@ -27,6 +37,17 @@ fn render_theorem_suite<'a>(theorem_files: impl IntoIterator<Item = &'a Utf8Path
     output
 }
 
+/// Escapes a path so it remains a valid Rust string literal.
+///
+/// # Examples
+///
+/// A path containing a backslash is escaped before insertion into generated
+/// Rust source:
+///
+/// ```text
+/// escape_rust_string(r"theorems\example.theorem")
+/// // returns: theorems\\example.theorem
+/// ```
 fn escape_rust_string(s: &str) -> String {
     s.chars()
         .map(|ch| match ch {

@@ -114,6 +114,20 @@ pub fn prepare_build_script() -> Result<BuildScriptOutput, BuildScriptError> {
     prepare_build_script_with_env(env::var)
 }
 
+/// Reads Cargo's manifest and output paths before preparing build output.
+///
+/// # Examples
+///
+/// An internal caller can supply the two Cargo variables without changing the
+/// process environment:
+///
+/// ```text
+/// prepare_build_script_with_env(|name| match name {
+///     "CARGO_MANIFEST_DIR" => Ok("/workspace/crate".to_owned()),
+///     "OUT_DIR" => Ok("/workspace/target/out".to_owned()),
+///     _ => Err(env::VarError::NotPresent),
+/// })
+/// ```
 fn prepare_build_script_with_env(
     read_cargo_variable: impl Fn(&'static str) -> Result<String, env::VarError>,
 ) -> Result<BuildScriptOutput, BuildScriptError> {
@@ -122,6 +136,16 @@ fn prepare_build_script_with_env(
     prepare_build_script_at(&manifest_dir, &out_dir_path)
 }
 
+/// Discovers theorem inputs and writes the suite under Cargo's output path.
+///
+/// # Examples
+///
+/// The internal preparation step accepts paths explicitly, which lets tests
+/// use temporary crate and output directories:
+///
+/// ```text
+/// prepare_build_script_at(crate_root, output_directory)
+/// ```
 fn prepare_build_script_at(
     manifest_dir: &Utf8Path,
     out_dir_path: &Utf8Path,
@@ -142,6 +166,15 @@ fn prepare_build_script_at(
     })
 }
 
+/// Converts one required Cargo environment variable into a UTF-8 path.
+///
+/// # Examples
+///
+/// A required manifest path is read by its Cargo variable name:
+///
+/// ```text
+/// required_cargo_path("CARGO_MANIFEST_DIR", &read_variable)
+/// ```
 fn required_cargo_path(
     variable: &'static str,
     read_cargo_variable: &impl Fn(&'static str) -> Result<String, env::VarError>,
