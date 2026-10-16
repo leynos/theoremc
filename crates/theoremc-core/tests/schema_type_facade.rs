@@ -60,25 +60,64 @@ fn kani_evidence() -> schema::KaniEvidence {
     }
 }
 
+#[derive(Debug)]
+struct BackendCase {
+    has_kani: bool,
+    has_verus: bool,
+    has_stateright: bool,
+    expected: bool,
+}
+
+impl BackendCase {
+    const NO_BACKEND: Self = Self {
+        has_kani: false,
+        has_verus: false,
+        has_stateright: false,
+        expected: false,
+    };
+
+    const KANI_ONLY: Self = Self {
+        has_kani: true,
+        has_verus: false,
+        has_stateright: false,
+        expected: true,
+    };
+
+    const VERUS_ONLY: Self = Self {
+        has_kani: false,
+        has_verus: true,
+        has_stateright: false,
+        expected: true,
+    };
+
+    const STATERIGHT_ONLY: Self = Self {
+        has_kani: false,
+        has_verus: false,
+        has_stateright: true,
+        expected: true,
+    };
+}
+
 #[rstest]
-#[case::no_backend(false, false, false, false)]
-#[case::kani_only(true, false, false, true)]
-#[case::verus_only(false, true, false, true)]
-#[case::stateright_only(false, false, true, true)]
+#[case::no_backend(BackendCase::NO_BACKEND)]
+#[case::kani_only(BackendCase::KANI_ONLY)]
+#[case::verus_only(BackendCase::VERUS_ONLY)]
+#[case::stateright_only(BackendCase::STATERIGHT_ONLY)]
 fn evidence_reports_each_supported_backend(
-    #[case] has_kani: bool,
-    #[case] has_verus: bool,
-    #[case] has_stateright: bool,
-    #[case] expected: bool,
+    #[case] backends: BackendCase,
     kani_evidence: schema::KaniEvidence,
 ) {
     let evidence = schema::Evidence {
-        kani: has_kani.then_some(kani_evidence),
-        verus: has_verus.then_some(schema::TheoremValue::Bool(true)),
-        stateright: has_stateright.then_some(schema::TheoremValue::Bool(true)),
+        kani: backends.has_kani.then_some(kani_evidence),
+        verus: backends
+            .has_verus
+            .then_some(schema::TheoremValue::Bool(true)),
+        stateright: backends
+            .has_stateright
+            .then_some(schema::TheoremValue::Bool(true)),
     };
 
-    assert_eq!(evidence.has_any_backend(), expected);
+    assert_eq!(evidence.has_any_backend(), backends.expected);
 }
 
 #[test]
