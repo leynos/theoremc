@@ -112,6 +112,18 @@ Use these signposts to trace each roadmap task to the defining requirement.
 - `ADR3-5`:
   [ADR 003 decision 5](adr-003-architectural-boundary-enforcement.md) (optional
   `cargo-deny` dependency policy checks).
+- `ADR5`:
+  [ADR 005](adr-005-vertical-slice-first-roadmap-sequencing.md) (vertical slice
+  before laws and rich reporting).
+- `ADR6`:
+  [ADR 006](adr-006-backend-neutral-harness-planning-boundary.md) (shared
+  backend-neutral harness plan and resolved invocations).
+- `ADR7`:
+  [ADR 007](adr-007-verus-backend-preservation-invariants.md) (law meaning,
+  backend bindings, identity, and evidence preservation).
+- `RFC1`:
+  [RFC 0001](rfcs/0001-semantic-law-templates.md) (versioned proof obligations
+  and semantic law templates).
 
 ## Phase 1: schema and validation foundation
 
@@ -471,70 +483,140 @@ Out of scope: full theorem-suite execution, reports, and detached run jobs.
   `describe_*` declaration, and no unbounded value reaches a label. Signposts:
   `CLI-DES`.
 
-## Phase 4: Kani backend semantics and safety policy
+## Phase 4: working Kani proof path, safety policy, and semantic laws
 
-Outcome: theorem steps compile into correct Kani proof harnesses with explicit
-non-vacuity guarantees.
+Outcome: a version 1 theorem produces a real Kani proof or counterexample with
+explicit non-vacuity guarantees; schema version 2 laws then reuse that path.
 
-### Step 4.1: implement theorem step emission for Kani
+### Step 4.1: deliver the Kani vertical slice through the shared harness-planning boundary
 
-Dependencies: phases 1 to 3.
+Dependencies: phases 1 to 3. Implementation plans must cite ADR 006.
 
-In scope: `Forall`, `Assume`, `Let`, `Do`, `Prove`, and `Witness` emission.
+In scope: a supported version 1 subset, shared planning, Kani rendering, and
+real positive and negative fixtures through normal build integration.
 
-Out of scope: non-Kani backends.
+Out of scope: schema version 2 laws, rich reports, and non-Kani backends.
 
-- [ ] Emit `Forall` symbolic bindings as typed `kani::any::<T>()` declarations
-  preserving declared order. Acceptance: generated code snapshots match theorem
-  declaration order and types. Signposts: `DES-8`, `TFS-1`.
-- [ ] Emit `Assume` clauses as `kani::assume(...)`, and `Prove` clauses as
-  `assert!(..., because)` using the supplied human rationale text. Acceptance:
-  harness tests show rationale strings appear in failure output. Signposts:
-  `DES-8`, `TFS-1`.
-- [ ] Emit `Witness` clauses as `kani::cover!(...)` checks. Acceptance: witness
-  presence is reflected in run output and reported reachability data. Signposts:
-  `DES-8`, `TFS-1`, `ADR-4`.
+- [ ] Introduce the internal backend-neutral `HarnessPlan` in `theoremc-core`
+  with resolved invocations, source provenance, stable obligation identities,
+  and explicitly opaque Rust predicates. Acceptance: plan fixtures contain no
+  token streams, Kani syntax, or generated local names as semantic identities.
+  Signposts: `ADR5`, `ADR6`, `ADR7`.
+- [ ] Lower the supported version 1 subset into the shared plan: ordered typed
+  `Forall`, `Assume`, `Let`, infallible `call` with bound results, `Prove`, and
+  `Witness`. Acceptance: unit tests cover binding order and identity; all
+  source constructs lacking implemented lowering fail deterministically,
+  including fallible calls, `must`, and `maybe` until supported. Signposts:
+  `TFS-1`, `TFS-4`, `ADR5`, `ADR6`.
+- [ ] Promote the argument-lowering prototype into the owned proc-macro
+  rendering path, and render plan operations as symbolic bindings, assumptions,
+  invocations, assertions with rationales, and covers. Acceptance:
+  generated-code snapshots verify literals, references, lists, struct values,
+  and declared borrowing without implicit clones or default construction; the
+  Kani renderer does not consume schema types directly. Signposts: `TFS-5`,
+  `DES-5`, `DES-8`, `ADR6`.
+- [ ] Add a small longhand idempotence example using a pure shared-reference
+  primary with an owned result, plus a deliberately false variant. Acceptance:
+  fixture crates discover theorems through normal build scripts, ordinary
+  `cargo build` needs no Kani dependencies, `cargo kani list` discovers stable
+  harness names, and real Kani proves one claim and produces a counterexample
+  for the other while preserving theorem and obligation identity. Explicit
+  witnesses are emitted and checked. At least one CI path or maintainer gate
+  executes Kani; mocked commands or snapshots alone do not complete this step.
+  Retain the example for version 2 plan-equivalence fixtures. Signposts:
+  `DES-7`, `DES-8`, `ADR-4`, `ADR5`, `ADR6`.
 
-### Step 4.2: implement `call`, `must`, and `maybe` operational semantics
+### Step 4.2: expand `call`, `must`, and `maybe` operational semantics
 
 Dependencies: step 4.1 and phase 2.
 
-In scope: call binding behaviour, failure obligations for `must`, and symbolic
-branching for `maybe`.
+In scope: incremental operational breadth through the same resolved-invocation
+model and Kani renderer.
 
-Out of scope: probabilistic branching semantics.
+Out of scope: probabilistic branching semantics and a second direct renderer.
 
-- [ ] Implement `call` semantics with `as` binding rules, including rejection
-  of unbound fallible results in `Do`. Acceptance: semantic tests cover `()`,
-  value-returning, `Result`, and `Option` action signatures. Signposts: `TFS-4`,
-  `DES-4`, `DES-8`.
-- [ ] Implement `must` semantics for `Result` and `Option` (`assert` then
-  unwrap), and pass-through semantics for infallible actions. Acceptance:
-  harness tests prove failed `must` steps produce counterexamples. Signposts:
-  `TFS-4`, `DES-4`, `DES-8`.
-- [ ] Implement `maybe` semantics using symbolic boolean branching and nested
-  step emission. Acceptance: branch-coverage tests confirm both branches are
-  explored by Kani under bounded settings. Signposts: `TFS-4`, `DES-4`, `DES-8`.
+- [ ] Complete value-returning and unit-returning `call`, then bound fallible
+  `call` with explicit results; enforce `as` binding rules and reject unbound
+  non-unit results in `Do`. Acceptance: semantic tests cover `()`, owned values,
+  `Result`, and `Option` signatures. Signposts: `TFS-4`, `DES-4`, `DES-8`,
+  `ADR5`, `ADR6`.
+- [ ] Add `must` over `Result`, then `Option`, then infallible documentary
+  `must`, using independently tested increments. Acceptance: real harness tests
+  produce counterexamples for failed success obligations and retain source
+  identity; successful cases yield the unwrapped value. Signposts: `TFS-4`,
+  `DES-8`, `ADR5`, `ADR6`.
+- [ ] Add symbolic `maybe` with nested steps through shared plan branching.
+  Acceptance: Kani explores both branches under bounded settings and nested
+  obligations retain structural identities. Signposts: `TFS-4`, `DES-8`, `ADR5`,
+  `ADR6`.
 
-### Step 4.3: implement evidence-driven result policy
+### Step 4.3: implement the minimal Kani runner and evidence policy
 
 Dependencies: steps 4.1 and 4.2.
 
-In scope: expected result handling, vacuity policy enforcement, and mismatch
-reporting.
+In scope: Kani invocation, stable obligation outcomes, expected-result
+handling, non-vacuity enforcement, and mismatch diagnostics.
 
-Out of scope: extended policy for future backends.
+Out of scope: Markdown, HTML, JUnit, Cucumber, playback, and full CLI
+orchestration.
 
-- [ ] Enforce `Evidence.kani.expect` handling and fail runs when actual status
-  differs from expected status. Acceptance: integration tests cover SUCCESS,
-  FAILURE, UNREACHABLE, and UNDETERMINED cases. Signposts: `TFS-6`, `DES-8`.
-- [ ] Enforce default failure for UNREACHABLE and UNDETERMINED unless explicitly
-  expected and justified via evidence configuration. Acceptance: policy tests
-  cover default and override paths. Signposts: `ADR-4`, `DES-8`.
-- [ ] Enforce vacuity override contract requiring both
-  `allow_vacuous: true` and non-empty `vacuity_because`. Acceptance: validation
-  and runtime tests confirm missing rationale is rejected. Signposts: `ADR-4`,
-  `TFS-6`, `DES-8`.
+- [ ] Implement a minimal runner that associates backend outcomes with stable
+  theorem and obligation identities. Acceptance: fixtures distinguish `proved`,
+  `falsified`, `unreachable`, `undetermined`, `unsupported`, and
+  `execution_error`; resource exhaustion is `undetermined` with reason
+  `resource_exhaustion`. Signposts: `ADR5`, `ADR6`, `ADR7`.
+- [ ] Compare actual status with `Evidence.kani.expect` and fail mismatches.
+  Acceptance: integration tests cover SUCCESS, FAILURE, UNREACHABLE, and
+  UNDETERMINED; unreachable and undetermined fail by default unless explicitly
+  expected and justified. Signposts: `TFS-6`, `DES-8`, `ADR-4`, `ADR5`.
+- [ ] Enforce explicit witnesses unless both `allow_vacuous: true` and a
+  non-empty `vacuity_because` justify the override. Acceptance: validation and
+  runtime tests reject missing rationale and distinguish unreachable witnesses
+  from successful proofs. Signposts: `TFS-6`, `DES-8`, `ADR-4`, `ADR5`.
+
+### Step 4.4: integrate RFC 0001 semantic laws through the proven Kani path
+
+Dependencies: steps 4.1 to 4.3. Work must cite ADRs 006 and 007.
+
+In scope: schema version 2, semantic Law IR, the six-law catalogue, validation,
+shared-plan lowering, and authoring guidance from accepted RFC 0001.
+
+Out of scope: Verus bindings or rendering, rich reporting, and implicit purity
+proofs or cloning adapters.
+
+- [ ] Freeze omitted `Schema` as the version 1 compatibility profile and add
+  explicit version 2 selection with raw and public `ProofObligation` variants.
+  Acceptance: parser fixtures preserve existing assertions in both versions,
+  reject laws in omitted/version 1 documents, reject unsupported versions, and
+  locate malformed or ambiguous obligation shapes. Document the breaking
+  `Vec<Assertion>` to `Vec<ProofObligation>` release boundary and migration.
+  Signposts: `RFC1`, `TFS-1`, `ADR5`.
+- [ ] Add domain types for `idempotent`, `round_trip`, `equivalent`, `refines`,
+  `preserves`, and `homomorphism`, plus common primary invocation and relation
+  types outside raw adapters. Acceptance: parameterized tests validate action
+  signatures, roles, fixed arguments, modes, shared-reference bound parameters,
+  composition, and boolean relations; ordinary rustc composition probes cover
+  type equivalence beyond structural validation. Extend referenced-action,
+  conflict, and type probes to law primaries. Signposts: `RFC1`, `ADR6`, `ADR7`.
+- [ ] Lower validated laws into semantic Law IR, then the existing
+  `HarnessPlan`, reusing resolved invocations, the Kani renderer, and the
+  minimal runner. Acceptance: fixtures retain parent/child obligation identity,
+  rationale, provenance, and backend constraints without Kani syntax in either
+  semantic representation; complete capability checking rejects unsupported
+  operations before partial emission. Signposts: `RFC1`, `ADR6`, `ADR7`.
+- [ ] Validate all six laws with positive and negative Kani integration cases,
+  including a counterexample for every comparison law and unreachable
+  preconditions for `preserves`. Acceptance: longhand version 1 and structured
+  version 2 examples yield semantically equivalent plans; generated
+  precondition covers supplement explicit witnesses and unreachable checks
+  never count as proved. Signposts: `RFC1`, `ADR-4`, `ADR5`, `ADR6`, `ADR7`.
+- [ ] Publish versioned examples for normalization, codecs, reference
+  equivalence, refinement, state transitions, and collection homomorphisms.
+  Acceptance: guidance shows explicit adapters for mutation-heavy APIs,
+  explains custom-relation weakness, witness requirements, bounded evidence,
+  and when opaque assertions are appropriate. Record future Verus binding
+  design as additive follow-up work preserving version 2 law meaning and
+  explicit executable/specification/proof modes. Signposts: `RFC1`, `ADR7`.
 
 ## Phase 5: execution, reporting, and stable theorem identity
 
@@ -576,19 +658,21 @@ Out of scope: hosted execution and report dashboarding.
 
 ### Step 5.1: implement theorem run result model and report outputs
 
-Dependencies: step 5.0.
+Dependencies: steps 5.0 and 4.4. Work must cite ADR 007.
 
 In scope: the `cargo theorem` canonical run model and output formats (human
 report plus CI artefacts).
 
 Out of scope: dashboard hosting.
 
-- [ ] Implement a canonical theorem run record that includes theorem ID,
-  metadata, assumptions, step outcomes, assertion outcomes, witness outcomes,
-  evidence config, backend provenance, diagnostics, artefacts, and final
-  status. Acceptance: serialized fixtures round-trip without field loss and
-  distinguish invariant fields from wall-clock or run-identity fields.
-  Signposts: `DES-9`, `TFS-1`, `TFS-6`, `CLI-DES`.
+- [ ] Implement a canonical theorem run record with theorem ID, metadata,
+  assumptions, step outcomes, generic proof obligations, law parent/child
+  identities and rationales, witnesses, backend-indexed evidence, provenance,
+  diagnostics, artefacts, and final status. Acceptance: serialized fixtures
+  round-trip without field loss, preserve the six terminal statuses and
+  resource-exhaustion reason, distinguish bounded Kani from future deductive
+  Verus evidence, and separate invariant fields from run identity and time.
+  Signposts: `DES-9`, `TFS-1`, `TFS-6`, `CLI-DES`, `RFC1`, `ADR7`.
 - [ ] Implement Markdown/HTML report rendering from the canonical run record.
   Acceptance: golden snapshots cover pass, fail, unreachable, undetermined,
   timeout, cancellation, and expected-failure examples. Signposts: `DES-9`,
@@ -727,8 +811,9 @@ Out of scope: splitting schema layers into separate crates.
 
 Dependencies: phases 1 to 5.
 
-In scope: runnable examples, theorem authoring guidance, and maintenance
-checklists.
+In scope: broad runnable examples, theorem authoring guidance, and maintenance
+checklists. The small first-slice example belongs to step 4.1 and does not wait
+for this step.
 
 Out of scope: production deployment templates.
 
@@ -848,8 +933,13 @@ Out of scope: implementation of localized theorem schema keys.
   not depend on completed theorem lowering.
 - Do not implement high-level `cargo theorem run` until both Kani execution
   semantics and the backend provider/pin-check contracts are stable.
-- Do not start report rendering before the Kani execution model is stable and
-  the canonical run ledger exists; complete alias migration before alias-aware
+- Make step 4.1's real version 1 Kani proof and counterexample the next release
+  gate. Complete operational breadth and minimal evidence policy in steps 4.2
+  and 4.3, then integrate RFC 0001 in step 4.4 before rich reporting. Laws
+  reuse the shared harness plan, renderer, and runner; they do not delay the
+  slice.
+- Start rich report rendering only after step 4.4, stable Kani execution, and
+  the canonical run ledger; complete alias migration before alias-aware
   selection tests or execution.
 - Treat vacuity policy implementation as a release gate, not an optional
   enhancement.

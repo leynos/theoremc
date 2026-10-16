@@ -34,6 +34,32 @@ reduce drift risk, normative definitions are centralized:
 - `docs/adr-003-architectural-boundary-enforcement.md` is normative for schema
   layer boundaries and architecture enforcement policy.
 
+- [RFC 0001](rfcs/0001-semantic-law-templates.md) defines accepted schema
+  version 2 laws; assertion-only descriptions below refer to the version 1
+  profile.
+- [ADR 005](adr-005-vertical-slice-first-roadmap-sequencing.md) requires a
+  working version 1 Kani vertical slice before laws and rich reporting.
+- [ADR 006](adr-006-backend-neutral-harness-planning-boundary.md) owns the
+  internal shared `HarnessPlan`: version 1 lowering and later semantic Law IR
+  converge here before Kani rendering. Schema-to-Kani token emission is not the
+  target architecture.
+- [ADR 007](adr-007-verus-backend-preservation-invariants.md) preserves law
+  meaning, primary identity, backend-indexed evidence, and explicit future
+  Verus bindings.
+
+The accepted law and planning changes remain pending implementation in
+[roadmap steps 4.1 to 4.4](roadmap.md#phase-4-working-kani-proof-path-safety-policy-and-semantic-laws).
+The current public schema and raw adapter still contain assertion-only proof
+lists. The target contract is normative even where implementation is pending.
+
+Law-reference integration must reuse the existing action-signature comparison
+and provenance contract from issue #51. Repeated declarations compare parameter
+names in order and parsed Rust types, rather than raw text; conflicts retain
+both declaring theorem identities and signature summaries. Extending referenced
+actions to law primaries must preserve that first-declaration reference and
+those diagnostics. This keeps the law frontend consistent with the established
+ordinary action probes.
+
 If wording differs between documents, the normative references above take
 precedence.
 
