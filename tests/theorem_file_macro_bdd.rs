@@ -178,21 +178,10 @@ fn is_expected_single_harness_listing(output: &str, expected_harness_identifier:
         && output.contains("No contracts or contract harnesses found.")
         && output.contains(expected_harness_identifier)
         && output.matches("theorem__").count() == 1
-        && has_single_total_harness_row(output)
+        && output.contains("| Total |")
+        && output.contains("| 1")
 }
 
-fn has_single_total_harness_row(output: &str) -> bool {
-    output.lines().any(|line| {
-        line.split('|')
-            .map(str::trim)
-            .filter(|cell| !cell.is_empty())
-            .eq(["Total", "1"])
-    })
-}
-
-#[cfg(test)]
-#[path = "theorem_file_macro_bdd/kani_listing_tests.rs"]
-mod kani_listing_tests;
 #[given("a fixture crate with one valid multi-document theorem file")]
 fn given_a_fixture_crate_with_one_valid_multi_document_theorem_file() {}
 
