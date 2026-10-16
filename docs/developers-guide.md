@@ -176,7 +176,9 @@ Keep these conventions when extending probe generation:
 - generated Rust probes should fail only for owner-crate issues such as missing
   exports, inaccessible exports, or signature drift;
 - duplicate declarations for the same referenced action in one macro expansion
-  must be identical;
+  must have the same parameter names in order and equivalent parsed types;
+  preserve the first declaration as the reference and retain both declaring
+  theorem identities and signature summaries in conflict diagnostics;
 - probe emission is ordinary non-Kani Rust so drift fails during normal
   compilation, not only under `cargo kani`.
 

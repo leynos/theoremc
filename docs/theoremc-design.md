@@ -52,6 +52,14 @@ The accepted law and planning changes remain pending implementation in
 The current public schema and raw adapter still contain assertion-only proof
 lists. The target contract is normative even where implementation is pending.
 
+Law-reference integration must reuse the existing action-signature comparison
+and provenance contract from issue #51. Repeated declarations compare parameter
+names in order and parsed Rust types, rather than raw text; conflicts retain
+both declaring theorem identities and signature summaries. Extending referenced
+actions to law primaries must preserve that first-declaration reference and
+those diagnostics. This keeps the law frontend consistent with the established
+ordinary action probes.
+
 If wording differs between documents, the normative references above take
 precedence.
 
