@@ -682,8 +682,14 @@ Obligation V4 — typed fields and rendered message agree.
 - Domain: the V1 and V2 fixtures.
 - Artefact: the two test modules named above.
 - Evidence: substring assertions for both theorem names and both summaries.
-- Non-vacuity: parameter names are removed from the expected values, so a
-  mismatch in type strings still fails.
+- Non-vacuity: each expected value is a complete summary — parameter names and
+  types together, as in `fn(account: u64) -> bool` — so a message rendered from
+  the types alone, or from the names alone, would not contain the expected
+  fragment and the assertion would fail. V1's `parameter_name_drift` case
+  (`account` against `wallet`) is the plainest witness: were the summary to
+  omit parameter names, that case's two expectations would coincide and assert
+  nothing. Parameter *order* is not exercised here, because every V1 and V2
+  case declares a single parameter; V6 is what pins the order.
 
 Obligation V5 — C5 position independence.
 
@@ -1224,3 +1230,24 @@ This was fixed rather than suppressed, by the remedy `AGENTS.md` prescribes:
 the four document spellings moved into a named `NestedPair` struct, leaving the
 builder with two parameters. No threshold was raised, no rule disabled, and
 nothing suppressed.
+
+Revision (2026-10-16, formal review): CodeRabbit reviewed `d2d091a` and returned
+`CHANGES_REQUESTED` on one finding — that Obligation V4's non-vacuity
+statement described expected values with the parameter names stripped, whereas
+the V1 and V2 assertions compare complete summaries that include them.
+
+The finding was verified against the code and is correct. The expected values
+are full summaries (`fn(account: u64) -> bool` at `reference_selection.rs:239`,
+built by `format!("fn({}) -> {}", first.0, first.1)` at
+`action_signature_index.rs:122`), and they are compared with
+`contains_substring` against `error.to_string()`. Parameter names are kept by
+design: `render_signature_summary` documents that they are the keys the author
+writes under `Actions.params`. This plan already said so at the rendering
+decision and at C3; V4's non-vacuity entry was the lone site contradicting both.
+
+The replacement states what the assertions actually check, and names V1's
+`parameter_name_drift` case as the witness: with names omitted, that case's two
+expectations would coincide and assert nothing. It also records that these
+cases declare a single parameter each, so parameter *order* is V6's obligation
+rather than theirs. Documentation only: no production code, test, threshold, or
+workflow change, and no assertion was weakened.
