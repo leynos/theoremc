@@ -2,6 +2,9 @@ target/
 **/*.rs.bk
 *.swp
 *.rlib
+# rustc writes an ICE dump into the working directory when it crashes.
+# These are machine-local compiler artefacts, not sources.
+rustc-ice-*.txt
 .grepai/
 .memdb/
 .claude/

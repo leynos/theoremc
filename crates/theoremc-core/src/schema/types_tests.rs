@@ -24,6 +24,18 @@ fn whitespace_only_difference_is_equivalent() {
 }
 
 #[test]
+fn parenthesized_type_is_not_equivalent_to_bare_type() {
+    // Canonicalization serializes the parsed tokens, and `syn` retains the
+    // parentheses, so `(u64)` is a distinct type from `u64` here even though
+    // the two are interchangeable to rustc. The users' guide documents this;
+    // this test is what keeps that statement honest.
+    let a = signature(&[("v", "u64")], "()");
+    let b = signature(&[("v", "(u64)")], "()");
+    assert!(!a.is_semantically_equivalent(&b));
+    assert!(!b.is_semantically_equivalent(&a));
+}
+
+#[test]
 fn parameter_name_drift_is_not_equivalent() {
     let a = signature(&[("v", "u64")], "()");
     let b = signature(&[("w", "u64")], "()");

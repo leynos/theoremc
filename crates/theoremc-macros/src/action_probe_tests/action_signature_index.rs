@@ -1,9 +1,31 @@
 //! Focused unit tests for the action-signature index.
 
-use super::super::{ActionSignatureIndex, MacroExpansionError};
+use super::super::{MacroExpansionError, action_signature_index::ActionSignatureIndex};
 use googletest::prelude::*;
 use pretty_assertions::assert_eq as pretty_assert_eq;
+use rstest::rstest;
 use theoremc_core::schema::load_theorem_docs;
+
+/// Renders an `Actions` block declaring one action with one parameter.
+fn declared_action_yaml(action: &str, declaration: (&str, &str)) -> String {
+    let (param, returns) = declaration;
+    let (param_name, param_type) = param
+        .split_once(": ")
+        .expect("test cases always declare a named parameter");
+    format!(
+        concat!(
+            "Actions:\n",
+            "  {action}:\n",
+            "    params:\n",
+            "      {param_name}: {param_type}\n",
+            "    returns: {returns}\n",
+        ),
+        action = action,
+        param_name = param_name,
+        param_type = param_type,
+        returns = returns,
+    )
+}
 
 #[test]
 fn action_signature_index_finds_one_action_in_one_document()
@@ -68,41 +90,61 @@ fn action_signature_index_accepts_equivalent_repeated_signatures()
     Ok(())
 }
 
-#[test]
-fn action_signature_index_rejects_conflicting_signatures() -> Result<(), Box<dyn std::error::Error>>
-{
+#[rstest]
+#[case::parameter_type_drift(
+    "account.deposit",
+    ("account: u64", "bool"),
+    ("account: u32", "bool")
+)]
+#[case::return_type_drift(
+    "payload.write",
+    ("buffer: u64", "u64"),
+    ("buffer: u64", "String")
+)]
+fn action_signature_index_reports_conflicting_signatures_with_provenance(
+    #[case] action: &str,
+    #[case] first: (&str, &str),
+    #[case] conflicting: (&str, &str),
+) -> Result<(), Box<dyn std::error::Error>> {
     let docs = load_theorem_docs(&format!(
         "{}---\n{}",
+        theorem_yaml("FirstIndexConflict", &declared_action_yaml(action, first)),
         theorem_yaml(
-            "FirstConflictingAction",
-            concat!(
-                "Actions:\n",
-                "  account.deposit:\n",
-                "    params:\n",
-                "      account: u64\n",
-                "    returns: bool\n",
-            ),
-        ),
-        theorem_yaml(
-            "SecondConflictingAction",
-            concat!(
-                "Actions:\n",
-                "  account.deposit:\n",
-                "    params:\n",
-                "      account: u32\n",
-                "    returns: bool\n",
-            ),
+            "SecondIndexConflict",
+            &declared_action_yaml(action, conflicting),
         ),
     ))?;
-    let selected = vec!["account.deposit"];
+    let selected = vec![action];
 
     let error = ActionSignatureIndex::for_actions(&docs, &selected)
         .expect_err("conflicting selected signatures should fail");
 
+    let expected_first = format!("fn({}) -> {}", first.0, first.1);
+    let expected_conflicting = format!("fn({}) -> {}", conflicting.0, conflicting.1);
+
     assert_that!(
         error,
-        matches_pattern!(MacroExpansionError::ConflictingActionSignature { .. })
+        matches_pattern!(MacroExpansionError::ConflictingActionSignature {
+            action: eq(action),
+            first_theorem: eq("FirstIndexConflict"),
+            conflicting_theorem: eq("SecondIndexConflict"),
+            first_signature: eq(expected_first.as_str()),
+            conflicting_signature: eq(expected_conflicting.as_str()),
+        })
     );
+
+    // The rendered message is what a theorem author actually reads, so it must
+    // carry the same provenance as the typed fields.
+    let message = error.to_string();
+    for fragment in [
+        action,
+        "FirstIndexConflict",
+        "SecondIndexConflict",
+        expected_first.as_str(),
+        expected_conflicting.as_str(),
+    ] {
+        assert_that!(message.as_str(), contains_substring(fragment));
+    }
     Ok(())
 }
 
