@@ -212,6 +212,42 @@ Observable success:
       `PASS theoremc::theorem_file_macro_bdd
       a_valid_theorem_file_exposes_a_kani_proof_harness` for `118508f`, so the
       local Kani failure remains environmental on the rebased head too.
+- [x] (2026-10-16T00:00Z) Rebased the branch a second time, after `origin/main`
+      advanced from `41fd07a` to `025e466` while the PR waited for review. Six
+      `main` commits were inherited, and one of them is semantically load
+      bearing for this branch: `2e3cd11` migrated the workspace from `syn` 2 to
+      `syn` 3 for `prettyplease` 0.3.0, and it rewrites
+      `crates/theoremc-core/src/schema/rust_type.rs`, which owns
+      `canonical_token_stream` — the function `ActionSignature::
+      is_semantically_equivalent` is built on. `025e466` then bumped `trybuild`,
+      the crate that compiles this branch's new `.stderr` golden file, and the
+      same migration added `rust_type_property_tests.rs`. A clean textual
+      merge would therefore have proved nothing, so the replay was validated by
+      running the gates rather than by inspecting the diff.
+      The replay boundary was still the branch's original fork point `41fd07a`,
+      so all 18 child commits were replayed. It ran under `--merge`,
+      `merge.conflictStyle=zdiff3`, and the estate-baseline
+      `core.attributesFile=/dev/null` override, and completed in one pass with
+      zero conflicts. `git range-diff` reports all 18 commits patch-identical,
+      the 18 per-commit `git patch-id --stable` values match, and 10 of the 11
+      child-owned paths are byte-identical post-images. The eleventh,
+      `docs/users-guide.md`, differs only because `main` inserted a 32-line
+      "Shared `&str` wrapper API" section above the branch's hunk; the branch's
+      own added lines are byte-identical and the hunk simply moved from line
+      516 to 548. No line of `main`'s version was removed.
+- [x] (2026-10-16T00:00Z) Re-established every gate against the second rebased
+      head, `ce6b2b0`. `make check-fmt`, `make typecheck`, `make lint`,
+      `make markdownlint`, `make nixie`, and
+      `cargo test --workspace --all-features --doc` (25 passed, 0 failed, 4
+      ignored) all pass. `make test` reports 792 run / 791 passed / 1 failed /
+      0 skipped, the single failure being the same documented Kani environment
+      fault. The syn 3 migration is specifically cleared: the trybuild test
+      `theoremc-macros::expand compile_errors`, which compiles the new
+      `conflicting_action_signatures.stderr` golden file, passes against
+      `trybuild` 1.0.122, `make typecheck` reports no renamed-AST-node errors,
+      and the `rust_type` proptest properties pass. The test count rose from
+      783/784 to 792/791 because `main` added tests, not because this branch
+      changed size.
 
 ## Surprises & Discoveries
 
@@ -325,6 +361,23 @@ Observable success:
   was borne out — the child and target changes share no paths, so no merge
   driver had anything to reconcile and the replay was exact. Date/Author:
   2026-10-11, implementation agent.
+- Decision: rebase a second time onto `025e466` rather than let the PR merge
+  from the stale `41fd07a` base, and accept the rename risk that the inherited
+  `syn` 3 migration creates for this branch, because the alternative is a
+  landing that was never compiled against `syn` 3. Rationale: `2e3cd11` rewrote
+  `canonical_token_stream`, which is the exact function
+  `is_semantically_equivalent` depends on, and the branch's own
+  `parenthesized_type_is_not_equivalent_to_bare_type` test asserts a
+  `syn`-version-sensitive property of that function. GitHub reported the PR
+  `MERGEABLE` with a clean `merge-tree`, but a clean three-way merge of text
+  says nothing about whether the combined tree compiles, and this repository's
+  squash-only merge policy would have squashed the branch onto the new `main`
+  without ever running its gates against `syn` 3. The same reasoning applies to
+  the `trybuild` bump, since this branch's most load-bearing new artefact is a
+  `.stderr` golden file that only `trybuild` can validate. Verified after the
+  fact by running the full gate set: the trybuild test passes, typecheck and
+  lint are clean, and no test regressed. Date/Author: 2026-10-16,
+  implementation agent.
 
 ## Outcomes & Retrospective
 
@@ -809,6 +862,17 @@ Git's text merge. Verify the override before relying on it with
 `git -c core.attributesFile=/dev/null check-attr merge -- <path>`, which must
 print `unspecified`.
 
+The command is re-runnable after the PR target moves again. `origin/main` must
+be fetched first, `<original-fork-point>` is the branch's exclusive replay
+boundary — the merge base frozen before the branch was first rewritten, not the
+current tip of `main` — and the rebase is accepted only after `range-diff` and
+the per-commit `patch-id` values show the series unchanged. A clean exit is not
+sufficient on its own: when the target has advanced with a dependency or AST
+migration that touches this branch's own files, the combined tree must be
+compiled and tested, because a textual merge cannot detect that class of
+breakage. That is what happened on 2026-10-16, when `main` landed the `syn` 2 to
+`syn` 3 migration while this branch was waiting for review.
+
 ## Validation and acceptance
 
 Behaviour to observe, in order:
@@ -931,3 +995,24 @@ path matches `origin/main` byte for byte. No lock file is involved, because
 neither side touches one. The rebase command block and the surrounding note in
 `Concrete steps` were added in this revision; the `Progress` and `Decision Log`
 entries record the identities and the reasoning.
+
+Revision (2026-10-16): the branch was rebased a second time, onto `origin/main`
+`025e466` after `main` advanced six further commits from `41fd07a`. Unlike the
+first rebase, this one is not merely a freshness refresh. Three of the
+inherited commits bear directly on this branch's correctness: `2e3cd11`
+migrated the workspace from `syn` 2 to `syn` 3 and rewrote
+`crates/theoremc-core/src/schema/rust_type.rs`, whose `canonical_token_stream`
+is the function `is_semantically_equivalent` is built on; `025e466` bumped the
+`trybuild` version that compiles this branch's new `.stderr` golden file; and
+the same migration added `rust_type_property_tests.rs`. A clean textual merge
+was therefore insufficient evidence, and the replay was accepted on the
+strength of the gate run rather than the diff. The replay boundary stayed the
+branch's original fork point `41fd07a`, all 18 child commits were replayed with
+the same zdiff3 and `core.attributesFile=/dev/null` settings, and it completed
+with zero conflicts. `range-diff` reports all 18 commits patch-identical and
+the per-commit `patch-id` values match; 10 of 11 child-owned paths are
+byte-identical post-images, with `docs/users-guide.md` differing only by the
+32-line section `main` inserted above the branch's hunk. All gates pass on the
+new head `ce6b2b0` except the single documented Kani environment failure. The
+`Progress` and `Decision Log` entries record the identities, the exactness
+evidence, and the reasoning for accepting the rename risk.
