@@ -303,11 +303,12 @@ Observable success:
   conflicting actions.
 - Observation: C5's two halves have different sensitivity to reference depth,
   and only one of them can fail on depth. `ActionSignatureIndex::for_actions`
-  walks `doc.actions` and never consults `referenced_actions`, so the *error*
-  path cannot observe where a reference sits; conflict detection is settled
-  before the reference set is built. The *success* path is the depth-sensitive
-  half: the generated `crate::theorem_actions::<probe>` anchor exists only if
-  `collect_step_actions` reached the reference through
+  scans every declaration in `doc.actions` and checks for conflicts there,
+  consulting the selected reference set only afterwards when filtering the
+  result. Conflict detection is therefore independent of reference *selection*,
+  so the *error* path cannot observe where a reference sits. The *success* path
+  is the depth-sensitive half: the generated `crate::theorem_actions::<probe>`
+  anchor exists only if `collect_step_actions` reached the reference through
   `Step::Maybe(s) => s.maybe.do_steps`. Evidence: the seeded-fault probe below
   left all three `conflict_diagnostic_is_independent_of_reference_depth` cases
   passing while failing both nested `equivalent_signature_reference_*` cases.
@@ -708,12 +709,13 @@ Obligation V5 — C5 position independence.
   (`crates/theoremc-core/src/collision.rs`) so it stops descending, and the
   nested equivalent cases fail on the missing probe anchor while the depth-0
   case and all three conflict cases still pass — the error path cannot observe
-  depth because `for_actions` reads `doc.actions` and never consults
-  `referenced_actions`. The seeded fault was applied, observed, and reverted;
-  the file is unmodified in the final diff. This is the evidence that the
-  success-path assertions are load-bearing and that the error-path assertions
-  guard against a *different* regression (a future index change that starts
-  consulting reference position) rather than duplicating them.
+  depth because `for_actions` checks every declaration in `doc.actions` before
+  it consults the selected reference set. The seeded fault was applied,
+  observed, and reverted; the file is unmodified in the final diff. This is the
+  evidence that the success-path assertions are load-bearing and that the
+  error-path assertions guard against a *different* regression (a future index
+  change that starts consulting reference position) rather than duplicating
+  them.
 
 Obligation V6 — C7 and C8 reference selection and summary order.
 
@@ -1193,3 +1195,31 @@ guarantees have identifiers to trace. Trace links, `Milestones and plateaus`
 The deliverable diff is otherwise unchanged: the seeded fault used to show the
 new assertions are not vacuous was applied to `collision.rs`, observed, and
 reverted byte-identically.
+
+Revision (2026-10-16, later still): the follow-up assessment replied that both
+coverage gaps were closed with no remaining in-scope defect, and raised three
+corrections to the *explanatory* wording plus one hosted-check failure. All
+four were actioned.
+
+The wording corrections were verified against the code before being accepted,
+and all three were accurate. `crates/theoremc-macros/src/lib.rs` collects
+`referenced_actions` at line 235 and calls `ActionSignatureIndex::for_actions`
+at line 236, so describing conflict detection as settled *before* the reference
+set exists was wrong; the precise statement is that `for_actions` checks every
+declaration in `doc.actions` first and consults the selected references only
+when filtering the result, so detection is independent of reference
+*selection*. The `zeta, alpha` remark overstated its case: only the first
+declaration is non-alphabetical, and its expectation alone is what rejects a
+sorted summary. Both sites in `Surprises & Discoveries` and the module doc were
+corrected. The third correction — that only the follow-up delta rather than the
+whole base-to-head delta is test-only — was already honoured in what was
+published and needs no change here beyond this note.
+
+CodeScene failed on `39a97ce` where it had passed on `3b45546`: the new
+`nested_reference_fixture` took five arguments, four of them strings, scoring
+9.39 against the 10.00 "new code is healthy" gate under the advisory rules
+`Excess Number of Function Arguments` and `String Heavy Function Arguments`.
+This was fixed rather than suppressed, by the remedy `AGENTS.md` prescribes:
+the four document spellings moved into a named `NestedPair` struct, leaving the
+builder with two parameters. No threshold was raised, no rule disabled, and
+nothing suppressed.

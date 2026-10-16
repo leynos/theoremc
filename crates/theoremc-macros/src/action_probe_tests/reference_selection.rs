@@ -7,15 +7,16 @@
 //! order the signature summary is rendered in.
 //!
 //! The error path and the success path are not equally sensitive to depth, and
-//! the tests are aimed accordingly. `ActionSignatureIndex::for_actions` walks
-//! `doc.actions` and never consults `referenced_actions`, so conflict detection
-//! is settled before the reference set exists and the *diagnostic* cannot
-//! observe where a reference sits; those cases guard against a future index
-//! change that starts consulting position. The *success* path is the live one:
-//! the generated probe anchor exists only if `collect_step_actions` reached the
-//! reference through `Step::Maybe`. Seeding that traversal fault leaves the
-//! conflict cases green and fails the nested equivalent cases, which is the
-//! evidence that the latter are not vacuous.
+//! the tests are aimed accordingly. `ActionSignatureIndex::for_actions` scans
+//! every declaration in `doc.actions` and checks for conflicts there, and it
+//! consults the selected reference set only afterwards, when filtering the
+//! result. Conflict detection is therefore independent of reference *selection*,
+//! and the *diagnostic* cannot observe where a reference sits; those cases guard
+//! against a future index change that starts consulting position. The *success*
+//! path is the live one: the generated probe anchor exists only if
+//! `collect_step_actions` reached the reference through `Step::Maybe`. Seeding
+//! that traversal fault leaves the conflict cases green and fails the nested
+//! equivalent cases, which is the evidence that the latter are not vacuous.
 
 use super::super::MacroExpansionError;
 use super::super::tests_support::{TheoremFixture, expand_fixture};
@@ -83,13 +84,17 @@ impl Provenance<'_> {
 
 /// Renders one theorem document whose `Do` section is supplied verbatim.
 ///
+/// Every document carries the same `About` prose. The schema requires it to be
+/// non-blank, but no assertion here reads it, so taking it as a parameter would
+/// only push identical boilerplate through every call site.
+///
 /// Passing an empty `do_block` omits the section entirely, which is how a
 /// document can declare an action without referencing it.
-fn document(name: &str, about: &str, actions: &str, do_block: &str) -> String {
+fn document(name: &str, actions: &str, do_block: &str) -> String {
     format!(
         concat!(
             "Theorem: {name}\n",
-            "About: {about}\n",
+            "About: Shared fixture document\n",
             "{actions}",
             "{do_block}",
             "Witness:\n",
@@ -104,7 +109,6 @@ fn document(name: &str, about: &str, actions: &str, do_block: &str) -> String {
             "    expect: SUCCESS\n",
         ),
         name = name,
-        about = about,
         actions = actions,
         do_block = do_block,
     )
@@ -161,19 +165,26 @@ const BASELINE_DECLARATION: &str = concat!(
     "    returns: bool\n",
 );
 
+/// The document pair a nested-reference fixture is built from.
+///
+/// Grouping the four spellings keeps the fixture builder's signature short and
+/// lets each caller state its two theorem names once, beside the types that
+/// decide whether the pair conflicts.
+struct NestedPair<'a> {
+    first_theorem: &'a str,
+    later_theorem: &'a str,
+    later_param: &'a str,
+    later_return: &'a str,
+}
+
 /// A two-document fixture whose later document references `account.deposit`
 /// only inside `depth` nested `maybe:` blocks.
 ///
 /// The first document always declares the [`BASELINE_DECLARATION`], so
-/// `later_param` and `later_return` alone decide whether the pair conflicts
-/// (`u32`, `bool`) or is merely spelled differently (`"u64 "`, `"bool "`).
-fn nested_reference_fixture(
-    first_theorem: &str,
-    later_theorem: &str,
-    later_param: &str,
-    later_return: &str,
-    depth: usize,
-) -> TheoremFixture {
+/// [`NestedPair::later_param`] and [`NestedPair::later_return`] alone decide
+/// whether the pair conflicts (`u32`, `bool`) or is merely spelled differently
+/// (`"u64 "`, `"bool "`).
+fn nested_reference_fixture(pair: &NestedPair<'_>, depth: usize) -> TheoremFixture {
     let later_actions = format!(
         concat!(
             "Actions:\n",
@@ -182,49 +193,37 @@ fn nested_reference_fixture(
             "      account: {later_param}\n",
             "    returns: {later_return}\n",
         ),
-        later_param = later_param,
-        later_return = later_return,
+        later_param = pair.later_param,
+        later_return = pair.later_return,
     );
 
     TheoremFixture(format!(
         "{first}---\n{second}",
-        first = document(
-            first_theorem,
-            "First declaration of the action",
-            BASELINE_DECLARATION,
-            "",
-        ),
+        first = document(pair.first_theorem, BASELINE_DECLARATION, ""),
         second = document(
-            later_theorem,
-            "Later declaration referenced only through nested maybe blocks",
+            pair.later_theorem,
             &later_actions,
             &do_with_deposit_reference(depth, &[("account", "1")]),
         ),
     ))
 }
 
-/// Two documents that disagree on `account.deposit`, referenced `depth` deep.
-fn nested_conflict_fixture(depth: usize) -> TheoremFixture {
-    nested_reference_fixture(
-        "NestedReferenceFirst",
-        "NestedReferenceSecond",
-        "u32",
-        "bool",
-        depth,
-    )
-}
+/// Two documents that disagree on `account.deposit`.
+const CONFLICT_PAIR: NestedPair<'static> = NestedPair {
+    first_theorem: "NestedReferenceFirst",
+    later_theorem: "NestedReferenceSecond",
+    later_param: "u32",
+    later_return: "bool",
+};
 
-/// Two documents that agree on `account.deposit` once tokenized, referenced
-/// `depth` deep, but spell its types differently.
-fn nested_equivalent_fixture(depth: usize) -> TheoremFixture {
-    nested_reference_fixture(
-        "NestedEquivalentFirst",
-        "NestedEquivalentSecond",
-        "\"u64 \"",
-        "\"bool \"",
-        depth,
-    )
-}
+/// Two documents that agree on `account.deposit` once tokenized, but spell its
+/// types differently.
+const EQUIVALENT_PAIR: NestedPair<'static> = NestedPair {
+    first_theorem: "NestedEquivalentFirst",
+    later_theorem: "NestedEquivalentSecond",
+    later_param: "\"u64 \"",
+    later_return: "\"bool \"",
+};
 
 #[rstest]
 #[case::top_level_reference(0)]
@@ -243,7 +242,7 @@ fn conflict_diagnostic_is_independent_of_reference_depth(
 
     let message = provenance.assert_reported(
         &format!("theorems/nested-conflict-depth-{depth}.theorem"),
-        &nested_conflict_fixture(depth),
+        &nested_reference_fixture(&CONFLICT_PAIR, depth),
     )?;
 
     // One expectation above serves every arrangement, which is the claim: only
@@ -252,7 +251,7 @@ fn conflict_diagnostic_is_independent_of_reference_depth(
     if depth > 0 {
         let baseline = provenance.assert_reported(
             "theorems/nested-conflict-depth-0.theorem",
-            &nested_conflict_fixture(0),
+            &nested_reference_fixture(&CONFLICT_PAIR, 0),
         )?;
         assert_eq!(
             message, baseline,
@@ -269,7 +268,7 @@ fn conflict_diagnostic_is_independent_of_reference_depth(
 fn equivalent_signature_reference_expands_at_any_depth(
     #[case] depth: usize,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let fixture = nested_equivalent_fixture(depth);
+    let fixture = nested_reference_fixture(&EQUIVALENT_PAIR, depth);
     let path = format!("theorems/nested-equivalent-depth-{depth}.theorem");
 
     // The `?` is the negative control: nesting the reference must not turn an
@@ -308,21 +307,10 @@ fn first_declaration_supplies_the_reference_signature_spelling()
 
     let fixture = TheoremFixture(format!(
         "{first}---\n{second}---\n{third}",
-        first = document(
-            "FirstOrderingThesis",
-            "First ordering declaration",
-            BASELINE_DECLARATION,
-            "",
-        ),
-        second = document(
-            "SecondOrderingThesis",
-            "Equivalent re-declaration",
-            equivalent_actions,
-            "",
-        ),
+        first = document("FirstOrderingThesis", BASELINE_DECLARATION, ""),
+        second = document("SecondOrderingThesis", equivalent_actions, ""),
         third = document(
             "ThirdOrderingThesis",
-            "Conflicting third declaration",
             conflicting_actions,
             &do_with_deposit_reference(0, &[("account", "1")]),
         ),
@@ -347,8 +335,10 @@ fn first_declaration_supplies_the_reference_signature_spelling()
 fn conflict_summary_preserves_declaration_parameter_order() -> Result<(), Box<dyn std::error::Error>>
 {
     // `zeta` precedes `alpha` in the first declaration, and the reverse is true
-    // in the second. Neither order is alphabetical, so a summary rendered in
-    // sorted order cannot satisfy the expectation below.
+    // in the second. The first order is non-alphabetical, so a summary rendered
+    // in sorted order cannot satisfy the expectation below; the second
+    // declaration happens to be alphabetical, which is why the non-alphabetical
+    // one must be the reference.
     let first_actions = concat!(
         "Actions:\n",
         "  account.deposit:\n",
@@ -370,16 +360,10 @@ fn conflict_summary_preserves_declaration_parameter_order() -> Result<(), Box<dy
         "{first}---\n{second}",
         first = document(
             "FirstParameterOrderThesis",
-            "First parameter order declaration",
             first_actions,
             &do_with_deposit_reference(0, &[("zeta", "1"), ("alpha", "2")]),
         ),
-        second = document(
-            "SecondParameterOrderThesis",
-            "Reordered parameter declaration",
-            reordered_actions,
-            "",
-        ),
+        second = document("SecondParameterOrderThesis", reordered_actions, ""),
     ));
 
     Provenance {
