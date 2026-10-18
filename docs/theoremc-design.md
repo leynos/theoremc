@@ -170,9 +170,9 @@ flowchart TD
   BS --> META
   A --> PM
   PM --> P --> V
-  PM --> KS
-  PM --> P2
-  PM --> MA
+  V --> KS
+  V --> P2
+  V --> MA
   V --> R --> IR
   KS --> H
   IR --> KB --> H
@@ -1576,8 +1576,8 @@ in the remaining subsections are the planned target.
 
 For screen readers: this flowchart shows `theoremc-macros` consuming `.theorem`
 sources and producing three outputs — Kani harness stubs, action and type
-probes, and the planned Kani body/step emission — of which only the harness
-stubs feed Kani execution.
+probes, and the planned Kani body/step emission. The planned body/step emission
+populates the harness stubs, and the harness stubs feed Kani execution.
 
 ```mermaid
 flowchart TD
@@ -1585,11 +1585,13 @@ flowchart TD
   PM --> H["Kani harness stubs"]
   PM --> P["Action and type probes"]
   PM --> KB["Kani body/step emission (planned)"]
+  KB --> H
   H --> CK["Kani execution"]
 ```
 
 Figure: emission paths from `.theorem` sources through `theoremc-macros`.
-Harness stubs and probes are implemented; body/step emission is planned.
+Harness stubs and probes are implemented; body/step emission is planned and
+fills in the harness bodies the stubs declare.
 
 ### 8.1 Harness generation strategy
 
