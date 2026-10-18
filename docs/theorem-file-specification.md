@@ -3,7 +3,14 @@
 Decision context for symbol stability and vacuity policy is recorded in
 [Architecture Decision Record (ADR) 0001](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md).
 
-## 1. YAML (a human-readable data-serialization format) schema reference (v1)
+[RFC 0001](rfcs/0001-semantic-law-templates.md) is accepted and defines schema
+version 2. This specification records that target contract as well as the
+version 1 compatibility profile. Version 2 implementation is pending roadmap
+step 4.4, after the working version 1 Kani vertical slice. The current public
+model and raw adapter still use assertion-only proof lists; accepted syntax
+below must not be read as a claim of current parser or backend support.
+
+## 1. YAML schema reference (versions 1 and 2)
 
 ### 1.1 Document model
 
@@ -19,7 +26,7 @@ avoid `unsafe` in library code).[^1]
 
 ### 1.2 Conformance rules
 
-These rules are *normative* for v1:
+These rules are *normative* for both versions unless explicitly qualified:
 
 - Unknown top-level keys: **MUST error** (`deny_unknown_fields` behaviour).
 - Required keys missing: **MUST error**.
@@ -108,10 +115,21 @@ A theorem document is a YAML mapping with these fields.
 
 - Type: integer
 - Optional
-- Default: `None` (unspecified). Consumers should treat an omitted schema field
-  as the current format version, but the loader preserves the distinction
-  between omitted and explicitly declared values.
-- Purpose: forwards compatibility for future schema changes.
+- Omitted: **MUST** select the version 1 compatibility profile permanently.
+  The domain model may preserve omission as `None`; this does not mean the
+  newest supported version.
+- `Schema: 1`: **MUST** select version 1 (opaque assertions only).
+- `Schema: 2`: **MUST** select version 2 (opaque assertions and structured
+  laws).
+- Unsupported values: **MUST** produce a source-located unsupported-version
+  diagnostic. A law in an omitted/version 1 document **MUST** produce a
+  targeted version diagnostic rather than silently upgrading the document.
+- Purpose: explicit opt-in to language evolution without changing the meaning
+  of existing unversioned files.
+
+These are the accepted version-selection requirements from RFC 0001; enforcing
+version 2 and unsupported-version diagnostics remains implementation work in
+step 4.4.
 
 ### 3.2 `Theorem` (required)
 
@@ -274,7 +292,8 @@ Actions:
 Semantics:
 
 - Every action referenced by this document's `Let` and `Do` sections must have
-  a matching `Actions` entry.
+  a matching `Actions` entry. In version 2, this also applies to every law
+  primary and custom relation.
 - `params` order is significant and defines the generated `fn(...)` probe
   parameter order.
 - Parameter names must match `args` keys used by calls to the action.
@@ -289,10 +308,15 @@ Semantics:
 
 ### 3.10 `Prove` (required)
 
-- Type: list of `Assertion`
-- Must be non-empty.
+- Type: non-empty list of `ProofObligation`.
+- Version 1 permits only `Assert(Assertion)`.
+- Version 2 permits `Assert(Assertion)` and `Law(LawObligation)` in the same
+  list.
+- Each item **MUST** contain exactly one of `assert` or `law`, with sibling
+  `because` (required, non-empty after trimming). Unknown fields and ambiguous
+  items **MUST** error.
 
-Each `Assertion` is a mapping:
+An opaque `Assertion` is a mapping:
 
 - `assert` (required): `RustExpr` (must parse)
 - `because` (required): non-empty string
@@ -305,7 +329,131 @@ Prove:
     because: "bidirectional invariant holds after commit-path reconciliation"
 ```
 
-Semantics (Kani): emits `assert!(<expr>, "<because>");`.
+Semantics (Kani): emits `assert!(<expr>, "<because>");`. Opaque assertions
+remain valid in version 2 and explicitly backend-constrained in the shared plan.
+
+A `LawObligation` has `{ law: Law, because: String }`. The `law` mapping
+**MUST** contain exactly one catalogue kind from section 3.10.2.
+
+### 3.10.1 Primary invocations and relations (version 2)
+
+Laws reuse `Actions`; there is no top-level `Primaries` registry. A primary
+invocation contains:
+
+- `action`: canonical `ActionName`, with a theorem-owned `Actions` signature;
+- `bind`: mapping of law-defined roles to actual action parameter identifiers;
+- `args`: fixed arguments using section 5's existing value forms;
+- `mode`: `call` or `must`, defaulting to `call`.
+
+Unary operations, invariants, and mappings require the role `input`. Binary
+combiners and relations require both `left` and `right`. A fully specified
+invocation has no dynamic roles. Each role **MUST** name a declared parameter;
+missing or unexpected roles, absent parameters, and parameters supplied by both
+`bind` and `args` **MUST** error.
+
+Dynamically bound parameters **MUST** use shared references; by-value or
+mutable bound parameters are rejected for the initial catalogue. Primaries
+should return owned semantic results. No implicit cloning, default
+construction, or semantic adapter may be inserted. Signature checks cannot
+establish purity or exclude hidden state, I/O, randomness, or interior mutation.
+
+`call` preserves the declared return type, including fallible values. `must`
+reuses section 4.2.2: require successful `Result` or present `Option`, then
+yield the inner value; infallible returns pass through. Unsupported unwrapping
+shapes **MUST** error.
+
+The comparison laws default to equality except `refines`, which requires a
+custom relation. A custom relation is a binary primary binding `left` and
+`right`, whose final unwrapped return type **MUST** be `bool`. Its signature
+does not prove that the relation is adequate; weak or always-true relations
+require independent scrutiny.
+
+### 3.10.2 Law catalogue (version 2)
+
+In the following table, `R` denotes equality or the selected custom relation.
+Inputs and states use the existing section 5 value forms; primary fields use
+section 3.10.1.
+
+| Kind           | Required fields                                               | Meaning                                                     |
+| -------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
+| `idempotent`   | `operation`, `input`                                          | `f(f(x)) R f(x)`                                            |
+| `round_trip`   | `forward`, `backward`, `input`                                | `backward(forward(x)) R x`                                  |
+| `equivalent`   | `left`, `right`, `input`                                      | `left(x) R right(x)`                                        |
+| `refines`      | `implementation`, `specification`, `relation`, `input`        | `relation(implementation(x), specification(x))`             |
+| `preserves`    | `invariant`, `transition`, `state`                            | `invariant(state)` implies `invariant(transition(state))`   |
+| `homomorphism` | `mapping`, `input_combine`, `output_combine`, `left`, `right` | `map(combine_input(x, y)) R combine_output(map(x), map(y))` |
+
+*Table 1: Version 2 law kinds, fields, and semantic propositions.*
+
+`idempotent`, `round_trip`, `equivalent`, and `homomorphism` accept an optional
+`relation` primary. Round trip is directional; a bidirectional codec needs two
+instances. For `preserves`, the invariant yields `bool` and the model
+transition yields a new state. Kani lowering checks precondition reachability,
+assumes the precondition, invokes the transition, and asserts the invariant on
+its result.
+
+Example fragment (accepted version 2 syntax, pending implementation):
+
+```yaml
+Schema: 2
+Actions:
+  config.normalize:
+    params:
+      config: "&crate::config::Config"
+    returns: "crate::config::Config"
+Prove:
+  - assert: "config.is_valid()"
+    because: "the existing opaque assertion remains available"
+  - law:
+      idempotent:
+        operation:
+          action: config.normalize
+          bind: { input: config }
+          args: {}
+        input: { ref: config }
+    because: "normalization reaches a fixed point after one application"
+```
+
+The fragment requires the usual theorem metadata, a `config` binding, evidence,
+and explicit witnesses to form a complete document. Full examples for every law
+are in
+[RFC 0001's catalogue](rfcs/0001-semantic-law-templates.md#initial-law-catalogue).
+
+### 3.10.3 Validation, lowering, and evidence (version 2)
+
+Validation **MUST** reject unknown or multiple law kinds, missing signatures,
+invalid action names, role/parameter conflicts, invalid reference shapes,
+invalid modes or relations, obvious composition mismatches, and empty
+rationales. Diagnostics retain source spans and precise field breadcrumbs. Law
+action references extend signature conflict checks, action probes,
+referenced-type probes, and non-executed law-composition probes. rustc handles
+aliases, associated types, coercions, and generic normalization beyond
+theoremc's structural validation.
+
+Validated laws lower into semantic Law IR, then the shared `HarnessPlan` from
+[ADR 006](adr-006-backend-neutral-harness-planning-boundary.md). Opaque
+obligations join at the same plan. Neither representation contains Kani syntax
+or token streams. Laws reuse the existing renderer and runner; backends
+**MUST** check the complete plan's capabilities before emitting partial output.
+
+Each law preserves its source rationale and parent identity, with deterministic
+child identities such as `prove[2].law.idempotent.relation`. These identities
+must not depend on generated local names. Longhand version 1 and corresponding
+version 2 laws require semantically equivalent plan fixtures.
+
+Law-generated precondition covers supplement explicit theorem witnesses; they
+**MUST NOT** replace them. Unreachable obligations are not successful proofs.
+Run records distinguish `proved`, `falsified`, `unreachable`, `undetermined`,
+`unsupported`, and `execution_error`. Resource exhaustion is `undetermined`
+with reason `resource_exhaustion`. Evidence remains backend-indexed, retaining
+bounds and provenance; a Kani law result remains bounded model-checking
+evidence.
+
+Future Verus support **MUST** preserve version 2 law meaning and add explicit
+bindings for executable, specification, and proof symbols and mathematical
+views. Ordinary action signatures do not imply those bindings. Opaque Rust
+expressions remain backend-constrained. These requirements follow
+[ADR 007](adr-007-verus-backend-preservation-invariants.md).
 
 ### 3.11 `Evidence` (required)
 
@@ -776,150 +924,119 @@ ______________________________________________________________________
 
 ## 8. Minimal Rust struct skeleton (to make implementation straightforward)
 
-This is not “extra design”; it is the schema expressed in the shape actually
-deserialized into.
+This sketch describes the accepted domain model after step 4.4, not the current
+assertion-only public API. Version-aware raw decoding and semantic validation
+enforce the version rules before conversion to these domain types. The separate
+Serde-derived raw adapters are omitted here.
 
-This can be implemented with `serde` derives and deserialized using
-`serde-saphyr` (e.g., `serde_saphyr::from_str`, or multi-doc APIs), as
-required.[^1]
+The public change from `Vec<Assertion>` to `Vec<ProofObligation>` is
+source-breaking for constructing, destructuring, and iterating consumers. It
+must land at a documented release boundary; a compatibility accessor must not
+hide law obligations. Existing version 1 files require no migration. Adding
+`Schema: 2` opts into laws while preserving existing assertion syntax.
+
+The raw adapters are deserialized using `serde-saphyr` (e.g.,
+`serde_saphyr::from_str`, or multi-doc APIs), then validated and converted to
+this domain model.[^1]
 
 ```rust
-// Pseudocode-level skeleton; fields omitted for brevity.
+// Domain model sketch; fields omitted for brevity.
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TheoremDoc {
-    #[serde(default)]
     pub schema: Option<u32>, // "Schema"
 
-    #[serde(rename = "Theorem", alias = "theorem")]
     pub theorem: String,
 
-    #[serde(rename = "About", alias = "about")]
     pub about: String,
 
-    #[serde(rename = "Tags", alias = "tags", default)]
     pub tags: Vec<String>,
 
-    #[serde(rename = "Given", alias = "given", default)]
     pub given: Vec<String>,
 
-    #[serde(rename = "Forall", alias = "forall", default)]
     pub forall: indexmap::IndexMap<String, String>, // Identifier -> RustType
 
-    #[serde(rename = "Assume", alias = "assume", default)]
     pub assume: Vec<Assumption>,
 
-    #[serde(rename = "Witness", alias = "witness", default)]
     pub witness: Vec<WitnessCheck>,
 
-    #[serde(rename = "Let", alias = "let", default)]
     pub let_bindings: indexmap::IndexMap<String, LetBinding>,
 
-    #[serde(rename = "Do", alias = "do", default)]
     pub do_steps: Vec<Step>,
 
-    #[serde(rename = "Actions", alias = "actions", default)]
     pub actions: indexmap::IndexMap<String, ActionSignature>,
 
-    #[serde(rename = "Prove", alias = "prove")]
-    pub prove: Vec<Assertion>,
+    pub prove: Vec<ProofObligation>,
 
-    #[serde(rename = "Evidence", alias = "evidence")]
     pub evidence: Evidence,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Assumption {
     pub expr: String,
     pub because: String,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Assertion {
-    #[serde(rename = "assert")]
     pub assert_expr: String,
     pub because: String,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
+// Domain sketch only: raw adapters enforce exclusive keys and version gating.
+pub enum ProofObligation {
+    Assert(Assertion),
+    Law(LawObligation),
+}
+
+pub struct LawObligation {
+    pub law: Law, // Dedicated law domain types from section 3.10.2.
+    pub because: String,
+}
+
 pub struct WitnessCheck {
     pub cover: String,
     pub because: String,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(untagged)]
 pub enum LetBinding {
     Call { call: ActionCall },
     Must { must: ActionCall },
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(untagged)]
 pub enum Step {
     Call { call: ActionCall },
     Must { must: ActionCall },
     Maybe { maybe: MaybeBlock },
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct MaybeBlock {
     pub because: String,
-    #[serde(rename = "do")]
     pub do_steps: Vec<Step>,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ActionCall {
     pub action: String,
-    // Or your own Value type.
-    pub args: indexmap::IndexMap<String, serde_saphyr::Value>,
-    #[serde(rename = "as", default)]
+    // A domain value decoded by the separate raw adapter.
+    pub args: indexmap::IndexMap<String, Value>,
     pub as_binding: Option<String>,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ActionSignature {
-    #[serde(default)]
     pub params: indexmap::IndexMap<String, String>, // Identifier -> RustType
-    #[serde(default = "unit_type")]
     pub returns: String,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Evidence {
-    #[serde(default)]
     pub kani: Option<KaniEvidence>,
-    #[serde(default)]
-    pub verus: Option<serde_saphyr::Value>,
-    #[serde(default)]
-    pub stateright: Option<serde_saphyr::Value>,
+    pub verus: Option<Value>,
+    pub stateright: Option<Value>,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct KaniEvidence {
     pub unwind: u32,
     pub expect: String,
-    #[serde(default)]
     pub allow_vacuous: bool,
-    #[serde(default)]
     pub vacuity_because: Option<String>,
 }
 
-fn unit_type() -> String {
-    "()".to_owned()
-}
 ```
 
 (A wrapper around `serde_saphyr::Value` is likely useful so a project-specific
