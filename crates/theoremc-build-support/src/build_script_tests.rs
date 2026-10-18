@@ -175,23 +175,50 @@ fn missing_cargo_environment_is_reported(
     Ok(())
 }
 
+/// Filesystem failures whose diagnostics must identify the preparation stage.
+#[derive(Debug, Clone, Copy)]
+enum PreparationFailure {
+    /// Opening the nonexistent manifest directory must fail during discovery.
+    MissingManifestDirectory,
+    /// A directory at the generated suite path must prevent writing the suite.
+    SuitePathIsDirectory,
+}
+
 #[rstest]
-fn missing_manifest_directory_is_reported_as_a_discovery_error(
+#[case::missing_manifest_directory(PreparationFailure::MissingManifestDirectory)]
+#[case::suite_path_is_directory(PreparationFailure::SuitePathIsDirectory)]
+fn preparation_preserves_filesystem_error_variants(
     build_script_fixture: Result<BuildScriptFixture, Box<dyn Error>>,
+    #[case] failure: PreparationFailure,
 ) -> Result<(), Box<dyn Error>> {
     let fixture = build_script_fixture?;
-    let missing_manifest_dir = fixture.manifest_dir.join("missing");
-
+    let (manifest_dir, context, expected_error) = match failure {
+        PreparationFailure::MissingManifestDirectory => (
+            fixture.manifest_dir.join("missing"),
+            "a missing manifest directory should fail discovery",
+            "a discovery error",
+        ),
+        PreparationFailure::SuitePathIsDirectory => {
+            fixture.dir.create_dir_all("out/theorem_suite.rs")?;
+            (
+                fixture.manifest_dir,
+                "a directory at the suite-file path should fail to write",
+                "a suite error",
+            )
+        }
+    };
     let error = require_build_error(
-        prepare_build_script_at(&missing_manifest_dir, &fixture.out_dir),
-        "a missing manifest directory should fail discovery",
+        prepare_build_script_at(&manifest_dir, &fixture.out_dir),
+        context,
     )?;
 
-    match error {
-        BuildScriptError::Discovery(_) => Ok(()),
-        unexpected => {
-            Err(io::Error::other(format!("expected a discovery error, got {unexpected:?}")).into())
-        }
+    match (failure, error) {
+        (PreparationFailure::MissingManifestDirectory, BuildScriptError::Discovery(_))
+        | (PreparationFailure::SuitePathIsDirectory, BuildScriptError::Suite(_)) => Ok(()),
+        (_, unexpected) => Err(io::Error::other(format!(
+            "expected {expected_error} for {failure:?}, got {unexpected:?}"
+        ))
+        .into()),
     }
 }
 
@@ -214,24 +241,4 @@ fn missing_output_directory_is_reported_with_its_path(
     };
     require_equal(&path, &missing_out_dir, "missing output directory path")?;
     Ok(())
-}
-
-#[rstest]
-fn an_unwritable_suite_target_is_reported_as_a_suite_error(
-    build_script_fixture: Result<BuildScriptFixture, Box<dyn Error>>,
-) -> Result<(), Box<dyn Error>> {
-    let fixture = build_script_fixture?;
-    fixture.dir.create_dir_all("out/theorem_suite.rs")?;
-
-    let error = require_build_error(
-        prepare_build_script_at(&fixture.manifest_dir, &fixture.out_dir),
-        "a directory at the suite-file path should fail to write",
-    )?;
-
-    match error {
-        BuildScriptError::Suite(_) => Ok(()),
-        unexpected => {
-            Err(io::Error::other(format!("expected a suite error, got {unexpected:?}")).into())
-        }
-    }
 }
