@@ -46,6 +46,10 @@ reduce drift risk, normative definitions are centralized:
 - [ADR 007](adr-007-verus-backend-preservation-invariants.md) preserves law
   meaning, primary identity, backend-indexed evidence, and explicit future
   Verus bindings.
+- [ADR 008](adr-008-workspace-build-support-boundary.md) limits
+  `theoremc-build-support` to existing build-script preparation, theorem
+  discovery, and generated-suite writing. It leaves the `HarnessPlan` boundary
+  in `theoremc-core` as specified by ADR 006.
 
 The accepted law and planning changes remain pending implementation in
 [roadmap steps 4.1 to 4.4](roadmap.md#phase-4-working-kani-proof-path-safety-policy-and-semantic-laws).

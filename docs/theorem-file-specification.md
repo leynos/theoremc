@@ -10,7 +10,7 @@ step 4.4, after the working version 1 Kani vertical slice. The current public
 model and raw adapter still use assertion-only proof lists; accepted syntax
 below must not be read as a claim of current parser or backend support.
 
-## 1. YAML (a human-readable data-serialization format) schema reference (v1)
+## 1. YAML schema reference (versions 1 and 2)
 
 ### 1.1 Document model
 
@@ -924,10 +924,10 @@ ______________________________________________________________________
 
 ## 8. Minimal Rust struct skeleton (to make implementation straightforward)
 
-This sketch describes the accepted target model after step 4.4, not the current
-assertion-only public API or raw adapter. Version-aware raw decoding and
-semantic validation enforce the version rules before domain conversion. Raw
-adapters remain separate from domain types and lowering.
+This sketch describes the accepted domain model after step 4.4, not the current
+assertion-only public API. Version-aware raw decoding and semantic validation
+enforce the version rules before conversion to these domain types. The separate
+Serde-derived raw adapters are omitted here.
 
 The public change from `Vec<Assertion>` to `Vec<ProofObligation>` is
 source-breaking for constructing, destructuring, and iterating consumers. It
@@ -935,67 +935,47 @@ must land at a documented release boundary; a compatibility accessor must not
 hide law obligations. Existing version 1 files require no migration. Adding
 `Schema: 2` opts into laws while preserving existing assertion syntax.
 
-This can be implemented with `serde` derives and deserialized using
-`serde-saphyr` (e.g., `serde_saphyr::from_str`, or multi-doc APIs), as
-required.[^1]
+The raw adapters are deserialized using `serde-saphyr` (e.g.,
+`serde_saphyr::from_str`, or multi-doc APIs), then validated and converted to
+this domain model.[^1]
 
 ```rust
-// Pseudocode-level skeleton; fields omitted for brevity.
+// Domain model sketch; fields omitted for brevity.
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct TheoremDoc {
-    #[serde(default)]
     pub schema: Option<u32>, // "Schema"
 
-    #[serde(rename = "Theorem", alias = "theorem")]
     pub theorem: String,
 
-    #[serde(rename = "About", alias = "about")]
     pub about: String,
 
-    #[serde(rename = "Tags", alias = "tags", default)]
     pub tags: Vec<String>,
 
-    #[serde(rename = "Given", alias = "given", default)]
     pub given: Vec<String>,
 
-    #[serde(rename = "Forall", alias = "forall", default)]
     pub forall: indexmap::IndexMap<String, String>, // Identifier -> RustType
 
-    #[serde(rename = "Assume", alias = "assume", default)]
     pub assume: Vec<Assumption>,
 
-    #[serde(rename = "Witness", alias = "witness", default)]
     pub witness: Vec<WitnessCheck>,
 
-    #[serde(rename = "Let", alias = "let", default)]
     pub let_bindings: indexmap::IndexMap<String, LetBinding>,
 
-    #[serde(rename = "Do", alias = "do", default)]
     pub do_steps: Vec<Step>,
 
-    #[serde(rename = "Actions", alias = "actions", default)]
     pub actions: indexmap::IndexMap<String, ActionSignature>,
 
-    #[serde(rename = "Prove", alias = "prove")]
     pub prove: Vec<ProofObligation>,
 
-    #[serde(rename = "Evidence", alias = "evidence")]
     pub evidence: Evidence,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Assumption {
     pub expr: String,
     pub because: String,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Assertion {
-    #[serde(rename = "assert")]
     pub assert_expr: String,
     pub because: String,
 }
@@ -1011,82 +991,52 @@ pub struct LawObligation {
     pub because: String,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct WitnessCheck {
     pub cover: String,
     pub because: String,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(untagged)]
 pub enum LetBinding {
     Call { call: ActionCall },
     Must { must: ActionCall },
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-#[serde(untagged)]
 pub enum Step {
     Call { call: ActionCall },
     Must { must: ActionCall },
     Maybe { maybe: MaybeBlock },
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct MaybeBlock {
     pub because: String,
-    #[serde(rename = "do")]
     pub do_steps: Vec<Step>,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ActionCall {
     pub action: String,
-    // Or your own Value type.
-    pub args: indexmap::IndexMap<String, serde_saphyr::Value>,
-    #[serde(rename = "as", default)]
+    // A domain value decoded by the separate raw adapter.
+    pub args: indexmap::IndexMap<String, Value>,
     pub as_binding: Option<String>,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct ActionSignature {
-    #[serde(default)]
     pub params: indexmap::IndexMap<String, String>, // Identifier -> RustType
-    #[serde(default = "unit_type")]
     pub returns: String,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct Evidence {
-    #[serde(default)]
     pub kani: Option<KaniEvidence>,
-    #[serde(default)]
-    pub verus: Option<serde_saphyr::Value>,
-    #[serde(default)]
-    pub stateright: Option<serde_saphyr::Value>,
+    pub verus: Option<Value>,
+    pub stateright: Option<Value>,
 }
 
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct KaniEvidence {
     pub unwind: u32,
     pub expect: String,
-    #[serde(default)]
     pub allow_vacuous: bool,
-    #[serde(default)]
     pub vacuity_because: Option<String>,
 }
 
-fn unit_type() -> String {
-    "()".to_owned()
-}
 ```
 
 (A wrapper around `serde_saphyr::Value` is likely useful so a project-specific

@@ -50,7 +50,7 @@ Use these signposts to trace each roadmap task to the defining requirement.
   command surface, project integration, backend management, execution,
   reporting, and agent-native contracts).
 - `TFS-1`:
-  [docs/theorem-file-specification.md §§1-3](theorem-file-specification.md#1-yaml-a-human-readable-data-serialization-format-schema-reference-v1)
+  [docs/theorem-file-specification.md §§1-3](theorem-file-specification.md#1-yaml-schema-reference-versions-1-and-2)
   (document model and conformance rules).
 - `TFS-4`:
   [docs/theorem-file-specification.md §4](theorem-file-specification.md#4-step-and-action-schemas)
@@ -493,7 +493,10 @@ explicit non-vacuity guarantees; schema version 2 laws then reuse that path.
 Dependencies: phases 1 to 3. Implementation plans must cite ADR 006.
 
 In scope: a supported version 1 subset, shared planning, Kani rendering, and
-real positive and negative fixtures through normal build integration.
+real positive and negative fixtures through normal build integration. Per
+ADR-008, `theoremc-build-support` remains limited to build-script preparation,
+discovery, and suite writing; `HarnessPlan` belongs in `theoremc-core` per
+ADR-006.
 
 Out of scope: schema version 2 laws, rich reports, and non-Kani backends.
 
@@ -501,7 +504,7 @@ Out of scope: schema version 2 laws, rich reports, and non-Kani backends.
   with resolved invocations, source provenance, stable obligation identities,
   and explicitly opaque Rust predicates. Acceptance: plan fixtures contain no
   token streams, Kani syntax, or generated local names as semantic identities.
-  Signposts: `ADR5`, `ADR6`, `ADR7`.
+  Signposts: `ADR5`, `ADR6`, `ADR7`, `ADR8`.
 - [ ] Lower the supported version 1 subset into the shared plan: ordered typed
   `Forall`, `Assume`, `Let`, infallible `call` with bound results, `Prove`, and
   `Witness`. Acceptance: unit tests cover binding order and identity; all
