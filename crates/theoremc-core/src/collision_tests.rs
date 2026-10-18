@@ -10,11 +10,31 @@ use indexmap::IndexMap;
 use proptest::prelude::{Just, prop, prop_assert, proptest};
 use rstest::rstest;
 
+/// Setup must preserve invalid names as errors instead of panicking.
+#[rstest]
+#[case::empty("")]
+#[case::keyword("fn")]
+fn document_builders_return_identifier_errors(boilerplate: DocBoilerplate, #[case] name: &str) {
+    let results = [
+        theorem_doc(name, IndexMap::new(), Vec::new(), &boilerplate),
+        doc_with_let_actions(name, &["account.deposit"], &boilerplate),
+        doc_with_do_actions(name, &["account.deposit"], &boilerplate),
+    ];
+    for result in results {
+        let error = result.expect_err("invalid theorem name must fail setup");
+        assert!(
+            matches!(error, SchemaError::InvalidIdentifier { ref identifier, .. } if identifier == name),
+            "expected identifier error for {name:?}, got: {error}",
+        );
+    }
+}
+
 // ── Collection tests ────────────────────────────────────────────────
 
 #[rstest]
 fn collect_from_let_bindings(boilerplate: DocBoilerplate) {
-    let doc = doc_with_let_actions("T", &["account.deposit", "account.withdraw"], &boilerplate);
+    let doc = doc_with_let_actions("T", &["account.deposit", "account.withdraw"], &boilerplate)
+        .expect("test theorem name should be valid");
     let mut out = Vec::new();
     collect_doc_actions(&doc, &mut out);
     let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
@@ -23,7 +43,8 @@ fn collect_from_let_bindings(boilerplate: DocBoilerplate) {
 
 #[rstest]
 fn collect_from_do_steps(boilerplate: DocBoilerplate) {
-    let doc = doc_with_do_actions("T", &["hnsw.attach_node", "hnsw.detach_node"], &boilerplate);
+    let doc = doc_with_do_actions("T", &["hnsw.attach_node", "hnsw.detach_node"], &boilerplate)
+        .expect("test theorem name should be valid");
     let mut out = Vec::new();
     collect_doc_actions(&doc, &mut out);
     let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
@@ -41,7 +62,8 @@ fn collect_from_nested_maybe(boilerplate: DocBoilerplate) {
             do_steps: vec![inner_step],
         },
     });
-    let doc = theorem_doc("T", IndexMap::new(), vec![maybe], &boilerplate);
+    let doc = theorem_doc("T", IndexMap::new(), vec![maybe], &boilerplate)
+        .expect("test theorem name should be valid");
     let mut out = Vec::new();
     collect_doc_actions(&doc, &mut out);
     let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
@@ -60,7 +82,8 @@ fn collect_from_let_and_do_combined(boilerplate: DocBoilerplate) {
     let steps = vec![Step::Call(StepCall {
         call: action_call("account.validate"),
     })];
-    let doc = theorem_doc("T", let_bindings, steps, &boilerplate);
+    let doc = theorem_doc("T", let_bindings, steps, &boilerplate)
+        .expect("test theorem name should be valid");
     let mut out = Vec::new();
     collect_doc_actions(&doc, &mut out);
     let names: Vec<&str> = out.iter().map(|o| o.canonical).collect();
@@ -72,8 +95,10 @@ fn collect_from_let_and_do_combined(boilerplate: DocBoilerplate) {
 #[rstest]
 fn no_collisions_returns_ok(boilerplate: DocBoilerplate) {
     let docs = vec![
-        doc_with_let_actions("Alpha", &["account.deposit"], &boilerplate),
-        doc_with_do_actions("Beta", &["hnsw.attach_node"], &boilerplate),
+        doc_with_let_actions("Alpha", &["account.deposit"], &boilerplate)
+            .expect("test theorem name should be valid"),
+        doc_with_do_actions("Beta", &["hnsw.attach_node"], &boilerplate)
+            .expect("test theorem name should be valid"),
     ];
     assert!(check_action_collisions(&docs).is_ok());
 }
@@ -82,8 +107,10 @@ fn no_collisions_returns_ok(boilerplate: DocBoilerplate) {
 fn same_action_across_theorems_is_accepted(boilerplate: DocBoilerplate) {
     // Multiple theorems referencing the same action is normal usage.
     let docs = vec![
-        doc_with_let_actions("Alpha", &["account.deposit"], &boilerplate),
-        doc_with_do_actions("Beta", &["account.deposit"], &boilerplate),
+        doc_with_let_actions("Alpha", &["account.deposit"], &boilerplate)
+            .expect("test theorem name should be valid"),
+        doc_with_do_actions("Beta", &["account.deposit"], &boilerplate)
+            .expect("test theorem name should be valid"),
     ];
     assert!(check_action_collisions(&docs).is_ok());
 }
@@ -91,7 +118,8 @@ fn same_action_across_theorems_is_accepted(boilerplate: DocBoilerplate) {
 #[rstest]
 fn same_action_within_one_theorem_is_accepted(boilerplate: DocBoilerplate) {
     // Calling the same action twice in one theorem is normal.
-    let doc = doc_with_do_actions("T", &["account.deposit", "account.deposit"], &boilerplate);
+    let doc = doc_with_do_actions("T", &["account.deposit", "account.deposit"], &boilerplate)
+        .expect("test theorem name should be valid");
     assert!(check_action_collisions(&[doc]).is_ok());
 }
 
@@ -102,7 +130,8 @@ fn empty_docs_returns_ok() {
 
 #[rstest]
 fn doc_without_actions_returns_ok(boilerplate: DocBoilerplate) {
-    let doc = theorem_doc("T", IndexMap::new(), Vec::new(), &boilerplate);
+    let doc = theorem_doc("T", IndexMap::new(), Vec::new(), &boilerplate)
+        .expect("test theorem name should be valid");
     assert!(check_action_collisions(&[doc]).is_ok());
 }
 
@@ -150,8 +179,10 @@ fn crafted_collision_returns_mangled_identifier_collision_error(boilerplate: Doc
     // mangler that maps all names to the same identifier, forcing the
     // collision path through the public pipeline.
     let docs = vec![
-        doc_with_do_actions("Alpha", &["alpha.beta"], &boilerplate),
-        doc_with_do_actions("Gamma", &["gamma.delta"], &boilerplate),
+        doc_with_do_actions("Alpha", &["alpha.beta"], &boilerplate)
+            .expect("test theorem name should be valid"),
+        doc_with_do_actions("Gamma", &["gamma.delta"], &boilerplate)
+            .expect("test theorem name should be valid"),
     ];
 
     let always_collide = |_: &str| "colliding__identifier__h000000000000".to_owned();
@@ -283,9 +314,9 @@ mod prop_tests {
             let n = name_refs.len();
             let collisions = find_mangled_collisions(&name_refs);
             prop_assert!(
-                collisions.len() <= n / 2,
+                collisions.len() <= n.div_euclid(2),
                 "expected at most {} collision groups for {} names, got {}",
-                n / 2,
+                n.div_euclid(2),
                 n,
                 collisions.len(),
             );
@@ -302,7 +333,7 @@ mod prop_tests {
         ) {
             let name_refs: BTreeSet<&str> = names.iter().map(String::as_str).collect();
             let collisions = find_mangled_collisions(&name_refs);
-            for (_identifier, colliding_names) in &collisions {
+            for colliding_names in collisions.values() {
                 for colliding_name in colliding_names {
                     prop_assert!(
                         names.contains(colliding_name.as_str()),

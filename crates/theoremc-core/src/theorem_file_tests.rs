@@ -59,20 +59,29 @@ mod prop_tests {
     }
 }
 
+/// Keeps a temporary manifest directory alive while fixtures are loaded.
 #[derive(Debug)]
 struct TempManifestDir {
+    /// Owns cleanup after the filesystem-backed test finishes.
     _temp_dir: TempDir,
+    /// UTF-8 root supplied to the theorem loader.
     manifest_dir: Utf8PathBuf,
 }
 
+/// Loader failure categories covered by the filesystem case matrix.
 #[derive(Debug, Clone, Copy)]
 enum ExpectedErrorKind {
+    /// Rejects a path before attempting file access.
     InvalidTheoremPath,
+    /// Reports a failed read within the manifest directory.
     ReadTheoremFile,
+    /// Rejects a successfully read file with no documents.
     EmptyTheoremFile,
+    /// Reports schema failure in a successfully read file.
     InvalidTheoremFile,
 }
 
+/// Creates an isolated fixture root, propagating filesystem and UTF-8 errors.
 #[fixture]
 fn temp_manifest_dir() -> Result<TempManifestDir, Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
@@ -86,6 +95,7 @@ fn temp_manifest_dir() -> Result<TempManifestDir, Box<dyn std::error::Error>> {
     })
 }
 
+/// Stages theorem contents beneath the test-owned manifest root.
 fn write_fixture(
     manifest_dir: &Utf8Path,
     theorem_path: &Utf8Path,
@@ -101,6 +111,7 @@ fn write_fixture(
     Ok(())
 }
 
+/// Reports a mismatched loader failure through the fallible test boundary.
 fn assert_expected_error(
     result: &Result<Vec<TheoremDoc>, TheoremFileLoadError>,
     expected: ExpectedErrorKind,
@@ -142,20 +153,20 @@ fn theorem_path_violation_names_rejected_path_class(
     #[case] theorem_path: &str,
     #[case] expected: Option<TheoremPathViolation>,
 ) {
-    let theorem_path = Utf8Path::new(theorem_path);
-    assert_eq!(theorem_path_violation(theorem_path), expected);
-    assert_eq!(is_invalid_theorem_path(theorem_path), expected.is_some());
+    let parsed_path = Utf8Path::new(theorem_path);
+    assert_eq!(theorem_path_violation(parsed_path), expected);
+    assert_eq!(is_invalid_theorem_path(parsed_path), expected.is_some());
 }
 
 #[test]
 fn open_manifest_dir_error_when_directory_is_absent() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = TempDir::new()?;
-    let missing = temp_dir.path().join("nonexistent");
-    let missing = Utf8PathBuf::from_path_buf(missing).map_err(|path| {
+    let missing_path = temp_dir.path().join("nonexistent");
+    let missing_utf8 = Utf8PathBuf::from_path_buf(missing_path).map_err(|path| {
         std::io::Error::other(format!("non-UTF-8 temp path: {}", path.display()))
     })?;
     let result =
-        load_theorem_file_from_manifest_dir(&missing, Utf8Path::new("theorems/any.theorem"));
+        load_theorem_file_from_manifest_dir(&missing_utf8, Utf8Path::new("theorems/any.theorem"));
     match &result {
         Err(TheoremFileLoadError::OpenManifestDir { .. }) => Ok(()),
         _ => {
@@ -194,12 +205,12 @@ fn theorem_file_load_errors_are_reported_consistently(
     #[case] file_contents: Option<&str>,
     #[case] expected: ExpectedErrorKind,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let temp_manifest_dir = temp_manifest_dir?;
-    let theorem_path = Utf8Path::new(theorem_path);
-    if let Some(file_contents) = file_contents {
-        write_fixture(&temp_manifest_dir.manifest_dir, theorem_path, file_contents)?;
+    let fixture = temp_manifest_dir?;
+    let parsed_path = Utf8Path::new(theorem_path);
+    if let Some(contents) = file_contents {
+        write_fixture(&fixture.manifest_dir, parsed_path, contents)?;
     }
-    let result = load_theorem_file_from_manifest_dir(&temp_manifest_dir.manifest_dir, theorem_path);
+    let result = load_theorem_file_from_manifest_dir(&fixture.manifest_dir, parsed_path);
     assert_expected_error(&result, expected)
 }
 
@@ -231,9 +242,25 @@ fn backslash_relative_paths_load_after_normalization() -> Result<(), Box<dyn std
         Utf8Path::new(r"theorems\nested\valid.theorem"),
     )?;
 
-    assert_eq!(docs.len(), 1);
-    assert_eq!(docs[0].theorem, "BackslashPath");
+    let document = docs
+        .first()
+        .ok_or_else(|| std::io::Error::other("normalized path should load a theorem document"))?;
+    assert_single_theorem(docs.len(), document, "BackslashPath");
     Ok(())
+}
+
+/// Asserts pure document queries after the fallible test has loaded its fixture.
+#[track_caller]
+fn assert_single_theorem(document_count: usize, document: &TheoremDoc, expected_name: &str) {
+    assert_eq!(
+        document_count, 1,
+        "normalized path should load exactly one document"
+    );
+    assert_eq!(
+        document.theorem.as_str(),
+        expected_name,
+        "loaded theorem name"
+    );
 }
 
 #[test]

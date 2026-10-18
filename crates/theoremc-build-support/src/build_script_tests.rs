@@ -1,6 +1,6 @@
 //! Direct tests for Cargo build-script preparation.
 
-use std::{env, error::Error, io};
+use std::{env, error::Error, fmt::Debug, io};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir as Utf8Dir};
@@ -53,6 +53,30 @@ fn build_script_fixture() -> Result<BuildScriptFixture, Box<dyn Error>> {
     BuildScriptFixture::new()
 }
 
+/// Report mismatched values without introducing a panic into an I/O test.
+fn require_equal<T: Debug + PartialEq + ?Sized>(
+    actual: &T,
+    expected: &T,
+    context: &str,
+) -> Result<(), Box<dyn Error>> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!("{context}: expected {expected:?}, got {actual:?}")).into())
+    }
+}
+
+/// Extract a preparation error while retaining unexpected successful output.
+fn require_build_error(
+    result: Result<BuildScriptOutput, BuildScriptError>,
+    context: &str,
+) -> Result<BuildScriptError, Box<dyn Error>> {
+    match result {
+        Err(error) => Ok(error),
+        Ok(output) => Err(io::Error::other(format!("{context}: got {output:?}")).into()),
+    }
+}
+
 #[rstest]
 fn preparation_generates_an_empty_suite_and_root_watch_path(
     build_script_fixture: Result<BuildScriptFixture, Box<dyn Error>>,
@@ -61,15 +85,24 @@ fn preparation_generates_an_empty_suite_and_root_watch_path(
 
     let output = fixture.prepare()?;
 
-    assert!(!output.has_theorems());
-    assert_eq!(
-        output
+    require_equal(
+        &output.has_theorems(),
+        &false,
+        "empty suite theorem presence",
+    )?;
+    require_equal(
+        &output
             .rerun_paths()
             .map(|path| path.as_str())
             .collect::<Vec<_>>(),
-        vec!["theorems"]
-    );
-    assert_eq!(fixture.dir.read_to_string("out/theorem_suite.rs")?, "\n");
+        &vec!["theorems"],
+        "empty suite rerun paths",
+    )?;
+    require_equal(
+        fixture.dir.read_to_string("out/theorem_suite.rs")?.as_str(),
+        "\n",
+        "empty suite bytes",
+    )?;
     Ok(())
 }
 
@@ -85,22 +118,28 @@ fn preparation_generates_theorem_suite_and_rerun_paths(
 
     let output = fixture.prepare()?;
 
-    assert!(output.has_theorems());
-    assert_eq!(
-        output
+    require_equal(
+        &output.has_theorems(),
+        &true,
+        "populated suite theorem presence",
+    )?;
+    require_equal(
+        &output
             .rerun_paths()
             .map(|path| path.as_str())
             .collect::<Vec<_>>(),
-        vec![
+        &vec![
             "theorems",
             "theorems/nested",
-            "theorems/nested/example.theorem"
-        ]
-    );
-    assert_eq!(
-        fixture.dir.read_to_string("out/theorem_suite.rs")?,
-        "theorem_file!(\"theorems/nested/example.theorem\");\n"
-    );
+            "theorems/nested/example.theorem",
+        ],
+        "populated suite rerun paths in discovery order",
+    )?;
+    require_equal(
+        fixture.dir.read_to_string("out/theorem_suite.rs")?.as_str(),
+        "theorem_file!(\"theorems/nested/example.theorem\");\n",
+        "populated suite bytes",
+    )?;
     Ok(())
 }
 
@@ -112,34 +151,75 @@ fn missing_cargo_environment_is_reported(
     #[case] missing_variable: &'static str,
 ) -> Result<(), Box<dyn Error>> {
     let fixture = build_script_fixture?;
-    let error = prepare_build_script_with_env(|variable| {
-        if variable == missing_variable {
-            Err(env::VarError::NotPresent)
-        } else {
-            fixture.read_cargo_variable(variable)
-        }
-    })
-    .expect_err("a required Cargo variable that is absent should fail");
+    let error = require_build_error(
+        prepare_build_script_with_env(|variable| {
+            if variable == missing_variable {
+                Err(env::VarError::NotPresent)
+            } else {
+                fixture.read_cargo_variable(variable)
+            }
+        }),
+        "a required Cargo variable that is absent should fail",
+    )?;
 
     let BuildScriptError::Environment { variable, .. } = error else {
-        panic!("expected an environment error, got {error:?}");
+        return Err(
+            io::Error::other(format!("expected an environment error, got {error:?}")).into(),
+        );
     };
-    assert_eq!(variable, missing_variable);
+    require_equal(
+        variable,
+        missing_variable,
+        "missing Cargo variable identity",
+    )?;
     Ok(())
 }
 
+/// Filesystem failures whose diagnostics must identify the preparation stage.
+#[derive(Debug, Clone, Copy)]
+enum PreparationFailure {
+    /// Opening the nonexistent manifest directory must fail during discovery.
+    MissingManifestDirectory,
+    /// A directory at the generated suite path must prevent writing the suite.
+    SuitePathIsDirectory,
+}
+
 #[rstest]
-fn missing_manifest_directory_is_reported_as_a_discovery_error(
+#[case::missing_manifest_directory(PreparationFailure::MissingManifestDirectory)]
+#[case::suite_path_is_directory(PreparationFailure::SuitePathIsDirectory)]
+fn preparation_preserves_filesystem_error_variants(
     build_script_fixture: Result<BuildScriptFixture, Box<dyn Error>>,
+    #[case] failure: PreparationFailure,
 ) -> Result<(), Box<dyn Error>> {
     let fixture = build_script_fixture?;
-    let missing_manifest_dir = fixture.manifest_dir.join("missing");
+    let (manifest_dir, context, expected_error) = match failure {
+        PreparationFailure::MissingManifestDirectory => (
+            fixture.manifest_dir.join("missing"),
+            "a missing manifest directory should fail discovery",
+            "a discovery error",
+        ),
+        PreparationFailure::SuitePathIsDirectory => {
+            fixture.dir.create_dir_all("out/theorem_suite.rs")?;
+            (
+                fixture.manifest_dir,
+                "a directory at the suite-file path should fail to write",
+                "a suite error",
+            )
+        }
+    };
+    let error = require_build_error(
+        prepare_build_script_at(&manifest_dir, &fixture.out_dir),
+        context,
+    )?;
 
-    let error = prepare_build_script_at(&missing_manifest_dir, &fixture.out_dir)
-        .expect_err("a missing manifest directory should fail discovery");
-
-    assert!(matches!(error, BuildScriptError::Discovery(_)));
-    Ok(())
+    match (failure, error) {
+        (PreparationFailure::MissingManifestDirectory, BuildScriptError::Discovery(_))
+        | (PreparationFailure::SuitePathIsDirectory, BuildScriptError::Suite(_)) => Ok(()),
+        (_, unexpected) => Err(io::Error::other(format!(
+            "expected {expected_error} for {failure:?}, got {unexpected:?}"
+        ))
+        .into()),
+    }
 }
 
 #[rstest]
@@ -149,26 +229,16 @@ fn missing_output_directory_is_reported_with_its_path(
     let fixture = build_script_fixture?;
     let missing_out_dir = fixture.manifest_dir.join("missing-out");
 
-    let error = prepare_build_script_at(&fixture.manifest_dir, &missing_out_dir)
-        .expect_err("a missing output directory should fail to open");
+    let error = require_build_error(
+        prepare_build_script_at(&fixture.manifest_dir, &missing_out_dir),
+        "a missing output directory should fail to open",
+    )?;
 
     let BuildScriptError::OpenOutputDirectory { path, .. } = error else {
-        panic!("expected an output-directory error, got {error:?}");
+        return Err(
+            io::Error::other(format!("expected an output-directory error, got {error:?}")).into(),
+        );
     };
-    assert_eq!(path, missing_out_dir);
-    Ok(())
-}
-
-#[rstest]
-fn an_unwritable_suite_target_is_reported_as_a_suite_error(
-    build_script_fixture: Result<BuildScriptFixture, Box<dyn Error>>,
-) -> Result<(), Box<dyn Error>> {
-    let fixture = build_script_fixture?;
-    fixture.dir.create_dir_all("out/theorem_suite.rs")?;
-
-    let error = prepare_build_script_at(&fixture.manifest_dir, &fixture.out_dir)
-        .expect_err("a directory at the suite-file path should fail to write");
-
-    assert!(matches!(error, BuildScriptError::Suite(_)));
+    require_equal(&path, &missing_out_dir, "missing output directory path")?;
     Ok(())
 }

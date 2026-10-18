@@ -203,42 +203,54 @@ fn multi_key_map_with_literal_is_raw_map() {
 
 // ── Error message includes parameter name ───────────────────────────
 
+/// Expected typed failure and its caller-facing diagnostic fragment.
+struct ParamErrorExpectation<'a> {
+    /// Full error value, including the parameter identity.
+    error: ArgDecodeError,
+    /// Text that must remain visible in the rendered diagnostic.
+    fragment: &'a str,
+}
+
 #[rstest]
 #[case::reserved_keyword(
     "ref",
     TheoremValue::String("fn".into()),
     "graph_ref",
-    ArgDecodeError::ReservedKeyword {
-        param: "graph_ref".into(),
-        name: "fn".into(),
-    },
-    "graph_ref"
+    ParamErrorExpectation {
+        error: ArgDecodeError::ReservedKeyword {
+            param: "graph_ref".into(),
+            name: "fn".into(),
+        },
+        fragment: "graph_ref",
+    }
 )]
 #[case::non_string_literal(
     "literal",
     TheoremValue::Integer(7),
     "my_label",
-    ArgDecodeError::NonStringLiteralValue {
-        param: "my_label".into(),
-        kind: "an integer",
-    },
-    "my_label"
+    ParamErrorExpectation {
+        error: ArgDecodeError::NonStringLiteralValue {
+            param: "my_label".into(),
+            kind: "an integer",
+        },
+        fragment: "my_label",
+    }
 )]
 fn error_message_includes_param_name(
     #[case] key: &str,
     #[case] value: TheoremValue,
     #[case] param_name: &str,
-    #[case] expected: ArgDecodeError,
-    #[case] expected_fragment: &str,
+    #[case] expected: ParamErrorExpectation<'_>,
 ) {
     let map = IndexMap::from([(key.to_owned(), value)]);
     let err = decode_arg_value(ParamName::new(param_name), TheoremValue::Mapping(map))
         .expect_err("should fail");
-    assert_eq!(err, expected);
+    assert_eq!(err, expected.error);
     let msg = err.to_string();
     assert!(
-        msg.contains(expected_fragment),
-        "expected display to mention '{expected_fragment}', got: {msg}"
+        msg.contains(expected.fragment),
+        "expected display to mention '{}', got: {msg}",
+        expected.fragment,
     );
 }
 

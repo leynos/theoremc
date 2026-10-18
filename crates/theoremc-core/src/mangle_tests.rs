@@ -11,8 +11,19 @@ use crate::mangle::golden::HARNESS_GOLDEN_TUPLES;
 // ── Helpers ─────────────────────────────────────────────────────
 
 /// Shorthand for constructing a [`CanonicalActionName`] in tests.
-fn can(name: &str) -> CanonicalActionName {
-    CanonicalActionName::new(name).expect("test input must be a valid canonical action name")
+fn can(name: &str) -> Result<CanonicalActionName, InvalidCanonicalActionName> {
+    CanonicalActionName::new(name)
+}
+
+#[rstest]
+#[case::missing_separator("deposit")]
+#[case::keyword("account.fn")]
+fn can_returns_invalid_action_name(#[case] name: &str) {
+    let error = can(name).expect_err("invalid canonical name must fail setup");
+    assert_eq!(
+        error.name, name,
+        "setup should preserve the rejected action name"
+    );
 }
 
 // ── Action name mangling ──────────────────────────────────────────
@@ -40,7 +51,8 @@ fn segment_escape_cases(#[case] input: &str, #[case] expected: &str) {
 #[case::lone_underscore_segment("ns._", "ns___u")]
 #[case::minimal("x.y", "x__y")]
 fn action_slug_cases(#[case] input: &str, #[case] expected: &str) {
-    assert_eq!(action_slug(can(input)), expected);
+    let canonical = can(input).expect("action slug case must use a valid canonical name");
+    assert_eq!(action_slug(canonical), expected);
 }
 
 #[rstest]
@@ -96,7 +108,8 @@ fn mangle_action_name_golden_cases(
     #[case] expected_slug: &str,
     #[case] expected_hash: &str,
 ) {
-    let m = mangle_action_name(can(canonical));
+    let m =
+        mangle_action_name(can(canonical).expect("mangling case must use a valid canonical name"));
     assert_eq!(m.slug(), expected_slug);
     assert_eq!(m.hash(), expected_hash);
     let expected_ident = format!("{expected_slug}__h{expected_hash}");
@@ -107,21 +120,21 @@ fn mangle_action_name_golden_cases(
 
 #[test]
 fn underscore_placement_produces_distinct_slugs() {
-    let slug_a = action_slug(can("a.b_c"));
-    let slug_b = action_slug(can("a_b.c"));
+    let slug_a = action_slug(can("a.b_c").expect("test action name should be valid"));
+    let slug_b = action_slug(can("a_b.c").expect("test action name should be valid"));
     assert_ne!(slug_a, slug_b);
 }
 
 #[test]
 fn underscore_placement_produces_distinct_identifiers() {
-    let m_a = mangle_action_name(can("a.b_c"));
-    let m_b = mangle_action_name(can("a_b.c"));
+    let m_a = mangle_action_name(can("a.b_c").expect("test action name should be valid"));
+    let m_b = mangle_action_name(can("a_b.c").expect("test action name should be valid"));
     assert_ne!(m_a.identifier(), m_b.identifier());
 }
 
 #[test]
 fn action_path_structural_properties() {
-    let m = mangle_action_name(can("account.deposit"));
+    let m = mangle_action_name(can("account.deposit").expect("test action name should be valid"));
     let prefix = format!("{RESOLUTION_TARGET}::");
     assert!(m.path().starts_with(&prefix));
     assert!(m.path().ends_with(m.identifier()));

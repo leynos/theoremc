@@ -2,8 +2,8 @@
 
 use super::{LetBinding, Step, TheoremDoc};
 use crate::schema::{
-    ActionCall, Assertion, Evidence, KaniEvidence, KaniExpectation, LetCall, StepCall, TheoremName,
-    WitnessCheck,
+    ActionCall, Assertion, Evidence, KaniEvidence, KaniExpectation, LetCall, SchemaError, StepCall,
+    TheoremName, WitnessCheck,
 };
 use indexmap::IndexMap;
 
@@ -50,15 +50,19 @@ pub(super) fn action_call(name: &str) -> ActionCall {
 }
 
 /// Builds a minimal valid `TheoremDoc` with custom bindings and steps.
+///
+/// # Errors
+///
+/// Returns the identifier validation error if `name` is invalid.
 pub(super) fn theorem_doc(
     name: &str,
     let_bindings: IndexMap<String, LetBinding>,
     do_steps: Vec<Step>,
     bp: &DocBoilerplate,
-) -> TheoremDoc {
-    TheoremDoc {
+) -> Result<TheoremDoc, SchemaError> {
+    Ok(TheoremDoc {
         schema: None,
-        theorem: TheoremName::new(name.to_owned()).expect("valid theorem name"),
+        theorem: TheoremName::new(name.to_owned())?,
         about: "test theorem".to_owned(),
         tags: Vec::new(),
         given: Vec::new(),
@@ -70,15 +74,19 @@ pub(super) fn theorem_doc(
         do_steps,
         prove: bp.assertions.clone(),
         evidence: bp.evidence.clone(),
-    }
+    })
 }
 
 /// Builds a `TheoremDoc` with the given action names in `Let` bindings.
+///
+/// # Errors
+///
+/// Returns the identifier validation error if `name` is invalid.
 pub(super) fn doc_with_let_actions(
     name: &str,
     actions: &[&str],
     bp: &DocBoilerplate,
-) -> TheoremDoc {
+) -> Result<TheoremDoc, SchemaError> {
     let mut let_bindings = IndexMap::new();
     for (i, action) in actions.iter().enumerate() {
         let_bindings.insert(
@@ -92,7 +100,15 @@ pub(super) fn doc_with_let_actions(
 }
 
 /// Builds a `TheoremDoc` with the given action names in `Do` steps.
-pub(super) fn doc_with_do_actions(name: &str, actions: &[&str], bp: &DocBoilerplate) -> TheoremDoc {
+///
+/// # Errors
+///
+/// Returns the identifier validation error if `name` is invalid.
+pub(super) fn doc_with_do_actions(
+    name: &str,
+    actions: &[&str],
+    bp: &DocBoilerplate,
+) -> Result<TheoremDoc, SchemaError> {
     let steps: Vec<Step> = actions
         .iter()
         .map(|a| {

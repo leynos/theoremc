@@ -4,7 +4,7 @@ use super::test_helpers::{
     DocBoilerplate, boilerplate, doc_with_do_actions, doc_with_let_actions, theorem_doc,
 };
 use super::*;
-use crate::schema::{ActionSignature, ForallVar};
+use crate::schema::{ActionSignature, ForallVar, SchemaError};
 use indexmap::IndexMap;
 use rstest::rstest;
 
@@ -14,12 +14,14 @@ fn referenced_actions_deduplicate_in_first_seen_order(boilerplate: DocBoilerplat
         "First",
         &["account.params", "account.deposit", "account.params"],
         &boilerplate,
-    );
+    )
+    .expect("test theorem name should be valid");
     let second = doc_with_do_actions(
         "Second",
         &["account.validate", "account.deposit"],
         &boilerplate,
-    );
+    )
+    .expect("test theorem name should be valid");
 
     assert_eq!(
         referenced_actions(&[first, second]),
@@ -31,10 +33,16 @@ fn referenced_actions_deduplicate_in_first_seen_order(boilerplate: DocBoilerplat
 fn referenced_types_collects_forall_params_and_returns_in_first_seen_order(
     boilerplate: DocBoilerplate,
 ) {
-    let mut doc = theorem_doc("First", IndexMap::new(), Vec::new(), &boilerplate);
-    doc.forall
-        .insert(forall_var("account"), "crate::Account".to_owned());
-    doc.forall.insert(forall_var("limit"), "u64".to_owned());
+    let mut doc = theorem_doc("First", IndexMap::new(), Vec::new(), &boilerplate)
+        .expect("test theorem name should be valid");
+    doc.forall.insert(
+        forall_var("account").expect("test quantified variable should be valid"),
+        "crate::Account".to_owned(),
+    );
+    doc.forall.insert(
+        forall_var("limit").expect("test quantified variable should be valid"),
+        "u64".to_owned(),
+    );
     doc.actions.insert(
         "account.deposit".to_owned(),
         ActionSignature {
@@ -60,10 +68,12 @@ fn referenced_types_collects_forall_params_and_returns_in_first_seen_order(
 
 #[rstest]
 fn referenced_types_deduplicate_by_canonical_type_tokens(boilerplate: DocBoilerplate) {
-    let mut first = theorem_doc("First", IndexMap::new(), Vec::new(), &boilerplate);
-    first
-        .forall
-        .insert(forall_var("payload"), "Vec<u8>".to_owned());
+    let mut first = theorem_doc("First", IndexMap::new(), Vec::new(), &boilerplate)
+        .expect("test theorem name should be valid");
+    first.forall.insert(
+        forall_var("payload").expect("test quantified variable should be valid"),
+        "Vec<u8>".to_owned(),
+    );
     first.actions.insert(
         "payload.write".to_owned(),
         ActionSignature {
@@ -71,7 +81,8 @@ fn referenced_types_deduplicate_by_canonical_type_tokens(boilerplate: DocBoilerp
             returns: "u64".to_owned(),
         },
     );
-    let mut second = theorem_doc("Second", IndexMap::new(), Vec::new(), &boilerplate);
+    let mut second = theorem_doc("Second", IndexMap::new(), Vec::new(), &boilerplate)
+        .expect("test theorem name should be valid");
     second.actions.insert(
         "payload.read".to_owned(),
         ActionSignature {
@@ -83,8 +94,20 @@ fn referenced_types_deduplicate_by_canonical_type_tokens(boilerplate: DocBoilerp
     assert_eq!(referenced_types(&[first, second]), vec!["Vec<u8>", "u64"]);
 }
 
-fn forall_var(name: &str) -> ForallVar {
-    ForallVar::new(name.to_owned()).expect("valid Forall var")
+/// Validates the variable name without panicking during setup.
+fn forall_var(name: &str) -> Result<ForallVar, SchemaError> {
+    ForallVar::new(name.to_owned())
+}
+
+#[rstest]
+#[case::empty("")]
+#[case::keyword("fn")]
+fn forall_var_returns_identifier_errors(#[case] name: &str) {
+    let error = forall_var(name).expect_err("invalid quantified variable must fail setup");
+    assert!(
+        matches!(error, SchemaError::InvalidIdentifier { ref identifier, .. } if identifier == name),
+        "expected identifier error for {name:?}, got: {error}",
+    );
 }
 
 mod referenced_types_proptests {
@@ -94,7 +117,7 @@ mod referenced_types_proptests {
     use super::super::test_helpers::{DocBoilerplate, boilerplate, theorem_doc};
     use super::forall_var;
     use crate::schema::rust_type::canonical_token_stream;
-    use crate::schema::{ActionSignature, TheoremDoc};
+    use crate::schema::{ActionSignature, SchemaError, TheoremDoc};
     use indexmap::IndexMap;
     use proptest::prelude::*;
     use std::collections::BTreeSet;
@@ -109,14 +132,14 @@ mod referenced_types_proptests {
         position: usize,
         ty: &str,
         boilerplate: &DocBoilerplate,
-    ) -> TheoremDoc {
-        let mut doc = theorem_doc(name, IndexMap::new(), Vec::new(), boilerplate);
+    ) -> Result<TheoremDoc, SchemaError> {
+        let mut doc = theorem_doc(name, IndexMap::new(), Vec::new(), boilerplate)?;
         let action_name = format!("action_{position}");
 
-        match position % 3 {
+        match position.rem_euclid(3) {
             0 => {
                 doc.forall
-                    .insert(forall_var(&format!("value_{position}")), ty.to_owned());
+                    .insert(forall_var(&format!("value_{position}"))?, ty.to_owned());
             }
             1 => {
                 doc.actions.insert(
@@ -138,7 +161,18 @@ mod referenced_types_proptests {
             }
         }
 
-        doc
+        Ok(doc)
+    }
+
+    #[test]
+    fn property_document_builder_rejects_invalid_theorem_name_before_type_placement() {
+        let boilerplate = boilerplate();
+        let error = build_doc_with_type("fn", 0, "u64", &boilerplate)
+            .expect_err("invalid theorem name must fail before placing a type");
+        assert!(
+            matches!(error, SchemaError::InvalidIdentifier { ref identifier, .. } if identifier == "fn"),
+            "expected identifier error, got: {error}",
+        );
     }
 
     fn expected_first_seen_types<'a>(types: impl IntoIterator<Item = &'a String>) -> Vec<String> {
@@ -161,22 +195,28 @@ mod referenced_types_proptests {
         ) {
             let indices: Vec<_> = raw_indices
                 .into_iter()
-                .map(|index| index % pool.len())
+                .map(|index| index.rem_euclid(pool.len()))
                 .collect();
+            let selected_types = indices
+                .iter()
+                .map(|index| pool.get(*index))
+                .collect::<Option<Vec<_>>>()
+                .expect("reduced indices must identify generated pool entries");
             let boilerplate = boilerplate();
-            let docs: Vec<_> = indices
+            let docs = selected_types
                 .iter()
                 .enumerate()
-                .map(|(position, index)| {
+                .map(|(position, ty)| {
                     build_doc_with_type(
                         &format!("Theorem{position}"),
                         position,
-                        &pool[*index],
+                        ty,
                         &boilerplate,
                     )
                 })
-                .collect();
-            let expected = expected_first_seen_types(indices.iter().map(|index| &pool[*index]));
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|error| TestCaseError::fail(format!("generated theorem setup failed: {error}")))?;
+            let expected = expected_first_seen_types(selected_types);
             let actual: Vec<_> = referenced_types(&docs)
                 .into_iter()
                 .map(str::to_owned)
@@ -191,18 +231,23 @@ mod referenced_types_proptests {
         ) {
             let variants: Vec<_> = padding
                 .iter()
-                .map(|padding| format!("Vec{}<{}u8{}>", " ".repeat(*padding), " ".repeat(*padding), " ".repeat(*padding)))
+                .map(|width| format!("Vec{}<{}u8{}>", " ".repeat(*width), " ".repeat(*width), " ".repeat(*width)))
                 .collect();
             let boilerplate = boilerplate();
-            let mut doc = theorem_doc("Whitespace", IndexMap::new(), Vec::new(), &boilerplate);
+            let mut doc = theorem_doc("Whitespace", IndexMap::new(), Vec::new(), &boilerplate)
+                .map_err(|error| TestCaseError::fail(format!("whitespace theorem setup failed: {error}")))?;
             for (position, ty) in variants.iter().enumerate() {
-                doc.forall
-                    .insert(forall_var(&format!("value_{position}")), ty.clone());
+                let variable = forall_var(&format!("value_{position}"))
+                    .map_err(|error| TestCaseError::fail(format!("generated variable setup failed: {error}")))?;
+                doc.forall.insert(variable, ty.clone());
             }
 
             let docs = [doc];
             let actual = referenced_types(&docs);
-            prop_assert_eq!(actual, vec![variants[0].as_str()]);
+            let first_variant = variants
+                .first()
+                .expect("four padding inputs must produce a first type variant");
+            prop_assert_eq!(actual, vec![first_variant.as_str()]);
         }
     }
 }
