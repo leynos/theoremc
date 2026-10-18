@@ -19,7 +19,8 @@ pub use schema_fixtures::{
 
 /// Identifies a fixture file under `tests/fixtures/`.
 ///
-/// The constructor and accessor come from [`StrNewtype`]; the trait is
+/// The constructor and accessor come from
+/// [`theoremc_core::schema::StrNewtype`]; the trait is
 /// re-exported through `test_helpers` so integration binaries can import it
 /// alongside this type.
 ///
@@ -39,8 +40,8 @@ pub struct FixtureName<'a>(&'a str);
 
 /// Identifies an expected substring in fixture diagnostics or build logs.
 ///
-/// Shares [`StrNewtype`] with [`FixtureName`] rather than repeating the
-/// `new`/`as_str` pair, and gives up `const`-callability on the same terms
-/// documented above.
+/// Shares [`theoremc_core::schema::StrNewtype`] with [`FixtureName`] rather
+/// than repeating the `new`/`as_str` pair, and gives up `const`-callability on
+/// the same terms documented above.
 #[derive(Debug, Clone, Copy, Newtype, From, Into)]
 pub struct ExpectedFragment<'a>(&'a str);
