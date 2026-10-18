@@ -170,6 +170,7 @@ fn is_unusable_kani_environment(error: &str) -> bool {
     error.contains("error while loading shared libraries")
         || error.contains("cannot open shared object file")
         || error.contains("Broken pipe")
+        || error.contains("unexpected output from `rustc --version`: \"\"")
 }
 
 fn is_expected_single_harness_listing(output: &str, expected_harness_identifier: &str) -> bool {

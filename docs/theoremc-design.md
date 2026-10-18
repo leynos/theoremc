@@ -86,7 +86,9 @@ ______________________________________________________________________
 `theoremc` is currently a Cargo workspace composed of:
 
 - a root facade package (`theoremc`) that re-exports public APIs and owns Cargo
-  build integration,
+  build-script integration,
+- an internal build-support crate (`theoremc-build-support`) that owns theorem
+  discovery and generated-suite writing,
 - a core library (`theoremc-core`) containing schema loading, validation,
   diagnostics, name mangling, collision checks, and theorem-file IO,
 - a proc-macro crate (`theoremc-macros`) that embeds theorem compilation into
@@ -118,7 +120,9 @@ flowchart TD
   end
 
   subgraph Cargo["Cargo build"]
-    BS["build.rs (suite discovery)"]
+    BS["build.rs (Cargo metadata adapter)"]
+    SUP["theoremc-build-support (discovery + suite writing)"]
+    META["cfg + rerun metadata"]
     INC["include!(OUT_DIR/theorem_suite.rs)"]
     PM["theorem_file!(...) proc macro"]
   end
@@ -146,7 +150,11 @@ flowchart TD
     REP["theoremd report (planned)"]
   end
 
-  T --> BS --> INC --> PM
+  T --> SUP
+  BS -->|prepare_build_script| SUP
+  SUP -->|BuildScriptOutput| BS
+  SUP -->|generated suite| INC --> PM
+  BS --> META
   A --> PM
   PM --> P --> V --> R --> IR
   IR --> K --> H --> CK --> REP
@@ -1316,44 +1324,41 @@ ______________________________________________________________________
 
 ## 7. Build integration ("always connected")
 
-### 7.1 `build.rs` suite discovery
+### 7.1 Build-support crate and `build.rs`
 
-To get “drop a file in `theorems/` and it participates”, the design uses a
-build script:
-
-- scan `theorems/` for `*.theorem`,
-- emit `cargo::rerun-if-changed=<path>` for the directory and each file,
-- hand the ordered theorem path list to Step 3.1.2 so that a later step can
-  generate `OUT_DIR/theorem_suite.rs` containing one `theorem_file!(...)`
-  invocation per file, and
-- compile that generated suite via `include!()`.
+To get “drop a file in `theorems/` and it participates”, the root build script
+delegates discovery and generated-suite writing to the workspace-internal
+`theoremc-build-support` crate. That crate discovers `.theorem` files,
+deterministically writes `OUT_DIR/theorem_suite.rs`, and returns a
+`BuildScriptOutput`. The root `build.rs` adapter uses that output to emit
+`cargo::rustc-cfg=theoremc_has_theorems` when needed and
+`cargo::rerun-if-changed=<path>` lines for the watched directories and theorem
+files. It also registers `cargo::rustc-check-cfg=cfg(theoremc_has_theorems)`.
+The generated suite is compiled through `include!()`.
 
 Cargo documents that `cargo::rerun-if-changed=PATH` reruns the build script
 when the file changes, and if the path is a directory Cargo scans it for
-modifications.[^6]
+modifications.[^6] Per-file rerun lines are also emitted for robustness across
+Cargo versions and edge cases.
 
-Per-file rerun lines are also emitted for robustness across Cargo versions and
-edge cases.
+### 7.1.1 Current implementation and boundary
 
-### 7.1.1 Implementation decisions (Step 3.1.1)
+Steps 3.1.1 and 3.1.2 introduced discovery, Cargo invalidation, and generated
+suite writing. ADR-008 records why the existing discovery and suite
+implementation now belongs in a dedicated crate: importing source files with
+`#[path]` coupled build-script compilation to file placement also used by
+library and test compilation. This decision applies only to this existing
+build-support functionality; it does not establish a general extraction policy.
 
-Step 3.1.1 intentionally ships only discovery and Cargo invalidation. The
-generated suite file and `include!()` wiring remain for Step 3.1.2 so the proc
-macro can stay the owner of per-file code generation.
-
-The build-discovery helper returns a deterministic crate-relative theorem file
-list plus the watched directories needed for Cargo invalidation. Both path sets
-are normalized to forward-slash form (`theorems/nested/example.theorem`) and
-sorted lexicographically before `build.rs` emits them. This keeps future
-suite-generation input stable across filesystem traversal differences and
-matches the path identity already assumed by the naming rules.
-
-The shipped invalidation contract is:
+The `BuildDiscovery` value contains ordered crate-relative theorem file paths
+and watched directories, normalized to forward slashes. The support crate
+writes the suite from those paths and returns whether it contains any theorems,
+together with the rerun paths. The shipped invalidation contract is:
 
 - `build.rs` always emits `cargo::rerun-if-changed=theorems`, even when the
   directory is absent.
-- when the directory exists, `build.rs` also emits nested theorem directories
-  plus every discovered `.theorem` file for robustness.
+- when the directory exists, the returned rerun paths include nested theorem
+  directories plus every discovered `.theorem` file for robustness.
 - only files ending in `.theorem` are returned as theorem inputs; sibling files
   such as `.txt` or `.yaml` are ignored by discovery.
 
@@ -1396,8 +1401,8 @@ attributes only inside `#[cfg(kani)]` generated items.
 
 ### 7.2.1 Implementation decisions (Step 3.2.1)
 
-Step 3.2.1 keeps the generated suite contract from Step 3.1.2 unchanged:
-`build.rs` still emits one bare `theorem_file!("path/to/file.theorem");`
+Step 3.2.1 keeps the generated suite contract from Step 3.1.2 unchanged: the
+support crate writes one bare `theorem_file!("path/to/file.theorem");`
 invocation per discovered theorem file. What changed is the meaning of that
 callsite.
 
@@ -1409,11 +1414,11 @@ The repository now matches the intended architecture more closely:
 - the root `theoremc` package remains the public facade and build-integration
   owner.
 
-For screen readers: this sequence diagram shows the build-time handoff from
-`cargo build`, through `build.rs` theorem discovery and generated-suite
-rendering, into `rustc` invoking the `theorem_file!` proc macro for each
-discovered theorem path, and finally to either a successful compilation or a
-compile-time theorem error.
+For screen readers: this sequence diagram shows `build.rs` delegating theorem
+discovery and suite writing to `theoremc-build-support`, then emitting Cargo
+metadata from `BuildScriptOutput`. Cargo subsequently invokes the
+`theorem_file!` proc macro for each discovered theorem path, ending in either
+successful compilation or a compile-time theorem error.
 ![Build-time theorem discovery sequence diagram](path/to/image)
 
 ```mermaid
@@ -1421,16 +1426,19 @@ sequenceDiagram
     actor Developer
     participant Cargo
     participant BuildRS as build_rs
+    participant BuildSupport as theoremc_build_support
     participant Rustc as rustc_compiler
     participant RootLib as theoremc_root_lib
     participant ProcMacro as theoremc_macros_proc_macro
     participant Core as theoremc_core
-    participant TheoremFile as theorem_file_P
 
     Developer->>Cargo: cargo build
     Cargo->>BuildRS: run build script
-    BuildRS->>TheoremFile: discover theorem files
-    BuildRS-->>BuildRS: render OUT_DIR/theorem_suite_rs
+    BuildRS->>BuildSupport: prepare_build_script
+    BuildSupport->>BuildSupport: discover theorem inputs
+    BuildSupport->>BuildSupport: write OUT_DIR/theorem_suite_rs
+    BuildSupport-->>BuildRS: BuildScriptOutput
+    BuildRS->>Cargo: emit cfg and rerun metadata
     BuildRS-->>Cargo: build script finished
 
     Cargo->>Rustc: compile crate theoremc
@@ -1693,10 +1701,10 @@ ______________________________________________________________________
 
 The canonical path map is maintained in
 [repository layout](repository-layout.md). The current workspace contains the
-root facade package, `crates/theoremc-core`, `crates/theoremc-macros`, and
-`crates/test-helpers`. Planned components such as backend crates, `theoremd`,
-and `theoremc-dylint` are part of the target architecture but are not current
-workspace members.
+root facade package, `crates/theoremc-build-support`, `crates/theoremc-core`,
+`crates/theoremc-macros`, and `crates/test-helpers`. Planned components such as
+backend crates, `theoremd`, and `theoremc-dylint` are part of the target
+architecture but are not current workspace members.
 
 ```plaintext
 /
@@ -1705,10 +1713,10 @@ workspace members.
 ├── src/
 │   ├── lib.rs                 # public facade and generated-suite include
 │   ├── main.rs                # placeholder binary entrypoint
-│   ├── build_discovery.rs     # theorem discovery for build.rs
-│   ├── build_suite.rs         # generated-suite rendering for build.rs
 │   └── arg_lowering.rs        # test-gated argument lowering prototype
 ├── crates/
+│   ├── theoremc-build-support/
+│   │   └── src/               # build-script preparation, discovery, suite writing
 │   ├── test-helpers/
 │   │   └── src/
 │   │       └── lib.rs         # reusable integration-test helpers

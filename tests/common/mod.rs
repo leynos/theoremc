@@ -2,10 +2,11 @@
 
 use derive_more::{From, Into};
 use the_newtype::Newtype;
-
+mod build_support_fixture;
 mod fixture_crate;
 mod schema_fixtures;
 
+pub use build_support_fixture::build_support_fixture_manifest;
 pub use fixture_crate::{
     BUILD_DISCOVERY_SOURCE, BUILD_SCRIPT_SOURCE, BUILD_SUITE_SOURCE, BuildLog, FixtureCrate,
     TRIVIAL_THEOREM, toml_section,

@@ -33,6 +33,10 @@
   invariants](adr-007-verus-backend-preservation-invariants.md)
   - Decision record for keeping law meaning, primary identity, backend
     bindings, evidence, and Verus mode distinctions separate.
+- [Architecture Decision Record (ADR) 008: workspace build-support
+  boundary](adr-008-workspace-build-support-boundary.md)
+  - Decision record for the narrow crate boundary around theorem discovery
+    and generated-suite writing.
 - [Request for Comments (RFC) 0001: semantic law templates over composable
   primaries](rfcs/0001-semantic-law-templates.md)
   - Accepted proposal for schema version 2 structured laws, composable

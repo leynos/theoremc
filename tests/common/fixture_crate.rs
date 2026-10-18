@@ -13,11 +13,25 @@ use super::ExpectedFragment;
 /// Source for the repository build script copied into fixture crates.
 pub const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
 
-/// Source for build-time theorem discovery copied into fixture crates.
-pub const BUILD_DISCOVERY_SOURCE: &str = include_str!("../../src/build_discovery.rs");
+/// Manifest for the internal build-support crate copied into fixture crates.
+pub const BUILD_SUPPORT_CARGO_TOML: &str =
+    include_str!("../../crates/theoremc-build-support/Cargo.toml");
 
-/// Source for build-time theorem-suite generation copied into fixture crates.
-pub const BUILD_SUITE_SOURCE: &str = include_str!("../../src/build_suite.rs");
+/// Root source for the internal build-support crate copied into fixture crates.
+pub const BUILD_SUPPORT_LIB_SOURCE: &str =
+    include_str!("../../crates/theoremc-build-support/src/lib.rs");
+
+/// Build-script source for the internal build-support crate copied into fixtures.
+pub const BUILD_SUPPORT_BUILD_SCRIPT_SOURCE: &str =
+    include_str!("../../crates/theoremc-build-support/src/build_script.rs");
+
+/// Discovery source for the internal build-support crate copied into fixtures.
+pub const BUILD_DISCOVERY_SOURCE: &str =
+    include_str!("../../crates/theoremc-build-support/src/discovery.rs");
+
+/// Suite source for the internal build-support crate copied into fixtures.
+pub const BUILD_SUITE_SOURCE: &str =
+    include_str!("../../crates/theoremc-build-support/src/suite.rs");
 
 /// Minimal valid theorem document used by build-script fixture crates.
 pub const TRIVIAL_THEOREM: &str = concat!(
@@ -66,10 +80,25 @@ impl FixtureCrate {
         fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
         fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
         fixture.write(
-            Utf8Path::new("src/build_discovery.rs"),
+            Utf8Path::new("build-support/Cargo.toml"),
+            &fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?,
+        )?;
+        fixture.write(
+            Utf8Path::new("build-support/src/lib.rs"),
+            BUILD_SUPPORT_LIB_SOURCE,
+        )?;
+        fixture.write(
+            Utf8Path::new("build-support/src/build_script.rs"),
+            BUILD_SUPPORT_BUILD_SCRIPT_SOURCE,
+        )?;
+        fixture.write(
+            Utf8Path::new("build-support/src/discovery.rs"),
             BUILD_DISCOVERY_SOURCE,
         )?;
-        fixture.write(Utf8Path::new("src/build_suite.rs"), BUILD_SUITE_SOURCE)?;
+        fixture.write(
+            Utf8Path::new("build-support/src/suite.rs"),
+            BUILD_SUITE_SOURCE,
+        )?;
 
         Ok(fixture)
     }
@@ -255,6 +284,34 @@ impl FixtureCrate {
     }
 }
 
+fn fixture_build_support_cargo_toml(manifest: &str) -> Result<String, String> {
+    let mut removed_lints = false;
+    let mut inside_lints = false;
+    let mut retained_lines = Vec::new();
+
+    for line in manifest.lines() {
+        let trimmed_line = line.trim();
+        let is_section_header = trimmed_line.starts_with('[') && trimmed_line.ends_with(']');
+        if is_section_header {
+            inside_lints = false;
+            if trimmed_line == "[lints]" {
+                removed_lints = true;
+                inside_lints = true;
+                continue;
+            }
+        }
+        if !inside_lints {
+            retained_lines.push(line);
+        }
+    }
+
+    if removed_lints {
+        Ok(format!("{}\n", retained_lines.join("\n")))
+    } else {
+        Err("build-support manifest must contain a [lints] table".to_owned())
+    }
+}
+
 /// Combined stdout and stderr emitted by a fixture `cargo build` run.
 pub struct BuildLog(String);
 
@@ -332,3 +389,7 @@ pub fn toml_section(document: &str, section_name: &str) -> Option<String> {
 
     in_section.then(|| format!("{}\n", body_lines.join("\n")))
 }
+
+#[cfg(test)]
+#[path = "fixture_crate_tests.rs"]
+mod tests;
