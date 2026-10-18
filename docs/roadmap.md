@@ -121,6 +121,9 @@ Use these signposts to trace each roadmap task to the defining requirement.
 - `ADR7`:
   [ADR 007](adr-007-verus-backend-preservation-invariants.md) (law meaning,
   backend bindings, identity, and evidence preservation).
+- `ADR8`:
+  [ADR 008](adr-008-workspace-build-support-boundary.md) (workspace build
+  support boundary).
 - `RFC1`:
   [RFC 0001](rfcs/0001-semantic-law-templates.md) (versioned proof obligations
   and semantic law templates).
