@@ -315,6 +315,10 @@ set -o pipefail; make lint | tee /tmp/make-lint.log
   package lint policy. Note that `expect_used = "deny"` fires in integration
   tests but not in `#[cfg(test)]` modules.
 
+`reference_provenance.rs` is a test-local child module of
+`reference_selection.rs`. Its `pub(super)` helper is available to the parent
+test module, where reference-selection cases use it.
+
 ### 3.4 File size limits
 
 No single code file may exceed 400 lines. When a module and its tests grow

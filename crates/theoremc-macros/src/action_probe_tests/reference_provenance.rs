@@ -1,4 +1,9 @@
-//! Diagnostic provenance assertions shared by reference-selection cases.
+//! Assertions for conflicting-action diagnostic provenance.
+//!
+//! Each expectation checks the typed
+//! `MacroExpansionError::ConflictingActionSignature` fields and the rendered
+//! message. Returning that message lets callers compare diagnostics across
+//! fixture arrangements.
 
 use super::{MacroExpansionError, TheoremFixture, expand_fixture};
 use camino::Utf8Path;
