@@ -56,6 +56,11 @@ The accepted law and planning changes remain pending implementation in
 The current public schema and raw adapter still contain assertion-only proof
 lists. The target contract is normative even where implementation is pending.
 
+Sections 3 and 8 record the current Kani MVP: harness stubs, action and type
+probes, and empty harness bodies. Treat these as the starting point for roadmap
+Step 4.1, not as completion of its real version 1 proof/counterexample gate;
+semantic laws remain in Step 4.4 after that gate.
+
 Law-reference integration must reuse the existing action-signature comparison
 and provenance contract from issue #51. Repeated declarations compare parameter
 names in order and parsed Rust types, rather than raw text; conflicts retain
