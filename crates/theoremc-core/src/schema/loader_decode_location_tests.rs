@@ -35,13 +35,17 @@ fn argument_and_mapping_lines_require_complete_yaml_keys() {
 }
 
 #[test]
-fn line_classifiers_distinguish_sections_headers_and_scope_boundaries() {
+fn line_classifiers_distinguish_sections_and_headers() {
     assert!(YamlLine::new("  Let:").is_section_line(YamlKey::new("Let")));
     assert!(!YamlLine::new("Let: nested").is_section_line(YamlKey::new("Let")));
     assert!(YamlLine::new("Evidence:").is_top_level_section());
     assert!(!YamlLine::new("  Evidence:").is_top_level_section());
     assert!(YamlLine::new("theorem:").is_theorem_header());
     assert!(YamlLine::new("  - call:").is_list_item());
+}
+
+#[test]
+fn line_classifiers_preserve_indentation_scope_boundaries() {
     assert!(YamlLine::new("  next:").exits_scope(2));
     assert!(!YamlLine::new("    nested:").exits_scope(2));
     assert_eq!(YamlLine::new("    nested:").indent_width(), 4);

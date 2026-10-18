@@ -34,7 +34,10 @@ Witness:
     because: always reachable
 ";
     let docs = load_theorem_docs(yaml).expect("should parse action signature");
-    let signature = docs[0]
+    let document = docs
+        .first()
+        .expect("action fixture should load a theorem document");
+    let signature = document
         .actions
         .get("account.deposit")
         .expect("signature should be present");
@@ -77,6 +80,7 @@ Witness:
     );
 }
 
+/// Malformed parameter type used to exercise action signature validation.
 const INVALID_ACTION_TYPE_YAML: &str = r"
 Theorem: InvalidSignature
 About: Declares an invalid action signature
@@ -96,6 +100,7 @@ Witness:
     because: always reachable
 ";
 
+/// Free parameter lifetime that cannot be bound by the theorem action.
 const FREE_LIFETIME_ACTION_YAML: &str = r#"
 Theorem: InvalidActionLifetime
 About: Declares an unbound action lifetime
@@ -115,6 +120,7 @@ Witness:
     because: always reachable
 "#;
 
+/// Free return lifetime that cannot be bound by the theorem action.
 const FREE_LIFETIME_ACTION_RETURN_YAML: &str = r#"
 Theorem: InvalidActionReturnLifetime
 About: Declares an unbound action return lifetime
