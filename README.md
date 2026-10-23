@@ -63,4 +63,4 @@ crate re-exports both. Import paths from `theoremc` are unchanged.
 ## Licence
 
 Theoremc is distributed under the
-[ISC licence](https://opensource.org/licenses/ISC). 
+[ISC licence](https://opensource.org/licenses/ISC).
