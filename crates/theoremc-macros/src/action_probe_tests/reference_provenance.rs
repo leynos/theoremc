@@ -1,9 +1,11 @@
-//! Assertions for conflicting-action diagnostic provenance.
+//! Shared `Provenance` assertions for the parent
+//! `reference_selection` tests.
 //!
-//! Each expectation checks the typed
-//! `MacroExpansionError::ConflictingActionSignature` fields and the rendered
-//! message. Returning that message lets callers compare diagnostics across
-//! fixture arrangements.
+//! `assert_reported` expands a fixture expected to fail, compares each
+//! expected value by exact equality with its
+//! `MacroExpansionError::ConflictingActionSignature` field, and checks that
+//! each appears as a substring in the rendered message. It returns the whole
+//! rendered message so callers can compare diagnostics across fixtures.
 
 use super::{MacroExpansionError, TheoremFixture, expand_fixture};
 use camino::Utf8Path;

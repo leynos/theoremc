@@ -316,8 +316,12 @@ set -o pipefail; make lint | tee /tmp/make-lint.log
   tests but not in `#[cfg(test)]` modules.
 
 `reference_provenance.rs` is a test-local child module of
-`reference_selection.rs`. Its `pub(super)` helper is available to the parent
-test module, where reference-selection cases use it.
+`reference_selection.rs`; its `pub(super)` `Provenance::assert_reported` helper
+is available only to the parent test module. It expands a fixture expected to
+fail, compares all five expected values for exact equality with the typed
+`MacroExpansionError::ConflictingActionSignature` fields, and checks each value
+as a substring in the rendered message. It returns the whole rendered message
+so reference-selection cases can compare diagnostics across fixtures.
 
 ### 3.4 File size limits
 
