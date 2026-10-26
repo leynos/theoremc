@@ -489,9 +489,11 @@ built-in defaults
 ```
 
 The selected subcommand receives only its relevant merged configuration.
-Configuration for `backend install` must not leak into `run`, and a `run`
-profile must not alter project mutation commands unless it declares those
-fields explicitly.
+Configuration for `backend install` must not leak into `run`. OrthoConfig
+0.10.0 forbids `cmds` inside profile bodies, so named profiles can override
+global settings but cannot override command-specific settings. Global values
+follow the full precedence order above; command-specific values follow defaults
+< files < environment < explicit command-line values.
 
 User-level configuration may provide renderer and installation-cache defaults,
 but project proof policy must live in the project file or in theorem evidence.
@@ -515,11 +517,12 @@ Each command's settings live under `[cmds.<command>]`. For example,
 
 A profile is a named configuration overlay selected by `--profile <name>` or
 `THEOREMC_PROFILE`. It sits between discovered configuration files and
-`THEOREMC_*` environment variables in the precedence order listed under
-Configuration and precedence, so it can specialize a project default without
-editing `theoremc.toml` and without exporting variables. The selected
-subcommand receives only its relevant merged configuration, and a profile
-applies only to the commands it declares fields for.
+`THEOREMC_*` environment variables for global settings, so it can specialize a
+project default without editing `theoremc.toml` and without exporting
+variables. OrthoConfig 0.10.0 rejects `cmds` and `inherits` in a profile body;
+profiles therefore apply to global settings only. The selected subcommand
+receives only its relevant merged command-specific configuration, which has no
+profile tier.
 
 Four subcommands manage the profile store:
 

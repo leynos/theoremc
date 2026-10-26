@@ -296,9 +296,11 @@ built-in defaults
 ```
 
 The selected subcommand receives only its relevant merged configuration.
-Configuration for `backend install` must not leak into `run`, and a `run`
-profile must not alter project mutation commands unless it declares those
-fields explicitly.
+Configuration for `backend install` must not leak into `run`. OrthoConfig
+0.10.0 forbids `cmds` inside a profile body, so named profiles can override
+global settings but cannot override command-specific settings. Global values
+follow the full precedence order above; command-specific values follow defaults
+< files < environment < explicit command-line values.
 
 Discovery stacks system, user, and project scopes in that order, so each more
 specific scope overrides the preceding one. On Unix and Redox, system files use
@@ -360,8 +362,10 @@ so sibling settings do not leak.
 
 Named profiles are supported through OrthoConfig's `profiles` derive option.
 `--profile <name>` and `THEOREMC_PROFILE` select `[profile.<name>]`, which
-overlays files and remains below environment variables and explicit flags. This
-selector does not conflict with the separate `profile` management subcommand.
+overlays global file settings and remains below environment variables and
+explicit flags. In v0.10.0, profile bodies cannot contain `cmds` or `inherits`;
+profiles therefore do not carry command-specific settings. The selector does
+not conflict with the separate `profile` management subcommand.
 Profile-management handlers remain a later roadmap item.
 
 The parser boundary uses OrthoConfig's localized parsing entry points and an
