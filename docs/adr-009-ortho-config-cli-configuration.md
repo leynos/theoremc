@@ -62,6 +62,15 @@ are ignored; malformed, unreadable, or explicitly missing files produce
 actionable configuration errors. TOML `extends` entries layer parent files,
 with relative paths resolved from the declaring file. Unknown keys are errors.
 
+OrthoConfig 0.10.0's selected-subcommand file helper discovers prefix-derived
+dotfiles and cannot accept the configured `theoremc.toml` project filename or
+an explicit `--config` selector. The application resolves the file chain once
+through OrthoConfig discovery with injected sources, then uses an
+application-owned adapter implementing `SelectedSubcommandMerge` to pass only
+the selected `cmds.<name>` values onward. It does not perform a second,
+prefix-derived file search. This keeps explicit and automatic discovery
+consistent for global and command-specific settings.
+
 Resolved settings follow this order:
 
 ```text
@@ -116,6 +125,9 @@ check against the CLI package; it does not infer behaviour from command names.
   the library package check must still succeed on Rust 1.88.
 - Configuration loading is testable without process-global environment
   mutation by using OrthoConfig's `_with_sources` entry points and `MapEnv`.
+- The application-owned selected-subcommand adapter uses the same resolved file
+  chain as global settings because the v0.10 helper cannot consume a custom
+  filename or explicit file selector.
 - Profiles and configuration namespaces are part of the planned CLI contract.
 - Only the Phase 3.1 foundation ships in this slice. Backend execution,
   project mutation, profile management, and translated catalogues remain later

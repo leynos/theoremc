@@ -350,9 +350,10 @@ Out of scope: theorem execution and project mutation.
   `cargo orthohelp --check-agent-native`. Acceptance: injected-source tests
   prove global defaults < files < profile < environment < flags, command
   settings remain under `cmds.<command>` with defaults < files < environment <
-  flags, profiles reject command namespaces as required by v0.10.0, and
-  generated recursive metadata matches the Clap command tree. Signposts:
-  `CLI-DES`, `ADR9`.
+  flags, the selected-command adapter uses the same resolved file chain as
+  global settings (including explicit `--config`), profiles reject command
+  namespaces as required by v0.10.0, and generated recursive metadata matches
+  the Clap command tree. Signposts: `CLI-DES`, `ADR9`.
 - [ ] Establish the mixed-MSRV policy required by `ortho_config` 0.10.0: retain
   Rust 1.88 for library packages and declare Rust 1.89 for `cargo-theorem`.
   Acceptance: CI tests the library workspace excluding the CLI on 1.88 and the
