@@ -267,7 +267,7 @@ pub enum Commands {
         config_cli_visible = true,
         automatic_mode = "stack_scopes",
         scope_order = ["system", "user", "project"],
-    )
+    ),
     profiles,
 )]
 pub struct CargoTheoremConfig {
