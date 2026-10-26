@@ -77,9 +77,10 @@ pull request.
 - [x] (2026-10-26) Reran documentation gates after preserving the imported
   guides' upstream sibling paths; the final tree content was committed as
   `07eee8bdb37f52106e32f370a760f868adddf0bd`.
-- [ ] Obtain a clear CodeRabbit review for the current M1 head. The prior
-  request at `d17eab5` was rate-limited; the foreground retry is waiting for
-  the requested cooldown and will target the current exact head.
+- [x] (2026-10-26) Reviewed exact M1 head
+  `261d92b0ac2d038170d482811fbfb500366fa2ca` with CodeRabbit 0.9.1 against
+  `origin/main` at `af7608108fee9e86a90cb683f8293bde56d227e4`; it reviewed all
+  12 changed Markdown files and reported zero findings.
 - [ ] Implement the application package and injected-source tests.
 - [ ] Run deterministic gates, request CodeRabbit reviews at milestone
   boundaries, commit the validated changes, push, and open a draft PR.
@@ -280,8 +281,13 @@ later committed as `07eee8b`; its recorded `HEAD` was the parent
   `/tmp/nixie-4589bf31-6003-42c5-b78f-652d6e7b79c1-issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli-3.out`.
 
 The review request at `d17eab5` was rate-limited before these final
-corrections. M1 remains open until CodeRabbit reviews the current exact head
-after cooldown.
+corrections. A fresh review of the exact final head then completed M1.
+
+CodeRabbit completed the exact-head M1 review on
+`261d92b0ac2d038170d482811fbfb500366fa2ca` against `origin/main` at
+`af7608108fee9e86a90cb683f8293bde56d227e4`. It reviewed 12 Markdown files and
+reported zero findings; the review log is
+`/tmp/coderabbit-theoremc-issue-200-m1-final-261d92b.out`. M1 is complete.
 
 ## Context and orientation
 
