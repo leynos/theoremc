@@ -95,6 +95,10 @@ pull request.
 - [x] Review commit `18500dd` with CodeRabbit and verify its findings.
 - [x] Move inline CLI tests and fix the copied derive example.
 - [x] Rerun the full sequential gate set after those fixes.
+- [x] Review commit `864cc8f` with CodeRabbit and verify its findings.
+- [x] Correct the nested Clap trait in the design example; confirm the root
+  placeholder is already absent from the candidate.
+- [x] Run docs-only gates after correcting the derive example.
 - [ ] Complete a clean exact-head review.
 - [ ] Push the reviewed candidate and open a draft PR.
 
@@ -172,6 +176,15 @@ under the same `tests` module, and the example separates `discovery(...)` from
 tests and doctests, workflow contracts, Markdown, Mermaid, agent-native, both
 MSRV checks, build and release targets, and Makefile validation. Logs are under
 `/tmp/` with the `m2-31` suffix. A clean exact-head review remains.
+
+CodeRabbit reviewed commit `864cc8f` and returned two findings. The copied
+`CommandLine` tuple payload incorrectly derived `Parser`; it now derives
+`Args`, matching the implemented `TheoremArgs` wrapper. The roadmap comment
+about a remaining root `src/main.rs` was stale:
+`git ls-tree 864cc8f src/main.rs` returns no entry, and the working tree has no
+such file. No source change was needed for that finding. Final docs gates and a
+clean exact-head review remain. The M2-34 docs-only sequence passed formatting,
+both imported-guide checksum checks, Markdown lint, and Mermaid validation.
 
 The first workspace-wide Clippy run found 27 pre-existing diagnostics in
 `theoremc-macros` test helpers that the old root-only `make lint` command did
@@ -352,7 +365,11 @@ formatting, docs, Mermaid, and Makefile checks. The subsequent review of
 guide relative-link issues. M2-29 passed the full gate sequence after those
 fixes. Review of `18500dd` then found the oversized CLI source file and a
 missing comma in the copied derive example. Those are fixed in the working tree
-and M2-31 passed all gates after them. A clean review and delivery remain.
+and M2-31 passed all gates after them. Review of `864cc8f` then found the
+nested Clap derive typo; this is fixed in the working tree. Its root-binary
+concern was invalid for the candidate, which already deletes `src/main.rs`. The
+derive correction passed the M2-33 docs-only gates, and M2-34 passed after the
+ExecPlan update. A clean exact-head review and delivery remain.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
