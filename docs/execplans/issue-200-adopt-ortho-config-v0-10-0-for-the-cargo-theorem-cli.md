@@ -92,6 +92,9 @@ pull request.
 - [x] Complete the focused Rust 1.89 MSRV retry and remaining build checks.
 - [x] Review commit `8fd5082` with CodeRabbit and verify its findings.
 - [x] Resolve the findings and rerun the full sequential gate set.
+- [x] Review commit `18500dd` with CodeRabbit and verify its findings.
+- [x] Move inline CLI tests and fix the copied derive example.
+- [x] Rerun the full sequential gate set after those fixes.
 - [ ] Complete a clean exact-head review.
 - [ ] Push the reviewed candidate and open a draft PR.
 
@@ -160,6 +163,15 @@ agent-native, and Makefile validation. Logs are under `/tmp/` with the `m2-29`
 suffix. A local relative-link scan also passed for both imported guides, and
 their recorded hashes still match. Only the clean exact-head review remains
 before delivery.
+
+CodeRabbit reviewed commit `18500dd` and returned three findings: two duplicate
+comments that `cli.rs` exceeded the 400-line limit, and one missing comma in
+the copied OrthoConfig derive example. The tests now live in `cli_tests.rs`
+under the same `tests` module, and the example separates `discovery(...)` from
+`profiles`. The M2-31 full sequence passed formatting, lint, typecheck, all 845
+tests and doctests, workflow contracts, Markdown, Mermaid, agent-native, both
+MSRV checks, build and release targets, and Makefile validation. Logs are under
+`/tmp/` with the `m2-31` suffix. A clean exact-head review remains.
 
 The first workspace-wide Clippy run found 27 pre-existing diagnostics in
 `theoremc-macros` test helpers that the old root-only `make lint` command did
@@ -338,7 +350,9 @@ artifacts; M2-25 then passed both MSRV checks and the build, release,
 formatting, docs, Mermaid, and Makefile checks. The subsequent review of
 `8fd5082` found parse-error JSON, command-namespace validation, and imported-
 guide relative-link issues. M2-29 passed the full gate sequence after those
-fixes. A clean review and delivery remain.
+fixes. Review of `18500dd` then found the oversized CLI source file and a
+missing comma in the copied derive example. Those are fixed in the working tree
+and M2-31 passed all gates after them. A clean review and delivery remain.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
