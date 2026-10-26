@@ -207,7 +207,7 @@ verification plan. Its docs gates passed:
 - `make nixie`:
   `/tmp/nixie-theoremc-issue-200-workspace-root-review-fix.out`.
 
-M1 remains open until CodeRabbit reassesses the committed `3c43681` candidate.
+M1 remains open until CodeRabbit reassesses the current committed candidate.
 
 ## Context and orientation
 
