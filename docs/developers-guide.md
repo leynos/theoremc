@@ -559,11 +559,15 @@ setting.
 Configuration, CLI parsing, and process error handling belong to
 `crates/cargo-theorem`. Its OrthoConfig-derived types will resolve files,
 profiles, environment, and selected command settings before handing validated
-values to application services. Tests will inject `MapEnv` and explicit file
-sources rather than changing the test process environment. The `cargo-theorem`
-entry point uses a single `theorem` subcommand wrapper so Cargo dispatch and
-direct `cargo-theorem theorem ...` invocation share one parser. Do not add
-OrthoConfig or `ortho_l10n` to the facade or reusable theorem crates.
+values to application services. The application resolves the file chain once
+because OrthoConfig 0.10.0's selected-subcommand helper cannot consume the
+canonical `theoremc.toml` filename or explicit `--config` path. An
+application-owned `SelectedSubcommandMerge` adapter passes only the selected
+`cmds.<name>` values from that resolved chain. Tests inject `MapEnv` and
+explicit file sources rather than changing the test process environment. The
+`cargo-theorem` entry point uses a single `theorem` subcommand wrapper so Cargo
+dispatch and direct `cargo-theorem theorem ...` invocation share one parser. Do
+not add OrthoConfig or `ortho_l10n` to the facade or reusable theorem crates.
 
 Backend integration uses narrow ports. Backend lifecycle concerns (discovery,
 resolution, installation, and health checks) must remain separate from backend

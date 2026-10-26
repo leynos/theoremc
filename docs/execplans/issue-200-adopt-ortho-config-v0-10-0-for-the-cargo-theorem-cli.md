@@ -189,6 +189,13 @@ pull request.
   available. Rationale: this resolves the design's context-completeness wording
   without starting deferred CLI handlers. Date/Author: 2026-10-26, Codex under
   issue #200.
+- Decision: resolve global and selected-command settings from one injected
+  OrthoConfig file chain. The application-owned `SelectedSubcommandMerge`
+  adapter handles the canonical filename and explicit `--config` path because
+  the v0.10 selected-subcommand file helper only discovers prefix-derived
+  dotfiles. Rationale: one selected file and discovery order must apply to both
+  global and command-specific values. Date/Author: 2026-10-26, Codex under
+  issue #200.
 
 ## Outcomes & retrospective
 
@@ -429,8 +436,9 @@ that gate before proceeding. Never discard unrelated changes.
   OrthoConfig, Clap, localization, or process configuration.
 - Configuration structs derive `ortho_config::OrthoConfig`; parser DTOs and
   validated application settings remain distinct where parsing needs differ.
-- Injected tests use v0.10.0 `_with_sources` entry points, `MapEnv`, and
-  explicit `SubcommandFileContext`/file sources.
+- Injected tests use v0.10.0 `_with_sources` entry points, `MapEnv`, explicit
+  `ConfigDiscovery` file sources, and the application-owned selected-command
+  adapter that consumes the same resolved `cmds.<name>` layer.
 - The Cargo entry point uses the single-variant wrapper shape documented by
   OrthoConfig v0.10.0 so both external-subcommand invocation forms work.
 

@@ -324,6 +324,15 @@ only accepted configuration-file format in this foundation. TOML `extends`
 entries may layer parent files, with paths relative to the file that declares
 them. Unknown configuration keys are errors.
 
+OrthoConfig 0.10.0's selected-subcommand file helper discovers prefix-derived
+dotfiles and does not accept the canonical project filename or an explicit
+`--config` selector. The application resolves the authoritative file chain once
+through OrthoConfig's configured discovery and source-injection APIs, then
+passes only the selected `cmds.<name>` values through an application-owned
+adapter implementing `SelectedSubcommandMerge`. This keeps global and
+command-specific settings on the same file chain and prevents a second,
+inconsistent file search.
+
 Legacy `KANI`, `VERUS_*`, and `INPUT_*` variables from `rust-prover-tools` are
 accepted only by the migration adapter and only for the corresponding backend
 command. Human mode emits a deprecation diagnostic. JSON mode records the
@@ -358,7 +367,8 @@ override them.
 Each command owns a `cmds.<command>` namespace. For example, `[cmds.run]`
 contains run settings and `THEOREMC_CMDS_RUN_<FIELD>` supplies the matching
 environment override. The selected-subcommand merge loads only that namespace,
-so sibling settings do not leak.
+so sibling settings do not leak. The application adapter obtains that namespace
+from the already-resolved configuration chain described in §6.3.
 
 Named profiles are supported through OrthoConfig's `profiles` derive option.
 `--profile <name>` and `THEOREMC_PROFILE` select `[profile.<name>]`, which
