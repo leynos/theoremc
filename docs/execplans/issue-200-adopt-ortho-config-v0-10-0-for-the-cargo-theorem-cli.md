@@ -85,8 +85,12 @@ pull request.
 - [x] Run the complete sequential deterministic gate set for the pre-rebase
   M2 candidate.
 - [x] Rerun the full sequential deterministic gate set on the rebased candidate.
-- [ ] Review the committed M2 candidate with CodeRabbit and resolve any
-  actionable findings.
+- [x] Review committed M2 candidate
+  `363642074d1f2b2cc94ef53a14b26b5ed36de8e5` with `coderabbit review --agent`.
+- [x] Resolve the verified review findings and rerun deterministic gates on
+  the working-tree candidate.
+- [x] Complete the focused Rust 1.89 MSRV retry and remaining build checks.
+- [ ] Complete a clean exact-head review.
 - [ ] Push the reviewed candidate and open a draft PR.
 
 M2 implementation is now present in the working tree: the dedicated package,
@@ -110,8 +114,34 @@ after preserving `3151a112074dd22ee97d0a53b58cfd5fce8f844f` as
 commits unchanged and showed the M2 commit inheriting the base's Rust setup
 action and `rstest` 0.28 update. The CLI test dependency now uses `rstest`
 0.28.0 as well. Scrutineer run M2-22 passed the full sequential gate set on the
-rebased candidate after that alignment; exact-head CodeRabbit review remains
+rebased candidate after that alignment.
+
+The first exact-head `coderabbit review --agent` completed on
+`363642074d1f2b2cc94ef53a14b26b5ed36de8e5` with four findings. Read-only
+verification grouped the two environment-name comments as one documentation
+defect and confirmed three fixes: use the tested nested `THEOREMC_CMDS__...__`
+environment form, skip implicit configuration loading for `context --json`
+while retaining explicit-file validation, and select `cargo-theorem` in the
+Makefile build recipe. The change adds unit and child-process coverage for the
+context rule. Gate results are recorded below; the exact-head review remains
 pending.
+
+The fixes are now in the working tree. The sequential M2-24 run passed format
+checking, Clippy, type checking, workspace tests (844 tests and doctests),
+workflow-contract tests, Markdown lint, Mermaid validation, and agent-native
+checking. `make msrv` passed the Rust 1.88 library check but failed during the
+Rust 1.89 application check when Cargo could not write two files under
+`target/debug`. The full log is
+`/tmp/msrv-4589bf31-6003-42c5-b78f-652d6e7b79c1-issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli-m2-24.out`.
+Investigation found adequate free disk space and inodes, a healthy build-limit
+supervisor, no active Cargo or cleanup process in this worktree, and missing
+individual hashed artifact directories under otherwise populated targets. The
+cause is not established. The focused M2-25 retry passed both Rust-version
+checks (717 seconds), followed by `make build`, `make release` (671 seconds),
+and `mbake validate Makefile`. The release build compiled successfully. Its
+format, Markdown, and Mermaid checks also passed after updating this plan; logs
+are under `/tmp/` with the `m2-25` suffix. The source gates from M2-24 remain
+green. A clean exact-head review is the next gate.
 
 The first workspace-wide Clippy run found 27 pre-existing diagnostics in
 `theoremc-macros` test helpers that the old root-only `make lint` command did
@@ -282,8 +312,13 @@ The pre-rebase M2 candidate passed all nine deterministic gates sequentially on
 application). Those logs are under `/tmp/` with the `m2-20` suffix. The branch
 has since been rebased onto live main and its CLI test dependency aligned to
 `rstest` 0.28. The rebased candidate passed the full sequential gate set in
-scrutineer run M2-22; logs are under `/tmp/` with the `m2-22` suffix. Only the
-review and delivery steps remain.
+scrutineer run M2-22; logs are under `/tmp/` with the `m2-22` suffix. The first
+CodeRabbit review reported four findings, grouped into three underlying
+defects. All three are fixed. M2-24 passed all source gates other than the Rust
+1.89 application half of `make msrv`, which failed while writing target
+artifacts; M2-25 then passed both MSRV checks and the build, release,
+formatting, docs, Mermaid, and Makefile checks. Remaining: exact-head review
+and delivery.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first

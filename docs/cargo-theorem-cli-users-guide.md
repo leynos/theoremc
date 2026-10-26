@@ -480,11 +480,13 @@ to `$HOME/.config`; both use `theoremc/theoremc.toml`. User discovery also
 checks `~/.theoremc.toml`. On other platforms OrthoConfig uses the home
 directory and native configuration directory supplied by its `EnvSource`, where
 available. The project file is `theoremc.toml` at the Cargo workspace root. At
-this foundation stage, `context` does not invoke `cargo metadata`; OrthoConfig
-uses the caller's current directory for its automatic project scope. Project
-commands will resolve the workspace root with `cargo metadata` and pass it to
-OrthoConfig. `--manifest-path` will select the manifest used for that
-resolution. `context --json` does not inspect Cargo workspace metadata.
+this foundation stage, `context --json` does not invoke `cargo metadata` and
+skips automatic file discovery, including project, user, and system scopes. It
+emits its metadata without loading ordinary configuration values or profiles.
+An explicit `--config` or `THEOREMC_CONFIG_PATH` still selects and validates
+one required file. Project commands will resolve the workspace root with
+`cargo metadata` and pass it to OrthoConfig. `--manifest-path` will select the
+manifest used for that resolution.
 
 An explicit `--config <path>` or `THEOREMC_CONFIG_PATH` suppresses automatic
 discovery and selects one required file; `--config` takes precedence if both
@@ -528,7 +530,7 @@ variables can override it.
 
 Each command's settings live under `[cmds.<command>]`. For example,
 `[cmds.run]` is selected only by `run`; its environment variables use the
-`THEOREMC_CMDS_RUN_` prefix. Settings never leak between sibling commands.
+`THEOREMC_CMDS__RUN__` prefix. Settings never leak between sibling commands.
 
 ## Working with profiles
 

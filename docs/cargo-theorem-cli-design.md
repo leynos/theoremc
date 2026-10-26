@@ -314,7 +314,10 @@ subcommand in the caller's current directory and does not pass the workspace
 root as an argument, so project commands resolve it with `cargo metadata` and
 pass that root to OrthoConfig. An explicit `--manifest-path` selects the
 manifest used for that resolution. The `context --json` command remains
-standalone and does not inspect the workspace.
+standalone: without an explicit `--config` or `THEOREMC_CONFIG_PATH`, it skips
+all automatic configuration-file discovery and emits metadata without reading
+project or user configuration. An explicit selector still loads and validates
+its required file.
 
 An explicitly selected `--config <path>` or `THEOREMC_CONFIG_PATH` is
 exclusive: the CLI selector wins if both are supplied, it suppresses automatic
@@ -365,7 +368,7 @@ CLI inputs. Where a setting appears on both surfaces, use
 override them.
 
 Each command owns a `cmds.<command>` namespace. For example, `[cmds.run]`
-contains run settings and `THEOREMC_CMDS_RUN_<FIELD>` supplies the matching
+contains run settings and `THEOREMC_CMDS__RUN__<FIELD>` supplies the matching
 environment override. The selected-subcommand merge loads only that namespace,
 so sibling settings do not leak. The application adapter obtains that namespace
 from the already-resolved configuration chain described in §6.3.

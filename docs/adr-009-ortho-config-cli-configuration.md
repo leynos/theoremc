@@ -53,7 +53,10 @@ directory supplied by its `EnvSource`, where available. The project file is
 in the caller's current directory without passing the workspace root, so
 project commands resolve it with `cargo metadata` and pass the result to
 OrthoConfig. `--manifest-path` selects the manifest used for that resolution.
-`context --json` remains standalone and does not inspect the workspace.
+`context --json` remains standalone: without an explicit `--config` or
+`THEOREMC_CONFIG_PATH`, it skips all automatic file discovery and does not read
+configuration files or project state. An explicit selector still loads and
+validates its required file.
 
 An explicit `--config <path>` or `THEOREMC_CONFIG_PATH` selects one required,
 exclusive file and suppresses automatic discovery; `--config` takes precedence
@@ -125,6 +128,9 @@ check against the CLI package; it does not infer behaviour from command names.
   the library package check must still succeed on Rust 1.88.
 - Configuration loading is testable without process-global environment
   mutation by using OrthoConfig's `_with_sources` entry points and `MapEnv`.
+- `context --json` skips implicit settings and file discovery because it emits
+  metadata from the registered command tree; an explicit `--config` or
+  `THEOREMC_CONFIG_PATH` still loads and validates its required file.
 - The application-owned selected-subcommand adapter uses the same resolved file
   chain as global settings because the v0.10 helper cannot consume a custom
   filename or explicit file selector.
