@@ -119,6 +119,7 @@ fn selected_namespace_obeys_file_environment_and_cli_precedence() -> Result<()> 
         source.clone(),
         source,
     )?;
+    let _resolved_settings = loaded.config().resolve()?;
     let file_and_environment =
         merge_namespace(&loaded.config().cmds, "context", CommandSettings::default())?;
     ensure!(
@@ -149,6 +150,7 @@ fn selected_namespace_rejects_unknown_keys() {
 #[rstest]
 #[case("color = \"sepia\"\n", "expected `auto`, `always`, or `never`")]
 #[case("unknown = true\n", "unknown field")]
+#[case("[cmds.contxt]\nlevel = 4\n", "unknown command namespace")]
 #[case(
     "[profile.ci]\ncmds = {}\n",
     "must not define the forbidden key 'cmds'"

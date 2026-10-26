@@ -12,6 +12,28 @@ use serde_json::Value;
 
 use crate::cli::Commands;
 
+// Keep namespaces for deferred top-level commands so documented future
+// settings remain usable, while rejecting misspellings before dispatch. This
+// name-only allowlist does not define parser arguments or command metadata.
+const CONFIGURABLE_COMMAND_NAMES: &[&str] = &[
+    "init",
+    "list",
+    "get",
+    "create",
+    "action",
+    "check",
+    "build-script",
+    "generate",
+    "run",
+    "replay",
+    "report",
+    "backend",
+    "jobs",
+    "profile",
+    "context",
+    "feedback",
+];
+
 /// Consume `OrthoConfig`'s internal config selector without treating it as a
 /// persisted setting.
 fn ignore_config_path<'de, D>(deserializer: D) -> Result<Option<std::path::PathBuf>, D::Error>
@@ -159,8 +181,9 @@ impl GlobalOptions {
     ///
     /// # Errors
     ///
-    /// Returns a validation error naming the first invalid policy value.
+    /// Returns a validation error for an unknown command namespace or policy.
     pub fn resolve(&self) -> OrthoResult<ResolvedSettings> {
+        validate_command_namespaces(&self.cmds)?;
         Ok(ResolvedSettings {
             color: policy("color", self.color.as_deref())?,
             emoji: policy("emoji", self.emoji.as_deref())?,
@@ -175,6 +198,24 @@ impl GlobalOptions {
             no_pager: self.no_pager,
         })
     }
+}
+
+/// Reject command namespace typos while retaining planned command settings.
+fn validate_command_namespaces(namespaces: &BTreeMap<String, Value>) -> OrthoResult<()> {
+    if let Some(unknown) = namespaces
+        .keys()
+        .find(|name| !CONFIGURABLE_COMMAND_NAMES.contains(&name.as_str()))
+    {
+        return Err(OrthoError::Validation {
+            key: format!("cmds.{unknown}"),
+            message: format!(
+                "unknown command namespace; expected one of: {}",
+                CONFIGURABLE_COMMAND_NAMES.join(", ")
+            ),
+        }
+        .into());
+    }
+    Ok(())
 }
 
 /// Merge defaults, one selected namespace, and explicit command-line values.

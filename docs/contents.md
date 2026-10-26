@@ -58,7 +58,8 @@
 - [OrthoConfig v0.10.0 migration guide](ortho-config/v0-10-0-migration-guide.md)
   - Imported migration notes for the APIs added in v0.10.0.
 - [OrthoConfig v0.10.0 documentation provenance](ortho-config-v0-10-0-provenance.md)
-  - Immutable source revision and SHA-256 checksums for the imported guides.
+  - Immutable source revision, imported-guide checksums, and local redirects
+    for the guides' unimported relative-link targets.
 - [Navigating code complexity: a guide for implementers and
   maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring

@@ -91,7 +91,11 @@ merged configuration, whose precedence is defaults < files < environment <
 explicit command-line values. `cli_default_as_absent` is used wherever a Clap
 parser default must remain below file and environment values. Per-command
 settings live under `cmds.<command>` and are merged only for the selected
-command.
+command. Namespace names must match registered or planned top-level commands;
+unknown names are configuration errors. This preserves planned command settings
+without silently accepting misspellings. The application keeps a name-only
+allowlist for this validation; command parsing and behaviour metadata still
+derive from the registered command enum.
 
 ### 3. Offer named profiles
 
