@@ -74,7 +74,8 @@ pull request.
   CLI exists to execute at baseline.
 - [x] (2026-10-26) Recorded the configuration decision in the design, ADR,
   roadmap, and user/developer documentation.
-- [ ] Complete documentation gates and the first review.
+- [x] Run the documentation gates for the initial documentation candidate;
+  record review remediation and repeat the gates/review before closing M1.
 - [ ] Implement the application package and injected-source tests.
 - [ ] Run deterministic gates, request CodeRabbit reviews at milestone
   boundaries, commit the validated changes, push, and open a draft PR.
@@ -176,6 +177,15 @@ pull request.
 
 Work is in progress. Update this section at each completed milestone and record
 any remaining validation or delivery blocker before completion.
+
+The initial documentation candidate was committed as `cdb1eb9`.
+`make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
+CodeRabbit 0.9.1 review (`/tmp/coderabbit-theoremc-issue-200-docs.out`). The
+review covered all 12 changed documentation paths and identified four small
+prose or consistency fixes plus broken relative links in the immutable upstream
+guide. The imported links are documented in this provenance file rather than
+changing the byte-preserved source. M1 remains open until the corrected
+candidate passes the same gates and receives a clear reassessment.
 
 ## Context and orientation
 
