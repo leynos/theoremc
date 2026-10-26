@@ -110,8 +110,8 @@ raises their minimum supported Rust version (MSRV).
 Continuous integration must test these contracts separately:
 
 ```console
-cargo +1.88 check --workspace --exclude cargo-theorem
-cargo +1.89 check -p cargo-theorem
+RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem
+RUSTFLAGS="" cargo +1.89 check -p cargo-theorem
 ```
 
 A workspace-wide MSRV increase may replace this split later, but adding the CLI
@@ -300,7 +300,7 @@ Configuration for `backend install` must not leak into `run`, and a `run`
 profile must not alter project mutation commands unless it declares those
 fields explicitly.
 
-Discovery stacks system, user, and project scopes in that order so each more
+Discovery stacks system, user, and project scopes in that order, so each more
 specific scope overrides the preceding one. On Unix and Redox, system files use
 each `$XDG_CONFIG_DIRS` entry (default `/etc/xdg`) and user files use
 `$XDG_CONFIG_HOME`, falling back to `$HOME/.config`; both look for

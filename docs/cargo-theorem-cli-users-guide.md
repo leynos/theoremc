@@ -24,7 +24,7 @@ in place:
   satisfies the CLI's own minimum supported Rust version (MSRV).
 
 The CLI is its own package, `cargo-theorem`, and it declares its own MSRV. The
-CLI requires Rust 1.89, because `ortho_config` 0.10.0 requires it, while the
+CLI requires Rust 1.89 because `ortho_config` 0.10.0 requires it, while the
 theoremc library packages stay on Rust 1.88 until a separate compatibility
 decision raises theirs. Continuous integration (CI) tests the two contracts
 separately:
@@ -514,7 +514,7 @@ Each command's settings live under `[cmds.<command>]`. For example,
 A profile is a named configuration overlay selected by `--profile <name>` or
 `THEOREMC_PROFILE`. It sits between discovered configuration files and
 `THEOREMC_*` environment variables in the precedence order listed under
-Configuration and precedence, so it can specialise a project default without
+Configuration and precedence, so it can specialize a project default without
 editing `theoremc.toml` and without exporting variables. The selected
 subcommand receives only its relevant merged configuration, and a profile
 applies only to the commands it declares fields for.

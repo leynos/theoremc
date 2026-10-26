@@ -28,3 +28,41 @@ The v0.10.0 package manifest at the same commit declares version `0.10.0`, Rust
 `1.89.0`, and default `serde_json` and TOML features. This was checked against
 the immutable upstream manifest; it does not replace the imported release
 guides as the integration reference.
+
+## Preserved relative links
+
+The imported Markdown retains its upstream relative links. They point into the
+source tree at the pinned commit and are not rewritten because the imported
+bytes must remain unchanged. The two imported guide paths were renamed locally:
+
+- `users-guide.md` maps to
+  [the local users' guide](ortho-config-users-guide.md).
+- `v0-10-0-migration-guide.md` maps to the
+  [local migration guide](ortho-config-v0-10-0-migration-guide.md).
+
+The following link targets remain in the upstream repository:
+
+- `adrs/adr-0004-cargo-external-subcommand-entry-point.md` maps to
+  [upstream ADR-0004][upstream-adr-0004].
+- `cargo-orthohelp-design.md` maps to
+  [the upstream cargo-orthohelp design][upstream-help-design].
+- `cargo-orthohelp-api-guide.md` maps to
+  [the upstream cargo-orthohelp API guide][upstream-help-api].
+- `v0-9-0-migration-guide.md` maps to
+  [the upstream v0.9.0 migration guide][upstream-v09-migration].
+- `../README.md` and `../CHANGELOG.md` map to the
+  [upstream README][upstream-readme] and
+  [upstream changelog][upstream-changelog].
+- `../examples/hello_world/` maps to the
+  [upstream Hello World example][upstream-example].
+- `../ortho_l10n/README.md` maps to the
+  [upstream ortho_l10n README][upstream-l10n-readme].
+
+[upstream-adr-0004]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/docs/adrs/adr-0004-cargo-external-subcommand-entry-point.md
+[upstream-help-design]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/docs/cargo-orthohelp-design.md
+[upstream-help-api]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/docs/cargo-orthohelp-api-guide.md
+[upstream-v09-migration]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/docs/v0-9-0-migration-guide.md
+[upstream-readme]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/README.md
+[upstream-changelog]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/CHANGELOG.md
+[upstream-example]: https://github.com/leynos/ortho-config/tree/38812c563e3953a490e3efc202609f37e21a0517/examples/hello_world
+[upstream-l10n-readme]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/ortho_l10n/README.md
