@@ -348,9 +348,11 @@ Out of scope: theorem execution and project mutation.
   `SelectedSubcommandMerge`, and `OrthoConfigSubcommandDocs`. Declare command
   behaviour metadata and validate the package with
   `cargo orthohelp --check-agent-native`. Acceptance: injected-source tests
-  prove defaults < files < profile < environment < flags, command settings
-  remain under `cmds.<command>`, and generated recursive metadata matches the
-  Clap command tree. Signposts: `CLI-DES`, `ADR9`.
+  prove global defaults < files < profile < environment < flags, command
+  settings remain under `cmds.<command>` with defaults < files < environment <
+  flags, profiles reject command namespaces as required by v0.10.0, and
+  generated recursive metadata matches the Clap command tree. Signposts:
+  `CLI-DES`, `ADR9`.
 - [ ] Establish the mixed-MSRV policy required by `ortho_config` 0.10.0: retain
   Rust 1.88 for library packages and declare Rust 1.89 for `cargo-theorem`.
   Acceptance: CI tests the library workspace excluding the CLI on 1.88 and the

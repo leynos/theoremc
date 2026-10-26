@@ -72,17 +72,24 @@ application defaults
 < explicit command-line values
 ```
 
-`cli_default_as_absent` is used wherever a Clap parser default must remain
-below file and environment values. Per-command settings live under
-`cmds.<command>` and are merged only for the selected command.
+This full order applies to global configuration. OrthoConfig 0.10.0 rejects
+`cmds` and `inherits` inside profile bodies, so a profile cannot contain
+command-specific settings. The selected subcommand receives only its relevant
+merged configuration, whose precedence is defaults < files < environment <
+explicit command-line values. `cli_default_as_absent` is used wherever a Clap
+parser default must remain below file and environment values. Per-command
+settings live under `cmds.<command>` and are merged only for the selected
+command.
 
 ### 3. Offer named profiles
 
 The application opts into OrthoConfig profiles. `[profile.<name>]` values sit
-between files and environment values. `--profile <name>` and `THEOREMC_PROFILE`
-select a profile; the global selector does not conflict with the later
-`profile` management subcommand. Secrets remain outside ordinary configuration
-and generated agent context.
+between files and environment values for global settings. `--profile <name>` and
+`THEOREMC_PROFILE` select a profile; the global selector does not conflict
+with the later `profile` management subcommand. In v0.10.0, profile bodies
+cannot contain `cmds` or `inherits`, so profiles cannot override
+command-specific settings. Secrets remain outside ordinary configuration and
+generated agent context.
 
 ### 4. Preserve application-owned localization
 

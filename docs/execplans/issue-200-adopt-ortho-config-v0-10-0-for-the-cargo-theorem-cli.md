@@ -176,10 +176,12 @@ pull request.
   implementation to replace. Date/Author: 2026-10-26, Codex under issue #200.
 - Decision: use the accepted CLI policy: `THEOREMC_*`, `theoremc.toml` at the
   Cargo workspace root, explicit `--config` selection, TOML, defaults < files <
-  named profile < environment < explicit CLI values, and `cmds.<subcommand>`
-  namespaces. Keep operation selection, delivery, and mutation-safety switches
-  CLI-only. Rationale: this preserves the merged CLI design and uses shipped
-  v0.10.0 profile and source-injection support. Date/Author: 2026-10-26, Codex
+  named profile < environment < explicit CLI values for global settings, and
+  `cmds.<subcommand>` namespaces with defaults < files < environment < CLI for
+  command-specific settings. OrthoConfig v0.10.0 forbids `cmds` in profile
+  bodies, so profiles are global-only. Keep operation selection, delivery, and
+  mutation-safety switches CLI-only. Rationale: this preserves the merged CLI
+  design within the published release contract. Date/Author: 2026-10-26, Codex
   under issue #200.
 
 ## Outcomes & retrospective
