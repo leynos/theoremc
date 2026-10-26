@@ -239,8 +239,9 @@ fn report_clap_error(
     } else {
         write!(stdout, "{rendered}")
     };
-    if write_result.is_err() && writeln!(stderr, "failed to write command-line diagnostic").is_err()
-    {
+    if write_result.is_err() {
+        // The exit status reports failure even if stderr cannot carry the fallback.
+        writeln!(stderr, "failed to write command-line diagnostic").unwrap_or(());
         return ExitCode::FAILURE;
     }
     ExitCode::from(u8::try_from(code).unwrap_or(2))
@@ -285,7 +286,10 @@ fn context_command_position(args: &[OsString]) -> Option<usize> {
             continue;
         };
         if takes_global_value(argument_text) {
-            skip_value = true;
+            skip_value = args
+                .get(index + 1)
+                .and_then(|next| next.to_str())
+                .is_some_and(|next| !next.starts_with('-'));
         } else if argument_text == "context" {
             return Some(index);
         } else if !argument_text.starts_with('-') {
@@ -298,7 +302,7 @@ fn context_command_position(args: &[OsString]) -> Option<usize> {
 /// Detect the JSON flag while ignoring global-option values.
 fn has_json_flag_after(args: &[OsString], command_position: usize) -> bool {
     let mut skip_value = false;
-    for raw_argument in args.iter().skip(command_position + 1) {
+    for (index, raw_argument) in args.iter().enumerate().skip(command_position + 1) {
         if skip_value {
             skip_value = false;
             continue;
@@ -312,7 +316,11 @@ fn has_json_flag_after(args: &[OsString], command_position: usize) -> bool {
         if argument_text == "--" {
             return false;
         }
-        skip_value = takes_global_value(argument_text);
+        skip_value = takes_global_value(argument_text)
+            && args
+                .get(index + 1)
+                .and_then(|next| next.to_str())
+                .is_some_and(|next| !next.starts_with('-'));
     }
     false
 }

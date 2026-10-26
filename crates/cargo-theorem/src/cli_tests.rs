@@ -1,6 +1,10 @@
 //! Parsing contracts for both Cargo and direct external-command entry.
 
-use std::ffi::OsString;
+use std::{
+    ffi::OsString,
+    io::{self, Write},
+    process::ExitCode,
+};
 
 use super::{CargoEntry, Commands};
 use anyhow::{Result, ensure};
@@ -43,6 +47,40 @@ fn help_and_parse_errors_keep_clap_exit_classes() -> Result<()> {
         "usage errors must use exit class 2"
     );
     Ok(())
+}
+
+#[test]
+fn failed_help_write_returns_failure_even_when_fallback_succeeds() -> Result<()> {
+    let help_parse = CargoEntry::try_parse_from(["cargo", "theorem", "--help"]);
+    let Err(help_error) = help_parse else {
+        anyhow::bail!("help must be represented as a Clap display request");
+    };
+    let mut stdout = FailingWriter;
+    let mut stderr = Vec::new();
+
+    let exit_code = super::report_clap_error(&help_error, &mut stdout, &mut stderr, false);
+
+    ensure!(
+        exit_code == ExitCode::FAILURE,
+        "failed help output must return a failure status"
+    );
+    ensure!(
+        stderr.starts_with(b"failed to write command-line diagnostic"),
+        "the fallback diagnostic must be attempted"
+    );
+    Ok(())
+}
+
+struct FailingWriter;
+
+impl Write for FailingWriter {
+    fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+        Err(io::Error::other("intentional writer failure"))
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[test]
