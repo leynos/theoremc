@@ -74,8 +74,12 @@ pull request.
   CLI exists to execute at baseline.
 - [x] (2026-10-26) Recorded the configuration decision in the design, ADR,
   roadmap, and user/developer documentation.
-- [ ] Rerun documentation gates and CodeRabbit review after preserving the
-  imported guides' upstream sibling paths.
+- [x] (2026-10-26) Reran documentation gates after preserving the imported
+  guides' upstream sibling paths; the final tree content was committed as
+  `07eee8bdb37f52106e32f370a760f868adddf0bd`.
+- [ ] Obtain a clear CodeRabbit review for the current M1 head. The prior
+  request at `d17eab5` was rate-limited; the foreground retry is waiting for
+  the requested cooldown and will target the current exact head.
 - [ ] Implement the application package and injected-source tests.
 - [ ] Run deterministic gates, request CodeRabbit reviews at milestone
   boundaries, commit the validated changes, push, and open a draft PR.
@@ -248,6 +252,36 @@ candidate passed its documentation gates:
 
 A follow-up CodeRabbit review of the exact committed candidate is still needed
 before M1 closes.
+
+The later M1 review preparation made three release-boundary corrections before
+implementation:
+
+- OrthoConfig v0.10.0 rejects `cmds` and `inherits` in profile bodies, so named
+  profiles apply to global settings only. The selected command retains its
+  defaults < files < environment < CLI precedence.
+- Compact agent context describes only handlers registered in the foundation
+  command tree; later roadmap slices extend it as their handlers ship.
+- The v0.10 selected-subcommand file helper searches prefix-derived dotfiles,
+  not `theoremc.toml` or the explicit `--config` path. The design therefore
+  resolves a single injected file chain and uses an application-owned
+  `SelectedSubcommandMerge` adapter for selected `cmds.<name>` values.
+
+The final documentation candidate passed `make check-fmt`, `make markdownlint`,
+and `make nixie`. The runner executed these against the working-tree contents
+later committed as `07eee8b`; its recorded `HEAD` was the parent
+`173f9488f7af0e8eef639c02a890f2aa10f21ce3`. Logs:
+
+- `make check-fmt`:
+  `/tmp/check-fmt-4589bf31-6003-42c5-b78f-652d6e7b79c1-issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli-3.out`;
+- `make markdownlint`:
+  `/tmp/markdownlint-4589bf31-6003-42c5-b78f-652d6e7b79c1-issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli-3.out`;
+  and
+- `make nixie`:
+  `/tmp/nixie-4589bf31-6003-42c5-b78f-652d6e7b79c1-issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli-3.out`.
+
+The review request at `d17eab5` was rate-limited before these final
+corrections. M1 remains open until CodeRabbit reviews the current exact head
+after cooldown.
 
 ## Context and orientation
 
