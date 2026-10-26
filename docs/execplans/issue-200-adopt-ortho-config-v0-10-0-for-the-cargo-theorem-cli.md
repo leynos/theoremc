@@ -189,12 +189,25 @@ any remaining validation or delivery blocker before completion.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
-CodeRabbit 0.9.1 review (`/tmp/coderabbit-theoremc-issue-200-docs.out`). The
+CodeRabbit 0.9.1 review (`/tmp/coderabbit-theoremc-issue-200-docs.out`). That
 review covered all 12 changed documentation paths and identified four small
 prose or consistency fixes plus broken relative links in the immutable upstream
-guide. The imported links are documented in this provenance file rather than
-changing the byte-preserved source. M1 remains open until the corrected
-candidate passes the same gates and receives a clear reassessment.
+guide. Commit `6b39971` corrected the prose and mapped imported links to their
+local copy or pinned upstream target; the same gates passed again. The review of
+`6b39971` found one further valid concern: the project scope did not say how
+the Cargo workspace root was resolved. Commit `3c43681` now requires project
+commands to resolve the root through `cargo metadata`, states that
+`context --json` skips workspace inspection, and adds CONFIG-WORKSPACE to the
+verification plan. Its docs gates passed:
+
+- `make check-fmt`:
+  `/tmp/check-fmt-theoremc-issue-200-workspace-root-review-fix.out`;
+- `make markdownlint`:
+  `/tmp/markdownlint-theoremc-issue-200-workspace-root-review-fix.out`; and
+- `make nixie`:
+  `/tmp/nixie-theoremc-issue-200-workspace-root-review-fix.out`.
+
+M1 remains open until CodeRabbit reassesses the committed `3c43681` candidate.
 
 ## Context and orientation
 
