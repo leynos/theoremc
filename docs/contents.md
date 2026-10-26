@@ -37,6 +37,10 @@
   boundary](adr-008-workspace-build-support-boundary.md)
   - Decision record for the narrow crate boundary around theorem discovery
     and generated-suite writing.
+- [Architecture Decision Record (ADR) 009: OrthoConfig CLI
+  configuration](adr-009-ortho-config-cli-configuration.md)
+  - Decision record for the application-only configuration boundary, source
+    precedence, profile support, and mixed MSRV.
 - [Request for Comments (RFC) 0001: semantic law templates over composable
   primaries](rfcs/0001-semantic-law-templates.md)
   - Accepted proposal for schema version 2 structured laws, composable
@@ -49,6 +53,12 @@
   Task-oriented guide for callers of the planned CLI, covering installation,
   project initialisation, theorem creation, checking, backend management,
   execution, reports, JSON output, exit classes, and migration.
+- [OrthoConfig v0.10.0 user's guide](ortho-config-users-guide.md) - Imported
+  release guide for the configuration APIs used by `cargo-theorem`.
+- [OrthoConfig v0.10.0 migration guide](ortho-config-v0-10-0-migration-guide.md)
+  - Imported migration notes for the APIs added in v0.10.0.
+- [OrthoConfig v0.10.0 documentation provenance](ortho-config-v0-10-0-provenance.md)
+  - Immutable source revision and SHA-256 checksums for the imported guides.
 - [Navigating code complexity: a guide for implementers and
   maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring
@@ -92,6 +102,8 @@
 - [0.2.0 migration guide](v0-2-0-migration-guide.md) - What the new build
   defaults change for an existing checkout.
 - [Execution plans](execplans/) - Implementation plans for roadmap steps.
+- [Issue 200: adopt OrthoConfig v0.10.0](execplans/issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli.md)
+  - Living plan for the CLI configuration foundation, validation, and draft PR.
 - [RFCs](rfcs/) - Accepted and proposed requests for comments that define
   substantial language and architecture changes before implementation.
 - [Step 1.1: `TheoremDoc` and subordinate schema

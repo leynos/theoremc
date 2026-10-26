@@ -53,18 +53,23 @@ workspace crates.
 
 **Table:** Documentation entrypoints
 
-| Path                                    | Responsibility                                                          |
-| --------------------------------------- | ----------------------------------------------------------------------- |
-| `docs/contents.md`                      | Index of repository documentation                                       |
-| `docs/users-guide.md`                   | User-facing API and theorem-file behaviour guide                        |
-| `docs/developers-guide.md`              | Maintainer workflows, quality gates, and internal conventions           |
-| `docs/theorem-file-specification.md`    | Normative `.theorem` schema and semantics reference                     |
-| `docs/theoremc-design.md`               | Architecture, design rationale, and current versus planned system shape |
-| `docs/cargo-theorem-cli-design.md`      | `cargo theorem` CLI contract, boundaries, and implementation sequence   |
-| `docs/cargo-theorem-cli-users-guide.md` | Task-oriented guide for callers of the planned `cargo theorem` CLI      |
-| `docs/adr-*.md`                         | Architecture Decision Records (ADRs)                                    |
-| `docs/rfcs/`                            | Language and architecture Requests for Comments (RFCs)                  |
-| `docs/execplans/`                       | Living implementation plans and milestone records                       |
+| Path                                                                               | Responsibility                                                          |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `docs/contents.md`                                                                 | Index of repository documentation                                       |
+| `docs/users-guide.md`                                                              | User-facing API and theorem-file behaviour guide                        |
+| `docs/developers-guide.md`                                                         | Maintainer workflows, quality gates, and internal conventions           |
+| `docs/theorem-file-specification.md`                                               | Normative `.theorem` schema and semantics reference                     |
+| `docs/theoremc-design.md`                                                          | Architecture, design rationale, and current versus planned system shape |
+| `docs/cargo-theorem-cli-design.md`                                                 | `cargo theorem` CLI contract, boundaries, and implementation sequence   |
+| `docs/cargo-theorem-cli-users-guide.md`                                            | Task-oriented guide for callers of the planned `cargo theorem` CLI      |
+| `docs/adr-009-ortho-config-cli-configuration.md`                                   | Application-only OrthoConfig decision and MSRV boundary                 |
+| `docs/ortho-config-users-guide.md`                                                 | Imported OrthoConfig v0.10.0 users' guide                               |
+| `docs/ortho-config-v0-10-0-migration-guide.md`                                     | Imported v0.10.0 migration reference                                    |
+| `docs/ortho-config-v0-10-0-provenance.md`                                          | Immutable source commit and imported-file checksums                     |
+| `docs/execplans/issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli.md` | Living implementation and validation plan                               |
+| `docs/adr-*.md`                                                                    | Architecture Decision Records (ADRs)                                    |
+| `docs/rfcs/`                                                                       | Language and architecture Requests for Comments (RFCs)                  |
+| `docs/execplans/`                                                                  | Living implementation plans and milestone records                       |
 
 An RFC defines a substantial proposed or accepted language and architecture
 change. An ADR records the decision and constraints that govern implementation.

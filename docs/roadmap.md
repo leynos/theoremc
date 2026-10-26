@@ -340,15 +340,18 @@ Out of scope: theorem execution and project mutation.
 - [ ] Add a dedicated `crates/cargo-theorem` package and `cargo-theorem`
   executable while keeping application-only dependencies outside the root
   theoremc facade, and remove the placeholder root `src/main.rs`. Acceptance:
-  both `cargo theorem --help` and `cargo-theorem --help` execute the same
-  command tree in end-to-end tests, and no unrelated `theoremc` binary remains.
-  Signposts: `CLI-DES`.
-- [ ] Adopt `ortho_config` for CLI, environment, file, selected-profile, and
-  selected-subcommand merging, using `SelectedSubcommandMerge` and
-  `OrthoConfigSubcommandDocs`. Acceptance: precedence tests prove defaults <
-  files < profile < environment < flags, and generated recursive documentation
-  matches the Clap command tree. Signposts: `CLI-DES`.
-- [ ] Establish the mixed-MSRV policy required by `ortho_config` 0.9.0: retain
+  both `cargo theorem --help` and `cargo-theorem theorem --help` execute the
+  same command tree in end-to-end tests, and no unrelated `theoremc` binary
+  remains. Signposts: `CLI-DES`.
+- [ ] Adopt `ortho_config` 0.10.0 for CLI, environment, TOML file, named
+  profile, and selected-subcommand merging, using source-injection APIs,
+  `SelectedSubcommandMerge`, and `OrthoConfigSubcommandDocs`. Declare command
+  behaviour metadata and validate the package with
+  `cargo orthohelp --check-agent-native`. Acceptance: injected-source tests
+  prove defaults < files < profile < environment < flags, command settings
+  remain under `cmds.<command>`, and generated recursive metadata matches the
+  Clap command tree. Signposts: `CLI-DES`, `ADR9`.
+- [ ] Establish the mixed-MSRV policy required by `ortho_config` 0.10.0: retain
   Rust 1.88 for library packages and declare Rust 1.89 for `cargo-theorem`.
   Acceptance: CI tests the library workspace excluding the CLI on 1.88 and the
   CLI package on 1.89. Signposts: `CLI-DES`.
