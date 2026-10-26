@@ -220,7 +220,7 @@ pub enum CargoSubcommand {
     Theorem(CommandLine),
 }
 
-#[derive(Debug, Parser)]
+#[derive(Debug, Args)]
 #[command(name = "theorem", version)]
 pub struct CommandLine {
     #[command(flatten)]
