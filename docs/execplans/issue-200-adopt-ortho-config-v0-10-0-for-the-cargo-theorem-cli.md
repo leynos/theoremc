@@ -105,7 +105,8 @@ pull request.
 - [x] Pass the complete sequential gate set after the help test.
 - [x] Review commit `5f54145` and reconcile profile documentation.
 - [x] Run docs gates after correcting profile guidance.
-- [ ] Complete a clean exact-head review.
+- [x] Review commit `8a67ece` after the profile correction; CodeRabbit returned
+  zero findings.
 - [ ] Push the reviewed candidate and open a draft PR.
 
 M2 implementation is now present in the working tree: the dedicated package,
@@ -150,6 +151,11 @@ it correctly said profiles cannot contain `cmds`, then later suggested that a
 `run` profile might alter command-specific settings. The later sentence now
 states that profiles apply only to global settings. Documentation checks and a
 clean review of the resulting commit remain.
+
+CodeRabbit reviewed commit `8a67ece` after the profile correction and returned
+zero findings. The docs-only checks passed as M2-44, including Markdown and
+Mermaid validation and both pinned guide checksums. Implementation and review
+are complete; only push and draft PR creation remain.
 
 Live `origin/main` advanced to `70926a18a32031d4c16c76b7c070a513f54a1bef` while
 the implementation was in progress. The branch was rebased onto that commit
@@ -420,6 +426,10 @@ test fix before delivery.
 CodeRabbit reviewed `5f54145` and found one contradictory profile example. The
 users' guide now says profiles affect global settings only. Run the
 documentation gates and obtain a clean review before pushing.
+
+The profile correction was reviewed on commit `8a67ece` with zero findings.
+M2-44 docs-only gates passed. Implementation, documentation, and review are
+complete; push and draft PR creation remain.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
