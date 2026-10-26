@@ -32,40 +32,27 @@ guides as the integration reference.
 ## Preserved relative links
 
 The imported Markdown retains its upstream relative links and exact bytes. Both
-guides are co-located under their upstream filenames so links between the
-guides resolve locally:
+guides are co-located under their upstream filenames, so links between them
+resolve locally. Small local redirect pages keep all other relative targets
+resolvable without editing either imported guide. These pages are not imported
+source; each points to the corresponding path at the immutable commit above.
 
-- `users-guide.md` resolves to
-  [the local users' guide](ortho-config/users-guide.md).
-- `v0-10-0-migration-guide.md` resolves to the
-  [local migration guide](ortho-config/v0-10-0-migration-guide.md).
-
-Relative links to files not imported into this repository still map to the
-immutable upstream commit listed below.
-
-The following link targets remain in the upstream repository:
-
-- `adrs/adr-0004-cargo-external-subcommand-entry-point.md` maps to
-  [upstream ADR-0004][upstream-adr-0004].
-- `cargo-orthohelp-design.md` maps to
-  [the upstream cargo-orthohelp design][upstream-help-design].
-- `cargo-orthohelp-api-guide.md` maps to
-  [the upstream cargo-orthohelp API guide][upstream-help-api].
-- `v0-9-0-migration-guide.md` maps to
-  [the upstream v0.9.0 migration guide][upstream-v09-migration].
-- `../README.md` and `../CHANGELOG.md` map to the
-  [upstream README][upstream-readme] and
-  [upstream changelog][upstream-changelog].
-- `../examples/hello_world/` maps to the
-  [upstream Hello World example][upstream-example].
-- `../ortho_l10n/README.md` maps to the
-  [upstream ortho_l10n README][upstream-l10n-readme].
+| Local redirect target                                                      | Pinned upstream target                           |
+| -------------------------------------------------------------------------- | ------------------------------------------------ |
+| `docs/examples/hello_world/README.md`                                      | [Hello World example][upstream-example]          |
+| `docs/ortho-config/adrs/adr-0004-cargo-external-subcommand-entry-point.md` | [ADR-0004][upstream-adr-0004]                    |
+| `docs/ortho_l10n/README.md`                                                | [ortho_l10n README][upstream-l10n-readme]        |
+| `docs/README.md`                                                           | [README section][upstream-readme-install]        |
+| `docs/ortho-config/cargo-orthohelp-design.md`                              | [cargo-orthohelp design][upstream-help-design]   |
+| `docs/ortho-config/cargo-orthohelp-api-guide.md`                           | [cargo-orthohelp API guide][upstream-help-api]   |
+| `docs/ortho-config/v0-9-0-migration-guide.md`                              | [v0.9.0 migration guide][upstream-v09-migration] |
+| `docs/CHANGELOG.md`                                                        | [upstream changelog][upstream-changelog]         |
 
 [upstream-adr-0004]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/docs/adrs/adr-0004-cargo-external-subcommand-entry-point.md
 [upstream-help-design]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/docs/cargo-orthohelp-design.md
 [upstream-help-api]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/docs/cargo-orthohelp-api-guide.md
 [upstream-v09-migration]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/docs/v0-9-0-migration-guide.md
-[upstream-readme]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/README.md
+[upstream-readme-install]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/README.md#install-the-documentation-generator
 [upstream-changelog]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/CHANGELOG.md
 [upstream-example]: https://github.com/leynos/ortho-config/tree/38812c563e3953a490e3efc202609f37e21a0517/examples/hello_world
 [upstream-l10n-readme]: https://github.com/leynos/ortho-config/blob/38812c563e3953a490e3efc202609f37e21a0517/ortho_l10n/README.md

@@ -530,7 +530,10 @@ variables can override it.
 
 Each command's settings live under `[cmds.<command>]`. For example,
 `[cmds.run]` is selected only by `run`; its environment variables use the
-`THEOREMC_CMDS__RUN__` prefix. Settings never leak between sibling commands.
+`THEOREMC_CMDS__RUN__` prefix. Namespace names must match registered or planned
+top-level commands; unknown names are configuration errors. Settings for
+planned commands are not applied until those command handlers are implemented,
+and settings never leak between sibling commands.
 
 ## Working with profiles
 

@@ -64,9 +64,13 @@ core schema or macro expansion logic owned by the workspace crates.
 | `docs/cargo-theorem-cli-design.md`                                                 | `cargo theorem` CLI contract, boundaries, and implementation sequence    |
 | `docs/cargo-theorem-cli-users-guide.md`                                            | User guide for the implemented `context` foundation and planned commands |
 | `docs/adr-009-ortho-config-cli-configuration.md`                                   | Application-only OrthoConfig decision and MSRV boundary                  |
+| `docs/ortho-config/`                                                               | Imported OrthoConfig guides and local redirects to pinned upstream docs  |
 | `docs/ortho-config/users-guide.md`                                                 | Imported OrthoConfig v0.10.0 users' guide                                |
 | `docs/ortho-config/v0-10-0-migration-guide.md`                                     | Imported v0.10.0 migration reference                                     |
 | `docs/ortho-config-v0-10-0-provenance.md`                                          | Immutable source commit and imported-file checksums                      |
+| `docs/ortho-config/adrs/`                                                          | Redirect to the pinned OrthoConfig external-subcommand ADR               |
+| `docs/examples/hello_world/`                                                       | Redirect to the pinned OrthoConfig Hello World example                   |
+| `docs/ortho_l10n/`                                                                 | Redirect to the pinned OrthoConfig localization crate README             |
 | `docs/execplans/issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli.md` | Living implementation and validation plan                                |
 | `docs/adr-*.md`                                                                    | Architecture Decision Records (ADRs)                                     |
 | `docs/rfcs/`                                                                       | Language and architecture Requests for Comments (RFCs)                   |

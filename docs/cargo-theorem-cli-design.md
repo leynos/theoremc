@@ -276,7 +276,9 @@ pub struct CargoTheoremConfig {
 ```
 
 The CLI uses OrthoConfig's localized parser and generated command metadata. A
-hand-maintained second command schema is prohibited.
+hand-maintained second command schema is prohibited. The name-only
+configuration namespace allowlist in §6.3 accepts names for deferred commands;
+it contains no parser arguments, dispatch handlers, or behaviour metadata.
 
 ### 6.3 Discovery and precedence
 
@@ -370,8 +372,11 @@ override them.
 Each command owns a `cmds.<command>` namespace. For example, `[cmds.run]`
 contains run settings and `THEOREMC_CMDS__RUN__<FIELD>` supplies the matching
 environment override. The selected-subcommand merge loads only that namespace,
-so sibling settings do not leak. The application adapter obtains that namespace
-from the already-resolved configuration chain described in §6.3.
+so sibling settings do not leak. Namespace names must match a registered or
+planned top-level command; unknown names are configuration errors. This allows
+settings for planned handlers to be prepared without silently accepting
+misspellings. The application adapter obtains the selected namespace from the
+already-resolved configuration chain described in §6.3.
 
 Named profiles are supported through OrthoConfig's `profiles` derive option.
 `--profile <name>` and `THEOREMC_PROFILE` select `[profile.<name>]`, which

@@ -75,6 +75,21 @@ fn help_and_json_configuration_failures_use_the_documented_streams() -> Result<(
         "help must use stdout"
     );
     ensure!(help.stderr.is_empty(), "help must not use stderr");
+    let json_help = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+        .args(["theorem", "context", "--json", "--help"])
+        .output()?;
+    ensure!(
+        json_help.status.success(),
+        "JSON-mode help must remain a successful display request"
+    );
+    ensure!(
+        String::from_utf8_lossy(&json_help.stdout).contains("Usage: cargo theorem context"),
+        "JSON-mode help must retain Clap's human-readable output"
+    );
+    ensure!(
+        json_help.stderr.is_empty(),
+        "JSON-mode help must use stdout"
+    );
     let version = isolated_command(OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "--version"])
         .output()?;
@@ -137,6 +152,39 @@ fn command_parse_failure_keeps_usage_status_and_stderr() -> Result<()> {
     ensure!(
         output.stderr.starts_with(b"error:"),
         "parse failure must use stderr"
+    );
+
+    let json = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+        .args(["theorem", "context", "--json", "--unknown"])
+        .output()?;
+    ensure!(
+        json.status.code() == Some(2),
+        "JSON parse failure must keep exit 2"
+    );
+    ensure!(
+        json.stdout.is_empty(),
+        "JSON parse failure must not use stdout"
+    );
+    let diagnostic: Value = serde_json::from_slice(&json.stderr)?;
+    ensure!(
+        diagnostic.get("command") == Some(&serde_json::json!(["context"])),
+        "JSON parse failure must identify the context command"
+    );
+    ensure!(
+        diagnostic
+            .get("error")
+            .and_then(|error| error.get("code"))
+            .and_then(Value::as_str)
+            == Some("cli.usage"),
+        "JSON parse failure must use the stable usage code"
+    );
+    ensure!(
+        diagnostic
+            .get("error")
+            .and_then(|error| error.get("class"))
+            .and_then(Value::as_str)
+            == Some("usage"),
+        "JSON parse failure must identify the usage class"
     );
     Ok(())
 }

@@ -99,6 +99,7 @@ where
     T: Into<OsString> + Clone,
 {
     let parsed_args = input_args.into_iter().map(Into::into).collect::<Vec<_>>();
+    let parse_error_json_mode = parse_error_requests_json(&parsed_args);
     let localizer = NoOpLocalizer::new();
     let command = CargoEntry::command()
         .with_base("cargo-theorem")
@@ -106,7 +107,9 @@ where
     let (entry, matches) =
         match parse_localized_command::<CargoEntry, _, _>(command, parsed_args, &localizer) {
             Ok(parsed) => parsed,
-            Err(error) => return report_clap_error(&error, stdout, stderr),
+            Err(error) => {
+                return report_clap_error(&error, stdout, stderr, parse_error_json_mode);
+            }
         };
     let json_mode = entry_wants_json(&entry);
     match execute(entry, &matches, stdout) {
@@ -224,8 +227,12 @@ fn report_clap_error(
     error: &clap::Error,
     stdout: &mut dyn Write,
     stderr: &mut dyn Write,
+    json_mode: bool,
 ) -> ExitCode {
     let code = error.exit_code();
+    if json_mode && code != 0 {
+        return report_json_clap_error(error, stderr, code);
+    }
     let rendered = error.render();
     let write_result = if error.use_stderr() {
         write!(stderr, "{rendered}")
@@ -237,6 +244,92 @@ fn report_clap_error(
         return ExitCode::FAILURE;
     }
     ExitCode::from(u8::try_from(code).unwrap_or(2))
+}
+
+/// Emit a machine-readable usage diagnostic without changing Clap's exit code.
+fn report_json_clap_error(error: &clap::Error, stderr: &mut dyn Write, code: i32) -> ExitCode {
+    let diagnostic = serde_json::json!({
+        "schema_version": "1",
+        "kind": "cargo-theorem.diagnostic",
+        "command": ["context"],
+        "status": "error",
+        "error": {
+            "code": "cli.usage",
+            "class": "usage",
+            "message_fallback": error.to_string(),
+        }
+    });
+    if serde_json::to_writer(&mut *stderr, &diagnostic).is_err() || writeln!(stderr).is_err() {
+        return ExitCode::FAILURE;
+    }
+    ExitCode::from(u8::try_from(code).unwrap_or(2))
+}
+
+/// Detect explicit JSON intent when Clap cannot produce complete matches.
+fn parse_error_requests_json(args: &[OsString]) -> bool {
+    context_command_position(args).is_some_and(|position| has_json_flag_after(args, position))
+}
+
+/// Locate the context subcommand after the external Cargo entry token.
+fn context_command_position(args: &[OsString]) -> Option<usize> {
+    if args.get(1).is_none_or(|argument| argument != "theorem") {
+        return None;
+    }
+    let mut skip_value = false;
+    for (index, raw_argument) in args.iter().enumerate().skip(2) {
+        if skip_value {
+            skip_value = false;
+            continue;
+        }
+        let Some(argument_text) = raw_argument.to_str() else {
+            continue;
+        };
+        if takes_global_value(argument_text) {
+            skip_value = true;
+        } else if argument_text == "context" {
+            return Some(index);
+        } else if !argument_text.starts_with('-') {
+            return None;
+        }
+    }
+    None
+}
+
+/// Detect the JSON flag while ignoring global-option values.
+fn has_json_flag_after(args: &[OsString], command_position: usize) -> bool {
+    let mut skip_value = false;
+    for raw_argument in args.iter().skip(command_position + 1) {
+        if skip_value {
+            skip_value = false;
+            continue;
+        }
+        let Some(argument_text) = raw_argument.to_str() else {
+            continue;
+        };
+        if argument_text == "--json" {
+            return true;
+        }
+        if argument_text == "--" {
+            return false;
+        }
+        skip_value = takes_global_value(argument_text);
+    }
+    false
+}
+
+/// Identify global options whose following token is a value, not a command.
+fn takes_global_value(argument: &str) -> bool {
+    matches!(
+        argument,
+        "--color"
+            | "--emoji"
+            | "--progress"
+            | "--accessibility"
+            | "--width"
+            | "--locale"
+            | "--config"
+            | "--profile"
+    )
 }
 
 /// Write configuration diagnostics to stderr and keep their stable exit class.

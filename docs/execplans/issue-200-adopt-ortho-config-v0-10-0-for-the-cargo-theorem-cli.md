@@ -90,6 +90,8 @@ pull request.
 - [x] Resolve the verified review findings and rerun deterministic gates on
   the working-tree candidate.
 - [x] Complete the focused Rust 1.89 MSRV retry and remaining build checks.
+- [x] Review commit `8fd5082` with CodeRabbit and verify its findings.
+- [x] Resolve the findings and rerun the full sequential gate set.
 - [ ] Complete a clean exact-head review.
 - [ ] Push the reviewed candidate and open a draft PR.
 
@@ -142,6 +144,22 @@ and `mbake validate Makefile`. The release build compiled successfully. Its
 format, Markdown, and Mermaid checks also passed after updating this plan; logs
 are under `/tmp/` with the `m2-25` suffix. The source gates from M2-24 remain
 green. A clean exact-head review is the next gate.
+
+CodeRabbit reviewed commit `8fd5082` and returned four findings, grouped into
+three defects. Read-only verification confirmed that parse failures after
+`context --json` must retain the JSON diagnostic contract; typoed command
+namespaces must fail while planned top-level namespaces such as `run` remain
+available; and eight unique relative targets in the byte-preserved guides need
+local redirects to the pinned upstream commit. The working tree now contains
+those fixes, regression tests, design notes, and redirect pages. The imported
+guide hashes remain unchanged. M2-28 stopped at Clippy on four diagnostics; the
+parser detector was split into smaller helpers and the namespace check now uses
+`contains`. M2-29 then passed all sequential gates, including 845 tests and
+doctests, Rust 1.88 and 1.89 checks, release build, Markdown, Mermaid,
+agent-native, and Makefile validation. Logs are under `/tmp/` with the `m2-29`
+suffix. A local relative-link scan also passed for both imported guides, and
+their recorded hashes still match. Only the clean exact-head review remains
+before delivery.
 
 The first workspace-wide Clippy run found 27 pre-existing diagnostics in
 `theoremc-macros` test helpers that the old root-only `make lint` command did
@@ -317,8 +335,10 @@ CodeRabbit review reported four findings, grouped into three underlying
 defects. All three are fixed. M2-24 passed all source gates other than the Rust
 1.89 application half of `make msrv`, which failed while writing target
 artifacts; M2-25 then passed both MSRV checks and the build, release,
-formatting, docs, Mermaid, and Makefile checks. Remaining: exact-head review
-and delivery.
+formatting, docs, Mermaid, and Makefile checks. The subsequent review of
+`8fd5082` found parse-error JSON, command-namespace validation, and imported-
+guide relative-link issues. M2-29 passed the full gate sequence after those
+fixes. A clean review and delivery remain.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
