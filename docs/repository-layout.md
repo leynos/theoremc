@@ -63,8 +63,8 @@ workspace crates.
 | `docs/cargo-theorem-cli-design.md`                                                 | `cargo theorem` CLI contract, boundaries, and implementation sequence   |
 | `docs/cargo-theorem-cli-users-guide.md`                                            | Task-oriented guide for callers of the planned `cargo theorem` CLI      |
 | `docs/adr-009-ortho-config-cli-configuration.md`                                   | Application-only OrthoConfig decision and MSRV boundary                 |
-| `docs/ortho-config-users-guide.md`                                                 | Imported OrthoConfig v0.10.0 users' guide                               |
-| `docs/ortho-config-v0-10-0-migration-guide.md`                                     | Imported v0.10.0 migration reference                                    |
+| `docs/ortho-config/users-guide.md`                                                 | Imported OrthoConfig v0.10.0 users' guide                               |
+| `docs/ortho-config/v0-10-0-migration-guide.md`                                     | Imported v0.10.0 migration reference                                    |
 | `docs/ortho-config-v0-10-0-provenance.md`                                          | Immutable source commit and imported-file checksums                     |
 | `docs/execplans/issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli.md` | Living implementation and validation plan                               |
 | `docs/adr-*.md`                                                                    | Architecture Decision Records (ADRs)                                    |

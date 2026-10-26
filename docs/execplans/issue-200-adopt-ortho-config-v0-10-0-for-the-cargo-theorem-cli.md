@@ -74,8 +74,8 @@ pull request.
   CLI exists to execute at baseline.
 - [x] (2026-10-26) Recorded the configuration decision in the design, ADR,
   roadmap, and user/developer documentation.
-- [x] Run the documentation gates for the initial documentation candidate;
-  record review remediation and repeat the gates/review before closing M1.
+- [ ] Rerun documentation gates and CodeRabbit review after preserving the
+  imported guides' upstream sibling paths.
 - [ ] Implement the application package and injected-source tests.
 - [ ] Run deterministic gates, request CodeRabbit reviews at milestone
   boundaries, commit the validated changes, push, and open a draft PR.
@@ -209,6 +209,31 @@ verification plan. Its docs gates passed:
 
 M1 remains open until CodeRabbit reassesses the current committed candidate.
 
+The final review of `6fe127e` completed successfully after the requested
+rate-limit cooldown and reported two related link findings:
+
+- The migration guide's `users-guide.md` links resolved to theoremc's
+  unrelated root users' guide after the import rename.
+- The imported guides can instead be co-located in `docs/ortho-config/` under
+  their upstream filenames, preserving both bytes and sibling relative links.
+
+The second finding supplies the compliant fix. Both imported files now live in
+`docs/ortho-config/`; the index, repository layout, provenance record, and this
+plan point to the new paths. Their SHA-256 checksums remain unchanged. The full
+review result is
+`/tmp/coderabbit-theoremc-issue-200-m1-final-6fe127e-retry.out`. The relocated
+candidate passed its documentation gates:
+
+- `make check-fmt`:
+  `/tmp/check-fmt-theoremc-issue-200-final-plan-evidence.out`;
+- `make markdownlint`:
+  `/tmp/markdownlint-theoremc-issue-200-final-plan-evidence.out`; and
+- `make nixie`:
+  `/tmp/nixie-theoremc-issue-200-final-plan-evidence.out`.
+
+A follow-up CodeRabbit review of the exact committed candidate is still needed
+before M1 closes.
+
 ## Context and orientation
 
 The CLI is planned in `docs/cargo-theorem-cli-design.md`; its foundation is
@@ -219,8 +244,8 @@ package belongs at `crates/cargo-theorem/` and owns command parsing,
 configuration types, source loading, application error handling, and the
 composition root. Domain crates remain inward-facing and configuration-free.
 
-The imported guides are `docs/ortho-config-users-guide.md` and
-`docs/ortho-config-v0-10-0-migration-guide.md`. Their source is the
+The imported guides are `docs/ortho-config/users-guide.md` and
+`docs/ortho-config/v0-10-0-migration-guide.md`. Their source is the
 `leynos/ortho-config` repository at tag `v0.10.0`, commit
 `38812c563e3953a490e3efc202609f37e21a0517`.
 
@@ -384,8 +409,8 @@ that gate before proceeding. Never discard unrelated changes.
 
 ## Artefacts and notes
 
-- Imported documentation: `docs/ortho-config-users-guide.md` and
-  `docs/ortho-config-v0-10-0-migration-guide.md`.
+- Imported documentation: `docs/ortho-config/users-guide.md` and
+  `docs/ortho-config/v0-10-0-migration-guide.md`.
 - Provenance record: `docs/ortho-config-v0-10-0-provenance.md`.
 - Implementation and verification evidence will be appended as milestones
   complete.

@@ -53,9 +53,9 @@
   Task-oriented guide for callers of the planned CLI, covering installation,
   project initialisation, theorem creation, checking, backend management,
   execution, reports, JSON output, exit classes, and migration.
-- [OrthoConfig v0.10.0 user's guide](ortho-config-users-guide.md) - Imported
+- [OrthoConfig v0.10.0 user's guide](ortho-config/users-guide.md) - Imported
   release guide for the configuration APIs used by `cargo-theorem`.
-- [OrthoConfig v0.10.0 migration guide](ortho-config-v0-10-0-migration-guide.md)
+- [OrthoConfig v0.10.0 migration guide](ortho-config/v0-10-0-migration-guide.md)
   - Imported migration notes for the APIs added in v0.10.0.
 - [OrthoConfig v0.10.0 documentation provenance](ortho-config-v0-10-0-provenance.md)
   - Immutable source revision and SHA-256 checksums for the imported guides.
