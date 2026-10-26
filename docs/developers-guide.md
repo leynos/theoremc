@@ -540,17 +540,30 @@ dispatch, application rendering, and exit-code mapping. Reusable theorem,
 project, execution, and report services remain in library packages rather than
 moving into the CLI.
 
-The planned CLI package has a separate MSRV from the libraries because
-OrthoConfig 0.9.0 requires Rust 1.89. That package is not in the workspace yet:
-all current packages, including the root `theoremc` crate, use Rust 1.88.
-Validate the current workspace with
-`RUSTFLAGS="" cargo +1.88 check --workspace`. The empty `RUSTFLAGS` matters:
-the repository's Cargo configuration carries the nightly-only `-Zthreads=8`,
-which a stable toolchain refuses before it checks any package, and an assigned
-`RUSTFLAGS` displaces the configuration's flags. After the CLI package lands,
-introduce split validation with
-`RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem` and
-`RUSTFLAGS="" cargo +1.89 check -p cargo-theorem`.
+The planned `cargo-theorem` package uses `ortho_config` 0.10.0 and requires
+Rust 1.89. The facade, `theoremc-core`, `theoremc-macros`, and build-support
+crates remain on Rust 1.88 and do not depend on application configuration. Once
+the package lands, keep these split checks in CI:
+
+```console
+RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem
+RUSTFLAGS="" cargo +1.89 check -p cargo-theorem
+```
+
+The empty `RUSTFLAGS` matters: repository Cargo configuration carries the
+nightly-only `-Zthreads=8`, which stable Rust refuses before checking a
+package. An assigned `RUSTFLAGS` displaces the configuration's flags, so the
+empty assignment allows the stable checks to run without the nightly-only
+setting.
+
+Configuration, CLI parsing, and process error handling belong to
+`crates/cargo-theorem`. Its OrthoConfig-derived types will resolve files,
+profiles, environment, and selected command settings before handing validated
+values to application services. Tests will inject `MapEnv` and explicit file
+sources rather than changing the test process environment. The `cargo-theorem`
+entry point uses a single `theorem` subcommand wrapper so Cargo dispatch and
+direct `cargo-theorem theorem ...` invocation share one parser. Do not add
+OrthoConfig or `ortho_l10n` to the facade or reusable theorem crates.
 
 Backend integration uses narrow ports. Backend lifecycle concerns (discovery,
 resolution, installation, and health checks) must remain separate from backend
