@@ -103,6 +103,8 @@ pull request.
 - [x] Rerun the full sequential gate set after the final review fixes.
 - [x] Review commit `08a2441` and test Cargo/direct help parity.
 - [x] Pass the complete sequential gate set after the help test.
+- [x] Review commit `5f54145` and reconcile profile documentation.
+- [x] Run docs gates after correcting profile guidance.
 - [ ] Complete a clean exact-head review.
 - [ ] Push the reviewed candidate and open a draft PR.
 
@@ -142,6 +144,12 @@ temporary symlink in the new test setup. M2-42 passed the full sequential
 gates, including 847 tests and doctests, both MSRVs, and the release build.
 Logs are under `/tmp/` with the `m2-42` suffix. A clean review of the committed
 candidate remains before push.
+
+CodeRabbit reviewed `5f54145` and found one contradiction in the users' guide:
+it correctly said profiles cannot contain `cmds`, then later suggested that a
+`run` profile might alter command-specific settings. The later sentence now
+states that profiles apply only to global settings. Documentation checks and a
+clean review of the resulting commit remain.
 
 Live `origin/main` advanced to `70926a18a32031d4c16c76b7c070a513f54a1bef` while
 the implementation was in progress. The branch was rebased onto that commit
@@ -408,6 +416,10 @@ test now installs `cargo-theorem` in its temporary `PATH` before invoking
 Cargo, then compares both outputs. M2-42 passed all sequential gates on this
 candidate, including 847 tests, both MSRVs, and release. Review the committed
 test fix before delivery.
+
+CodeRabbit reviewed `5f54145` and found one contradictory profile example. The
+users' guide now says profiles affect global settings only. Run the
+documentation gates and obtain a clean review before pushing.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
