@@ -9,10 +9,12 @@ initialising a project, creating and inspecting theorems, checking a project,
 installing and pinning proof backends, running proofs, reading reports, and
 migrating from `rust-prover-tools`.
 
-The command surface is **planned, not shipped**. It is defined normatively in
-the [`cargo theorem` CLI design](cargo-theorem-cli-design.md); where this guide
-and that design disagree, the design wins. Nothing here is a compatibility
-promise for a released binary.
+The command surface is **planned, not shipped**. The initial foundation will
+expose only implemented handlers; later commands appear as their roadmap slices
+ship. The target surface is defined normatively in the
+[`cargo theorem` CLI design](cargo-theorem-cli-design.md); where this guide and
+that design disagree, the design wins. Nothing here is a compatibility promise
+for a released binary.
 
 ## Before you begin
 
