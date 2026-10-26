@@ -82,7 +82,9 @@ pull request.
   `origin/main` at `af7608108fee9e86a90cb683f8293bde56d227e4`; it reviewed all
   12 changed Markdown files and reported zero findings.
 - [x] Implement the application package and injected-source tests.
-- [x] Run the complete sequential deterministic gate set for the M2 candidate.
+- [x] Run the complete sequential deterministic gate set for the pre-rebase
+  M2 candidate.
+- [x] Rerun the full sequential deterministic gate set on the rebased candidate.
 - [ ] Review the committed M2 candidate with CodeRabbit and resolve any
   actionable findings.
 - [ ] Push the reviewed candidate and open a draft PR.
@@ -97,8 +99,19 @@ guides still match their recorded SHA-256 checksums. The first `make test`
 compile exposed import and `ExitCode` constness errors, which were corrected.
 Expanding `make lint` to the whole workspace exposed an existing
 `clippy::map_unwrap_or` finding in the macro trybuild fixture helper; that
-expression now uses `map_or_else`. The M2 acceptance gates passed; exact-head
-CodeRabbit review and delivery remain pending.
+expression now uses `map_or_else`. Both pre-rebase and rebased M2 candidates
+passed the full deterministic gate set; exact-head CodeRabbit review and
+delivery remain pending.
+
+Live `origin/main` advanced to `70926a18a32031d4c16c76b7c070a513f54a1bef` while
+the implementation was in progress. The branch was rebased onto that commit
+after preserving `3151a112074dd22ee97d0a53b58cfd5fce8f844f` as
+`recovery/issue-200-pre-rebase-3151a11`. `git range-diff` matched all eleven M1
+commits unchanged and showed the M2 commit inheriting the base's Rust setup
+action and `rstest` 0.28 update. The CLI test dependency now uses `rstest`
+0.28.0 as well. Scrutineer run M2-22 passed the full sequential gate set on the
+rebased candidate after that alignment; exact-head CodeRabbit review remains
+pending.
 
 The first workspace-wide Clippy run found 27 pre-existing diagnostics in
 `theoremc-macros` test helpers that the old root-only `make lint` command did
@@ -261,15 +274,16 @@ latest formatting command passed; restart the complete gate sequence.
 Work is in progress. Update this section at each completed milestone and record
 any remaining validation or delivery blocker before completion.
 
-The final M2 candidate passed all nine deterministic gates sequentially on
+The pre-rebase M2 candidate passed all nine deterministic gates sequentially on
 2026-10-26 (scrutineer run M2-20): `make check-fmt`, `make lint`,
 `make typecheck`, `make test` (842 tests and doctests; 631 seconds),
 `make test-workflow-contracts`, `make markdownlint`, `make nixie`,
 `make check-agent-native`, and `make msrv` (Rust 1.88 libraries and Rust 1.89
-application). The full sequence followed the implementation-status update; logs
-are under `/tmp/` with the `m2-20` suffix. The remaining work is to commit this
-candidate, request the required CodeRabbit review, resolve any findings with
-fresh gates, push over SSH, and open the draft PR.
+application). Those logs are under `/tmp/` with the `m2-20` suffix. The branch
+has since been rebased onto live main and its CLI test dependency aligned to
+`rstest` 0.28. The rebased candidate passed the full sequential gate set in
+scrutineer run M2-22; logs are under `/tmp/` with the `m2-22` suffix. Only the
+review and delivery steps remain.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
