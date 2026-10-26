@@ -563,9 +563,9 @@ names and non-secret fields only, and never secret values.
 
 Profile read-modify-write transactions are atomic under the profile lock, so a
 concurrent reader observes either the previous state or the complete new state.
-Configuration for one subcommand must not leak into another: configuration for
-`backend install` must not leak into `run`, and a `run` profile must not alter
-project mutation commands unless it declares those fields explicitly.
+Configuration for one subcommand must not leak into another. For example,
+configuration for `backend install` must not affect `run`. Profiles apply only
+to global settings and cannot change either command's settings.
 
 ## Migrating from `rust-prover-tools`
 
