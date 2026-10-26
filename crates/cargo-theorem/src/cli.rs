@@ -9,7 +9,8 @@ use std::{
 
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use ortho_config::{
-    LocalizeCmd, NoOpLocalizer, OrthoConfig, OrthoConfigSubcommandDocs, parse_localized_command,
+    EnvSource, LocalizeCmd, NoOpLocalizer, OrthoConfig, OrthoConfigSubcommandDocs,
+    parse_localized_command,
 };
 use serde::{Deserialize, Serialize};
 
@@ -122,9 +123,14 @@ fn execute(
 ) -> Result<(), ApplicationError> {
     let CargoCommand::Theorem(cli) = entry.command;
     let (discovery, merge) = process_sources();
-    let config_args = config_arguments(&cli.options, cli.profile.as_deref());
-    let loaded = GlobalOptions::load_with_sources(config_args, discovery.clone(), merge.clone())?;
-    let settings = loaded.config().clone();
+    let settings = if should_load_configuration(&cli.command, &cli.options, discovery.as_ref()) {
+        let config_args = config_arguments(&cli.options, cli.profile.as_deref());
+        GlobalOptions::load_with_sources(config_args, discovery.clone(), merge.clone())?
+            .config()
+            .clone()
+    } else {
+        cli.options.clone()
+    };
     let _effective = settings.resolve()?;
 
     let project_root = Path::new(".");
@@ -155,6 +161,19 @@ fn execute(
         }
         Commands::Context(_) => Ok(()),
     }
+}
+
+/// Keep generated context independent of implicit files and ordinary settings.
+fn should_load_configuration(
+    command: &Commands,
+    options: &GlobalOptions,
+    discovery: &dyn EnvSource,
+) -> bool {
+    !matches!(command, Commands::Context(_))
+        || options.config_path.is_some()
+        || discovery
+            .get("THEOREMC_CONFIG_PATH")
+            .is_some_and(|path| !path.is_empty())
 }
 
 /// Build a configuration-only argument list from explicitly parsed options.
@@ -281,7 +300,7 @@ mod tests {
     use super::{CargoEntry, Commands};
     use anyhow::{Result, ensure};
     use clap::{CommandFactory, Parser};
-    use ortho_config::OrthoConfigSubcommandDocs;
+    use ortho_config::{MapEnv, OrthoConfigSubcommandDocs};
 
     #[rstest::rstest]
     #[case(["cargo-theorem", "theorem", "context", "--json"])]
@@ -347,5 +366,32 @@ mod tests {
         let options = super::GlobalOptions::default();
         let args = super::config_arguments(&options, None);
         assert_eq!(args, [OsString::from("cargo-theorem")]);
+    }
+
+    #[test]
+    fn context_loads_only_an_explicit_configuration_file() -> Result<()> {
+        let context = Commands::Context(super::ContextArgs { json: true });
+        let options = super::GlobalOptions::default();
+        let environment = MapEnv::new();
+        ensure!(
+            !super::should_load_configuration(&context, &options, &environment),
+            "context must skip automatic configuration discovery"
+        );
+
+        let cli_selected = super::GlobalOptions {
+            config_path: Some("selected.toml".into()),
+            ..super::GlobalOptions::default()
+        };
+        ensure!(
+            super::should_load_configuration(&context, &cli_selected, &environment),
+            "context must validate an explicitly selected CLI file"
+        );
+
+        let environment_selected = MapEnv::new().with_var("THEOREMC_CONFIG_PATH", "selected.toml");
+        ensure!(
+            super::should_load_configuration(&context, &options, &environment_selected),
+            "context must validate an explicitly selected environment file"
+        );
+        Ok(())
     }
 }

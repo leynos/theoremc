@@ -44,6 +44,24 @@ fn cargo_and_direct_invocations_emit_the_same_json_document() -> Result<()> {
 }
 
 #[test]
+fn context_ignores_malformed_automatic_project_configuration() -> Result<()> {
+    let directory = tempfile::tempdir()?;
+    let capability = Dir::open_ambient_dir(directory.path(), ambient_authority())?;
+    capability.write("theoremc.toml", b"color = [\n")?;
+    let path = isolated_path(directory.path())?;
+    let output = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+        .args(["theorem", "context", "--json"])
+        .output()?;
+
+    ensure!(
+        output.status.success(),
+        "context must skip malformed automatic project configuration"
+    );
+    assert_success_json(&output)?;
+    Ok(())
+}
+
+#[test]
 fn help_and_json_configuration_failures_use_the_documented_streams() -> Result<()> {
     let directory = tempfile::tempdir()?;
     let path = isolated_path(directory.path())?;
