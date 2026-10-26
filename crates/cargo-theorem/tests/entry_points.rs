@@ -62,9 +62,13 @@ fn context_ignores_malformed_automatic_project_configuration() -> Result<()> {
 }
 
 #[test]
-fn help_and_json_configuration_failures_use_the_documented_streams() -> Result<()> {
+fn cargo_and_direct_help_expose_the_same_command_tree() -> Result<()> {
     let directory = tempfile::tempdir()?;
-    let path = isolated_path(directory.path())?;
+    let bin_dir = directory.path().join("bin");
+    let capability = Dir::open_ambient_dir(directory.path(), ambient_authority())?;
+    capability.create_dir("bin")?;
+    install_subcommand(&bin_dir)?;
+    let path = isolated_path(&bin_dir)?;
     let help = isolated_command(OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "--help"])
         .output()?;
@@ -75,6 +79,29 @@ fn help_and_json_configuration_failures_use_the_documented_streams() -> Result<(
         "help must use stdout"
     );
     ensure!(help.stderr.is_empty(), "help must not use stderr");
+    let cargo_executable = cargo_binary()?;
+    let cargo_help = isolated_command(cargo_executable.as_os_str(), directory.path(), &path)
+        .args(["theorem", "--help"])
+        .output()?;
+    ensure!(
+        cargo_help.status.success(),
+        "Cargo help must exit successfully"
+    );
+    ensure!(
+        cargo_help.stdout == help.stdout,
+        "Cargo and direct help must expose the same command tree"
+    );
+    ensure!(
+        cargo_help.stderr.is_empty(),
+        "Cargo help must not use stderr"
+    );
+    Ok(())
+}
+
+#[test]
+fn help_and_json_configuration_failures_use_the_documented_streams() -> Result<()> {
+    let directory = tempfile::tempdir()?;
+    let path = isolated_path(directory.path())?;
     let json_help = isolated_command(OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "context", "--json", "--help"])
         .output()?;

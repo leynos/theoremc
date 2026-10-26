@@ -101,6 +101,8 @@ pull request.
 - [x] Run docs-only gates after correcting the derive example.
 - [x] Review commit `29620d7` with CodeRabbit and fix verified findings.
 - [x] Rerun the full sequential gate set after the final review fixes.
+- [x] Review commit `08a2441` and test Cargo/direct help parity.
+- [x] Pass the complete sequential gate set after the help test.
 - [ ] Complete a clean exact-head review.
 - [ ] Push the reviewed candidate and open a draft PR.
 
@@ -130,6 +132,16 @@ typecheck, 846 tests and doctests, workflow contracts, Markdown, Mermaid,
 agent-native, Rust 1.88 and 1.89 checks, build, release, and Makefile
 validation. Logs are under `/tmp/` with the `m2-38` suffix. A clean exact-head
 review is the remaining gate before delivery.
+
+CodeRabbit reviewed `08a2441` and identified a roadmap acceptance gap: the
+end-to-end suite had not compared help output through Cargo with direct
+invocation. A focused test now installs the external-command symlink in an
+isolated `PATH` and asserts the two help outputs and streams match. M2-40
+identified and fixed an overlong test function; M2-41 exposed a missing
+temporary symlink in the new test setup. M2-42 passed the full sequential
+gates, including 847 tests and doctests, both MSRVs, and the release build.
+Logs are under `/tmp/` with the `m2-42` suffix. A clean review of the committed
+candidate remains before push.
 
 Live `origin/main` advanced to `70926a18a32031d4c16c76b7c070a513f54a1bef` while
 the implementation was in progress. The branch was rebased onto that commit
@@ -390,6 +402,12 @@ CodeRabbit's review of `29620d7` found two valid diagnostic edge cases, both
 covered by regression tests and fixed in the working tree. The full M2-38 gate
 sequence passed after the fixes. Request one clean review on the committed
 candidate before pushing.
+
+The review of `08a2441` also found that end-to-end help parity was missing. The
+test now installs `cargo-theorem` in its temporary `PATH` before invoking
+Cargo, then compares both outputs. M2-42 passed all sequential gates on this
+candidate, including 847 tests, both MSRVs, and release. Review the committed
+test fix before delivery.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
