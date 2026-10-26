@@ -183,6 +183,12 @@ pull request.
   mutation-safety switches CLI-only. Rationale: this preserves the merged CLI
   design within the published release contract. Date/Author: 2026-10-26, Codex
   under issue #200.
+- Decision: generated agent context describes only command paths registered by
+  the current foundation. Later roadmap slices extend it from the same command
+  tree when operational handlers ship; planned commands are not advertised as
+  available. Rationale: this resolves the design's context-completeness wording
+  without starting deferred CLI handlers. Date/Author: 2026-10-26, Codex under
+  issue #200.
 
 ## Outcomes & retrospective
 

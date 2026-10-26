@@ -382,11 +382,13 @@ selected-subcommand merge boundary, command metadata, Cargo entry shape, and
 configuration error mapping. It does not implement backend execution, proof
 runs, project mutations, or the full command list in §7. Operational commands
 are added as their later roadmap slices land; the foundation must not advertise
-an unimplemented handler as operational.
+an unimplemented handler as operational. Its generated agent context describes
+only paths registered in the foundation command tree. Follow-on slices extend
+that context from the same tree when they add operational handlers.
 
 ## 7. Public command surface
 
-The first stable command tree is:
+The target command tree is:
 
 ```text
 cargo theorem init
@@ -453,6 +455,10 @@ CLI does not stutter as `cargo theorem theorem list`.
 | `feedback`       | Record CLI friction                                                         | Yes      | One record                                  | Local append; optional delivery is explicit                    |
 
 *Table 2: Command effects, response bounds, and mutation guards.*
+
+This is the planned public surface, not the foundation's initial registered
+tree. The foundation exposes only commands with implemented handlers; agent
+context must not advertise later roadmap commands before those handlers ship.
 
 ## 8. Global application contracts
 
@@ -1235,23 +1241,26 @@ consent and reports local and remote outcomes separately.
 ## 14. Agent context and long-form workflows
 
 `cargo theorem context --json` emits OrthoConfig's compact, versioned
-agent-context document. It includes:
+agent-context document generated from the registered command tree. During the
+foundation slice, that tree contains only the entry points implemented in that
+slice. Later roadmap slices add their command paths and behaviour metadata to
+the same generated context when their handlers are implemented. The context
+includes:
 
-- every command path and canonical/domain verb;
+- every currently registered command path and canonical/domain verb;
 - required and optional inputs, types, defaults, enum values, and environment
-  bindings;
-- interaction, mutation, dry-run, force, idempotency, and network contracts;
-- stdout, stderr, JSON, report, and exit-code contracts;
-- pagination and bounded-response metadata;
-- asynchronous run and job-ledger metadata;
-- profiles, delivery, and feedback support;
-- backend capability and provenance metadata; and
+  bindings supported by those commands;
+- interaction, mutation, dry-run, force, idempotency, and network contracts
+  declared for those commands;
+- stdout, stderr, JSON, and exit-code contracts for those commands;
+- pagination and bounded-response metadata where those commands define them;
+- global configuration and profile support exposed by the foundation; and
 - short invocation examples generated from the same command tree.
 
 Context generation is read-only, does not require a theoremc project, and does
-not probe the network or installed backends. Project-specific context may be
-requested explicitly with `--project`, in which case it adds configured backend
-and profile names without secrets.
+not probe the network or installed backends. Project-specific context and
+backend capability metadata are deferred with project discovery and backend
+handlers; they do not appear in the foundation context.
 
 Long-form agent workflow material, including a future `SKILL.md`, is validated
 against the compact context rather than becoming another hand-maintained

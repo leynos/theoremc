@@ -363,9 +363,10 @@ Out of scope: theorem execution and project mutation.
   output cannot leak beside a JSON document. Signposts: `CLI-DES`, `ADR2-4`.
 - [ ] Implement `cargo theorem context --json` from OrthoConfig's compact agent
   context and add agent-native policy checks to CI. Acceptance: the versioned
-  context includes every command path, mutation boundary, output mode,
-  pagination rule, and exit class without reading project state or the network.
-  Signposts: `CLI-DES`.
+  context includes every command path and its available behaviour metadata
+  registered in the foundation tree, without advertising later unimplemented
+  commands or reading project state or the network. Follow-on slices add their
+  paths and metadata to the same generated context. Signposts: `CLI-DES`.
 
 ### Step 3.1.2: implement Cargo project discovery and read-only commands
 
