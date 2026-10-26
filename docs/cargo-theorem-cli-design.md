@@ -307,9 +307,12 @@ each `$XDG_CONFIG_DIRS` entry (default `/etc/xdg`) and user files use
 `theoremc/theoremc.toml`. User discovery also checks `~/.theoremc.toml`. On
 other platforms OrthoConfig uses the home directory and native configuration
 directory supplied by its `EnvSource`, where available. The project scope looks
-for `theoremc.toml` in its base directory. OrthoConfig defaults that base to
-the current working directory; the application supplies an explicit base when
-it has resolved a project directory.
+for `theoremc.toml` at the Cargo workspace root. Cargo starts an external
+subcommand in the caller's current directory and does not pass the workspace
+root as an argument, so project commands resolve it with `cargo metadata` and
+pass that root to OrthoConfig. An explicit `--manifest-path` selects the
+manifest used for that resolution. The `context --json` command remains
+standalone and does not inspect the workspace.
 
 An explicitly selected `--config <path>` or `THEOREMC_CONFIG_PATH` is
 exclusive: the CLI selector wins if both are supplied, it suppresses automatic
