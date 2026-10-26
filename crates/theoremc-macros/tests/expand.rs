@@ -7,8 +7,7 @@ fn stage_fixture(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let crate_root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let source = crate_root.join("tests/expand").join(name);
     let target_dir = std::env::var("CARGO_TARGET_DIR")
-        .map(Utf8PathBuf::from)
-        .unwrap_or_else(|_| crate_root.join("../../target"));
+        .map_or_else(|_| crate_root.join("../../target"), Utf8PathBuf::from);
     let relative_destination_dir = Utf8PathBuf::from("tests/trybuild/theoremc-macros/tests/expand");
     let destination = relative_destination_dir.join(name);
     let source_root = Utf8Dir::open_ambient_dir(

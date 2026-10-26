@@ -5,7 +5,7 @@
 //! theorems and both signature summaries.
 
 use super::super::MacroExpansionError;
-use super::super::tests_support::{TheoremFixture, expand_fixture};
+use super::super::tests_support::{TheoremFixture, ensure_condition, expand_fixture};
 use camino::Utf8Path;
 use googletest::prelude::*;
 use rstest::{fixture, rstest};
@@ -329,9 +329,9 @@ fn whitespace_only_signature_drift_does_not_conflict() -> Result<(), Box<dyn std
     let expanded = expand_fixture(Utf8Path::new("theorems/whitespace-drift.theorem"), &theorem)?;
     let mangled_action = mangle_action_name("payload.write");
     let probe_identifier = mangled_action.identifier();
-    assert!(
+    ensure_condition(
         expanded.contains(&format!("crate::theorem_actions::{probe_identifier}")),
-        "expected the payload.write probe in the expansion, got: {expanded}",
-    );
+        format!("expected the payload.write probe in the expansion, got: {expanded}"),
+    )?;
     Ok(())
 }

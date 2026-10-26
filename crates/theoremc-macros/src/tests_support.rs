@@ -22,6 +22,17 @@ pub(super) struct TheoremSpec<'a> {
 
 pub(super) struct TheoremFixture(pub(super) String);
 
+pub(super) fn ensure_condition(
+    condition: bool,
+    message: String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if condition {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(message).into())
+    }
+}
+
 impl TheoremFixture {
     fn as_str(&self) -> &str {
         &self.0
@@ -74,12 +85,23 @@ pub(super) fn redact_hashes(s: &str) -> String {
     let marker = "__h";
     let mut rest = s;
     while let Some(pos) = rest.find(marker) {
-        result.push_str(&rest[..pos]);
-        let after_marker = &rest[pos + marker.len()..];
-        let suffix = &after_marker[..after_marker.len().min(12)];
+        let Some((before_marker, marker_and_suffix)) = rest.split_at_checked(pos) else {
+            result.push_str(rest);
+            return result;
+        };
+        result.push_str(before_marker);
+        let Some((_, after_marker)) = marker_and_suffix.split_at_checked(marker.len()) else {
+            result.push_str(marker_and_suffix);
+            return result;
+        };
+        let Some((suffix, after_suffix)) = after_marker.split_at_checked(12) else {
+            result.push_str(marker);
+            rest = after_marker;
+            continue;
+        };
         if suffix.len() == 12 && suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
             result.push_str("__hXXXXXXXXXXXX");
-            rest = &after_marker[12..];
+            rest = after_suffix;
         } else {
             result.push_str(marker);
             rest = after_marker;
@@ -124,7 +146,7 @@ pub(super) fn expected_expansion_with_unwinds(
         })
         .collect::<Vec<_>>()
         .join(" ");
-    let harness_refs = harnesses
+    let harness_reference_list = harnesses
         .iter()
         .map(|harness| format!("kani :: {harness}"))
         .collect::<Vec<_>>()
@@ -140,7 +162,7 @@ pub(super) fn expected_expansion_with_unwinds(
             const _: [fn(); {}] = [ {} ] ;
         }}",
         harnesses.len(),
-        harness_refs,
+        harness_reference_list,
     ))
 }
 
@@ -172,7 +194,10 @@ pub(super) fn assert_expansion_matches(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let actual = expand_fixture(path, fixture)?;
     let expected = expected_expansion(path, expected_theorems);
-    assert_eq!(actual, expected);
+    ensure_condition(
+        actual == expected,
+        format!("expansion mismatch: expected {expected:?}, got {actual:?}"),
+    )?;
     Ok(())
 }
 
@@ -182,7 +207,10 @@ pub(super) fn assert_expansion_is_stable(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let first = expand_fixture(path, fixture)?;
     let second = expand_fixture(path, fixture)?;
-    assert_eq!(first, second);
+    ensure_condition(
+        first == second,
+        format!("expansion changed between calls: {first:?} vs {second:?}"),
+    )?;
     Ok(())
 }
 

@@ -21,6 +21,10 @@ jobs:
         uses: leynos/shared-actions/.github/actions/setup-rust@0f3047d45d1371d8ae700c69e7bed42c4f8862a1
         with:
           install-mold: 'true'
+      - name: Install supported MSRV toolchains
+        run: rustup toolchain install 1.88 1.89 --profile minimal
+      - name: Install cargo-orthohelp
+        run: cargo install cargo-orthohelp --version 0.10.0 --locked
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
@@ -43,6 +47,10 @@ jobs:
         run: make lint
       - name: Typecheck
         run: make typecheck
+      - name: Check minimum Rust versions
+        run: make msrv
+      - name: Check agent-native command policy
+        run: make check-agent-native
       - name: Test and Measure Coverage
         env:
           # One of the two exclusions from the build standard: a coverage build is a

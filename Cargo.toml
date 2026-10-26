@@ -2,6 +2,7 @@
 members = [
     "crates/test-helpers",
     "crates/theoremc-build-support",
+    "crates/cargo-theorem",
     "crates/theoremc-core",
     "crates/theoremc-macros",
 ]
@@ -22,6 +23,13 @@ theoremc-macros = { version = "0.1.0", path = "crates/theoremc-macros" }
 
 [build-dependencies]
 theoremc-build-support = { version = "0.1.0", path = "crates/theoremc-build-support" }
+
+[workspace.dependencies]
+clap = { version = "4.5.53", features = ["derive"] }
+ortho_config = "0.10.0"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.149"
+thiserror = "2.0.18"
 
 [dev-dependencies]
 proptest = { version = "1.11.0", default-features = false, features = ["std"] }

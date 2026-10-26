@@ -19,7 +19,7 @@
 //! equivalent cases, which is the evidence that the latter are not vacuous.
 
 use super::super::MacroExpansionError;
-use super::super::tests_support::{TheoremFixture, expand_fixture};
+use super::super::tests_support::{TheoremFixture, ensure_condition, expand_fixture};
 use camino::Utf8Path;
 use rstest::rstest;
 use theoremc_core::mangle::mangle_action_name;
@@ -69,10 +69,15 @@ fn document(name: &str, actions: &str, do_block: &str) -> String {
 fn do_with_deposit_reference(depth: usize, args: &[(&str, &str)]) -> String {
     let indent = |level: usize| " ".repeat(2 + 6 * level);
     let pad = indent(depth);
-    let arg_lines = args
-        .iter()
-        .map(|(name, value)| format!("{pad}      {name}: {value}\n"))
-        .collect::<String>();
+    let mut arg_lines = String::new();
+    for (name, value) in args {
+        arg_lines.push_str(&pad);
+        arg_lines.push_str("      ");
+        arg_lines.push_str(name);
+        arg_lines.push_str(": ");
+        arg_lines.push_str(value);
+        arg_lines.push('\n');
+    }
 
     let mut steps = format!(
         concat!(
@@ -86,7 +91,7 @@ fn do_with_deposit_reference(depth: usize, args: &[(&str, &str)]) -> String {
     );
 
     for level in (0..depth).rev() {
-        let pad = indent(level);
+        let nested_pad = indent(level);
         steps = format!(
             concat!(
                 "{pad}- maybe:\n",
@@ -94,7 +99,7 @@ fn do_with_deposit_reference(depth: usize, args: &[(&str, &str)]) -> String {
                 "{pad}    do:\n",
                 "{steps}",
             ),
-            pad = pad,
+            pad = nested_pad,
             steps = steps,
         );
     }
@@ -199,10 +204,10 @@ fn conflict_diagnostic_is_independent_of_reference_depth(
             "theorems/nested-conflict-depth-0.theorem",
             &nested_reference_fixture(&CONFLICT_PAIR, 0),
         )?;
-        assert_eq!(
-            message, baseline,
-            "moving the reference {depth} level(s) deep changed the diagnostic",
-        );
+        ensure_condition(
+            message == baseline,
+            format!("moving the reference {depth} level(s) deep changed the diagnostic"),
+        )?;
     }
     Ok(())
 }
@@ -223,10 +228,10 @@ fn equivalent_signature_reference_expands_at_any_depth(
     let expanded = expand_fixture(Utf8Path::new(&path), &fixture)?;
     let mangled_action = mangle_action_name("account.deposit");
     let probe_identifier = mangled_action.identifier();
-    assert!(
+    ensure_condition(
         expanded.contains(&format!("crate::theorem_actions::{probe_identifier}")),
-        "expected the account.deposit probe at nesting depth {depth}, got: {expanded}",
-    );
+        format!("expected the account.deposit probe at nesting depth {depth}, got: {expanded}"),
+    )?;
     Ok(())
 }
 
