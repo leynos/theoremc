@@ -186,6 +186,27 @@ fn command_parse_failure_keeps_usage_status_and_stderr() -> Result<()> {
             == Some("usage"),
         "JSON parse failure must identify the usage class"
     );
+
+    let missing_color_value = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+        .args(["theorem", "context", "--color", "--json"])
+        .output()?;
+    ensure!(
+        missing_color_value.status.code() == Some(2),
+        "missing option value must keep exit 2"
+    );
+    ensure!(
+        missing_color_value.stdout.is_empty(),
+        "JSON parse failure must not use stdout"
+    );
+    let missing_color_diagnostic: Value = serde_json::from_slice(&missing_color_value.stderr)?;
+    ensure!(
+        missing_color_diagnostic
+            .get("error")
+            .and_then(|error| error.get("code"))
+            .and_then(Value::as_str)
+            == Some("cli.usage"),
+        "a following JSON flag must select a JSON usage diagnostic"
+    );
     Ok(())
 }
 

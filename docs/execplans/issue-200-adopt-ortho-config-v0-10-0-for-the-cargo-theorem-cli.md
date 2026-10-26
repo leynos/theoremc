@@ -99,6 +99,8 @@ pull request.
 - [x] Correct the nested Clap trait in the design example; confirm the root
   placeholder is already absent from the candidate.
 - [x] Run docs-only gates after correcting the derive example.
+- [x] Review commit `29620d7` with CodeRabbit and fix verified findings.
+- [x] Rerun the full sequential gate set after the final review fixes.
 - [ ] Complete a clean exact-head review.
 - [ ] Push the reviewed candidate and open a draft PR.
 
@@ -115,6 +117,19 @@ Expanding `make lint` to the whole workspace exposed an existing
 expression now uses `map_or_else`. Both pre-rebase and rebased M2 candidates
 passed the full deterministic gate set; exact-head CodeRabbit review and
 delivery remain pending.
+
+CodeRabbit reviewed `29620d7` after the nested Clap example fix and found two
+valid CLI edge cases: a failed help-output write could return success when its
+fallback reached stderr, and a missing global option value could hide a later
+`--json` flag. The CLI now returns failure for the first case and only skips a
+global value token when it is not another option. A writer-injection unit test
+and isolated binary test cover both cases. The first two gate attempts stopped
+at Clippy on the intentional fallback result and a shadowed test binding; both
+were corrected. M2-38 then passed the full sequential set: formatting, lint,
+typecheck, 846 tests and doctests, workflow contracts, Markdown, Mermaid,
+agent-native, Rust 1.88 and 1.89 checks, build, release, and Makefile
+validation. Logs are under `/tmp/` with the `m2-38` suffix. A clean exact-head
+review is the remaining gate before delivery.
 
 Live `origin/main` advanced to `70926a18a32031d4c16c76b7c070a513f54a1bef` while
 the implementation was in progress. The branch was rebased onto that commit
@@ -370,6 +385,11 @@ nested Clap derive typo; this is fixed in the working tree. Its root-binary
 concern was invalid for the candidate, which already deletes `src/main.rs`. The
 derive correction passed the M2-33 docs-only gates, and M2-34 passed after the
 ExecPlan update. A clean exact-head review and delivery remain.
+
+CodeRabbit's review of `29620d7` found two valid diagnostic edge cases, both
+covered by regression tests and fixed in the working tree. The full M2-38 gate
+sequence passed after the fixes. Request one clean review on the committed
+candidate before pushing.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
