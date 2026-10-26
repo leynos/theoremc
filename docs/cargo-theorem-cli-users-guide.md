@@ -1,6 +1,6 @@
 # `cargo theorem` user's guide
 
-- Status: proposed
+- Status: foundation implemented; full command surface proposed
 - Audience: users, integrators, and automation authors
 
 This guide describes how to use the `cargo theorem` command-line interface
@@ -9,9 +9,10 @@ initialising a project, creating and inspecting theorems, checking a project,
 installing and pinning proof backends, running proofs, reading reports, and
 migrating from `rust-prover-tools`.
 
-The command surface is **planned, not shipped**. The initial foundation will
-expose only implemented handlers; later commands appear as their roadmap slices
-ship. The target surface is defined normatively in the
+The Phase 3.1.1 foundation is implemented in this branch and registers only
+`context`. It is not yet a released binary. The remaining command surface is
+planned; later commands appear as their roadmap slices ship. The target surface
+is defined normatively in the
 [`cargo theorem` CLI design](cargo-theorem-cli-design.md); where this guide and
 that design disagree, the design wins. Nothing here is a compatibility promise
 for a released binary.
@@ -51,6 +52,17 @@ The distributable package and executable are both named `cargo-theorem`. Cargo
 dispatches `cargo theorem <args>` as `cargo-theorem theorem <args>`. Direct
 invocation uses the same injected `theorem` token; documentation and
 diagnostics use `cargo theorem`.
+
+The currently registered command is:
+
+```console
+cargo theorem context --json
+cargo-theorem theorem context --json
+```
+
+Both forms emit the same compact agent-context document. Project inspection,
+mutation, backend, proof, reporting, profile-management, and feedback commands
+remain planned and are not accepted by this foundation.
 
 Commands that inspect or mutate a Cargo project accept these global selectors:
 
@@ -467,11 +479,12 @@ ones. On Unix and Redox, system files come from each `$XDG_CONFIG_DIRS` entry
 to `$HOME/.config`; both use `theoremc/theoremc.toml`. User discovery also
 checks `~/.theoremc.toml`. On other platforms OrthoConfig uses the home
 directory and native configuration directory supplied by its `EnvSource`, where
-available. The project file is `theoremc.toml` at the Cargo workspace root.
-Cargo starts this subcommand in the caller's current directory, so project
-commands resolve the workspace root with `cargo metadata` and pass it to
-OrthoConfig. `--manifest-path` selects the manifest used for that resolution.
-`context --json` remains standalone and does not inspect the workspace.
+available. The project file is `theoremc.toml` at the Cargo workspace root. At
+this foundation stage, `context` does not invoke `cargo metadata`; OrthoConfig
+uses the caller's current directory for its automatic project scope. Project
+commands will resolve the workspace root with `cargo metadata` and pass it to
+OrthoConfig. `--manifest-path` will select the manifest used for that
+resolution. `context --json` does not inspect Cargo workspace metadata.
 
 An explicit `--config <path>` or `THEOREMC_CONFIG_PATH` suppresses automatic
 discovery and selects one required file; `--config` takes precedence if both
@@ -504,12 +517,14 @@ No legacy `rust-prover-tools` file is discovered. Its `KANI`, `VERUS_*`, and
 `INPUT_*` variables are handled only by the corresponding later backend
 migration command, not by general configuration loading.
 
-Persistent project policy, backend pins and executable settings, run limits,
-installation-cache defaults, and renderer defaults are configurable. One-shot
-command selection, theorem and package selectors, `--json`, `--deliver`,
-`--dry-run`, `--force`, `--compile`, `--config`, and `--profile` remain
-command-line inputs. Where a setting appears on both surfaces, a parser default
-is treated as absent so files and environment variables can override it.
+The foundation resolves renderer defaults, but `context` does not render human
+output. Persistent project policy, backend pins and executable settings, run
+limits, and installation-cache defaults become configurable as their commands
+are implemented. One-shot command selection, theorem and package selectors,
+`--json`, `--deliver`, `--dry-run`, `--force`, `--compile`, `--config`, and
+`--profile` remain command-line inputs. Where a setting appears on both
+surfaces, a parser default is treated as absent so files and environment
+variables can override it.
 
 Each command's settings live under `[cmds.<command>]`. For example,
 `[cmds.run]` is selected only by `run`; its environment variables use the

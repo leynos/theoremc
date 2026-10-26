@@ -337,13 +337,13 @@ Rust versions, direct and Cargo-mediated invocation, and base output contracts.
 
 Out of scope: theorem execution and project mutation.
 
-- [ ] Add a dedicated `crates/cargo-theorem` package and `cargo-theorem`
+- [x] Add a dedicated `crates/cargo-theorem` package and `cargo-theorem`
   executable while keeping application-only dependencies outside the root
   theoremc facade, and remove the placeholder root `src/main.rs`. Acceptance:
   both `cargo theorem --help` and `cargo-theorem theorem --help` execute the
   same command tree in end-to-end tests, and no unrelated `theoremc` binary
   remains. Signposts: `CLI-DES`.
-- [ ] Adopt `ortho_config` 0.10.0 for CLI, environment, TOML file, named
+- [x] Adopt `ortho_config` 0.10.0 for CLI, environment, TOML file, named
   profile, and selected-subcommand merging, using source-injection APIs,
   `SelectedSubcommandMerge`, and `OrthoConfigSubcommandDocs`. Declare command
   behaviour metadata and validate the package with
@@ -354,7 +354,7 @@ Out of scope: theorem execution and project mutation.
   global settings (including explicit `--config`), profiles reject command
   namespaces as required by v0.10.0, and generated recursive metadata matches
   the Clap command tree. Signposts: `CLI-DES`, `ADR9`.
-- [ ] Establish the mixed-MSRV policy required by `ortho_config` 0.10.0: retain
+- [x] Establish the mixed-MSRV policy required by `ortho_config` 0.10.0: retain
   Rust 1.88 for library packages and declare Rust 1.89 for `cargo-theorem`.
   Acceptance: CI tests the library workspace excluding the CLI on 1.88 and the
   CLI package on 1.89. Signposts: `CLI-DES`.
@@ -362,7 +362,7 @@ Out of scope: theorem execution and project mutation.
   invariants, stable exit classes, and global renderer options. Acceptance:
   snapshots cover success and failure for human and JSON modes, and subprocess
   output cannot leak beside a JSON document. Signposts: `CLI-DES`, `ADR2-4`.
-- [ ] Implement `cargo theorem context --json` from OrthoConfig's compact agent
+- [x] Implement `cargo theorem context --json` from OrthoConfig's compact agent
   context and add agent-native policy checks to CI. Acceptance: the versioned
   context includes every command path and its available behaviour metadata
   registered in the foundation tree, without advertising later unimplemented

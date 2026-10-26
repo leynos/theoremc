@@ -50,8 +50,8 @@
   backend management, theorem execution, reporting, and migration from
   `rust-prover-tools`.
 - [`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md) -
-  Task-oriented guide for callers of the planned CLI, covering installation,
-  project initialisation, theorem creation, checking, backend management,
+  User guide for the implemented `context` foundation and planned CLI commands,
+  covering configuration, installation, project work, backend management,
   execution, reports, JSON output, exit classes, and migration.
 - [OrthoConfig v0.10.0 user's guide](ortho-config/users-guide.md) - Imported
   release guide for the configuration APIs used by `cargo-theorem`.

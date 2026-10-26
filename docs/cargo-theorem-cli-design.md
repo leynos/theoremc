@@ -387,12 +387,13 @@ variables.
 
 ### 6.6 Phase 3.1 foundation scope
 
-The initial foundation owns the package, OrthoConfig-derived configuration,
+The Phase 3.1.1 foundation owns the package, OrthoConfig-derived configuration,
 selected-subcommand merge boundary, command metadata, Cargo entry shape, and
-configuration error mapping. It does not implement backend execution, proof
-runs, project mutations, or the full command list in §7. Operational commands
-are added as their later roadmap slices land; the foundation must not advertise
-an unimplemented handler as operational. Its generated agent context describes
+configuration error mapping. Its initial registered handler is
+`context --json`. It does not implement backend execution, proof runs, project
+mutations, or the full command list in §7. Operational commands are added as
+their later roadmap slices land; the foundation must not advertise an
+unimplemented handler as operational. Its generated agent context describes
 only paths registered in the foundation command tree. Follow-on slices extend
 that context from the same tree when they add operational handlers.
 

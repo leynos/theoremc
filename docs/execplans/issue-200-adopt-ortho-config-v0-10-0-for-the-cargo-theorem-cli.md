@@ -81,9 +81,63 @@ pull request.
   `261d92b0ac2d038170d482811fbfb500366fa2ca` with CodeRabbit 0.9.1 against
   `origin/main` at `af7608108fee9e86a90cb683f8293bde56d227e4`; it reviewed all
   12 changed Markdown files and reported zero findings.
-- [ ] Implement the application package and injected-source tests.
-- [ ] Run deterministic gates, request CodeRabbit reviews at milestone
-  boundaries, commit the validated changes, push, and open a draft PR.
+- [x] Implement the application package and injected-source tests.
+- [x] Run the complete sequential deterministic gate set for the M2 candidate.
+- [ ] Review the committed M2 candidate with CodeRabbit and resolve any
+  actionable findings.
+- [ ] Push the reviewed candidate and open a draft PR.
+
+M2 implementation is now present in the working tree: the dedicated package,
+Cargo entry wrapper, OrthoConfig configuration model, selected-command adapter,
+agent context, JSON diagnostics, injected-source tests, binary-level entry
+tests, mixed-MSRV CI checks, and Make targets. The user's guide now
+distinguishes the registered `context --json` command from later planned
+handlers. Formatting was applied with `make fmt`; the two imported upstream
+guides still match their recorded SHA-256 checksums. The first `make test`
+compile exposed import and `ExitCode` constness errors, which were corrected.
+Expanding `make lint` to the whole workspace exposed an existing
+`clippy::map_unwrap_or` finding in the macro trybuild fixture helper; that
+expression now uses `map_or_else`. The M2 acceptance gates passed; exact-head
+CodeRabbit review and delivery remain pending.
+
+The first workspace-wide Clippy run found 27 pre-existing diagnostics in
+`theoremc-macros` test helpers that the old root-only `make lint` command did
+not visit. The helper code was corrected without lint suppressions: result
+tests now return diagnostics instead of asserting, generated string assembly
+uses safe UTF-8 handling, test defaults name `IndexMap`, and shadowed bindings
+were renamed. The `make lint` target now matches the workspace-wide command
+specified in the repository instructions. A fresh full gate sequence is still
+required. A subsequent lint attempt found a missing fixture import, two
+OrthoConfig documentation-trait imports, and a discarded formatting result;
+these were corrected. Agent-context output now uses compact JSON serialization.
+
+The next sequential gate run passed `make check-fmt` but `make lint` found 32
+Clippy diagnostics across the new CLI package. The captured lint log is
+`/tmp/lint-4589bf31-6003-42c5-b78f-652d6e7b79c1-issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli-m2-7.out`.
+The implementation now uses non-shadowing names, borrowed errors, fallible
+diagnostic writes, and structured test assertions. The two renderer/config
+records retain independent boolean CLI switches with narrowly justified
+`clippy::struct_excessive_bools` expectations. Formatting has been reapplied;
+the full sequence must be rerun from the first gate.
+
+The following run passed `make check-fmt` but `make lint` found eight
+`anyhow::Error`/boxed-error mismatches in result-returning source tests and one
+collapsible write-error conditional. Those are corrected. Reviewing the
+end-to-end contract also showed its expected agent-context command list did not
+match OrthoConfig's documented bridge shape, which includes the binary root as
+well as the registered `context` command. The child-process tests now assert
+that two-entry shape and check JSON streams with `anyhow::ensure!`. A fresh
+gate run is pending.
+
+The next lint attempt found five remaining `&str` to `anyhow::Error`
+conversions in `ok_or` expressions. Those now create explicit `anyhow!` errors,
+including the child-process test helpers, and the isolated Cargo test child
+preserves `RUSTUP_HOME` while keeping its configuration home temporary.
+`make fmt` passed; all deterministic gates remain pending.
+
+The next workspace lint pass found two potentially panicking indexes in the
+end-to-end command metadata assertion. They now use checked accessors. The
+latest formatting command passed; restart the complete gate sequence.
 
 ## Baseline inventory
 
@@ -206,6 +260,16 @@ pull request.
 
 Work is in progress. Update this section at each completed milestone and record
 any remaining validation or delivery blocker before completion.
+
+The final M2 candidate passed all nine deterministic gates sequentially on
+2026-10-26 (scrutineer run M2-20): `make check-fmt`, `make lint`,
+`make typecheck`, `make test` (842 tests and doctests; 631 seconds),
+`make test-workflow-contracts`, `make markdownlint`, `make nixie`,
+`make check-agent-native`, and `make msrv` (Rust 1.88 libraries and Rust 1.89
+application). The full sequence followed the implementation-status update; logs
+are under `/tmp/` with the `m2-20` suffix. The remaining work is to commit this
+candidate, request the required CodeRabbit review, resolve any findings with
+fresh gates, push over SSH, and open the draft PR.
 
 The initial documentation candidate was committed as `cdb1eb9`.
 `make check-fmt`, `make markdownlint`, and `make nixie` passed before the first
@@ -486,3 +550,51 @@ that gate before proceeding. Never discard unrelated changes.
 
 - 2026-10-26: Created after importing the pinned upstream guides and completing
   the initial repository, branch, compiler, and remote issue/PR inventory.
+- 2026-10-26: M2 first gate sequence passed formatting and workspace Clippy,
+  then stopped at tests. The failure identified OrthoConfig's generated
+  `config_path` selector missing from `GlobalOptions`' Serde shape, while
+  omitted boolean values also needed struct-level Serde defaults. The app now
+  owns the explicit config path field and keeps it out of merged settings; the
+  full sequence must be rerun before the milestone can be reviewed or committed.
+- 2026-10-26: The second M2 sequence passed formatting, Clippy, and typecheck,
+  then showed that `serde(skip)` removes `config_path` from the destination
+  shape as well. It also exposed that Clap's `Error::print` bypasses injected
+  output writers. The config selector now remains recognized while being
+  skipped during deserialization, and parse diagnostics are rendered into the
+  caller-selected stream. Rerun the full sequence, including `make typecheck`.
+- 2026-10-26: The third M2 sequence passed formatting, Clippy, and typecheck;
+  tests confirmed the parser-writer fix but showed Serde also excludes fields
+  marked `skip_deserializing` from the accepted field set. The selector now
+  uses a custom deserializer that consumes its internal CLI value and returns
+  `None`, preserving `deny_unknown_fields` for other keys. Rerun the full gate
+  sequence before advancing.
+- 2026-10-26: M2-14 stopped at Clippy's `doc_markdown` check for the new helper
+  comment; the finding is corrected with the required code formatting. Restart
+  the full gate sequence before moving to review.
+- 2026-10-26: M2-15 passed formatting, Clippy, and typecheck. All config
+  precedence tests passed; the remaining test failures were stale assertions
+  for OrthoConfig's single-quoted profile error and Clap help's leading command
+  description. The assertions now check the actual message and require the
+  usage line in stdout. Restart the complete gate sequence.
+- 2026-10-26: M2-16 passed check-fmt, lint, and typecheck; the help assertion
+  now passes, as do all configuration tests. The final failure expected
+  `cargo theorem` as the version label, while the executable correctly reports
+  `cargo-theorem`. The test now checks the executable's version label. Rerun
+  the full sequence before reviewing the milestone.
+- 2026-10-26: M2-17 passed every gate except the Rust 1.88 library check. The
+  pre-existing `serde-saphyr = "1.0.1"` caret requirement resolved to 1.3.0,
+  whose declared floor is 1.89. Keep library MSRVs unchanged and resolve to a
+  release that compiles on 1.88; rerun the full gate sequence afterward.
+- 2026-10-26: Updated the core crate's caret minimum to
+  `serde-saphyr = "1.1.0"` and locked the workspace to 1.1.0, preserving the
+  Rust 1.88 library policy. The MSRV gate must prove this release compiles
+  before the dependency change is considered complete.
+- 2026-10-26: Updated repository layout and the documentation index to remove
+  the deleted root placeholder binary and describe the new application crate.
+  The imported docs remain checksum-identical. Formatting has passed; rerun all
+  candidate gates, including the Rust 1.88 check, before CodeRabbit review.
+- 2026-10-26: Focused `make msrv` passed with `serde-saphyr` 1.1.0: Rust 1.88
+  checked the workspace without `cargo-theorem`, and Rust 1.89 checked the
+  application package. The roadmap now marks the package, OrthoConfig spine,
+  mixed-MSRV policy, and context foundation as implemented; the broader output
+  envelope remains planned. Rerun the complete gate sequence on this candidate.
