@@ -49,9 +49,11 @@ project scopes in that order. On Unix and Redox, system files use each
 `theoremc/theoremc.toml`. User discovery also checks `~/.theoremc.toml`. On
 other platforms OrthoConfig uses the home directory and native configuration
 directory supplied by its `EnvSource`, where available. The project file is
-`theoremc.toml` in the project base directory. The foundation uses the current
-working directory by default, and the application may supply a resolved project
-directory.
+`theoremc.toml` at the Cargo workspace root. Cargo starts external subcommands
+in the caller's current directory without passing the workspace root, so
+project commands resolve it with `cargo metadata` and pass the result to
+OrthoConfig. `--manifest-path` selects the manifest used for that resolution.
+`context --json` remains standalone and does not inspect the workspace.
 
 An explicit `--config <path>` or `THEOREMC_CONFIG_PATH` selects one required,
 exclusive file and suppresses automatic discovery; `--config` takes precedence

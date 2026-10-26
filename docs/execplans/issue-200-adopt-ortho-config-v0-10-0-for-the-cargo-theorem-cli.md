@@ -151,6 +151,15 @@ pull request.
   `38812c563e3953a490e3efc202609f37e21a0517`; the local fetched manifest
   confirms default features are `serde_json` and `toml`. Impact: the dependency
   keeps its default feature set, and the CLI accepts TOML configuration only.
+- Observation: Cargo's external-tools documentation says custom subcommands
+  use the caller's working directory as their invocation context and describes
+  the injected command token and arguments, but does not describe a workspace
+  root argument. Evidence: Firecrawl scrape of the official Cargo Book's
+  [External Tools](https://doc.rust-lang.org/cargo/reference/external-tools.html)
+  page on 2026-10-26. Inference: project commands must resolve the workspace
+  root themselves and pass it to OrthoConfig. Impact: the implementation tests
+  config discovery from a workspace member; `context --json` skips workspace
+  discovery to meet its standalone contract.
 
 ## Decision log
 
@@ -245,6 +254,13 @@ Trace links:
   setting does not leak. Artefact: application configuration tests. Negative
   control: select the sibling command with the wrong merge result and require
   the test to fail.
+- Obligation CONFIG-WORKSPACE: project-scope configuration is rooted at the
+  Cargo workspace root even when Cargo invokes the subcommand from a member
+  directory. Method: resolve a nested member with `cargo metadata` and assert
+  OrthoConfig receives the workspace root; assert `context --json` does not
+  invoke workspace discovery. Artefact: application tests. Negative control:
+  start in a member and require a project file at the workspace root to win
+  over any member-local file.
 - Obligation CONFIG-ERROR: malformed, unreadable, explicit-missing, invalid,
   and rejected unknown-key files produce an actionable configuration error;
   absence of an optional discovered file remains non-fatal. Method: table tests
