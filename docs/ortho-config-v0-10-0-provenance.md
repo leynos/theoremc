@@ -17,8 +17,8 @@ from the pinned commit below.
 
 | Upstream path                     | Local path                                     | SHA-256                                                            |
 | --------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------ |
-| `docs/users-guide.md`             | `docs/ortho-config-users-guide.md`             | `84d1c97b77024224dc9220a12d4b749205d9bb2db54849185da21c969dda5575` |
-| `docs/v0-10-0-migration-guide.md` | `docs/ortho-config-v0-10-0-migration-guide.md` | `b5331aa6cfcc07b3dcd188c620db98d0a1a1f13b0c8ef96d88913d701bca25bf` |
+| `docs/users-guide.md`             | `docs/ortho-config/users-guide.md`             | `84d1c97b77024224dc9220a12d4b749205d9bb2db54849185da21c969dda5575` |
+| `docs/v0-10-0-migration-guide.md` | `docs/ortho-config/v0-10-0-migration-guide.md` | `b5331aa6cfcc07b3dcd188c620db98d0a1a1f13b0c8ef96d88913d701bca25bf` |
 
 Each local file was written from
 `git show 38812c563e3953a490e3efc202609f37e21a0517:<upstream-path>` without
@@ -31,14 +31,17 @@ guides as the integration reference.
 
 ## Preserved relative links
 
-The imported Markdown retains its upstream relative links. They point into the
-source tree at the pinned commit and are not rewritten because the imported
-bytes must remain unchanged. The two imported guide paths were renamed locally:
+The imported Markdown retains its upstream relative links and exact bytes. Both
+guides are co-located under their upstream filenames so links between the
+guides resolve locally:
 
-- `users-guide.md` maps to
-  [the local users' guide](ortho-config-users-guide.md).
-- `v0-10-0-migration-guide.md` maps to the
-  [local migration guide](ortho-config-v0-10-0-migration-guide.md).
+- `users-guide.md` resolves to
+  [the local users' guide](ortho-config/users-guide.md).
+- `v0-10-0-migration-guide.md` resolves to the
+  [local migration guide](ortho-config/v0-10-0-migration-guide.md).
+
+Relative links to files not imported into this repository still map to the
+immutable upstream commit listed below.
 
 The following link targets remain in the upstream repository:
 
