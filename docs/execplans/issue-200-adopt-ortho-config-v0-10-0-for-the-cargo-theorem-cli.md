@@ -883,6 +883,14 @@ that gate before proceeding. Never discard unrelated changes.
   statistics notice, but no job or step failed. The PR remained open and draft.
 - 2026-10-27: After the 84-minute wait, a second exact-head
   `coderabbit review --agent` attempt again hit the included-review quota and
-  produced no findings or review result. The service reported a 7-minute wait;
-  the requested policy started another randomized 53-minute `vsleep`. Do not
-  enable usage-based billing or retry before this cooldown completes.
+  produced no findings or review result. The service reported a 7-minute wait.
+  The requested randomized 53-minute `vsleep` was interrupted with 39 minutes
+  remaining (exit 143), so no cooldown completion was claimed. A fresh
+  randomized 67-minute `vsleep` is now running; do not retry before it ends.
+- 2026-10-27: Hosted run `40447436629` completed successfully on exact head
+  `bb6caa0eaa69564beefdf1b075022ea73892d1da`. The test, coverage, lint,
+  typecheck, MSRV, formatting, Markdown lint, and agent-native steps passed.
+  CodeScene and Gecko Security also passed. CodeRabbit, Kody, and automerge
+  checks skipped because this PR remains a draft. GitHub did not expose the
+  live test log while it was running; the final run snapshot confirms success.
+  CodeRabbit's CLI review and the final PR-body reconciliation remain pending.
