@@ -894,3 +894,9 @@ that gate before proceeding. Never discard unrelated changes.
   checks skipped because this PR remains a draft. GitHub did not expose the
   live test log while it was running; the final run snapshot confirms success.
   CodeRabbit's CLI review and the final PR-body reconciliation remain pending.
+- 2026-10-27: The plan-only update in `42038e9` passed the documentation gates
+  (`make fmt`, `make check-fmt`, `make markdownlint`, and `make nixie`) and was
+  pushed to PR #204. Hosted run `40449365196` then passed all CI steps on exact
+  head `42038e9e05cbeccc379147ae63bab1553691d39d`; CodeScene and Gecko Security
+  passed as well. The PR remains open and draft. The final CodeRabbit CLI
+  review is still pending the full randomized 67-minute cooldown.
