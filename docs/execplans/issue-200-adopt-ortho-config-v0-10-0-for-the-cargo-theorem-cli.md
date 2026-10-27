@@ -938,3 +938,9 @@ that gate before proceeding. Never discard unrelated changes.
   Gecko Security passed. The run emitted informational cache/runner annotations
   only. The PR remains open and draft; the full randomized CodeRabbit cooldown
   is still running.
+- 2026-10-27: Hosted run `40470960699` passed all CI steps on exact head
+  `7a2c5099ca393362dc025893d3e21308182382a5`; CodeScene result `8145132` and
+  Gecko Security passed. After the full randomized 80-minute cooldown, the
+  exact-head CodeRabbit attempt again hit the included-review rate limit. The
+  service reported 2 minutes and 45 seconds and returned no review result. A
+  fresh randomized 72-minute `vsleep` is running; do not retry before it ends.
