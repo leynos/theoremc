@@ -133,76 +133,50 @@ fn json_parse_diagnostic_keeps_the_usage_exit_class() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn parse_error_json_detection_skips_global_values_and_respects_end_of_options() {
-    let cases: &[(&[&str], bool)] = &[
-        (&["cargo-theorem", "theorem", "context", "--json"], true),
-        (
-            &[
-                "cargo-theorem",
-                "theorem",
-                "--locale",
-                "en",
-                "context",
-                "--json",
-            ],
-            true,
-        ),
-        (
-            &[
-                "cargo-theorem",
-                "theorem",
-                "context",
-                "--locale",
-                "en",
-                "--json",
-            ],
-            true,
-        ),
-        (
-            &["cargo-theorem", "theorem", "context", "--", "--json"],
-            false,
-        ),
-        (
-            &["cargo-theorem", "theorem", "--", "context", "--json"],
-            false,
-        ),
-        (&["cargo-theorem", "theorem", "unknown", "--json"], false),
-        (&["cargo-theorem", "theorem", "--config", "--json"], false),
-        (&["cargo-theorem"], false),
-        (&["cargo-theorem", "wrong", "context", "--json"], false),
+#[rstest::rstest]
+#[case(&["cargo-theorem", "theorem", "context", "--json"], true)]
+#[case(&["cargo-theorem", "theorem", "--locale", "en", "context", "--json"], true)]
+#[case(&["cargo-theorem", "theorem", "context", "--locale", "en", "--json"], true)]
+#[case(&["cargo-theorem", "theorem", "context", "--", "--json"], false)]
+#[case(&["cargo-theorem", "theorem", "--", "context", "--json"], false)]
+#[case(&["cargo-theorem", "theorem", "unknown", "--json"], false)]
+#[case(&["cargo-theorem", "theorem", "--config", "--json"], false)]
+#[case(&["cargo-theorem"], false)]
+#[case(&["cargo-theorem", "wrong", "context", "--json"], false)]
+fn parse_error_json_detection_matches_command_shapes(
+    #[case] arguments: &[&str],
+    #[case] expected: bool,
+) {
+    assert_eq!(parse_error_requests_json(arguments), expected);
+}
+
+#[rstest::rstest]
+#[case("--color")]
+#[case("--emoji")]
+#[case("--progress")]
+#[case("--accessibility")]
+#[case("--width")]
+#[case("--locale")]
+#[case("--config")]
+#[case("--profile")]
+fn parse_error_json_detection_skips_global_option_values(#[case] option: &str) {
+    let arguments = [
+        "cargo-theorem",
+        "theorem",
+        option,
+        "value",
+        "context",
+        "--json",
     ];
-    for (case_args, expected) in cases {
-        let os_arguments = case_args.iter().map(OsString::from).collect::<Vec<_>>();
-        assert_eq!(
-            application::parse_error_requests_json(&os_arguments),
-            *expected
-        );
-    }
-    for option in [
-        "--color",
-        "--emoji",
-        "--progress",
-        "--accessibility",
-        "--width",
-        "--locale",
-        "--config",
-        "--profile",
-    ] {
-        let os_arguments = [
-            "cargo-theorem",
-            "theorem",
-            option,
-            "value",
-            "context",
-            "--json",
-        ]
-        .map(OsString::from);
-        assert!(
-            application::parse_error_requests_json(&os_arguments),
-            "{option} value must be skipped"
-        );
-    }
+    assert!(
+        parse_error_requests_json(&arguments),
+        "{option} value must be skipped"
+    );
+}
+
+fn parse_error_requests_json(arguments: &[&str]) -> bool {
+    let os_arguments = arguments.iter().map(OsString::from).collect::<Vec<_>>();
+    application::parse_error_requests_json(&os_arguments)
 }
 
 #[test]
