@@ -118,9 +118,9 @@ pull request.
 - [x] Pass hosted CI, coverage, CodeScene, and Gecko checks on implementation
   head `40a8b47545ad9c61cdaa1e86956155f14bbe797e`.
 - [x] Complete the first requested cooldown and attempt an exact-head review.
-- [ ] Complete the second requested cooldown and obtain a CodeRabbit review
-  result for the exact candidate.
-- [ ] Record the final review and hosted results, refresh the draft PR body,
+- [x] Complete the final requested cooldown and obtain a CodeRabbit review
+  result for exact candidate `aea054739617eb8b3b542ede27ad907457b7b79d`.
+- [x] Record the final review and hosted results, refresh the draft PR body,
   and confirm the PR remains open and draft.
 
 M2 implementation is now present in the working tree: the dedicated package,
@@ -953,3 +953,9 @@ that gate before proceeding. Never discard unrelated changes.
   Gecko Security passed. The PR remains open and draft. The fresh randomized
   72-minute CodeRabbit cooldown is still running; its exact-head review remains
   pending.
+- 2026-10-27: Hosted run `40480470936` passed all CI steps on exact head
+  `aea054739617eb8b3b542ede27ad907457b7b79d`; CodeScene result `8146424` and
+  Gecko Security passed. After the full randomized 72-minute cooldown,
+  `coderabbit review --agent --base origin/main --include-untracked` completed
+  on that exact head with zero findings. The PR body records the result, and PR
+  #204 remains open and draft.
