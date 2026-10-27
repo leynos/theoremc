@@ -905,3 +905,9 @@ that gate before proceeding. Never discard unrelated changes.
   Gecko Security passed. The PR remains open and draft, with no unresolved
   hosted failures. The final CodeRabbit CLI review still awaits completion of
   the full randomized cooldown.
+- 2026-10-27: After the full randomized 67-minute cooldown, the final exact-head
+  `coderabbit review --agent` attempt on `0d7603d` again hit the
+  included-review rate limit and returned no review result. The service
+  reported 8 minutes and 41 seconds. Following the requested policy, a new
+  randomized 71-minute `vsleep` is running; do not retry before it ends. All
+  deterministic local and hosted checks passed on `0d7603d` before this attempt.
