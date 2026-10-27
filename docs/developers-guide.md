@@ -541,10 +541,12 @@ configuration types, dispatch, application rendering, and exit-code mapping.
 Reusable theorem, project, execution, and report services remain in library
 packages rather than moving into the CLI.
 
-The `cargo-theorem` package uses `ortho_config` 0.10.0 and requires Rust 1.89.
-The facade, `theoremc-core`, `theoremc-macros`, and build-support crates remain
-on Rust 1.88 and do not depend on application configuration. CI keeps these
-split checks:
+The `cargo-theorem` package uses `ortho_config` and `cargo-orthohelp` 0.10.0
+and requires Rust 1.89. The CLI's `agent_context.rs` calls cargo-orthohelp at
+runtime to convert generated command metadata into the agent-context schema.
+Keep both dependencies in the application package. The facade, `theoremc-core`,
+`theoremc-macros`, and build-support crates remain on Rust 1.88 and do not
+depend on application configuration. CI keeps these split checks:
 
 ```console
 RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem

@@ -9,25 +9,35 @@ use std::{
 
 use anyhow::{Result, ensure};
 use cap_std::{ambient_authority, fs::Dir};
+use rstest::rstest;
 use serde_json::Value;
 
 const BINARY: &str = env!("CARGO_BIN_EXE_cargo-theorem");
 
-#[test]
-fn cargo_and_direct_invocations_emit_the_same_json_document() -> Result<()> {
-    let directory = tempfile::tempdir()?;
-    let bin_dir = directory.path().join("bin");
-    let capability = Dir::open_ambient_dir(directory.path(), ambient_authority())?;
-    capability.create_dir("bin")?;
-    install_subcommand(&bin_dir)?;
-    let path = isolated_path(&bin_dir)?;
-    let direct = isolated_command(OsStr::new(BINARY), directory.path(), &path)
-        .args(["theorem", "context", "--json"])
-        .output()?;
+#[path = "entry_points/support.rs"]
+mod support;
+use support::{CargoSubcommandEnvironment, cargo_subcommand_environment};
+
+#[rstest]
+fn cargo_and_direct_invocations_emit_the_same_json_document(
+    cargo_subcommand_environment: Result<CargoSubcommandEnvironment>,
+) -> Result<()> {
+    let environment = cargo_subcommand_environment?;
+    let direct = isolated_command(
+        OsStr::new(BINARY),
+        environment.directory.path(),
+        &environment.path,
+    )
+    .args(["theorem", "context", "--json"])
+    .output()?;
     let cargo = cargo_binary()?;
-    let via_cargo = isolated_command(cargo.as_os_str(), directory.path(), &path)
-        .args(["theorem", "context", "--json"])
-        .output()?;
+    let via_cargo = isolated_command(
+        cargo.as_os_str(),
+        environment.directory.path(),
+        &environment.path,
+    )
+    .args(["theorem", "context", "--json"])
+    .output()?;
 
     assert_success_json(&direct)?;
     assert_success_json(&via_cargo)?;
@@ -61,17 +71,18 @@ fn context_ignores_malformed_automatic_project_configuration() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn cargo_and_direct_help_expose_the_same_command_tree() -> Result<()> {
-    let directory = tempfile::tempdir()?;
-    let bin_dir = directory.path().join("bin");
-    let capability = Dir::open_ambient_dir(directory.path(), ambient_authority())?;
-    capability.create_dir("bin")?;
-    install_subcommand(&bin_dir)?;
-    let path = isolated_path(&bin_dir)?;
-    let help = isolated_command(OsStr::new(BINARY), directory.path(), &path)
-        .args(["theorem", "--help"])
-        .output()?;
+#[rstest]
+fn cargo_and_direct_help_expose_the_same_command_tree(
+    cargo_subcommand_environment: Result<CargoSubcommandEnvironment>,
+) -> Result<()> {
+    let environment = cargo_subcommand_environment?;
+    let help = isolated_command(
+        OsStr::new(BINARY),
+        environment.directory.path(),
+        &environment.path,
+    )
+    .args(["theorem", "--help"])
+    .output()?;
     ensure!(help.status.success(), "help must exit successfully");
     let help_stdout = String::from_utf8_lossy(&help.stdout);
     ensure!(
@@ -80,9 +91,13 @@ fn cargo_and_direct_help_expose_the_same_command_tree() -> Result<()> {
     );
     ensure!(help.stderr.is_empty(), "help must not use stderr");
     let cargo_executable = cargo_binary()?;
-    let cargo_help = isolated_command(cargo_executable.as_os_str(), directory.path(), &path)
-        .args(["theorem", "--help"])
-        .output()?;
+    let cargo_help = isolated_command(
+        cargo_executable.as_os_str(),
+        environment.directory.path(),
+        &environment.path,
+    )
+    .args(["theorem", "--help"])
+    .output()?;
     ensure!(
         cargo_help.status.success(),
         "Cargo help must exit successfully"
@@ -214,6 +229,13 @@ fn command_parse_failure_keeps_usage_status_and_stderr() -> Result<()> {
         "JSON parse failure must identify the usage class"
     );
 
+    Ok(())
+}
+
+#[test]
+fn missing_global_value_preserves_a_following_json_flag() -> Result<()> {
+    let directory = tempfile::tempdir()?;
+    let path = isolated_path(directory.path())?;
     let missing_color_value = isolated_command(OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "context", "--color", "--json"])
         .output()?;

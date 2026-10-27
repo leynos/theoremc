@@ -7,7 +7,13 @@ use std::{
     process::ExitCode,
 };
 
+#[path = "cli_diagnostics.rs"]
+mod diagnostics;
+
 use clap::{Args, CommandFactory, Parser, Subcommand};
+use diagnostics::{
+    entry_wants_json, parse_error_requests_json, report_application_error, report_clap_error,
+};
 use ortho_config::{
     EnvSource, LocalizeCmd, NoOpLocalizer, OrthoConfig, OrthoConfigSubcommandDocs,
     parse_localized_command,
@@ -98,6 +104,28 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
+    let (discovery, merge) = process_sources();
+    let sources = ConfigurationSources { discovery, merge };
+    run_with_sources_and_io(input_args, stdout, stderr, &sources)
+}
+
+/// Configuration sources passed through the application boundary as one unit.
+struct ConfigurationSources {
+    discovery: ortho_config::SharedEnvSource,
+    merge: ortho_config::SharedScanEnvSource,
+}
+
+/// Parse and execute with injected configuration sources for deterministic tests.
+fn run_with_sources_and_io<I, T>(
+    input_args: I,
+    stdout: &mut dyn Write,
+    stderr: &mut dyn Write,
+    sources: &ConfigurationSources,
+) -> ExitCode
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
     let parsed_args = input_args.into_iter().map(Into::into).collect::<Vec<_>>();
     let parse_error_json_mode = parse_error_requests_json(&parsed_args);
     let localizer = NoOpLocalizer::new();
@@ -112,7 +140,7 @@ where
             }
         };
     let json_mode = entry_wants_json(&entry);
-    match execute(entry, &matches, stdout) {
+    match execute(entry, &matches, stdout, sources) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => report_application_error(&error, stderr, json_mode),
     }
@@ -123,17 +151,22 @@ fn execute(
     entry: CargoEntry,
     matches: &clap::ArgMatches,
     stdout: &mut dyn Write,
+    sources: &ConfigurationSources,
 ) -> Result<(), ApplicationError> {
     let CargoCommand::Theorem(cli) = entry.command;
-    let (discovery, merge) = process_sources();
-    let settings = if should_load_configuration(&cli.command, &cli.options, discovery.as_ref()) {
-        let config_args = config_arguments(&cli.options, cli.profile.as_deref());
-        GlobalOptions::load_with_sources(config_args, discovery.clone(), merge.clone())?
+    let settings =
+        if should_load_configuration(&cli.command, &cli.options, sources.discovery.as_ref()) {
+            let config_args = config_arguments(&cli.options, cli.profile.as_deref());
+            GlobalOptions::load_with_sources(
+                config_args,
+                sources.discovery.clone(),
+                sources.merge.clone(),
+            )?
             .config()
             .clone()
-    } else {
-        cli.options.clone()
-    };
+        } else {
+            cli.options.clone()
+        };
     let _effective = settings.resolve()?;
 
     let project_root = Path::new(".");
@@ -145,17 +178,13 @@ fn execute(
         ortho_config::load_globals_and_merge_selected_subcommand_with_sources(
             matches,
             adapter,
-            selected_sources(project_root, discovery.as_ref(), merge),
-            || Ok::<_, io::Error>(settings),
-        )
-        .map_err(|error| {
-            ApplicationError::Configuration(std::sync::Arc::new(
-                ortho_config::OrthoError::Validation {
-                    key: String::from("selected command"),
-                    message: error.to_string(),
-                },
-            ))
-        })?;
+            selected_sources(
+                project_root,
+                sources.discovery.as_ref(),
+                sources.merge.clone(),
+            ),
+            || Ok::<_, std::convert::Infallible>(settings),
+        )?;
 
     match selected.command {
         Commands::Context(context_args) if context_args.json => {
@@ -220,176 +249,6 @@ fn append_bool(args: &mut Vec<OsString>, name: &str, value: bool) {
     if value {
         args.push(OsString::from(name));
     }
-}
-
-/// Preserve Clap's success and usage-error output classes and streams.
-fn report_clap_error(
-    error: &clap::Error,
-    stdout: &mut dyn Write,
-    stderr: &mut dyn Write,
-    json_mode: bool,
-) -> ExitCode {
-    let code = error.exit_code();
-    if json_mode && code != 0 {
-        return report_json_clap_error(error, stderr, code);
-    }
-    let rendered = error.render();
-    let write_result = if error.use_stderr() {
-        write!(stderr, "{rendered}")
-    } else {
-        write!(stdout, "{rendered}")
-    };
-    if write_result.is_err() {
-        // The exit status reports failure even if stderr cannot carry the fallback.
-        writeln!(stderr, "failed to write command-line diagnostic").unwrap_or(());
-        return ExitCode::FAILURE;
-    }
-    ExitCode::from(u8::try_from(code).unwrap_or(2))
-}
-
-/// Emit a machine-readable usage diagnostic without changing Clap's exit code.
-fn report_json_clap_error(error: &clap::Error, stderr: &mut dyn Write, code: i32) -> ExitCode {
-    let diagnostic = serde_json::json!({
-        "schema_version": "1",
-        "kind": "cargo-theorem.diagnostic",
-        "command": ["context"],
-        "status": "error",
-        "error": {
-            "code": "cli.usage",
-            "class": "usage",
-            "message_fallback": error.to_string(),
-        }
-    });
-    if serde_json::to_writer(&mut *stderr, &diagnostic).is_err() || writeln!(stderr).is_err() {
-        return ExitCode::FAILURE;
-    }
-    ExitCode::from(u8::try_from(code).unwrap_or(2))
-}
-
-/// Detect explicit JSON intent when Clap cannot produce complete matches.
-fn parse_error_requests_json(args: &[OsString]) -> bool {
-    context_command_position(args).is_some_and(|position| has_json_flag_after(args, position))
-}
-
-/// Locate the context subcommand after the external Cargo entry token.
-fn context_command_position(args: &[OsString]) -> Option<usize> {
-    if args.get(1).is_none_or(|argument| argument != "theorem") {
-        return None;
-    }
-    let mut skip_value = false;
-    for (index, raw_argument) in args.iter().enumerate().skip(2) {
-        if skip_value {
-            skip_value = false;
-            continue;
-        }
-        let Some(argument_text) = raw_argument.to_str() else {
-            continue;
-        };
-        if takes_global_value(argument_text) {
-            skip_value = args
-                .get(index + 1)
-                .and_then(|next| next.to_str())
-                .is_some_and(|next| !next.starts_with('-'));
-        } else if argument_text == "context" {
-            return Some(index);
-        } else if !argument_text.starts_with('-') {
-            return None;
-        }
-    }
-    None
-}
-
-/// Detect the JSON flag while ignoring global-option values.
-fn has_json_flag_after(args: &[OsString], command_position: usize) -> bool {
-    let mut skip_value = false;
-    for (index, raw_argument) in args.iter().enumerate().skip(command_position + 1) {
-        if skip_value {
-            skip_value = false;
-            continue;
-        }
-        let Some(argument_text) = raw_argument.to_str() else {
-            continue;
-        };
-        if argument_text == "--json" {
-            return true;
-        }
-        if argument_text == "--" {
-            return false;
-        }
-        skip_value = takes_global_value(argument_text)
-            && args
-                .get(index + 1)
-                .and_then(|next| next.to_str())
-                .is_some_and(|next| !next.starts_with('-'));
-    }
-    false
-}
-
-/// Identify global options whose following token is a value, not a command.
-fn takes_global_value(argument: &str) -> bool {
-    matches!(
-        argument,
-        "--color"
-            | "--emoji"
-            | "--progress"
-            | "--accessibility"
-            | "--width"
-            | "--locale"
-            | "--config"
-            | "--profile"
-    )
-}
-
-/// Write configuration diagnostics to stderr and keep their stable exit class.
-fn report_application_error(
-    error: &ApplicationError,
-    stderr: &mut dyn Write,
-    json_mode: bool,
-) -> ExitCode {
-    let code = error.exit_code();
-    if json_mode {
-        let (diagnostic_code, class) = match &error {
-            ApplicationError::Configuration(_) => ("configuration.invalid", "configuration"),
-            ApplicationError::Serialization(_) | ApplicationError::Output(_) => {
-                ("application.internal", "internal")
-            }
-        };
-        let diagnostic = serde_json::json!({
-            "schema_version": "1",
-            "kind": "cargo-theorem.diagnostic",
-            "command": ["context"],
-            "status": "error",
-            "error": {
-                "code": diagnostic_code,
-                "class": class,
-                "message_fallback": error.to_string(),
-            }
-        });
-        if serde_json::to_writer(&mut *stderr, &diagnostic).is_err() || writeln!(stderr).is_err() {
-            return ExitCode::FAILURE;
-        }
-        return code;
-    }
-    let label = if matches!(&error, ApplicationError::Configuration(_)) {
-        "configuration error"
-    } else {
-        "cargo theorem error"
-    };
-    if writeln!(stderr, "{label}: {error}").is_err() {
-        return ExitCode::FAILURE;
-    }
-    code
-}
-
-/// Identify machine-readable mode before configuration resolution can fail.
-const fn entry_wants_json(entry: &CargoEntry) -> bool {
-    matches!(
-        &entry.command,
-        CargoCommand::Theorem(TheoremArgs {
-            command: Commands::Context(ContextArgs { json: true }),
-            ..
-        })
-    )
 }
 
 #[cfg(test)]

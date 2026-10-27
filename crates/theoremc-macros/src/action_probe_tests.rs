@@ -53,71 +53,18 @@ fn expansion_emits_typed_action_probe_for_referenced_action()
 }
 
 #[rstest]
+#[case::return_type("u64", "bool", "u64", "u32")]
+#[case::parameter_type("u64", "bool", "u32", "bool")]
 fn expansion_rejects_conflicting_signatures_for_shared_action(
-    #[values("return", "parameter")] conflict: &str,
+    #[case] first_param: &str,
+    #[case] first_return: &str,
+    #[case] second_param: &str,
+    #[case] second_return: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (first_param, first_return, second_param, second_return) = match conflict {
-        "return" => ("u64", "bool", "u64", "u32"),
-        "parameter" => ("u64", "bool", "u32", "bool"),
-        _ => {
-            return Err(std::io::Error::other(format!(
-                "unexpected action signature conflict case: {conflict}"
-            ))
-            .into());
-        }
-    };
     let theorem = TheoremFixture(format!(
-        concat!(
-            "Theorem: FirstActionProbe\n",
-            "About: First probe\n",
-            "Actions:\n",
-            "  account.deposit:\n",
-            "    params:\n",
-            "      account: {first_param}\n",
-            "    returns: {first_return}\n",
-            "Do:\n",
-            "  - call:\n",
-            "      action: account.deposit\n",
-            "      args:\n",
-            "        account: 1\n",
-            "Witness:\n",
-            "  - cover: \"true\"\n",
-            "    because: \"reachable\"\n",
-            "Prove:\n",
-            "  - assert: \"true\"\n",
-            "    because: \"trivial\"\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-            "---\n",
-            "Theorem: SecondActionProbe\n",
-            "About: Second probe\n",
-            "Actions:\n",
-            "  account.deposit:\n",
-            "    params:\n",
-            "      account: {second_param}\n",
-            "    returns: {second_return}\n",
-            "Do:\n",
-            "  - call:\n",
-            "      action: account.deposit\n",
-            "      args:\n",
-            "        account: 2\n",
-            "Witness:\n",
-            "  - cover: \"true\"\n",
-            "    because: \"reachable\"\n",
-            "Prove:\n",
-            "  - assert: \"true\"\n",
-            "    because: \"trivial\"\n",
-            "Evidence:\n",
-            "  kani:\n",
-            "    unwind: 1\n",
-            "    expect: SUCCESS\n",
-        ),
-        first_param = first_param,
-        first_return = first_return,
-        second_param = second_param,
-        second_return = second_return,
+        "{}---\n{}",
+        action_probe_theorem("FirstActionProbe", first_param, first_return, 1),
+        action_probe_theorem("SecondActionProbe", second_param, second_return, 2),
     ));
 
     let expansion = expand_fixture(Utf8Path::new("theorems/conflicting.theorem"), &theorem)
@@ -131,6 +78,39 @@ fn expansion_rejects_conflicting_signatures_for_shared_action(
         matches_pattern!(MacroExpansionError::ConflictingActionSignature { .. })
     );
     Ok(())
+}
+
+fn action_probe_theorem(name: &str, parameter: &str, returns: &str, value: u8) -> String {
+    format!(
+        concat!(
+            "Theorem: {name}\n",
+            "About: Shared action signature probe\n",
+            "Actions:\n",
+            "  account.deposit:\n",
+            "    params:\n",
+            "      account: {parameter}\n",
+            "    returns: {returns}\n",
+            "Do:\n",
+            "  - call:\n",
+            "      action: account.deposit\n",
+            "      args:\n",
+            "        account: {value}\n",
+            "Witness:\n",
+            "  - cover: \"true\"\n",
+            "    because: \"reachable\"\n",
+            "Prove:\n",
+            "  - assert: \"true\"\n",
+            "    because: \"trivial\"\n",
+            "Evidence:\n",
+            "  kani:\n",
+            "    unwind: 1\n",
+            "    expect: SUCCESS\n",
+        ),
+        name = name,
+        parameter = parameter,
+        returns = returns,
+        value = value
+    )
 }
 
 #[path = "action_probe_tests/conflicting_signatures.rs"]

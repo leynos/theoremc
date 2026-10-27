@@ -112,6 +112,33 @@ fn configuration_argument_builder_does_not_insert_absent_defaults() {
 }
 
 #[test]
+fn configuration_argument_builder_forwards_present_settings() {
+    let options = super::GlobalOptions {
+        color: Some(String::from("always")),
+        width: Some(100),
+        quiet: true,
+        config_path: Some("settings.toml".into()),
+        ..super::GlobalOptions::default()
+    };
+    assert_eq!(
+        super::config_arguments(&options, Some("ci")),
+        [
+            "cargo-theorem",
+            "--color",
+            "always",
+            "--width",
+            "100",
+            "--quiet",
+            "--config",
+            "settings.toml",
+            "--profile",
+            "ci",
+        ]
+        .map(OsString::from)
+    );
+}
+
+#[test]
 fn context_loads_only_an_explicit_configuration_file() -> Result<()> {
     let context = Commands::Context(super::ContextArgs { json: true });
     let options = super::GlobalOptions::default();
@@ -119,6 +146,12 @@ fn context_loads_only_an_explicit_configuration_file() -> Result<()> {
     ensure!(
         !super::should_load_configuration(&context, &options, &environment),
         "context must skip automatic configuration discovery"
+    );
+
+    let empty_environment = MapEnv::new().with_var("THEOREMC_CONFIG_PATH", "");
+    ensure!(
+        !super::should_load_configuration(&context, &options, &empty_environment),
+        "an empty config path must not trigger discovery"
     );
 
     let cli_selected = super::GlobalOptions {
@@ -137,3 +170,6 @@ fn context_loads_only_an_explicit_configuration_file() -> Result<()> {
     );
     Ok(())
 }
+
+#[path = "cli_tests/runner.rs"]
+mod runner;

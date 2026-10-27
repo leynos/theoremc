@@ -32,9 +32,12 @@ functionality:
 
 The CLI uses `ortho_config` for configuration discovery and merging, generated
 command documentation, recursive subcommand metadata, localization, and compact
-agent context. The command surface follows the agent-native principles
-described by Trevin Chow and the stricter reusable contract in OrthoConfig's
-agent-native CLI design.[^agent-native][^ortho-agent-native]
+agent context. Its direct runtime dependency `cargo-orthohelp` converts the
+generated documentation metadata into the agent-context schema. Both v0.10.0
+packages are application-only and require Rust 1.89.0. The command surface
+follows the agent-native principles described by Trevin Chow and the stricter
+reusable contract in OrthoConfig's agent-native CLI
+design.[^agent-native][^ortho-agent-native]
 
 The CLI is not a second theorem compiler. It is an application shell around
 library-owned parsing, generation, execution, reporting, and project-mutation
@@ -102,10 +105,10 @@ an unrelated `theoremc` executable beside the Cargo subcommand.
 
 ### 4.2 Mixed minimum supported Rust version policy
 
-At the time of this design, theoremc declares Rust 1.88 while `ortho_config`
-0.10.0 declares Rust 1.89.0. The CLI package therefore declares Rust 1.89.0 and
-the library packages retain Rust 1.88 until a separate compatibility decision
-raises their minimum supported Rust version (MSRV).
+At the time of this design, theoremc declares Rust 1.88 while `ortho_config` and
+`cargo-orthohelp` 0.10.0 declare Rust 1.89.0. The CLI package therefore
+declares Rust 1.89.0 and the library packages retain Rust 1.88 until a separate
+compatibility decision raises their minimum supported Rust version (MSRV).
 
 Continuous integration must test these contracts separately:
 
