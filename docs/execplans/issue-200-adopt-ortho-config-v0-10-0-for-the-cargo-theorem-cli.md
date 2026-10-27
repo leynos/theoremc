@@ -925,3 +925,7 @@ that gate before proceeding. Never discard unrelated changes.
   exact-head CodeRabbit attempt again hit the included-review rate limit; the
   service reported 10 minutes and 5 seconds and returned no review result. A
   fresh randomized 80-minute `vsleep` is running; do not retry before it ends.
+- 2026-10-27: Hosted run `40463463197` passed all CI steps on exact head
+  `11d4ac3882d84a7cb2fa0d116da53526acc10cf6`; CodeScene result `8144100` and
+  Gecko Security passed. The PR remains open and draft. The full randomized
+  80-minute CodeRabbit cooldown is still running.
