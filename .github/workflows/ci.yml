@@ -22,9 +22,18 @@ jobs:
         with:
           install-mold: 'true'
       - name: Install supported MSRV toolchains
+        # Keep these minor channels current rather than caching stale patches.
         run: rustup toolchain install 1.88 1.89 --profile minimal
+      - name: Cache cargo-orthohelp binary
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cargo/bin/cargo-orthohelp
+          key: ${{ runner.os }}-${{ runner.arch }}-cargo-orthohelp-0.10.0-${{ hashFiles('rust-toolchain.toml') }}
       - name: Install cargo-orthohelp
-        run: cargo install cargo-orthohelp --version 0.10.0 --locked
+        run: |
+          if ! command -v cargo-orthohelp >/dev/null 2>&1; then
+            cargo install cargo-orthohelp --version 0.10.0 --locked
+          fi
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.

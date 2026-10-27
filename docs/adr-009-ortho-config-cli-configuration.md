@@ -1,11 +1,16 @@
 # Architectural Decision Record (ADR) 009: OrthoConfig CLI configuration
 
-- Status: accepted
-- Date: 2026-10-26
-- Deciders: theoremc maintainers
-- Technical story: configuration boundary for the planned `cargo theorem` app
+## Status
 
-## Context
+Accepted. Keep configuration and the agent-context bridge in the
+`cargo-theorem` application package, requiring Rust 1.89 while reusable crates
+retain Rust 1.88.
+
+## Date
+
+2026-10-27
+
+## Context and problem statement
 
 The merged `cargo theorem` design assigns command parsing and configuration to
 the dedicated `crates/cargo-theorem/` application package. Issue #200 adopts
@@ -23,15 +28,24 @@ and Fluent. The reusable theoremc crates do not currently contain a Fluent
 runtime or OrthoConfig dependency. The application can use the localizer
 re-exported by OrthoConfig without raising the library MSRV.
 
+## Decision metadata
+
+- Deciders: theoremc maintainers
+- Technical story: configuration boundary for the planned `cargo theorem` app
+
 ## Decision
 
 ### 1. Keep OrthoConfig in the application package
 
-Only `cargo-theorem` depends on `ortho_config = "0.10.0"`, with default
-features enabled. The root facade, `theoremc-core`, `theoremc-macros`, and
-build-support crates remain configuration-free and retain Rust 1.88. The CLI
-package declares Rust 1.89.0. CI and local validation check the library
-workspace on Rust 1.88 and the application package on Rust 1.89.
+Only the `cargo-theorem` application package directly depends on
+`ortho_config = "0.10.0"` and `cargo-orthohelp = "0.10.0"`. OrthoConfig keeps
+its default features enabled. `agent_context.rs` uses cargo-orthohelp at
+runtime to convert generated command documentation into the shipped
+agent-context schema; it is not a test-only or policy-check dependency. Both
+releases declare Rust 1.89.0, so the application package declares that MSRV.
+The root facade, `theoremc-core`, `theoremc-macros`, and build-support crates
+remain configuration-free and retain Rust 1.88. CI and local validation check
+the library workspace on Rust 1.88 and the application package on Rust 1.89.
 
 The CLI uses the OrthoConfig facade's Fluent APIs. Reusable libraries do not
 adopt a direct `ortho_l10n` dependency for this change and do not raise their

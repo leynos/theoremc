@@ -5,6 +5,7 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::{Result, ensure};
 use cap_std::{ambient_authority, fs::Dir};
 use ortho_config::MapEnv;
+use ortho_config::SelectedSubcommandMerge;
 use rstest::rstest;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -79,6 +80,55 @@ fn global_defaults_are_used_when_sources_omit_a_value() -> Result<()> {
     ensure!(
         loaded.config().resolve()?.color == "auto",
         "omitted color must resolve to auto"
+    );
+    Ok(())
+}
+
+#[test]
+fn the_internal_config_path_is_consumed_without_becoming_a_setting() -> Result<()> {
+    let options: GlobalOptions = serde_json::from_str(r#"{"config_path":"ignored.toml"}"#)?;
+    ensure!(
+        options.config_path.is_none(),
+        "the loader's internal config selector must not become persisted state"
+    );
+    Ok(())
+}
+
+#[rstest]
+#[case(None, "auto")]
+#[case(Some("on"), "on")]
+#[case(Some("off"), "off")]
+fn accessibility_policy_uses_its_own_vocabulary(
+    #[case] configured: Option<&str>,
+    #[case] expected: &str,
+) -> Result<()> {
+    let options = GlobalOptions {
+        accessibility: configured.map(String::from),
+        ..GlobalOptions::default()
+    };
+    ensure!(
+        options.resolve()?.accessibility == expected,
+        "expected accessibility policy {expected}"
+    );
+    Ok(())
+}
+
+#[test]
+fn selected_command_adapter_merges_its_command_namespace() -> Result<()> {
+    let namespaces = [(String::from("context"), json!({}))].into_iter().collect();
+    let command = crate::cli::Commands::Context(crate::cli::ContextArgs::default());
+    let resolved = super::ResolvedCommand {
+        command,
+        settings: GlobalOptions {
+            cmds: namespaces,
+            ..GlobalOptions::default()
+        },
+    };
+    let matches = clap::Command::new("unused").try_get_matches_from(["unused"])?;
+    let merged = resolved.load_and_merge_selected(&matches)?;
+    ensure!(
+        matches!(merged.command, crate::cli::Commands::Context(_)),
+        "the context command must remain selected after merging"
     );
     Ok(())
 }

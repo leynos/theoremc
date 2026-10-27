@@ -33,6 +33,8 @@ const CONFIGURABLE_COMMAND_NAMES: &[&str] = &[
     "context",
     "feedback",
 ];
+const POLICY_VALUES: &[&str] = &["auto", "always", "never"];
+const ACCESSIBILITY_POLICY_VALUES: &[&str] = &["auto", "on", "off"];
 
 /// Consume `OrthoConfig`'s internal config selector without treating it as a
 /// persisted setting.
@@ -302,27 +304,35 @@ pub(crate) fn process_sources() -> (SharedEnvSource, SharedScanEnvSource) {
 
 /// Convert an application policy into its resolved defaulted value.
 fn policy(name: &str, value: Option<&str>) -> OrthoResult<String> {
-    let selected = value.unwrap_or("auto");
-    match selected {
-        "auto" | "always" | "never" => Ok(String::from(selected)),
-        _ => Err(OrthoError::Validation {
-            key: name.to_owned(),
-            message: format!("expected `auto`, `always`, or `never`; received `{selected}`"),
-        }
-        .into()),
-    }
+    validate_policy(name, value, POLICY_VALUES, "`auto`, `always`, or `never`")
 }
 
 /// Validate the separate `auto|on|off` accessibility vocabulary.
 fn accessibility_policy(value: Option<&str>) -> OrthoResult<String> {
+    validate_policy(
+        "accessibility",
+        value,
+        ACCESSIBILITY_POLICY_VALUES,
+        "`auto`, `on`, or `off`",
+    )
+}
+
+/// Validate one named policy while preserving its caller-facing vocabulary.
+fn validate_policy(
+    name: &str,
+    value: Option<&str>,
+    allowed: &[&str],
+    expected: &str,
+) -> OrthoResult<String> {
     let selected = value.unwrap_or("auto");
-    match selected {
-        "auto" | "on" | "off" => Ok(String::from(selected)),
-        _ => Err(OrthoError::Validation {
-            key: String::from("accessibility"),
-            message: format!("expected `auto`, `on`, or `off`; received `{selected}`"),
+    if allowed.contains(&selected) {
+        Ok(String::from(selected))
+    } else {
+        Err(OrthoError::Validation {
+            key: name.to_owned(),
+            message: format!("expected {expected}; received `{selected}`"),
         }
-        .into()),
+        .into())
     }
 }
 

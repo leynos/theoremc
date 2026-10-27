@@ -107,7 +107,14 @@ pull request.
 - [x] Run docs gates after correcting profile guidance.
 - [x] Review commit `8a67ece` after the profile correction; CodeRabbit returned
   zero findings.
-- [ ] Push the reviewed candidate and open a draft PR.
+- [x] Address CodeRabbit review10's actionable findings and run the complete
+  sequential gate set on the resulting candidate.
+- [x] Rerun formatting, Markdown, Mermaid, and pinned-guide checksum checks
+  after recording the final docs-gate results and read-only dispositions in
+  this plan.
+- [ ] Review the exact final candidate with `coderabbit review --agent`.
+- [ ] Commit and push the reviewed candidate; refresh draft PR #204 and
+  reconcile its hosted checks.
 
 M2 implementation is now present in the working tree: the dedicated package,
 Cargo entry wrapper, OrthoConfig configuration model, selected-command adapter,
@@ -153,9 +160,9 @@ states that profiles apply only to global settings. Documentation checks and a
 clean review of the resulting commit remain.
 
 CodeRabbit reviewed commit `8a67ece` after the profile correction and returned
-zero findings. The docs-only checks passed as M2-44, including Markdown and
-Mermaid validation and both pinned guide checksums. Implementation and review
-are complete; only push and draft PR creation remain.
+zero findings. Later follow-up reviews found additional maintainability and
+typed-error issues, which have since been addressed. The latest complete gate
+run is green; a fresh review of the current candidate and delivery remain.
 
 Live `origin/main` advanced to `70926a18a32031d4c16c76b7c070a513f54a1bef` while
 the implementation was in progress. The branch was rebased onto that commit
@@ -758,3 +765,83 @@ that gate before proceeding. Never discard unrelated changes.
   application package. The roadmap now marks the package, OrthoConfig spine,
   mixed-MSRV policy, and context foundation as implemented; the broader output
   envelope remains planned. Rerun the complete gate sequence on this candidate.
+- 2026-10-27: PR #204's hosted run measured 86.62% coverage against the 91.47%
+  baseline (±1.00 percentage-point tolerance) and CodeScene flagged duplicated
+  policy validation plus three oversized test methods. The application now
+  shares its policy validator, splits those methods, and exercises the CLI's
+  parser, configuration, output, and diagnostic boundary in-process with
+  injected `MapEnv` sources. An intermediate full run passed check-fmt, lint,
+  typecheck, workflow contracts, Markdown, Nixie, agent-native, both MSRV
+  checks, build/release, and Makefile validation; `make test` stopped on two
+  overly strict help-prefix assertions. The focused replacement test now
+  passes. A separate lint run required moving diagnostics out of `cli.rs`'s
+  same-named module directory. Repeat the full gates and application coverage
+  before committing this review follow-up. The local whole-workspace coverage
+  attempt remains unavailable because its Kani harness lacks
+  `profiler_builtins`; hosted coverage is the deciding ratchet result.
+- 2026-10-27: The final local source-candidate sequence passed check-fmt, lint,
+  typecheck, all 864 workspace tests and doctests, workflow contracts,
+  Markdown, Nixie, agent-native, both MSRV checks, build/release, and Makefile
+  validation. Package-only `cargo-theorem` coverage passed 46 tests and
+  measured 678/716 lines (94.69%) and 61/70 functions (87.14%). CodeRabbit
+  returned one documentation finding: `cargo-orthohelp` is a runtime bridge in
+  `agent_context.rs` and shares the Rust 1.89 floor. ADR-009, the CLI design,
+  and developers' guide now record that boundary. Run the documentation gates
+  and another CodeRabbit review before committing; hosted CI and the coverage
+  ratchet remain pending the follow-up push.
+- 2026-10-27: CodeRabbit review6 reported a delimiter-handling bug in JSON
+  intent detection, repeated Cargo subprocess setup, and two overlapping ADR
+  structure findings. The pre-command scan now stops at `--`, with a regression
+  test proving later operands do not select JSON diagnostics. The two parity
+  tests share an `rstest` fixture. ADR-009 now uses separate Status and Date
+  sections, an accepted-decision summary, and the repository's required Context
+  and problem statement section. Rerun the full candidate gates, then review
+  this final diff before committing and pushing.
+- 2026-10-27: Review7 passed the full local sequence: check-fmt, lint,
+  typecheck, 865 workspace tests and doctests, workflow contracts, Markdown,
+  Nixie, agent-native, both MSRV checks, build/release, and Makefile
+  validation. The application-only coverage run passed 47 tests and measured
+  703/740 lines (95.00%) and 62/71 functions (87.32%). CodeRabbit review6's
+  four findings have been addressed; obtain a clean review of the resulting
+  diff before committing. Hosted CI and the global coverage ratchet remain
+  pending the follow-up push.
+- 2026-10-27: CodeRabbit review10 returned five findings, including two
+  duplicate typed-merge-error reports, two conflicting suggestions about
+  extracting the shared JSON diagnostic writer, and a CI cache suggestion. The
+  selected-command conversion now preserves the inner `Arc<OrthoError>`, with a
+  regression test for its message; both JSON failure paths call one writer. CI
+  caches the pinned `cargo-orthohelp` binary keyed by its version, target, and
+  toolchain-file hash. Floating Rust 1.88 and 1.89 channel aliases remain
+  uncached so the cache cannot freeze a stale patch release.
+- 2026-10-27: The review10 follow-up passed the complete sequential gate run
+  (M13): `make fmt`, `make check-fmt`, `make lint`, `make typecheck`,
+  `make test` (866 tests and doctests), package coverage (48 tests), workflow
+  contracts, Markdown, Mermaid, agent-native, Rust 1.88/1.89 MSRV checks,
+  build, release, and Makefile validation. CLI coverage measured 711/755 lines
+  (94.17%) and 64/73 functions (87.67%); no branch counters were emitted. Logs
+  use the `pr204-review13` suffix under `/tmp`. The full-workspace coverage
+  attempt remains unavailable because the Kani harness lacks
+  `profiler_builtins`; the hosted coverage ratchet remains pending the push.
+  The exact candidate is ready for the requested fresh CodeRabbit review.
+- 2026-10-27: After recording the M13 result, the docs-only rerun passed
+  `make fmt`, `make check-fmt`, `make markdownlint`, and `make nixie`; both
+  imported-guide checksums still match the provenance record. Logs use the
+  `pr204-finaldocs` suffix under `/tmp`. The formatter introduced no candidate
+  path changes.
+- 2026-10-27: The final docs-only run after this entry also passed `make fmt`,
+  `make check-fmt`, `make markdownlint`, and `make nixie`; both imported-guide
+  checksums still match. Logs use the `pr204-finaldocs2` suffix under `/tmp`.
+  The candidate diff hash was unchanged by formatting
+  (`6577496077da99f6f2f84ce9dfb261cf53a1b5fee66a7c92290b5acfc3f91404`), as was
+  its 15-path set.
+- 2026-10-27: A read-only verification confirmed the review10 repairs in
+  `cli_diagnostics.rs`, `error.rs`, their regression tests, and the CI
+  workflow. The third docs-only run passed the same four formatting, Markdown,
+  and Mermaid gates and reverified both guide checksums. Logs use the
+  `pr204-finaldocs3` suffix under `/tmp`. Formatting changed the aggregate
+  candidate hash from
+  `f857cdfb07fcf3aea87e3957f1be6d249ea6ba40f6d5c2ad97852ddfa3466dcb` to
+  `6e6a40433667aa0c24491f39c98f0cea029a8f516bdbba416880b4e7e819d7f0`; the
+  15-path set stayed constant. The per-file pre-format contents were not
+  captured, so the exact source of that formatting change is unverified. The
+  current candidate passes `make check-fmt` and is ready for CodeRabbit review.
