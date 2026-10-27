@@ -933,3 +933,8 @@ that gate before proceeding. Never discard unrelated changes.
   `88680de13b207319abd3ed53e1f86815efb168fb`; CodeScene result `8144427` and
   Gecko Security passed. The PR remains open and draft, and the full randomized
   80-minute CodeRabbit cooldown is still running.
+- 2026-10-27: Hosted run `40468279136` passed all CI steps on exact head
+  `8e65a7ca216724baf1754915c3c7d9c191544771`; CodeScene result `8144716` and
+  Gecko Security passed. The run emitted informational cache/runner annotations
+  only. The PR remains open and draft; the full randomized CodeRabbit cooldown
+  is still running.
