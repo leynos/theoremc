@@ -911,3 +911,7 @@ that gate before proceeding. Never discard unrelated changes.
   reported 8 minutes and 41 seconds. Following the requested policy, a new
   randomized 71-minute `vsleep` is running; do not retry before it ends. All
   deterministic local and hosted checks passed on `0d7603d` before this attempt.
+- 2026-10-27: Hosted run `40455819761` passed all CI steps on exact head
+  `d5c54786594ef44c6126385859208150d9ba9028`; CodeScene result `8143544` and
+  Gecko Security passed. The PR remains open and draft. The latest CodeRabbit
+  cooldown is still running, with no review result available.
