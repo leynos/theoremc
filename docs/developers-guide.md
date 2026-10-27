@@ -533,24 +533,44 @@ failure exits 2 rather than passing.
 
 ### 3.8 `cargo theorem` application boundary
 
-The planned [`cargo theorem` CLI design](cargo-theorem-cli-design.md) adds a
-dedicated `crates/cargo-theorem/` application package. It owns the Cargo
-external-subcommand entry point, OrthoConfig command and configuration types,
-dispatch, application rendering, and exit-code mapping. Reusable theorem,
-project, execution, and report services remain in library packages rather than
-moving into the CLI.
+The [`cargo theorem` CLI foundation](cargo-theorem-cli-design.md) adds a
+dedicated `crates/cargo-theorem/` application package. Its initial registered
+command is `context --json`; later roadmap slices add operational commands. The
+package owns the Cargo external-subcommand entry point, OrthoConfig command and
+configuration types, dispatch, application rendering, and exit-code mapping.
+Reusable theorem, project, execution, and report services remain in library
+packages rather than moving into the CLI.
 
-The planned CLI package has a separate MSRV from the libraries because
-OrthoConfig 0.9.0 requires Rust 1.89. That package is not in the workspace yet:
-all current packages, including the root `theoremc` crate, use Rust 1.88.
-Validate the current workspace with
-`RUSTFLAGS="" cargo +1.88 check --workspace`. The empty `RUSTFLAGS` matters:
-the repository's Cargo configuration carries the nightly-only `-Zthreads=8`,
-which a stable toolchain refuses before it checks any package, and an assigned
-`RUSTFLAGS` displaces the configuration's flags. After the CLI package lands,
-introduce split validation with
-`RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem` and
-`RUSTFLAGS="" cargo +1.89 check -p cargo-theorem`.
+The `cargo-theorem` package uses `ortho_config` and `cargo-orthohelp` 0.10.0
+and requires Rust 1.89. The CLI's `agent_context.rs` calls cargo-orthohelp at
+runtime to convert generated command metadata into the agent-context schema.
+Keep both dependencies in the application package. The facade, `theoremc-core`,
+`theoremc-macros`, and build-support crates remain on Rust 1.88 and do not
+depend on application configuration. CI keeps these split checks:
+
+```console
+RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem
+RUSTFLAGS="" cargo +1.89 check -p cargo-theorem
+```
+
+The empty `RUSTFLAGS` matters: repository Cargo configuration carries the
+nightly-only `-Zthreads=8`, which stable Rust refuses before checking a
+package. An assigned `RUSTFLAGS` displaces the configuration's flags, so the
+empty assignment allows the stable checks to run without the nightly-only
+setting.
+
+Configuration, CLI parsing, and process error handling belong to
+`crates/cargo-theorem`. Its OrthoConfig-derived types resolve files, profiles,
+environment, and selected command settings before handing validated values to
+application services. The application resolves the file chain once because
+OrthoConfig 0.10.0's selected-subcommand helper cannot consume the canonical
+`theoremc.toml` filename or explicit `--config` path. An application-owned
+`SelectedSubcommandMerge` adapter passes only the selected `cmds.<name>` values
+from that resolved chain. Tests inject `MapEnv` and explicit file sources
+rather than changing the test process environment. The `cargo-theorem` entry
+point uses a single `theorem` subcommand wrapper so Cargo dispatch and direct
+`cargo-theorem theorem ...` invocation share one parser. Do not add OrthoConfig
+or `ortho_l10n` to the facade or reusable theorem crates.
 
 Backend integration uses narrow ports. Backend lifecycle concerns (discovery,
 resolution, installation, and health checks) must remain separate from backend

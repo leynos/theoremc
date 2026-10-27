@@ -1,6 +1,6 @@
 //! Unit tests for generated compile-time referenced-type probes.
 
-use super::tests_support::{TheoremFixture, expand_fixture};
+use super::tests_support::{TheoremFixture, ensure_condition, expand_fixture};
 use camino::Utf8Path;
 use rstest::{fixture, rstest};
 
@@ -188,27 +188,27 @@ fn expansion_emits_referenced_type_probes(
     let expanded = expand_fixture(Utf8Path::new(case.path), &theorem)?;
 
     if case.expected_probes.is_empty() {
-        assert!(
+        ensure_condition(
             !expanded.contains("__theoremc_assert_referenced"),
-            "expected no referenced-type probe block, got: {expanded}",
-        );
+            format!("expected no referenced-type probe block, got: {expanded}"),
+        )?;
     } else {
         for expected_probe in case.expected_probes {
-            assert!(
+            ensure_condition(
                 expanded.contains(expected_probe),
-                "expected probe {expected_probe:?} in expansion, got: {expanded}",
-            );
+                format!("expected probe {expected_probe:?} in expansion, got: {expanded}"),
+            )?;
         }
     }
 
     if matches!(case.fixture, ProbeFixture::WhitespaceEquivalent) {
-        assert_eq!(
+        ensure_condition(
             expanded
                 .match_indices("let_=__theoremc_assert_referenced::<Vec<u8>>;")
-                .count(),
-            1,
-            "expected one canonical Vec<u8> probe, got: {expanded}",
-        );
+                .count()
+                == 1,
+            format!("expected one canonical Vec<u8> probe, got: {expanded}"),
+        )?;
     }
     Ok(())
 }

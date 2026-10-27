@@ -1,7 +1,7 @@
-.PHONY: help all clean test build release lint typecheck fmt check-fmt markdownlint nixie test-workflow-contracts
+.PHONY: help all clean test build release lint typecheck fmt check-fmt markdownlint nixie test-workflow-contracts check-agent-native msrv
 
 
-TARGET ?= theoremc
+TARGET ?= cargo-theorem
 
 export PATH := $(HOME)/.cargo/bin:$(HOME)/.bun/bin:$(PATH)
 
@@ -10,7 +10,7 @@ BUILD_JOBS ?=
 RUST_FLAGS ?= -D warnings
 RUSTDOC_FLAGS ?= -D warnings
 CARGO_FLAGS ?= --all-targets --all-features
-CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
+CLIPPY_FLAGS ?= --workspace $(CARGO_FLAGS) -- $(RUST_FLAGS)
 NEXTEST_FLAGS ?= --workspace $(CARGO_FLAGS)
 DOCTEST_FLAGS ?= --workspace --all-features --doc
 MDLINT ?= markdownlint-cli2
@@ -46,6 +46,13 @@ STANDARD_RUSTFLAGS := -Zthreads=8$(if $(filter Linux,$(BUILD_HOST_OS)), -Clink-a
 test-workflow-contracts: ## Check the CV-005 CodeScene workflow contracts
 	$(CV005_CONTRACTS) check --repository .
 
+check-agent-native: ## Check OrthoConfig agent-native command policy
+	cargo orthohelp --check-agent-native --package cargo-theorem
+
+msrv: ## Check library and application minimum supported Rust versions
+	RUSTFLAGS="" $(CARGO) +1.88 check --workspace --exclude cargo-theorem
+	RUSTFLAGS="" $(CARGO) +1.89 check -p cargo-theorem
+
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
 
@@ -59,7 +66,7 @@ test: ## Run tests with warnings treated as errors
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test $(DOCTEST_FLAGS) $(BUILD_JOBS)
 
 target/%/$(TARGET): ## Build binary in debug or release mode
-	$(if $(findstring release,$(@)),RUSTFLAGS="$${RUSTFLAGS-}",RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)") $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)
+	$(if $(findstring release,$(@)),RUSTFLAGS="$${RUSTFLAGS-}",RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)") $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) -p cargo-theorem --bin $(TARGET)
 
 lint: ## Run Clippy with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) doc --no-deps

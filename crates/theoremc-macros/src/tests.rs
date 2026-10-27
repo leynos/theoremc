@@ -6,16 +6,17 @@
 //! this module concentrates on internal expansion shape, ordering, and
 //! harness metadata before those tokens reach rustc.
 
-use super::tests_support::{
-    TheoremFixture, TheoremSpec, assert_expansion_is_stable, assert_single_theorem_expansion,
-    expand_fixture, expansion_error_message, expected_expansion_with_unwinds,
-    make_single_theorem_fixture, redact_hashes, set_cargo_manifest_dir_for_test, temp_fixture_dir,
-    write_fixture,
-};
 use super::{
     MacroExpansionError, expand_theorem_file_at, generated_harnesses, manifest_dir_from_env,
+    tests_support::{
+        TheoremFixture, TheoremSpec, assert_single_theorem_expansion, ensure_condition,
+        expand_fixture, expansion_error_message, expected_expansion_with_unwinds,
+        make_single_theorem_fixture, redact_hashes, set_cargo_manifest_dir_for_test,
+        temp_fixture_dir, write_fixture,
+    },
 };
 use camino::Utf8Path;
+use indexmap::IndexMap;
 use proptest::prelude::{prop, prop_assert_eq, proptest};
 use proptest::{prop_assert, prop_assume};
 use rstest::rstest;
@@ -26,6 +27,9 @@ use theoremc_core::{
         WitnessCheck,
     },
 };
+
+#[path = "tests_stability.rs"]
+mod stability;
 
 #[test]
 fn single_document_expansion_matches_expected_shape() -> Result<(), Box<dyn std::error::Error>> {
@@ -71,7 +75,10 @@ fn multi_document_expansion_preserves_document_order() -> Result<(), Box<dyn std
 
     let actual = expand_fixture(path, &TheoremFixture(theorem.to_owned()))?;
     let expected = expected_expansion_with_unwinds(path, &["FirstMacro", "SecondMacro"], &[1, 3]);
-    assert_eq!(actual, expected);
+    ensure_condition(
+        actual == expected,
+        format!("expansion mismatch: expected {expected:?}, got {actual:?}"),
+    )?;
     Ok(())
 }
 
@@ -87,21 +94,11 @@ fn nested_path_expansion_uses_stable_module_mangling() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn expansion_is_stable_for_repeat_calls() -> Result<(), Box<dyn std::error::Error>> {
-    let fixture = make_single_theorem_fixture(&TheoremSpec {
-        name: "RepeatableMacro",
-        about: "Repeatability test",
-    });
-    assert_expansion_is_stable(Utf8Path::new("theorems/repeat.theorem"), &fixture)
-}
-
-#[test]
 fn manifest_dir_from_env_reports_missing_manifest_dir() {
     let _env = set_cargo_manifest_dir_for_test(None);
 
-    let error = manifest_dir_from_env()
-        .err()
-        .expect("missing CARGO_MANIFEST_DIR should return an error");
+    let error =
+        manifest_dir_from_env().expect_err("missing CARGO_MANIFEST_DIR should return an error");
 
     assert!(matches!(error, MacroExpansionError::MissingManifestDir));
 }
@@ -152,14 +149,14 @@ fn generated_harnesses_reports_missing_kani_evidence() {
         about: "Missing Kani evidence coverage".to_owned(),
         tags: Vec::new(),
         given: Vec::new(),
-        forall: Default::default(),
-        actions: Default::default(),
+        forall: IndexMap::default(),
+        actions: IndexMap::default(),
         assume: Vec::new(),
         witness: vec![WitnessCheck {
             cover: "true".to_owned(),
             because: "reachable".to_owned(),
         }],
-        let_bindings: Default::default(),
+        let_bindings: IndexMap::default(),
         do_steps: Vec::new(),
         prove: vec![Assertion {
             assert_expr: "true".to_owned(),
@@ -190,14 +187,14 @@ fn theorem_doc_with_unwind(name: String, unwind: u32) -> TheoremDoc {
         about: "Generated theorem".to_owned(),
         tags: Vec::new(),
         given: Vec::new(),
-        forall: Default::default(),
-        actions: Default::default(),
+        forall: IndexMap::default(),
+        actions: IndexMap::default(),
         assume: Vec::new(),
         witness: vec![WitnessCheck {
             cover: "true".to_owned(),
             because: "reachable".to_owned(),
         }],
-        let_bindings: Default::default(),
+        let_bindings: IndexMap::default(),
         do_steps: Vec::new(),
         prove: vec![Assertion {
             assert_expr: "true".to_owned(),
@@ -285,14 +282,14 @@ proptest! {
                         about: "Missing kani".to_owned(),
                         tags: Vec::new(),
                         given: Vec::new(),
-                        forall: Default::default(),
-                        actions: Default::default(),
+                        forall: IndexMap::default(),
+                        actions: IndexMap::default(),
                         assume: Vec::new(),
                         witness: vec![WitnessCheck {
                             cover: "true".to_owned(),
                             because: "reachable".to_owned(),
                         }],
-                        let_bindings: Default::default(),
+                        let_bindings: IndexMap::default(),
                         do_steps: Vec::new(),
                         prove: vec![Assertion {
                             assert_expr: "true".to_owned(),
@@ -376,13 +373,13 @@ proptest! {
     "Evidence.kani.unwindmustbeapositiveinteger"
 )]
 fn theorem_file_errors_report_expected_compile_error(
-    #[case] path: &str,
+    #[case] path_text: &str,
     #[case] fixture_content: Option<&str>,
     #[case] expected_fragment: &str,
 ) {
     let (_temp_dir, fixture_dir) =
         temp_fixture_dir().expect("should create temp fixture dir for error fixture");
-    let path = Utf8Path::new(path);
+    let path = Utf8Path::new(path_text);
 
     if let Some(content) = fixture_content {
         write_fixture(&fixture_dir, path, &TheoremFixture(content.to_owned()))

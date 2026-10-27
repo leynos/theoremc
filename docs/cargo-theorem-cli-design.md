@@ -1,6 +1,6 @@
 # `cargo theorem` CLI design
 
-Status: proposed. This document defines the target command-line interface and
+Status: accepted. This document defines the target command-line interface and
 its implementation boundaries. The implementation sequence lives in
 [the roadmap](roadmap.md). Task-oriented usage guidance for the eventual
 command surface lives in the
@@ -16,8 +16,9 @@ cargo theorem <command> [options]
 ```
 
 The distributable package and executable will both be named `cargo-theorem`.
-Direct invocation as `cargo-theorem` remains supported for tests and unusual
-execution environments, but documentation and diagnostics use `cargo theorem`.
+Cargo dispatches `cargo theorem <args>` as `cargo-theorem theorem <args>`;
+direct invocation uses the same injected `theorem` token. Documentation and
+diagnostics use `cargo theorem`.
 
 `cargo theorem` subsumes three previously separate areas of planned or existing
 functionality:
@@ -31,9 +32,12 @@ functionality:
 
 The CLI uses `ortho_config` for configuration discovery and merging, generated
 command documentation, recursive subcommand metadata, localization, and compact
-agent context. The command surface follows the agent-native principles
-described by Trevin Chow and the stricter reusable contract in OrthoConfig's
-agent-native CLI design.[^agent-native][^ortho-agent-native]
+agent context. Its direct runtime dependency `cargo-orthohelp` converts the
+generated documentation metadata into the agent-context schema. Both v0.10.0
+packages are application-only and require Rust 1.89.0. The command surface
+follows the agent-native principles described by Trevin Chow and the stricter
+reusable contract in OrthoConfig's agent-native CLI
+design.[^agent-native][^ortho-agent-native]
 
 The CLI is not a second theorem compiler. It is an application shell around
 library-owned parsing, generation, execution, reporting, and project-mutation
@@ -101,16 +105,16 @@ an unrelated `theoremc` executable beside the Cargo subcommand.
 
 ### 4.2 Mixed minimum supported Rust version policy
 
-At the time of this design, theoremc declares Rust 1.88 while `ortho_config`
-0.9.0 declares Rust 1.89.0. The CLI package therefore declares Rust 1.89.0 and
-the library packages retain Rust 1.88 until a separate compatibility decision
-raises their minimum supported Rust version (MSRV).
+At the time of this design, theoremc declares Rust 1.88 while `ortho_config` and
+`cargo-orthohelp` 0.10.0 declare Rust 1.89.0. The CLI package therefore
+declares Rust 1.89.0 and the library packages retain Rust 1.88 until a separate
+compatibility decision raises their minimum supported Rust version (MSRV).
 
 Continuous integration must test these contracts separately:
 
 ```console
-cargo +1.88 check --workspace --exclude cargo-theorem
-cargo +1.89 check -p cargo-theorem
+RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem
+RUSTFLAGS="" cargo +1.89 check -p cargo-theorem
 ```
 
 A workspace-wide MSRV increase may replace this split later, but adding the CLI
@@ -182,15 +186,16 @@ Project and artefact filesystem services use `camino`, `cap_std`, and
 
 ### 6.1 Required OrthoConfig capabilities
 
-`cargo theorem` treats these OrthoConfig capabilities as hard ship-time
+`cargo theorem` treats these OrthoConfig v0.10.0 capabilities as hard ship-time
 dependencies:
 
 - recursive whole-CLI metadata through `OrthoConfigSubcommandDocs`;
 - selected-subcommand configuration merging through
   `SelectedSubcommandMerge`;
 - the compact, independently versioned agent-context schema;
-- generated and localizable human help; and
-- agent-native vocabulary and global-option policy checks.
+- generated and localizable human help;
+- behaviour metadata for the agent-context foundation; and
+- agent-native policy checks through `cargo orthohelp --check-agent-native`.
 
 Profiles, delivery targets, feedback stores, skill-manifest validation, and the
 execution-ledger contract are soft dependencies in OrthoConfig's design. Until
@@ -206,7 +211,20 @@ field list will evolve with implementation, but the structural pattern is:
 
 ```rust
 #[derive(Debug, Parser)]
-#[command(name = "cargo theorem", bin_name = "cargo theorem", version)]
+#[command(name = "cargo", bin_name = "cargo", version)]
+pub struct CargoEntry {
+    #[command(subcommand)]
+    pub command: CargoSubcommand,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CargoSubcommand {
+    #[command(name = "theorem", version)]
+    Theorem(CommandLine),
+}
+
+#[derive(Debug, Args)]
+#[command(name = "theorem", version)]
 pub struct CommandLine {
     #[command(flatten)]
     pub globals: GlobalArgs,
@@ -250,7 +268,10 @@ pub enum Commands {
         project_file_name = "theoremc.toml",
         config_cli_long = "config",
         config_cli_visible = true,
-    )
+        automatic_mode = "stack_scopes",
+        scope_order = ["system", "user", "project"],
+    ),
+    profiles,
 )]
 pub struct CargoTheoremConfig {
     // Global and selected-subcommand configuration.
@@ -258,7 +279,9 @@ pub struct CargoTheoremConfig {
 ```
 
 The CLI uses OrthoConfig's localized parser and generated command metadata. A
-hand-maintained second command schema is prohibited.
+hand-maintained second command schema is prohibited. The name-only
+configuration namespace allowlist in §6.3 accepts names for deferred commands;
+it contains no parser arguments, dispatch handlers, or behaviour metadata.
 
 ### 6.3 Discovery and precedence
 
@@ -278,9 +301,45 @@ built-in defaults
 ```
 
 The selected subcommand receives only its relevant merged configuration.
-Configuration for `backend install` must not leak into `run`, and a `run`
-profile must not alter project mutation commands unless it declares those
-fields explicitly.
+Configuration for `backend install` must not leak into `run`. OrthoConfig
+0.10.0 forbids `cmds` inside a profile body, so named profiles can override
+global settings but cannot override command-specific settings. Global values
+follow the full precedence order above; command-specific values follow defaults
+< files < environment < explicit command-line values.
+
+Discovery stacks system, user, and project scopes in that order, so each more
+specific scope overrides the preceding one. On Unix and Redox, system files use
+each `$XDG_CONFIG_DIRS` entry (default `/etc/xdg`) and user files use
+`$XDG_CONFIG_HOME`, falling back to `$HOME/.config`; both look for
+`theoremc/theoremc.toml`. User discovery also checks `~/.theoremc.toml`. On
+other platforms OrthoConfig uses the home directory and native configuration
+directory supplied by its `EnvSource`, where available. The project scope looks
+for `theoremc.toml` at the Cargo workspace root. Cargo starts an external
+subcommand in the caller's current directory and does not pass the workspace
+root as an argument, so project commands resolve it with `cargo metadata` and
+pass that root to OrthoConfig. An explicit `--manifest-path` selects the
+manifest used for that resolution. The `context --json` command remains
+standalone: without an explicit `--config` or `THEOREMC_CONFIG_PATH`, it skips
+all automatic configuration-file discovery and emits metadata without reading
+project or user configuration. An explicit selector still loads and validates
+its required file.
+
+An explicitly selected `--config <path>` or `THEOREMC_CONFIG_PATH` is
+exclusive: the CLI selector wins if both are supplied, it suppresses automatic
+discovery, and a missing, unreadable, or malformed file is a configuration
+error. Missing files found during automatic discovery are optional. TOML is the
+only accepted configuration-file format in this foundation. TOML `extends`
+entries may layer parent files, with paths relative to the file that declares
+them. Unknown configuration keys are errors.
+
+OrthoConfig 0.10.0's selected-subcommand file helper discovers prefix-derived
+dotfiles and does not accept the canonical project filename or an explicit
+`--config` selector. The application resolves the authoritative file chain once
+through OrthoConfig's configured discovery and source-injection APIs, then
+passes only the selected `cmds.<name>` values through an application-owned
+adapter implementing `SelectedSubcommandMerge`. This keeps global and
+command-specific settings on the same file chain and prevents a second,
+inconsistent file search.
 
 Legacy `KANI`, `VERUS_*`, and `INPUT_*` variables from `rust-prover-tools` are
 accepted only by the migration adapter and only for the corresponding backend
@@ -302,9 +361,56 @@ Selection uses the stable `cargo metadata` JSON protocol through the
 the valid package identifiers. Mutation commands require one unambiguous target
 unless their contract explicitly supports workspace-wide changes.
 
+### 6.5 Configuration and command-line ownership
+
+Persistent project policy, backend pins and executable settings, run limits,
+installation-cache defaults, and renderer defaults are configuration values.
+Secrets are not accepted as ordinary configuration fields. One-shot command
+selection, theorem and package selectors, `--json`, `--deliver`, `--dry-run`,
+`--force`, `--compile`, and explicit `--config` and `--profile` selectors are
+CLI inputs. Where a setting appears on both surfaces, use
+`cli_default_as_absent` for parser defaults so file and environment values can
+override them.
+
+Each command owns a `cmds.<command>` namespace. For example, `[cmds.run]`
+contains run settings and `THEOREMC_CMDS__RUN__<FIELD>` supplies the matching
+environment override. The selected-subcommand merge loads only that namespace,
+so sibling settings do not leak. Namespace names must match a registered or
+planned top-level command; unknown names are configuration errors. This allows
+settings for planned handlers to be prepared without silently accepting
+misspellings. The application adapter obtains the selected namespace from the
+already-resolved configuration chain described in §6.3.
+
+Named profiles are supported through OrthoConfig's `profiles` derive option.
+`--profile <name>` and `THEOREMC_PROFILE` select `[profile.<name>]`, which
+overlays global file settings and remains below environment variables and
+explicit flags. In v0.10.0, profile bodies cannot contain `cmds` or `inherits`;
+profiles therefore do not carry command-specific settings. The selector does
+not conflict with the separate `profile` management subcommand.
+Profile-management handlers remain a later roadmap item.
+
+The parser boundary uses OrthoConfig's localized parsing entry points and an
+application-owned localizer. The initial foundation keeps English Clap text as
+its fallback; translated CLI catalogues and locale negotiation remain a later
+slice. Machine-readable diagnostic codes and JSON fields remain non-localized.
+Libraries receive an injected localizer and do not read process locale
+variables.
+
+### 6.6 Phase 3.1 foundation scope
+
+The Phase 3.1.1 foundation owns the package, OrthoConfig-derived configuration,
+selected-subcommand merge boundary, command metadata, Cargo entry shape, and
+configuration error mapping. Its initial registered handler is
+`context --json`. It does not implement backend execution, proof runs, project
+mutations, or the full command list in §7. Operational commands are added as
+their later roadmap slices land; the foundation must not advertise an
+unimplemented handler as operational. Its generated agent context describes
+only paths registered in the foundation command tree. Follow-on slices extend
+that context from the same tree when they add operational handlers.
+
 ## 7. Public command surface
 
-The first stable command tree is:
+The target command tree is:
 
 ```text
 cargo theorem init
@@ -371,6 +477,10 @@ CLI does not stutter as `cargo theorem theorem list`.
 | `feedback`       | Record CLI friction                                                         | Yes      | One record                                  | Local append; optional delivery is explicit                    |
 
 *Table 2: Command effects, response bounds, and mutation guards.*
+
+This is the planned public surface, not the foundation's initial registered
+tree. The foundation exposes only commands with implemented handlers; agent
+context must not advertise later roadmap commands before those handlers ship.
 
 ## 8. Global application contracts
 
@@ -1153,23 +1263,26 @@ consent and reports local and remote outcomes separately.
 ## 14. Agent context and long-form workflows
 
 `cargo theorem context --json` emits OrthoConfig's compact, versioned
-agent-context document. It includes:
+agent-context document generated from the registered command tree. During the
+foundation slice, that tree contains only the entry points implemented in that
+slice. Later roadmap slices add their command paths and behaviour metadata to
+the same generated context when their handlers are implemented. The context
+includes:
 
-- every command path and canonical/domain verb;
+- every currently registered command path and canonical/domain verb;
 - required and optional inputs, types, defaults, enum values, and environment
-  bindings;
-- interaction, mutation, dry-run, force, idempotency, and network contracts;
-- stdout, stderr, JSON, report, and exit-code contracts;
-- pagination and bounded-response metadata;
-- asynchronous run and job-ledger metadata;
-- profiles, delivery, and feedback support;
-- backend capability and provenance metadata; and
+  bindings supported by those commands;
+- interaction, mutation, dry-run, force, idempotency, and network contracts
+  declared for those commands;
+- stdout, stderr, JSON, and exit-code contracts for those commands;
+- pagination and bounded-response metadata where those commands define them;
+- global configuration and profile support exposed by the foundation; and
 - short invocation examples generated from the same command tree.
 
 Context generation is read-only, does not require a theoremc project, and does
-not probe the network or installed backends. Project-specific context may be
-requested explicitly with `--project`, in which case it adds configured backend
-and profile names without secrets.
+not probe the network or installed backends. Project-specific context and
+backend capability metadata are deferred with project discovery and backend
+handlers; they do not appear in the foundation context.
 
 Long-form agent workflow material, including a future `SKILL.md`, is validated
 against the compact context rather than becoming another hand-maintained
@@ -1353,8 +1466,9 @@ ships, then moves to maintenance-only status before archival.
 Implementation proceeds through vertical slices rather than building the entire
 command tree as empty scaffolding:
 
-1. Establish the `cargo-theorem` crate, mixed-MSRV CI, OrthoConfig command tree,
-   JSON protocol, and `context --json`.
+1. Establish the `cargo-theorem` crate, mixed-MSRV CI, the OrthoConfig v0.10.0
+   configuration and profile spine, behaviour metadata, JSON protocol, and
+   `context --json`.
 2. Add Cargo workspace discovery plus read-only `list`, `get`, and `check`.
 3. Add mutation plans, `init`, theorem/action scaffolding, and build-script
    install/check/run/delete.
@@ -1386,7 +1500,8 @@ stable CLI:
     CLIs"][agent-native], 1 May 2026.
 [^ortho-agent-native]:
     [`leynos/ortho-config` agent-native CLI assistance
-    design][ortho-agent-native].
+    design][ortho-agent-native]. The adopted dependency and localization
+    boundary are recorded in [ADR-009](adr-009-ortho-config-cli-configuration.md).
 
 [agent-native]: https://trevinsays.com/p/10-principles-for-agent-native-clis
 [ortho-agent-native]: https://github.com/leynos/ortho-config/blob/main/docs/agent-native-cli-design.md

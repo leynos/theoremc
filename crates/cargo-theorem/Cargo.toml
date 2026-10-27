@@ -1,0 +1,31 @@
+[package]
+name = "cargo-theorem"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+description = "Cargo subcommand for theoremc"
+license = "MIT OR Apache-2.0"
+
+[package.metadata.ortho_config.policy]
+mode = "deny"
+
+[[bin]]
+name = "cargo-theorem"
+path = "src/main.rs"
+
+[dependencies]
+cargo-orthohelp = "0.10.0"
+clap.workspace = true
+ortho_config.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+anyhow = "1.0.100"
+cap-std = { version = "4.0.2", features = ["fs_utf8"] }
+rstest = "0.28.0"
+tempfile = "3.15.0"
+
+[lints]
+workspace = true
