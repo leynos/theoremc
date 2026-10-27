@@ -115,10 +115,13 @@ pull request.
 - [x] Publish the review10 follow-up to existing draft PR #204 for hosted
   validation.
 - [x] Split CodeScene's large test method and pass the full local gate set.
-- [ ] Complete the requested rate-limit cooldown and review the exact
-  candidate with `coderabbit review --agent`.
-- [ ] Commit and push the final test and plan follow-up; refresh draft PR #204
-  and reconcile its hosted checks.
+- [x] Pass hosted CI, coverage, CodeScene, and Gecko checks on implementation
+  head `40a8b47545ad9c61cdaa1e86956155f14bbe797e`.
+- [x] Complete the first requested cooldown and attempt an exact-head review.
+- [ ] Complete the second requested cooldown and obtain a CodeRabbit review
+  result for the exact candidate.
+- [ ] Record the final review and hosted results, refresh the draft PR body,
+  and confirm the PR remains open and draft.
 
 M2 implementation is now present in the working tree: the dedicated package,
 Cargo entry wrapper, OrthoConfig configuration model, selected-command adapter,
@@ -873,3 +876,13 @@ that gate before proceeding. Never discard unrelated changes.
   policy, `vsleep` is observing a randomized 84-minute cooldown. This produced
   no review result; do not retry before the cooldown ends. Hosted CodeScene and
   CI checks must also pass on the corrected published head.
+- 2026-10-27: Hosted run `40441587594` passed on exact implementation head
+  `40a8b47545ad9c61cdaa1e86956155f14bbe797e`, including coverage and tests;
+  CodeScene and Gecko Security also passed. The workflow emitted cache-glob
+  warnings for absent Python dependency files and an informational sccache
+  statistics notice, but no job or step failed. The PR remained open and draft.
+- 2026-10-27: After the 84-minute wait, a second exact-head
+  `coderabbit review --agent` attempt again hit the included-review quota and
+  produced no findings or review result. The service reported a 7-minute wait;
+  the requested policy started another randomized 53-minute `vsleep`. Do not
+  enable usage-based billing or retry before this cooldown completes.
