@@ -112,9 +112,13 @@ pull request.
 - [x] Rerun formatting, Markdown, Mermaid, and pinned-guide checksum checks
   after recording the final docs-gate results and read-only dispositions in
   this plan.
-- [ ] Review the exact final candidate with `coderabbit review --agent`.
-- [ ] Commit and push the reviewed candidate; refresh draft PR #204 and
-  reconcile its hosted checks.
+- [x] Publish the review10 follow-up to existing draft PR #204 for hosted
+  validation.
+- [x] Split CodeScene's large test method and pass the full local gate set.
+- [ ] Complete the requested rate-limit cooldown and review the exact
+  candidate with `coderabbit review --agent`.
+- [ ] Commit and push the final test and plan follow-up; refresh draft PR #204
+  and reconcile its hosted checks.
 
 M2 implementation is now present in the working tree: the dedicated package,
 Cargo entry wrapper, OrthoConfig configuration model, selected-command adapter,
@@ -844,4 +848,28 @@ that gate before proceeding. Never discard unrelated changes.
   `6e6a40433667aa0c24491f39c98f0cea029a8f516bdbba416880b4e7e819d7f0`; the
   15-path set stayed constant. The per-file pre-format contents were not
   captured, so the exact source of that formatting change is unverified. The
-  current candidate passes `make check-fmt` and is ready for CodeRabbit review.
+  next hosted review identified a test-method size issue, recorded below.
+- 2026-10-27: Pushed commit `ab787ed` to the existing draft PR after the
+  review10 fixes. The hosted CodeScene gate failed because
+  `parse_error_json_detection_skips_global_values_and_respects_end_of_options`
+  in `runner.rs` was classified as a large method. The prior Actions run
+  remained in progress on that head and became stale after the fix. The test is
+  now expressed as focused `rstest` cases for command shapes and global-option
+  values. Its first gate attempt failed because the parameters lacked
+  `#[case]`; that was corrected before the accepted run.
+- 2026-10-27: The corrected test split passed the full sequential local gates:
+  format, check-fmt, lint, typecheck, workspace tests (882/882 and doctests),
+  package coverage (64 tests), workflow contracts, Markdown, Mermaid,
+  agent-native, both MSRVs, build/release, and Makefile validation. Package
+  coverage measured 651/695 lines (93.67%) and 64/73 functions (87.67%); no
+  branch counters were emitted. Logs use the `pr204-review13` suffix under
+  `/tmp`; the LCOV report is
+  `/tmp/theoremc-issue-200-cargo-theorem-pr204-review13.lcov`. Full-workspace
+  local coverage remains unavailable because the Kani harness lacks
+  `profiler_builtins`.
+- 2026-10-27: `coderabbit review --agent` was attempted on the published head
+  after local gates, but returned a rate limit: all 10 included reviews were
+  used and the service reported an 8-minute wait. Following the requested
+  policy, `vsleep` is observing a randomized 84-minute cooldown. This produced
+  no review result; do not retry before the cooldown ends. Hosted CodeScene and
+  CI checks must also pass on the corrected published head.
