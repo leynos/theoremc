@@ -6,7 +6,7 @@ use std::{
     process::ExitCode,
 };
 
-use super::{CargoEntry, Commands};
+use super::{CargoCommand, CargoEntry, Commands};
 use anyhow::{Result, ensure};
 use clap::{CommandFactory, Parser};
 use ortho_config::{MapEnv, OrthoConfigSubcommandDocs};
@@ -81,6 +81,25 @@ impl Write for FailingWriter {
     fn flush(&mut self) -> io::Result<()> {
         Ok(())
     }
+}
+
+#[test]
+fn generated_wrapper_metadata_matches_the_clap_tree() -> Result<()> {
+    let command = CargoEntry::command();
+    let clap_wrappers = command
+        .get_subcommands()
+        .map(clap::Command::get_name)
+        .collect::<Vec<_>>();
+    let metadata_wrappers = CargoCommand::get_subcommand_doc_metadata();
+    let metadata_names = metadata_wrappers
+        .iter()
+        .map(|entry| entry.app_name.as_str())
+        .collect::<Vec<_>>();
+    ensure!(
+        clap_wrappers == metadata_names,
+        "Cargo wrapper metadata differs from Clap: {clap_wrappers:?} vs {metadata_names:?}"
+    );
+    Ok(())
 }
 
 #[test]

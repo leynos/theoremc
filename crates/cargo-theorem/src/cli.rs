@@ -14,6 +14,7 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 use diagnostics::{
     entry_wants_json, parse_error_requests_json, report_application_error, report_clap_error,
 };
+use ortho_config::docs::{DocMetadata, OrthoConfigDocs};
 use ortho_config::{
     EnvSource, LocalizeCmd, NoOpLocalizer, OrthoConfig, OrthoConfigSubcommandDocs,
     parse_localized_command,
@@ -54,6 +55,18 @@ struct TheoremArgs {
     command: Commands,
 }
 
+impl OrthoConfigDocs for TheoremArgs {
+    fn get_doc_metadata() -> DocMetadata {
+        Self::get_doc_metadata_for_path(&[])
+    }
+
+    fn get_doc_metadata_for_path(command_path: &[String]) -> DocMetadata {
+        let mut metadata = GlobalOptions::get_doc_metadata_for_path(command_path);
+        metadata.subcommands = Commands::get_subcommand_doc_metadata_for_path(command_path);
+        metadata
+    }
+}
+
 /// Registered application commands for the current foundation milestone.
 #[derive(Debug, Clone, Subcommand, Deserialize, Serialize, OrthoConfigSubcommandDocs)]
 #[serde(rename_all = "kebab-case")]
@@ -91,11 +104,26 @@ struct CargoEntry {
 }
 
 /// Single-variant wrapper for `cargo theorem` dispatch.
-#[derive(Debug, Subcommand)]
+#[derive(Debug, Subcommand, OrthoConfigSubcommandDocs)]
 enum CargoCommand {
     /// Theoremc's Cargo-native command root.
     #[command(name = "theorem", version)]
     Theorem(TheoremArgs),
+}
+
+/// Describe the direct executable and its declared Cargo command wrapper.
+///
+/// The root `cargo-theorem` contains `theorem`, whose children include `context`.
+pub(crate) fn command_metadata() -> DocMetadata {
+    let mut metadata = GlobalOptions::get_doc_metadata();
+    metadata.app_name = String::from("cargo-theorem");
+    metadata.bin_name = Some(String::from("cargo-theorem"));
+    metadata.fields.clear();
+    metadata.sections.discovery = None;
+    metadata.sections.precedence = None;
+    metadata.subcommands =
+        CargoCommand::get_subcommand_doc_metadata_for_path(&[String::from("cargo-theorem")]);
+    metadata
 }
 
 /// Parse, resolve configuration, and write the command result to its stream.

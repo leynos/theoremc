@@ -4,7 +4,7 @@ use std::{
     env,
     ffi::{OsStr, OsString},
     path::{Path, PathBuf},
-    process::{Command, Output},
+    process::Command,
 };
 
 use anyhow::{Result, ensure};
@@ -14,8 +14,11 @@ use serde_json::Value;
 
 const BINARY: &str = env!("CARGO_BIN_EXE_cargo-theorem");
 
+#[path = "entry_points/agent_context.rs"]
+mod agent_context;
 #[path = "entry_points/support.rs"]
 mod support;
+use agent_context::assert_success_json;
 use support::{CargoSubcommandEnvironment, cargo_subcommand_environment};
 
 #[rstest]
@@ -356,37 +359,4 @@ fn binary_name(name: &str) -> OsString {
     return OsString::from(format!("{name}.exe"));
     #[cfg(not(windows))]
     OsString::from(name)
-}
-
-/// Check the shared JSON success stream contract.
-fn assert_success_json(output: &Output) -> Result<()> {
-    ensure!(output.status.success(), "command must exit successfully");
-    ensure!(
-        output.stderr.is_empty(),
-        "successful JSON must not use stderr"
-    );
-    let document: Value = serde_json::from_slice(&output.stdout)?;
-    ensure!(
-        document.get("schema_version").is_some(),
-        "agent context must include a schema version"
-    );
-    let commands = document
-        .get("commands")
-        .and_then(Value::as_array)
-        .ok_or_else(|| anyhow::anyhow!("agent context is missing its commands array"))?;
-    ensure!(
-        commands.len() == 2,
-        "expected binary root and context commands"
-    );
-    let binary_path = commands.first().and_then(|command| command.get("path"));
-    let context_path = commands.get(1).and_then(|command| command.get("path"));
-    ensure!(
-        binary_path == Some(&serde_json::json!(["cargo-theorem"])),
-        "agent context must include the binary root path"
-    );
-    ensure!(
-        context_path == Some(&serde_json::json!(["cargo-theorem", "context"])),
-        "agent context must include the registered context command"
-    );
-    Ok(())
 }
