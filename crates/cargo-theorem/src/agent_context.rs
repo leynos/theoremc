@@ -1,15 +1,9 @@
 //! Build the compact agent context from the declared command metadata.
 
+use crate::cli::command_metadata;
 use cargo_orthohelp::{
     agent_context::bridge_ir_to_agent_context, schema::DocMetadata as BridgeDocMetadata,
 };
-use ortho_config::OrthoConfigSubcommandDocs;
-use ortho_config::docs::OrthoConfigDocs;
-
-use crate::{cli::Commands, config::GlobalOptions};
-
-#[cfg(test)]
-use ortho_config::docs::DocMetadata;
 
 /// Serialize metadata for the commands implemented by this foundation.
 ///
@@ -17,10 +11,7 @@ use ortho_config::docs::DocMetadata;
 /// future command slices can add their paths without maintaining another
 /// schema by hand.
 pub(crate) fn to_json() -> Result<String, serde_json::Error> {
-    let mut metadata = GlobalOptions::get_doc_metadata();
-    metadata.app_name = String::from("cargo-theorem");
-    metadata.bin_name = Some(String::from("cargo-theorem"));
-    metadata.subcommands = Commands::get_subcommand_doc_metadata();
+    let metadata = command_metadata();
     let bridge_metadata = bridge_metadata(&metadata)?;
     let context = bridge_ir_to_agent_context(&bridge_metadata, "cargo-theorem", None);
     serde_json::to_string(&context)
@@ -34,14 +25,6 @@ fn bridge_metadata(
     serde_json::from_value(serde_json::to_value(metadata)?)
 }
 
-/// Return metadata for focused assertions without converting the schema.
-#[cfg(test)]
-fn command_metadata() -> DocMetadata {
-    let mut metadata = GlobalOptions::get_doc_metadata();
-    metadata.subcommands = Commands::get_subcommand_doc_metadata();
-    metadata
-}
-
 #[cfg(test)]
 mod tests {
     //! Checks that agent context exposes only registered foundation commands.
@@ -52,19 +35,24 @@ mod tests {
     #[test]
     fn metadata_contains_context_and_no_planned_handlers() -> Result<()> {
         let metadata = command_metadata();
-        let names = metadata
-            .subcommands
-            .iter()
-            .map(|command| command.app_name.as_str())
-            .collect::<Vec<_>>();
         ensure!(
-            names == ["context"],
-            "unexpected foundation commands: {names:?}"
+            metadata.fields.is_empty(),
+            "binary root must not expose theorem options"
         );
-        let context = metadata
-            .subcommands
-            .first()
-            .ok_or_else(|| anyhow::anyhow!("context metadata is missing"))?;
+        let [theorem] = metadata.subcommands.as_slice() else {
+            anyhow::bail!("binary must expose only the theorem wrapper");
+        };
+        ensure!(
+            theorem.app_name == "theorem",
+            "unexpected Cargo wrapper name"
+        );
+        let [context] = theorem.subcommands.as_slice() else {
+            anyhow::bail!("theorem must expose only the context command");
+        };
+        ensure!(
+            context.app_name == "context",
+            "unexpected foundation command"
+        );
         ensure!(
             context.behaviour.is_some(),
             "the read-only context command must declare behaviour metadata"
@@ -84,7 +72,12 @@ mod tests {
             paths
                 == [
                     vec![String::from("cargo-theorem")],
-                    vec![String::from("cargo-theorem"), String::from("context")]
+                    vec![String::from("cargo-theorem"), String::from("theorem")],
+                    vec![
+                        String::from("cargo-theorem"),
+                        String::from("theorem"),
+                        String::from("context")
+                    ]
                 ],
             "unexpected agent-context commands: {paths:?}"
         );

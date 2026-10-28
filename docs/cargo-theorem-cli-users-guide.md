@@ -60,9 +60,12 @@ cargo theorem context --json
 cargo-theorem theorem context --json
 ```
 
-Both forms emit the same compact agent-context document. Project inspection,
-mutation, backend, proof, reporting, profile-management, and feedback commands
-remain planned and are not accepted by this foundation.
+Both forms emit the same compact agent-context document. Its invocation paths
+include the executable and injected token, such as
+`["cargo-theorem", "theorem", "context"]`; append the required `--json` flag
+when following that path. Project inspection, mutation, backend, proof,
+reporting, profile-management, and feedback commands remain planned and are not
+accepted by this foundation.
 
 Commands that inspect or mutate a Cargo project accept these global selectors:
 

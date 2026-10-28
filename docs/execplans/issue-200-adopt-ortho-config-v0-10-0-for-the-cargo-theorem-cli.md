@@ -56,6 +56,10 @@ pull request.
   Severity: medium. Likelihood: medium. Mitigation: preserve its bytes and
   restore imported files after any formatter attempt; report a deterministic
   gate conflict rather than rewriting upstream text.
+- Risk: generated command metadata may omit the Cargo wrapper and advertise an
+  invocation rejected by the real parser. Severity: medium. Likelihood: medium.
+  Mitigation: derive wrapper metadata from `CargoCommand` and execute the
+  emitted context path in an isolated subprocess regression.
 - Risk: the designed CLI surface is much larger than this foundation milestone.
   Severity: medium. Likelihood: high. Mitigation: keep operational commands
   outside scope and implement only configuration, metadata, and the entry shape
@@ -122,6 +126,14 @@ pull request.
   result for exact candidate `aea054739617eb8b3b542ede27ad907457b7b79d`.
 - [x] Record the final review and hosted results, refresh the draft PR body,
   and confirm the PR remains open and draft.
+- [x] (2026-10-27) Verify the hosted assessment's invocation-path and workspace
+  acceptance findings against the current code, roadmap, ADR, and guide.
+- [x] Include the declared `theorem` wrapper in generated agent context and add
+  an end-to-end regression that executes the emitted context path.
+- [x] Reconcile CONFIG-WORKSPACE with step 3.1.1's standalone context contract
+  and defer nested-workspace resolution and its root/member fixture to 3.1.2.
+- [ ] Run the sequential gates for the assessment repair, publish it, and
+  obtain candidate-bound assessment confirmation before readiness.
 
 M2 implementation is now present in the working tree: the dedicated package,
 Cargo entry wrapper, OrthoConfig configuration model, selected-command adapter,
@@ -357,9 +369,11 @@ latest formatting command passed; restart the complete gate sequence.
   root argument. Evidence: Firecrawl scrape of the official Cargo Book's
   [External Tools](https://doc.rust-lang.org/cargo/reference/external-tools.html)
   page on 2026-10-26. Inference: project commands must resolve the workspace
-  root themselves and pass it to OrthoConfig. Impact: the implementation tests
-  config discovery from a workspace member; `context --json` skips workspace
-  discovery to meet its standalone contract.
+  root themselves and pass it to OrthoConfig. Impact: step 3.1.1 tests that
+  `context --json` ignores automatic project configuration and skips workspace
+  discovery to meet its standalone contract. Nested-member workspace-root
+  resolution and the competing root/member configuration fixture belong to
+  roadmap step 3.1.2 and are not claimed as verified in this foundation.
 
 ## Decision log
 
@@ -397,7 +411,23 @@ latest formatting command passed; restart the complete gate sequence.
   global and command-specific values. Date/Author: 2026-10-26, Codex under
   issue #200.
 
+- Decision: include the declared Cargo wrapper in agent-context invocation
+  paths by deriving its metadata from `CargoCommand` and nesting application
+  metadata beneath it. Rationale: an agent must be able to execute the emitted
+  `cargo-theorem theorem context` path with the required `--json` flag. Keep
+  CONFIG-WORKSPACE limited to the foundation's no-discovery contract; roadmap
+  step 3.1.2 owns `cargo metadata`, nested-member resolution, and the competing
+  root/member configuration fixture. This corrects an unfulfilled plan claim
+  without starting deferred project commands. Date/Author: 2026-10-27, Codex
+  following hosted assessment comment `6441857666`.
+
 ## Outcomes & retrospective
+
+The pre-readiness assessment of `7fc73fe` found a real agent-context invocation
+bug and an ExecPlan acceptance mismatch. The current repair derives the
+`theorem` metadata level from the declared Cargo wrapper, adds a subprocess
+regression that follows the emitted invocation path, and makes the workspace
+boundary explicit. Validation and a renewed assessment remain pending.
 
 Work is in progress. Update this section at each completed milestone and record
 any remaining validation or delivery blocker before completion.
@@ -550,8 +580,9 @@ The imported guides are `docs/ortho-config/users-guide.md` and
   deliver a draft PR (REQ-6).
 - `docs/cargo-theorem-cli-design.md` §4–§6 and §19: application boundary,
   external-subcommand shape, mixed MSRV, config discovery and precedence.
-- `docs/roadmap.md` Phase 3.1: package, command metadata, configuration,
-  split MSRV, direct/Cargo invocation, and base output contracts.
+- `docs/roadmap.md` step 3.1.1: package, command metadata, configuration,
+  split MSRV, direct/Cargo invocation, and base output contracts. Step 3.1.2
+  owns Cargo workspace/package discovery and its nested-workspace fixtures.
 - `docs/adr-002-library-first-internationalization-and-localization-with-fluent.md`:
   keep localization ownership at the application boundary.
 - Repository instructions in `AGENTS.md`: Rust, documentation, test, commit,
@@ -572,9 +603,11 @@ Trace links:
 
 - Obligation CLI-ENTRY: Cargo dispatch and direct execution with the injected
   `theorem` token reach the same command parser. Method: isolated binary tests
-  that invoke both forms and compare status, streams, and normalized help.
-  Artefact: `crates/cargo-theorem/tests/`. Negative control: invoke the binary
-  without the required external-subcommand token and require a usage failure.
+  that invoke both forms and compare status, streams, and normalized help. Also
+  execute the context invocation path read from emitted agent JSON with its
+  required `--json` flag. Artefact: `crates/cargo-theorem/tests/`. Negative
+  control: invoke the binary without the required external-subcommand token and
+  require a usage failure.
 - Obligation CONFIG-ORDER: defaults, explicit file, selected profile,
   environment, and explicit CLI values merge in that order. Method: finite
   table tests using `_with_sources`, `MapEnv`, and explicit file sources.
@@ -585,13 +618,16 @@ Trace links:
   setting does not leak. Artefact: application configuration tests. Negative
   control: select the sibling command with the wrong merge result and require
   the test to fail.
-- Obligation CONFIG-WORKSPACE: project-scope configuration is rooted at the
-  Cargo workspace root even when Cargo invokes the subcommand from a member
-  directory. Method: resolve a nested member with `cargo metadata` and assert
-  OrthoConfig receives the workspace root; assert `context --json` does not
-  invoke workspace discovery. Artefact: application tests. Negative control:
-  start in a member and require a project file at the workspace root to win
-  over any member-local file.
+- Obligation CONFIG-WORKSPACE (foundation): `context --json` skips automatic
+  configuration and workspace discovery. Method: run the isolated binary in a
+  directory with malformed `theoremc.toml` and no Cargo workspace, and require
+  valid context JSON with successful status and empty stderr. Artefact:
+  `context_ignores_malformed_automatic_project_configuration`. Negative
+  control: automatic file loading would parse the malformed TOML and fail.
+  Deferred to roadmap step 3.1.2: resolve a nested member with
+  `cargo metadata`, pass the workspace root to OrthoConfig, and prove that the
+  root project file wins over a competing member-local file. This foundation
+  does not claim that deferred implementation or fixture as verified.
 - Obligation CONFIG-ERROR: malformed, unreadable, explicit-missing, invalid,
   and rejected unknown-key files produce an actionable configuration error;
   absence of an optional discovered file remains non-fatal. Method: table tests
@@ -959,3 +995,11 @@ that gate before proceeding. Never discard unrelated changes.
   `coderabbit review --agent --base origin/main --include-untracked` completed
   on that exact head with zero findings. The PR body records the result, and PR
   #204 remains open and draft.
+- 2026-10-27: Hosted assessment request `6441826875` received substantive
+  response `6441857666` for base `70926a1` and head `7fc73fe`. Both findings
+  were verified: emitted context paths omitted `theorem`, and CONFIG-WORKSPACE
+  overstated the foundation's workspace discovery evidence. The working-tree
+  repair adds the declared wrapper metadata and an executable emitted-path
+  regression, and assigns nested-workspace discovery evidence to roadmap step
+  3.1.2. The sequential gates and candidate-bound confirmation remain pending;
+  no new formal proof is introduced by this repair.
