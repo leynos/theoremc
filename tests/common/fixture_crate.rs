@@ -222,10 +222,7 @@ impl FixtureCrate {
     /// executed.
     pub fn cargo_build_log(&self) -> Result<BuildLog, String> {
         let target_dir = self.manifest_dir.join("target");
-        // The fixture build is read back from `target/debug/build`, so it must
-        // own its target and build directories whatever the caller exports:
-        // a CI or developer `CARGO_TARGET_DIR` would move the artefacts, and
-        // two fixtures sharing a build directory would block on its lock.
+        // Read back from `target/debug/build`: own the dirs, whatever is exported.
         let output = Command::new("cargo")
             .current_dir(&self.manifest_dir)
             .env("CARGO_TARGET_DIR", target_dir.as_str())
