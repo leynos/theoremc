@@ -246,23 +246,50 @@ impl FixtureCrate {
     /// Returns an error when the build output cannot be inspected or no
     /// generated theorem suite is present.
     pub fn generated_suite_contents(&self) -> Result<String, String> {
+        for suite_path in self.generated_suite_candidates()? {
+            match self.dir.read_to_string(&suite_path) {
+                Ok(contents) => return Ok(contents),
+                Err(error) if is_missing_path(&error) => {}
+                Err(error) => return Err(error.to_string()),
+            }
+        }
+        Err("generated theorem_suite.rs was not found".to_owned())
+    }
+
+    /// Lists where a build script may have written `theorem_suite.rs`.
+    ///
+    /// Cargo's classic layout keeps a build script's output at
+    /// `build/<package>-<hash>/out`; newer nightlies add a directory level,
+    /// `build/<package>/<hash>/out`. Both places are candidates.
+    fn generated_suite_candidates(&self) -> Result<Vec<Utf8PathBuf>, String> {
         let build_dir = Utf8Path::new("target/debug/build");
+        let mut candidates = Vec::new();
         for entry_result in self
             .dir
             .read_dir(build_dir)
             .map_err(|error| error.to_string())?
         {
             let entry = entry_result.map_err(|error| error.to_string())?;
-            let suite_path = build_dir
-                .join(entry.file_name().map_err(|error| error.to_string())?)
-                .join("out/theorem_suite.rs");
-            match self.dir.read_to_string(&suite_path) {
-                Ok(contents) => return Ok(contents),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(error.to_string()),
-            }
+            let package_dir = build_dir.join(entry.file_name().map_err(|error| error.to_string())?);
+            candidates.push(package_dir.join("out/theorem_suite.rs"));
+            candidates.extend(self.nested_suite_candidates(&package_dir)?);
         }
-        Err("generated theorem_suite.rs was not found".to_owned())
+        Ok(candidates)
+    }
+
+    /// Lists the per-hash output directories below one package directory.
+    fn nested_suite_candidates(&self, package_dir: &Utf8Path) -> Result<Vec<Utf8PathBuf>, String> {
+        let Ok(nested) = self.dir.read_dir(package_dir) else {
+            return Ok(Vec::new());
+        };
+        nested
+            .map(|entry| {
+                let name = entry
+                    .and_then(|found| found.file_name())
+                    .map_err(|error| error.to_string())?;
+                Ok(package_dir.join(name).join("out/theorem_suite.rs"))
+            })
+            .collect()
     }
 
     fn advance_parent_mtime(&self, path: &Utf8Path) -> Result<(), String> {
@@ -393,3 +420,11 @@ pub fn toml_section(document: &str, section_name: &str) -> Option<String> {
 #[cfg(test)]
 #[path = "fixture_crate_tests.rs"]
 mod tests;
+
+/// Whether a read failed because the path (or a parent) does not exist.
+fn is_missing_path(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+    )
+}
