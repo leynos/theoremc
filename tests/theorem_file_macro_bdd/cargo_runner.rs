@@ -9,6 +9,7 @@ use std::process::Command;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use camino::Utf8Path;
+use test_helpers::hermetic_cargo;
 
 #[derive(Clone, Copy)]
 pub(crate) enum CargoSubcommand {
@@ -90,14 +91,7 @@ pub(crate) fn cargo_run_output(
     _guard: &CargoGuard<'_>,
 ) -> Result<String, String> {
     let target_dir = manifest_dir.join("target");
-    let output = Command::new("cargo")
-        .current_dir(manifest_dir)
-        .env("CARGO_TARGET_DIR", target_dir.as_str())
-        // An inherited `CARGO_BUILD_TARGET_DIR` or `CARGO_BUILD_BUILD_DIR`
-        // would put the fixture's artefacts, or its build-directory lock,
-        // somewhere shared with the caller or with other fixtures.
-        .env_remove("CARGO_BUILD_TARGET_DIR")
-        .env_remove("CARGO_BUILD_BUILD_DIR")
+    let output = hermetic_cargo(manifest_dir, &target_dir)
         .args(subcommand.args())
         .output()
         .map_err(|error| error.to_string())?;

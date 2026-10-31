@@ -1,6 +1,5 @@
 //! Capability-scoped build-fixture helpers for integration tests.
 
-use std::process::Command;
 use std::time::{Duration, SystemTime};
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -9,6 +8,7 @@ use filetime::FileTime;
 use theoremc_core::schema::StrNewtype;
 
 use super::ExpectedFragment;
+use super::hermetic_cargo::hermetic_cargo;
 
 /// Source for the repository build script copied into fixture crates.
 pub const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
@@ -221,13 +221,8 @@ impl FixtureCrate {
     /// Returns the combined Cargo output when the command fails or cannot be
     /// executed.
     pub fn cargo_build_log(&self) -> Result<BuildLog, String> {
-        let target_dir = self.manifest_dir.join("target");
-        // Read back from `target/debug/build`: own the dirs, whatever is exported.
-        let output = Command::new("cargo")
-            .current_dir(&self.manifest_dir)
-            .env("CARGO_TARGET_DIR", target_dir.as_str())
-            .env_remove("CARGO_BUILD_TARGET_DIR")
-            .env_remove("CARGO_BUILD_BUILD_DIR")
+        // Read back from `target/debug/build`, so the fixture owns its target.
+        let output = hermetic_cargo(&self.manifest_dir, &self.manifest_dir.join("target"))
             .args(["build", "-vv", "--color", "never"])
             .output()
             .map_err(|error| error.to_string())?;
