@@ -93,6 +93,11 @@ pub(crate) fn cargo_run_output(
     let output = Command::new("cargo")
         .current_dir(manifest_dir)
         .env("CARGO_TARGET_DIR", target_dir.as_str())
+        // An inherited `CARGO_BUILD_TARGET_DIR` or `CARGO_BUILD_BUILD_DIR`
+        // would put the fixture's artefacts, or its build-directory lock,
+        // somewhere shared with the caller or with other fixtures.
+        .env_remove("CARGO_BUILD_TARGET_DIR")
+        .env_remove("CARGO_BUILD_BUILD_DIR")
         .args(subcommand.args())
         .output()
         .map_err(|error| error.to_string())?;

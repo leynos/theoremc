@@ -221,8 +221,16 @@ impl FixtureCrate {
     /// Returns the combined Cargo output when the command fails or cannot be
     /// executed.
     pub fn cargo_build_log(&self) -> Result<BuildLog, String> {
+        let target_dir = self.manifest_dir.join("target");
+        // The fixture build is read back from `target/debug/build`, so it must
+        // own its target and build directories whatever the caller exports:
+        // a CI or developer `CARGO_TARGET_DIR` would move the artefacts, and
+        // two fixtures sharing a build directory would block on its lock.
         let output = Command::new("cargo")
             .current_dir(&self.manifest_dir)
+            .env("CARGO_TARGET_DIR", target_dir.as_str())
+            .env_remove("CARGO_BUILD_TARGET_DIR")
+            .env_remove("CARGO_BUILD_BUILD_DIR")
             .args(["build", "-vv", "--color", "never"])
             .output()
             .map_err(|error| error.to_string())?;
