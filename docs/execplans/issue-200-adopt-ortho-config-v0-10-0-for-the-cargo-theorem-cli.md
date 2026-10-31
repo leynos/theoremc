@@ -138,8 +138,9 @@ published as a draft pull request.
 - [x] (2026-10-31) Adopt `serde-saphyr` 2.0.0, raise every workspace package
   to Rust 1.89, simplify `make msrv` and CI to one workspace check, and record
   ADR-010.
-- [ ] Run the sequential gates for the assessment repair and serde-saphyr/MSRV
-  candidate, publish it, and obtain candidate-bound assessment confirmation
+- [x] (2026-10-31) Run the sequential gates for the assessment repair and
+  serde-saphyr/MSRV candidate; the gate set passed on commit `5fc2a5f`.
+- [ ] Publish the candidate and obtain candidate-bound assessment confirmation
   before readiness.
 
 M2 implementation is now present in the working tree: the dedicated package,
@@ -1028,6 +1029,10 @@ that gate before proceeding. Never discard unrelated changes.
   instead of holding 1.1.0 to keep the Rust 1.88 library floor. All workspace
   packages now declare Rust 1.89; `make msrv` and CI run one
   `cargo +1.89 check --workspace`. ADR-010 records the decision and supersedes
-  ADR-009's mixed-MSRV clauses. That check passed after the lockfile moved to
-  `serde-saphyr` 2.0.0 and `granit-parser` 2.0.0. Full sequential gates remain
-  pending.
+  ADR-009's mixed-MSRV clauses. The full sequential gate set passed on
+  committed tree `5fc2a5f`: formatting, Markdown, Mermaid, lint, typecheck,
+  workflow contracts, agent-native policy, MSRV, 884 tests, build, release, and
+  Makefile validation. The 1.85 negative control failed with `serde-saphyr`
+  2.0.0 and `theoremc-core` requiring Rust 1.89. Logs use the `issue-200-msrv`
+  suffix under `/tmp`. Publishing the candidate and its candidate-bound
+  assessment remain pending.
