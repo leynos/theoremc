@@ -184,39 +184,49 @@ fn lower_theorem_value(
         TheoremValue::Float(f) => lower_literal(param_name, &LiteralValue::Float(*f)),
         TheoremValue::String(s) => lower_literal(param_name, &LiteralValue::String(s.clone())),
         TheoremValue::Sequence(elements) => lower_sequence(param_name, elements),
-        TheoremValue::Mapping(fields) => {
-            // Attempt sentinel decoding first: maps like { ref: graph } or
-            // { literal: "x" } are valid nested values that decode into
-            // ArgValue::Reference or ArgValue::Literal respectively.
-            let decoded =
-                decode_arg_value(ParamName::new(param_name), value.clone()).map_err(|e| {
-                    LoweringError::NestedDecodeError {
-                        param: param_name.to_owned(),
-                        detail: e.to_string(),
-                    }
-                })?;
-            match decoded {
-                ArgValue::Literal(lit) => lower_literal(param_name, &lit),
-                ArgValue::Reference(name) => lower_reference(param_name, &name),
-                // Non-sentinel maps lack the type information needed for
-                // struct literal synthesis at this nesting depth. Phase 3
-                // compile-time type probes will enable field-type
-                // introspection. For now, use explicit let-bindings.
-                ArgValue::RawMap(_) => Err(LoweringError::UnsupportedType {
-                    param: param_name.to_owned(),
-                    reason: format!(
-                        "nested map with keys {:?} requires type information that is not \
-                         available without compile-time field type probes (Phase 3); \
-                         use explicit let-bindings for nested struct construction",
-                        fields.keys().collect::<Vec<_>>()
-                    ),
-                }),
-                // Sequences inside a decoded mapping cannot occur (a
-                // sentinel map has exactly one scalar value), but handle
-                // the variant exhaustively.
-                ArgValue::RawSequence(elements) => lower_sequence(param_name, &elements),
-            }
+        TheoremValue::Mapping(fields) => lower_nested_mapping(param_name, value, fields),
+    }
+}
+
+/// Lowers a mapping that appears inside a sequence or another map.
+///
+/// The mapping is first decoded via [`decode_arg_value`], so sentinel
+/// wrappers (`{ ref: graph }`, `{ literal: "x" }`) become references or
+/// literals. Any other map is rejected with `LoweringError::UnsupportedType`.
+fn lower_nested_mapping(
+    param_name: &str,
+    value: &TheoremValue,
+    fields: &IndexMap<String, TheoremValue>,
+) -> Result<TokenStream, LoweringError> {
+    // Attempt sentinel decoding first: maps like { ref: graph } or
+    // { literal: "x" } are valid nested values that decode into
+    // ArgValue::Reference or ArgValue::Literal respectively.
+    let decoded = decode_arg_value(ParamName::new(param_name), value.clone()).map_err(|e| {
+        LoweringError::NestedDecodeError {
+            param: param_name.to_owned(),
+            detail: e.to_string(),
         }
+    })?;
+    match decoded {
+        ArgValue::Literal(lit) => lower_literal(param_name, &lit),
+        ArgValue::Reference(name) => lower_reference(param_name, &name),
+        // Non-sentinel maps lack the type information needed for
+        // struct literal synthesis at this nesting depth. Phase 3
+        // compile-time type probes will enable field-type
+        // introspection. For now, use explicit let-bindings.
+        ArgValue::RawMap(_) => Err(LoweringError::UnsupportedType {
+            param: param_name.to_owned(),
+            reason: format!(
+                "nested map with keys {:?} requires type information that is not \
+                 available without compile-time field type probes (Phase 3); \
+                 use explicit let-bindings for nested struct construction",
+                fields.keys().collect::<Vec<_>>()
+            ),
+        }),
+        // Sequences inside a decoded mapping cannot occur (a
+        // sentinel map has exactly one scalar value), but handle
+        // the variant exhaustively.
+        ArgValue::RawSequence(elements) => lower_sequence(param_name, &elements),
     }
 }
 

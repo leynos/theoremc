@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint typecheck fmt check-fmt markdownlint nixie test-workflow-contracts
+.PHONY: help all clean test build release lint lint-whitaker typecheck fmt check-fmt markdownlint nixie test-workflow-contracts
 
 
 TARGET ?= theoremc
@@ -6,6 +6,7 @@ TARGET ?= theoremc
 export PATH := $(HOME)/.cargo/bin:$(HOME)/.bun/bin:$(PATH)
 
 CARGO ?= cargo
+WHITAKER ?= whitaker
 BUILD_JOBS ?=
 RUST_FLAGS ?= -D warnings
 RUSTDOC_FLAGS ?= -D warnings
@@ -61,9 +62,12 @@ test: ## Run tests with warnings treated as errors
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(if $(findstring release,$(@)),RUSTFLAGS="$${RUSTFLAGS-}",RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)") $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)
 
-lint: ## Run Clippy with warnings denied
+lint: lint-whitaker ## Run rustdoc, Clippy and the Whitaker suite with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) doc --no-deps
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
+
+lint-whitaker: ## Run the Whitaker Dylint suite through its wrapper with warnings denied
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" DYLINT_RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 typecheck: ## Run type checking for all targets and features
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) check $(CARGO_FLAGS)
