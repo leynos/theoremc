@@ -40,7 +40,12 @@
 - [Architecture Decision Record (ADR) 009: OrthoConfig CLI
   configuration](adr-009-ortho-config-cli-configuration.md)
   - Decision record for the application-only configuration boundary, source
-    precedence, profile support, and mixed MSRV.
+    precedence, and profile support; its mixed-MSRV boundary is superseded by
+    ADR-010.
+- [Architecture Decision Record (ADR) 010: reusable-library MSRV for
+  serde-saphyr 2.0](adr-010-reusable-library-msrv-rust-1-89.md)
+  - Decision record for adopting serde-saphyr 2.0.0 and raising every
+    workspace package to Rust 1.89.
 - [Request for Comments (RFC) 0001: semantic law templates over composable
   primaries](rfcs/0001-semantic-law-templates.md)
   - Accepted proposal for schema version 2 structured laws, composable

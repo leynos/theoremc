@@ -354,10 +354,10 @@ Out of scope: theorem execution and project mutation.
   global settings (including explicit `--config`), profiles reject command
   namespaces as required by v0.10.0, and generated recursive metadata matches
   the Clap command tree. Signposts: `CLI-DES`, `ADR9`.
-- [x] Establish the mixed-MSRV policy required by `ortho_config` 0.10.0: retain
-  Rust 1.88 for library packages and declare Rust 1.89 for `cargo-theorem`.
-  Acceptance: CI tests the library workspace excluding the CLI on 1.88 and the
-  CLI package on 1.89. Signposts: `CLI-DES`.
+- [x] Declare Rust 1.89 for every workspace package: `cargo-theorem` requires
+  it for `ortho_config` 0.10.0, and the reusable libraries require it for
+  `serde-saphyr` 2.0.0. Acceptance: CI runs one Rust 1.89 workspace check.
+  Signposts: `CLI-DES`, `ADR9`, `ADR10`.
 - [ ] Implement the versioned JSON application envelope, stdout/stderr stream
   invariants, stable exit classes, and global renderer options. Acceptance:
   snapshots cover success and failure for human and JSON modes, and subprocess

@@ -10,10 +10,10 @@ Status: IN PROGRESS
 Build the planned `cargo theorem` configuration foundation on the published
 `ortho_config` 0.10.0 release. Users will have a dedicated Cargo subcommand
 package with the established configuration contract, while reusable theoremc
-libraries keep their Rust 1.88 minimum and remain independent of application
-configuration. The issue is complete when the exact candidate passes the local
-quality gates, receives a clear CodeRabbit review, and is published as a draft
-pull request.
+libraries remain independent of application configuration and share the
+workspace's Rust 1.89 floor. The issue is complete when the exact candidate
+passes the local quality gates, receives a clear CodeRabbit review, and is
+published as a draft pull request.
 
 ## Constraints
 
@@ -21,7 +21,9 @@ pull request.
   `38812c563e3953a490e3efc202609f37e21a0517`.
 - Keep OrthoConfig and process configuration in `crates/cargo-theorem`; do not
   add them to `theoremc-core`, `theoremc-macros`, or the `theoremc` facade.
-- Keep reusable packages at Rust 1.88. `cargo-theorem` may require Rust 1.89.
+- Declare Rust 1.89 for every workspace package. `cargo-theorem` requires it
+  for OrthoConfig, and the reusable libraries require it for `serde-saphyr`
+  2.0.0 (ADR-010).
 - Keep OrthoConfig default features enabled. Do not use unreleased APIs.
 - Follow roadmap Phase 3.1; do not implement backend, proof-run, project-edit,
   or other later command handlers in this change.
@@ -34,7 +36,8 @@ pull request.
 - Scope: if the implementation requires changes outside the CLI foundation,
   its governing docs, workspace manifests, CI, and tests, stop and reassess.
 - Interface: if a reusable library API or its MSRV must change, stop and record
-  the conflict before editing it.
+  the conflict before editing it. The user-approved MSRV increase to Rust 1.89
+  is recorded in ADR-010.
 - Dependencies: only `ortho_config` 0.10.0 and dependencies directly needed by
   the application foundation are in scope; keep default features enabled.
 - Compatibility: do not add aliases or fallbacks for configuration names not
@@ -49,9 +52,9 @@ pull request.
   use the imported v0.10.0 users' guide and exercise the real derive/API
   boundary in tests.
 - Risk: the shared lockfile may select transitive dependencies newer than the
-  library MSRV. Severity: high. Likelihood: medium. Mitigation: run the
-  separate Rust 1.88 library check and Rust 1.89 CLI check; do not hide
-  failures with flags that bypass MSRV validation.
+  workspace MSRV. Severity: high. Likelihood: medium. Mitigation: run the
+  workspace-wide Rust 1.89 check; do not hide failures with flags that bypass
+  MSRV validation.
 - Risk: imported upstream Markdown may conflict with repository formatting.
   Severity: medium. Likelihood: medium. Mitigation: preserve its bytes and
   restore imported files after any formatter attempt; report a deterministic
@@ -132,8 +135,12 @@ pull request.
   an end-to-end regression that executes the emitted context path.
 - [x] Reconcile CONFIG-WORKSPACE with step 3.1.1's standalone context contract
   and defer nested-workspace resolution and its root/member fixture to 3.1.2.
-- [ ] Run the sequential gates for the assessment repair, publish it, and
-  obtain candidate-bound assessment confirmation before readiness.
+- [x] (2026-10-31) Adopt `serde-saphyr` 2.0.0, raise every workspace package
+  to Rust 1.89, simplify `make msrv` and CI to one workspace check, and record
+  ADR-010.
+- [ ] Run the sequential gates for the assessment repair and serde-saphyr/MSRV
+  candidate, publish it, and obtain candidate-bound assessment confirmation
+  before readiness.
 
 M2 implementation is now present in the working tree: the dedicated package,
 Cargo entry wrapper, OrthoConfig configuration model, selected-command adapter,
@@ -388,6 +395,13 @@ latest formatting command passed; restart the complete gate sequence.
   separate Fluent runtime. Rationale: the released facade already re-exports
   the v0.10.0 localization runtime; the library code has no current Fluent
   implementation to replace. Date/Author: 2026-10-26, Codex under issue #200.
+- Decision: adopt `serde-saphyr` 2.0.0 and raise every workspace package to
+  Rust 1.89, superseding the Rust 1.88 library floor recorded above. Rationale:
+  2.0.0 is the current parser release and declares Rust 1.89; keeping 1.1.0
+  pinned would preserve a split MSRV that the application package already
+  exceeds, solely to hold back the parser. OrthoConfig remains
+  application-only. Recorded in ADR-010. Date/Author: 2026-10-31, user-directed
+  under issue #200.
 - Decision: use the accepted CLI policy: `THEOREMC_*`, `theoremc.toml` at the
   Cargo workspace root, explicit `--config` selection, TOML, defaults < files <
   named profile < environment < explicit CLI values for global settings, and
@@ -561,11 +575,12 @@ reported zero findings; the review log is
 
 The CLI is planned in `docs/cargo-theorem-cli-design.md`; its foundation is
 Phase 3.1 in `docs/roadmap.md`. The current workspace has the `theoremc` facade,
-`theoremc-core`, `theoremc-macros`, build support, and test helpers, all with
-Rust 1.88. `src/main.rs` is only a greeting placeholder. The new application
-package belongs at `crates/cargo-theorem/` and owns command parsing,
-configuration types, source loading, application error handling, and the
-composition root. Domain crates remain inward-facing and configuration-free.
+`theoremc-core`, `theoremc-macros`, build support, and test helpers, all now
+sharing the workspace's Rust 1.89 MSRV. `src/main.rs` is only a greeting
+placeholder. The new application package belongs at `crates/cargo-theorem/` and
+owns command parsing, configuration types, source loading, application error
+handling, and the composition root. Domain crates remain inward-facing and
+configuration-free.
 
 The imported guides are `docs/ortho-config/users-guide.md` and
 `docs/ortho-config/v0-10-0-migration-guide.md`. Their source is the
@@ -579,10 +594,11 @@ The imported guides are `docs/ortho-config/users-guide.md` and
   configuration policy (REQ-3), integrate (REQ-4), verify (REQ-5), document and
   deliver a draft PR (REQ-6).
 - `docs/cargo-theorem-cli-design.md` §4–§6 and §19: application boundary,
-  external-subcommand shape, mixed MSRV, config discovery and precedence.
+  external-subcommand shape, workspace MSRV, config discovery and precedence.
 - `docs/roadmap.md` step 3.1.1: package, command metadata, configuration,
-  split MSRV, direct/Cargo invocation, and base output contracts. Step 3.1.2
-  owns Cargo workspace/package discovery and its nested-workspace fixtures.
+  workspace MSRV, direct/Cargo invocation, and base output contracts. Step
+  3.1.2 owns Cargo workspace/package discovery and its nested-workspace
+  fixtures.
 - `docs/adr-002-library-first-internationalization-and-localization-with-fluent.md`:
   keep localization ownership at the application boundary.
 - Repository instructions in `AGENTS.md`: Rust, documentation, test, commit,
@@ -639,10 +655,14 @@ Trace links:
   tests with an isolated environment. Artefact: binary integration tests.
   Negative control: force a parse error through the config-error branch and
   require the status/stream assertion to fail.
-- Obligation MSRV: application-only dependencies do not raise library MSRV.
-  Method: `RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem`
-  and `RUSTFLAGS="" cargo +1.89 check -p cargo-theorem`. Non-vacuity: both
-  commands must compile actual package targets.
+- Obligation MSRV: every workspace package compiles on Rust 1.89 with
+  `serde-saphyr` 2.0.0 and OrthoConfig 0.10.0 resolved. Method:
+  `RUSTFLAGS="" cargo +1.89 check --workspace`. Non-vacuity: the command must
+  compile the facade, `theoremc-core`, `theoremc-macros`, build support, test
+  helpers, and `cargo-theorem`. Negative control:
+  `RUSTFLAGS="" cargo +1.85 check -p theoremc-core` must fail because the
+  package declares Rust 1.89, showing the gate rejects a toolchain below the
+  floor. The retired 1.88 channel is not required for the control.
 - Third-party axioms: treat the v0.10.0 OrthoConfig APIs as documented; exercise
   the repository-owned derive, source-injection, profile, and Clap integration
   against the real dependency. No third-party internals are re-proved.
@@ -667,8 +687,8 @@ using default features, application-owned config and command types, the Cargo
 external-subcommand wrapper, and injected-source tests. Remove the root
 placeholder binary as prescribed by the CLI design. Do not add operational
 backend or project-mutation commands. Run formatting, lint, typecheck, tests,
-and split MSRV checks sequentially; commit and obtain CodeRabbit review before
-the final docs/delivery milestone.
+and the workspace MSRV check sequentially; commit and obtain CodeRabbit review
+before the final docs/delivery milestone.
 
 ### EP-M3: reconcile and deliver
 
@@ -687,9 +707,10 @@ link in the terminal `## References` section. Do not merge.
   Compatibility decision: none; no `cargo theorem` CLI shipped at baseline.
 - EP-M2 outcome: dedicated application package consumes v0.10.0 and validates
   configuration without contaminating reusable crates. Acceptance: focused and
-  binary tests plus split MSRV checks pass. Recovery: revert the application
-  package and restore the placeholder binary as one commit. Remaining gaps:
-  future CLI handlers. Compatibility decision: none; the package is new.
+  binary tests plus the workspace MSRV check pass. Recovery: revert the
+  application package and restore the placeholder binary as one commit.
+  Remaining gaps: future CLI handlers. Compatibility decision: none; the
+  package is new.
 - EP-M3 outcome: documented, reviewed, pushed draft PR. Acceptance: all local
   gates pass, CodeRabbit concerns are clear, remote head equals local `HEAD`,
   PR is draft, and references are present. Recovery: amend and re-run gates on
@@ -726,8 +747,8 @@ peeled commit: 38812c563e3953a490e3efc202609f37e21a0517
   stream. Machine-readable output contains no localized prose.
 - Run `make check-fmt`, `make markdownlint`, `make nixie`, `make lint`,
   `make typecheck`, and `make test` sequentially, with output logs under
-  `/tmp`. Also run both split MSRV checks. Record actual outcomes; do not infer
-  a pass.
+  `/tmp`. Also run the workspace MSRV check. Record actual outcomes; do not
+  infer a pass.
 
 ## Idempotence and recovery
 
@@ -1003,3 +1024,10 @@ that gate before proceeding. Never discard unrelated changes.
   regression, and assigns nested-workspace discovery evidence to roadmap step
   3.1.2. The sequential gates and candidate-bound confirmation remain pending;
   no new formal proof is introduced by this repair.
+- 2026-10-31: User-directed dependency decision: adopt `serde-saphyr` 2.0.0
+  instead of holding 1.1.0 to keep the Rust 1.88 library floor. All workspace
+  packages now declare Rust 1.89; `make msrv` and CI run one
+  `cargo +1.89 check --workspace`. ADR-010 records the decision and supersedes
+  ADR-009's mixed-MSRV clauses. That check passed after the lockfile moved to
+  `serde-saphyr` 2.0.0 and `granit-parser` 2.0.0. Full sequential gates remain
+  pending.
