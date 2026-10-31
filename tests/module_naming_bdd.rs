@@ -21,7 +21,7 @@ fn then_each_path_produces_the_expected_module_name() {
         );
         assert_eq!(m.hash(), *expected_hash, "hash mismatch for {path}");
 
-        let expected_name = format!("__theoremc__file__{expected_mangled}__{expected_hash}",);
+        let expected_name = format!("__theoremc__file__{expected_mangled}__{expected_hash}");
         assert_eq!(
             m.module_name(),
             expected_name,

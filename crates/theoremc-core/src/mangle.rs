@@ -99,6 +99,13 @@ impl AsRef<str> for CanonicalActionName {
     }
 }
 
+impl std::str::FromStr for CanonicalActionName {
+    type Err = InvalidCanonicalActionName;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s)
+    }
+}
+
 impl TryFrom<&str> for CanonicalActionName {
     type Error = InvalidCanonicalActionName;
     fn try_from(s: &str) -> Result<Self, Self::Error> {

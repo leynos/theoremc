@@ -1,4 +1,4 @@
-error[E0433]: failed to resolve: could not find `old` in the crate root
+error[E0433]: cannot find `old` in the crate root
   --> tests/expand/moved_referenced_type.rs:11:1
    |
 11 | theorem_file!("tests/expand/moved_referenced_type.theorem");

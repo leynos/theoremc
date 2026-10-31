@@ -230,7 +230,7 @@ fn format_duplicate_theorem_key_summary(
 }
 
 fn render_duplicate_location(source: &SourceId, location: DuplicateTheoremLocation) -> String {
-    format!("{}:{}:{}", source.as_str(), location.line, location.column,)
+    format!("{}:{}:{}", source.as_str(), location.line, location.column)
 }
 
 fn attach_decode_failure_diagnostic(

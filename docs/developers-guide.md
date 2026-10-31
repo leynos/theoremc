@@ -653,3 +653,8 @@ pinned `nightly-2026-01-30` (measured 2026-10-02): four tests fail under LLVM
 on this host as well and one more under Cranelift, so the suite is not shown to
 pass under it. Revisit on the next toolchain bump: measure the whole suite
 under the backend, with CI's environment, and adopt it if every test passes.
+
+The pinned toolchain is now `nightly-2026-10-30`. No measurement has been taken
+on it, so the exception stands on the 2026-10-02 result; the whole suite is
+re-measured under both backends in the next build-standard change for this
+repository.
