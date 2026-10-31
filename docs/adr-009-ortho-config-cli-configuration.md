@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted. Keep configuration and the agent-context bridge in the
-`cargo-theorem` application package, requiring Rust 1.89 while reusable crates
-retain Rust 1.88.
+Accepted. The application-only configuration boundary, discovery and precedence
+rules, profile support, and command metadata decisions remain in force. Its
+mixed-MSRV boundary was superseded on 2026-10-31 by
+[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md).
 
 ## Date
 
@@ -44,15 +45,17 @@ runtime to convert generated command documentation into the shipped
 agent-context schema; it is not a test-only or policy-check dependency. Both
 releases declare Rust 1.89.0, so the application package declares that MSRV.
 The root facade, `theoremc-core`, `theoremc-macros`, and build-support crates
-remain configuration-free and retain Rust 1.88. CI and local validation check
-the library workspace on Rust 1.88 and the application package on Rust 1.89.
+remained configuration-free and retained Rust 1.88, with CI and local
+validation checking the library workspace on Rust 1.88 and the application
+package on Rust 1.89. ADR-010 retires that floor and moves every package to
+Rust 1.89; the configuration-boundary decision in this section is unchanged.
 
 The CLI uses the OrthoConfig facade's Fluent APIs. Reusable libraries do not
-adopt a direct `ortho_l10n` dependency for this change and do not raise their
-MSRV. Their localization boundary remains the injected, library-owned
-`Localizer` contract from ADR-002. If a library later needs an independent
-Fluent runtime, that dependency and its MSRV impact require a separate
-compatibility decision.
+adopt a direct `ortho_l10n` dependency, and their Rust 1.89 floor comes from
+ADR-010 rather than localization. Their localization boundary remains the
+injected, library-owned `Localizer` contract from ADR-002. If a library later
+needs an independent Fluent runtime, that dependency and its MSRV impact
+require a separate compatibility decision.
 
 ### 2. Define file discovery and precedence
 
@@ -141,9 +144,11 @@ check against the CLI package; it does not infer behaviour from command names.
 ## Consequences
 
 - The application package has a separate Rust 1.89 MSRV; reusable consumers
-  remain on Rust 1.88.
+  remain on Rust 1.88. ADR-010 retires this split and moves every package to
+  Rust 1.89.
 - The workspace lockfile contains the CLI's OrthoConfig dependency graph, but
-  the library package check must still succeed on Rust 1.88.
+  the library package check must still succeed on Rust 1.88. ADR-010 replaces
+  that check with one workspace-wide Rust 1.89 check.
 - Configuration loading is testable without process-global environment
   mutation by using OrthoConfig's `_with_sources` entry points and `MapEnv`.
 - `context --json` skips implicit settings and file discovery because it emits

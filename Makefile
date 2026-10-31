@@ -49,9 +49,8 @@ test-workflow-contracts: ## Check the CV-005 CodeScene workflow contracts
 check-agent-native: ## Check OrthoConfig agent-native command policy
 	cargo orthohelp --check-agent-native --package cargo-theorem
 
-msrv: ## Check library and application minimum supported Rust versions
-	RUSTFLAGS="" $(CARGO) +1.88 check --workspace --exclude cargo-theorem
-	RUSTFLAGS="" $(CARGO) +1.89 check -p cargo-theorem
+msrv: ## Check the workspace minimum supported Rust version
+	RUSTFLAGS="" $(CARGO) +1.89 check --workspace
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary

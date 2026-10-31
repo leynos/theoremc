@@ -21,9 +21,9 @@ jobs:
         uses: leynos/shared-actions/.github/actions/setup-rust@0f3047d45d1371d8ae700c69e7bed42c4f8862a1
         with:
           install-mold: 'true'
-      - name: Install supported MSRV toolchains
-        # Keep these minor channels current rather than caching stale patches.
-        run: rustup toolchain install 1.88 1.89 --profile minimal
+      - name: Install the supported MSRV toolchain
+        # Keep this minor channel current rather than caching stale patches.
+        run: rustup toolchain install 1.89 --profile minimal
       - name: Cache cargo-orthohelp binary
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
         with:
@@ -56,7 +56,7 @@ jobs:
         run: make lint
       - name: Typecheck
         run: make typecheck
-      - name: Check minimum Rust versions
+      - name: Check minimum Rust version
         run: make msrv
       - name: Check agent-native command policy
         run: make check-agent-native

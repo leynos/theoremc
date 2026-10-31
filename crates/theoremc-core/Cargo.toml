@@ -2,15 +2,14 @@
 name = "theoremc-core"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 
 [features]
 test-support = []
 
 [dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
-# Keep the locked parser release compatible with the library's Rust 1.88 MSRV.
-serde-saphyr = "1.1.0"
+serde-saphyr = "2.0.0"
 indexmap = { version = "2.13.0", features = ["serde"] }
 thiserror = "2.0.18"
 syn = { version = "3.0.3", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }

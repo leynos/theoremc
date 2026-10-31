@@ -254,10 +254,15 @@ depend directly on private implementation details such as
 
 ### 3.1 Rust toolchain policy
 
-The workspace minimum supported Rust version (MSRV) is Rust 1.88, declared via
-the root `Cargo.toml` `rust-version` field. This floor permits the use of let
-chains in conditionals while keeping the compiler requirement explicit for
-contributors and downstream automation.
+The workspace minimum supported Rust version (MSRV) is Rust 1.89, declared via
+the root `Cargo.toml` `rust-version` field and repeated in each workspace
+package. This floor is required by `serde-saphyr` 2.0.0 and `ortho_config`
+0.10.0; it also permits the use of let chains in conditionals. The decision to
+raise the reusable libraries from Rust 1.88 is recorded in
+[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md). The `msrv` target checks
+library and binary targets; test-only dependencies are outside the MSRV
+contract because the current `rstest-bdd` stack resolves a `cargo-platform`
+release that requires a newer toolchain.
 
 ### 3.2 Quality gates
 
@@ -541,16 +546,16 @@ configuration types, dispatch, application rendering, and exit-code mapping.
 Reusable theorem, project, execution, and report services remain in library
 packages rather than moving into the CLI.
 
-The `cargo-theorem` package uses `ortho_config` and `cargo-orthohelp` 0.10.0
-and requires Rust 1.89. The CLI's `agent_context.rs` calls cargo-orthohelp at
-runtime to convert generated command metadata into the agent-context schema.
-Keep both dependencies in the application package. The facade, `theoremc-core`,
-`theoremc-macros`, and build-support crates remain on Rust 1.88 and do not
-depend on application configuration. CI keeps these split checks:
+The `cargo-theorem` package uses `ortho_config` and `cargo-orthohelp` 0.10.0.
+The CLI's `agent_context.rs` calls cargo-orthohelp at runtime to convert
+generated command metadata into the agent-context schema. Keep both
+dependencies in the application package. The facade, `theoremc-core`,
+`theoremc-macros`, and build-support crates remain configuration-free and do
+not depend on application configuration, but every package now declares the
+same Rust 1.89 MSRV. CI and local validation run one workspace check:
 
 ```console
-RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem
-RUSTFLAGS="" cargo +1.89 check -p cargo-theorem
+RUSTFLAGS="" cargo +1.89 check --workspace
 ```
 
 The empty `RUSTFLAGS` matters: repository Cargo configuration carries the

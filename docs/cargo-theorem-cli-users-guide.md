@@ -26,19 +26,15 @@ in place:
 - Rust, installed through [Rustup](https://rustup.rs/), at a version that
   satisfies the CLI's own minimum supported Rust version (MSRV).
 
-The CLI is its own package, `cargo-theorem`, and it declares its own MSRV. The
-CLI requires Rust 1.89 because `ortho_config` 0.10.0 requires it, while the
-theoremc library packages stay on Rust 1.88 until a separate compatibility
-decision raises theirs. Continuous integration (CI) tests the two contracts
-separately:
+The CLI is its own package, `cargo-theorem`, and it requires Rust 1.89 because
+`ortho_config` 0.10.0 requires it. The theoremc library packages also require
+Rust 1.89, because `serde-saphyr` 2.0.0 declares that floor;
+[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md) records the decision.
+Continuous integration (CI) tests the single workspace contract:
 
 ```console
-cargo +1.88 check --workspace --exclude cargo-theorem
-cargo +1.89 check -p cargo-theorem
+cargo +1.89 check --workspace
 ```
-
-Adding the CLI must not silently increase the compiler version required by
-theoremc library consumers, which is why the split is tested explicitly.
 
 ## Running the command
 

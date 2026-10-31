@@ -12,7 +12,7 @@ resolver = "2"
 name = "theoremc"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 
 [features]
 test-support = ["theoremc-core/test-support"]

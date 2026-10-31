@@ -741,8 +741,10 @@ ______________________________________________________________________
 
 ### 6.1 YAML parsing with `serde-saphyr`
 
-`theoremc-core` uses `serde-saphyr` to deserialize theorem documents into
-strongly typed Rust structs.
+`theoremc-core` uses `serde-saphyr` 2.0.0 to deserialize theorem documents into
+strongly typed Rust structs. That release declares Rust 1.89, which is also the
+workspace MSRV; [ADR-010](adr-010-reusable-library-msrv-rust-1-89.md) records
+the decision to raise the reusable libraries from Rust 1.88.
 
 Motivation: `serde-saphyr` is designed to be panic-free on malformed input and
 avoid unsafe code in the library layer, and it is built atop the `saphyr` YAML
@@ -1948,7 +1950,7 @@ reference (field-by-field) and the precise mangling rules for action names and
 harness names. The remaining work is mostly engineering.
 
 [^1]: <https://docs.rs/crate/serde-saphyr/latest?utm_source=chatgpt.com>
-      "serde-saphyr 0.0.7"
+      "serde-saphyr 2.0.0"
 [^2]: <https://model-checking.github.io/kani/reference/attributes.html?utm_source=chatgpt.com>
        "Attributes - The Kani Rust Verifier"
 [^3]: <https://docs.rs/serde-saphyr?utm_source=chatgpt.com> "serde_saphyr -

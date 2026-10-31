@@ -103,22 +103,21 @@ control, Cargo metadata, and report-delivery dependencies. The placeholder
 `src/main.rs` is removed when `cargo-theorem` lands so theoremc does not ship
 an unrelated `theoremc` executable beside the Cargo subcommand.
 
-### 4.2 Mixed minimum supported Rust version policy
+### 4.2 Workspace minimum supported Rust version policy
 
-At the time of this design, theoremc declares Rust 1.88 while `ortho_config` and
-`cargo-orthohelp` 0.10.0 declare Rust 1.89.0. The CLI package therefore
-declares Rust 1.89.0 and the library packages retain Rust 1.88 until a separate
-compatibility decision raises their minimum supported Rust version (MSRV).
+`serde-saphyr` 2.0.0, `ortho_config` 0.10.0, and `cargo-orthohelp` 0.10.0 all
+declare Rust 1.89.0. Every workspace package therefore declares Rust 1.89 as
+its minimum supported Rust version (MSRV).
+[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md) records raising the
+reusable libraries from Rust 1.88;
+[ADR-009](adr-009-ortho-config-cli-configuration.md) continues to keep the
+application's OrthoConfig dependencies outside the library packages.
 
-Continuous integration must test these contracts separately:
+Continuous integration tests the single contract:
 
 ```console
-RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem
-RUSTFLAGS="" cargo +1.89 check -p cargo-theorem
+RUSTFLAGS="" cargo +1.89 check --workspace
 ```
-
-A workspace-wide MSRV increase may replace this split later, but adding the CLI
-must not silently increase the compiler required by theoremc library consumers.
 
 ### 4.3 Retirement of `theoremd`
 
@@ -1466,9 +1465,9 @@ ships, then moves to maintenance-only status before archival.
 Implementation proceeds through vertical slices rather than building the entire
 command tree as empty scaffolding:
 
-1. Establish the `cargo-theorem` crate, mixed-MSRV CI, the OrthoConfig v0.10.0
-   configuration and profile spine, behaviour metadata, JSON protocol, and
-   `context --json`.
+1. Establish the `cargo-theorem` crate, workspace MSRV CI, the OrthoConfig
+   v0.10.0 configuration and profile spine, behaviour metadata, JSON protocol,
+   and `context --json`.
 2. Add Cargo workspace discovery plus read-only `list`, `get`, and `check`.
 3. Add mutation plans, `init`, theorem/action scaffolding, and build-script
    install/check/run/delete.
