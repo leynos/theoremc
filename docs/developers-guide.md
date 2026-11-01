@@ -302,7 +302,8 @@ where available, and run the direct Cargo invocations for specialized checks:
 | Tests                | `make test`                                                                                        | nextest test binaries plus Cargo doctests                                    |
 | Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                                         |
 | Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                                         |
-| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all` plus mdformat                                              |
+| Spelling             | `make spelling`                                                                                    | Regenerates `typos.toml`, then checks spelling and shared phrase corrections |
+| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all`, then mdtablefix and markdownlint-cli2 `--fix`             |
 
 When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 `make nixie` must also pass.
@@ -325,9 +326,9 @@ Cargo doctest pass for Rustdoc examples. It runs
 with options supported by cargo-nextest, and use `DOCTEST_FLAGS` for doctest
 scope.
 
-CI runs `make check-fmt`, `make lint`, `make typecheck`, and `make test`. A
-separate coverage measurement step precedes `make test` and installs
-`cargo-nextest`.
+CI runs `make check-fmt`, the markdownlint-cli2 action, `make spelling`,
+`make lint`, `make typecheck`, and `make test`. A separate coverage measurement
+step precedes `make test` and installs `cargo-nextest`.
 
 Capture long command output through `tee` with `set -o pipefail` to avoid
 losing truncated results:
@@ -335,6 +336,18 @@ losing truncated results:
 ```sh
 set -o pipefail; make lint | tee /tmp/make-lint.log
 ```
+
+#### The spelling gate
+
+`make spelling` runs the pinned `typos-config-builder gate`, which regenerates
+the tracked `typos.toml` from the live shared en-GB-oxendict dictionary on the
+`main` branch of `leynos/agent-helper-scripts`, merges the repository's
+`typos.local.toml`, and then runs Typos and the shared phrase corrections.
+Because the dictionary is live, `typos.toml` changes whenever shared policy
+changes; CI runs the gate rather than a drift check, and the regenerated file
+is committed. `typos.local.toml` holds narrow repository-specific exceptions
+only: exact or full-line patterns for identifiers and terms the policy cannot
+correct, never bare accepted words. Never edit `typos.toml` by hand.
 
 ### 3.3 Test conventions
 

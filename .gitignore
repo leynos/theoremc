@@ -12,3 +12,7 @@ rustc-ice-*.txt
 .vtcode/
 *.swo
 *~
+# The spelling gate's untracked cache of the shared dictionary and its refresh
+# metadata.
+.typos-oxendict-base.json
+.typos-oxendict-base.toml

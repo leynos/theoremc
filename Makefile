@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint lint-whitaker typecheck fmt check-fmt markdownlint nixie test-workflow-contracts check-agent-native msrv
+.PHONY: help all clean test build release lint lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv
 
 TARGET ?= cargo-theorem
 
@@ -91,6 +91,9 @@ markdownlint: ## Lint Markdown files
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
+
+spelling: ## Check spelling and shared phrase corrections
+	uv tool run --python 3.14 --from "git+https://github.com/leynos/typos-config-builder.git@v0.1.3" typos-config-builder gate --repository . --scope all
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \
