@@ -91,9 +91,13 @@ object lines before parsing because verbose build-script output can be
 interleaved on stdout. Tests cover source isolation, exact manifest/output
 selection, mixed Cargo output, malformed JSON, and the shared target contract.
 
-The branch was rebased onto fetched `origin/main` at `af76081`, using `c489e91`
-as the verified old-base boundary. All four branch commits were replayed. The
-target's reference-provenance guidance and the installed-Kani harness check
-remain intact. No test skip or timeout increase is part of the repair. The
-rebased candidate and the restored timeout changes still require all repository
-gates; validation remains pending until those gates finish successfully.
+The branch was rebased onto fetched `origin/main` at `2bb0251`, using `af76081`
+as the verified old-base boundary. All six branch commits were replayed. The
+target's `hermetic_cargo` helper is retained and now receives the workspace
+fixture target, so its removal of the caller's build-directory variables still
+applies while dependencies remain shared. The target's reference-provenance
+guidance and the installed-Kani harness check remain intact.
+
+No test skip or timeout increase is part of the repair. The rebased candidate
+`03e01f3` passed `make check-fmt`, `make typecheck`, `make lint`, `make test`
+(834 of 834 tests, including doctests), `make markdownlint`, and `make nixie`.
