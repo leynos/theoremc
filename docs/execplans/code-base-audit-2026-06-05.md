@@ -544,10 +544,26 @@ intentional public API or documentation change.
   `schema/raw_action_name_tests.rs`, leaving `raw.rs` at 362 lines. The new
   tests cover a valid document, an invalid `Actions` key, and an invalid
   `ActionCall.action` value, asserting the typed reason text at each boundary.
-- [ ] Milestone 4 implementation is complete, validated, reviewed, and
-  committed. The rebased candidate now carries `main`'s typed diagnostics plus
-  the retained branch repairs; deterministic gates pass, and the milestone
-  awaits local CodeRabbit review.
+- [x] 2026-11-01: Local `coderabbit review --agent` on candidate `0ad6bd8`
+  reported seven raw findings (five distinct; two exact duplicate pairs) and no
+  non-existent paths. All five were verified against source and repaired in
+  `9fb3559`: a gratuitous map destructuring in the collision property test, a
+  self-contradictory sentence in this plan's repository orientation, a
+  duplicated `## Project documentation` section in `AGENTS.md`, the
+  `initialisation` spelling in three documents, and
+  `RawActionCallDecodeError::param()` returning an empty breadcrumb so an
+  invalid action name fell back to the theorem header. The action-name fix
+  carries the new `invalid_action_names_locate_the_action_key` regression test,
+  which reported line 2 before the fix and line 7 after it.
+- [x] 2026-11-01: Post-repair gates passed on the repaired candidate:
+      `make fmt`, `make check-fmt`, `make markdownlint`, `make nixie`,
+      `make lint`,
+      `make typecheck`, and `make test` (`818 tests run: 818 passed, 0 skipped`
+      plus passing doctests).
+- [x] Milestone 4 implementation is complete, validated, reviewed, and
+  committed. The rebased candidate carries `main`'s typed diagnostics plus the
+  retained branch repairs, all deterministic gates pass, and the local review
+  findings are cleared.
 - [ ] Milestone 5 implementation is complete, validated, reviewed, and
   committed.
 - [ ] Milestone 6 implementation is complete, validated, reviewed, and
@@ -683,11 +699,11 @@ intentional public API or documentation change.
 
 ## Outcomes & Retrospective
 
-Milestones 1–3 are committed and their gates and local reviews passed. The
-branch has since been rebased onto `main` at `2bb0251`, where `main`'s landed
-typed validation diagnostics supersede the branch's original Milestone 4
-implementation. The rebased candidate carries `main`'s `ValidationFailure` /
+Milestones 1–4 are committed and their gates and local reviews passed. The
+branch was rebased onto `main` at `2bb0251`, where `main`'s landed typed
+validation diagnostics supersede the branch's original Milestone 4
+implementation; the rebased candidate now carries `main`'s `ValidationFailure` /
 `ValidationReasonKind` design plus the branch repairs `main` lacked, and it
-must pass candidate-bound gates and local review before M4 is accepted.
-Milestones 5–8 remain pending. The final outcome and proof inventory will be
-recorded after the final candidate gates.
+passed candidate-bound gates (818 nextest tests plus doctests) and local review
+with all findings cleared. Milestones 5–8 remain pending. The final outcome and
+proof inventory will be recorded after the final candidate gates.
