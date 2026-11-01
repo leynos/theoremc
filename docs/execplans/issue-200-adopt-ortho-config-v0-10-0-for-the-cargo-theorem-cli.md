@@ -1057,3 +1057,12 @@ that gate before proceeding. Never discard unrelated changes.
   Makefile keeps both the Whitaker and MSRV targets. PR #204's description
   still needs the corrected MSRV and dependency record, and the rebased
   candidate needs a fresh sequential gate run.
+- 2026-11-01: The rebased candidate's `make lint` gate failed on
+  `tests/common/hermetic_cargo_tests.rs`, a fixture regression file inherited
+  from `main` through PR #213. The helper returned `Option<Option<String>>`
+  (`clippy::option_option`) and rebound `value` in its inner closure
+  (`clippy::shadow_reuse`, denied workspace-wide). Commit `3b45828` replaces
+  the nested option with an `EnvState` enum that names the untouched, removed
+  and exported cases explicitly, and renames the closure binding. No assertion
+  changes meaning. The remaining gates must be re-run from `make lint` onward
+  against this commit.
