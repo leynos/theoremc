@@ -49,26 +49,25 @@ impl CargoGuard<'_> {
     }
 }
 
-/// Serializes all fixture `cargo` invocations.
+/// Serializes fixture Cargo commands within a libtest process.
 ///
 /// `cargo` writes lock files, registry caches, and incremental artefacts to
 /// paths derived from the manifest directory. When multiple fixture crates run
 /// `cargo build` concurrently they race on the shared `~/.cargo` registry
 /// cache and on any workspace-level `Cargo.lock`, producing spurious build
-/// failures even with isolated `CARGO_TARGET_DIR` values. A single global
-/// mutex is the minimal correct serialization mechanism for in-process test
-/// parallelism; the alternative--spawning each fixture in a fully isolated
-/// toolchain environment--would require per-test network access and is
-/// disproportionate for a test suite this size.
+/// failures even though every fixture builds into the shared warm target.
+/// Nextest's `nested-cargo-builds` group serializes these tests across
+/// processes; this mutex covers the libtest threads inside one process.
 pub(crate) static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
 
 /// Runs a Cargo subcommand in the fixture crate directory.
 ///
 /// `CARGO_TARGET_DIR` is set to the target directory every fixture shares, so
 /// third-party dependencies compile once per run; fixtures keep their own
-/// artefacts apart through unique package names. The caller must supply a [`CargoGuard`] proving that
-/// `FIXTURE_CARGO_LOCK` is held, because registry cache access and
-/// workspace-level lock files are still shared across invocations.
+/// artefacts apart through unique package names. The caller must supply a
+/// [`CargoGuard`] proving that `FIXTURE_CARGO_LOCK` is held, because registry
+/// cache access and workspace-level lock files are still shared across
+/// invocations.
 ///
 /// # Timeout
 ///
