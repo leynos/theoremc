@@ -12,8 +12,8 @@ mod __theoremc__file__theorems_snapshot__fd7e35d80da8 {
     pub(super) mod kani {
         #[kani::proof]
         #[kani::unwind(1)]
-        pub(crate) fn theorem__snapshot_thm__hXXXXXXXXXXXX() {}
+        pub(crate) fn theorem__snapshot_theorem__hXXXXXXXXXXXX() {}
     }
     #[cfg(kani)]
-    const _: [fn(); 1] = [kani::theorem__snapshot_thm__hXXXXXXXXXXXX];
+    const _: [fn(); 1] = [kani::theorem__snapshot_theorem__hXXXXXXXXXXXX];
 }

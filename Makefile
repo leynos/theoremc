@@ -57,7 +57,7 @@ release: target/release/$(TARGET) ## Build release binary
 
 all: check-fmt lint test test-workflow-contracts ## Perform a comprehensive check of code
 
-clean: ## Remove build artifacts
+clean: ## Remove build artefacts
 	$(CARGO) clean
 
 test: ## Run tests with warnings treated as errors

@@ -33,7 +33,7 @@ fn temp_config(contents: &str) -> Result<(tempfile::TempDir, PathBuf)> {
 struct GlobalCase {
     contents: &'static str,
     arguments: &'static [&'static str],
-    environment_color: Option<&'static str>,
+    environment_colour: Option<&'static str>,
     expected: &'static str,
 }
 
@@ -41,25 +41,25 @@ struct GlobalCase {
 #[case::file_over_default(GlobalCase {
     contents: "color = \"never\"\n",
     arguments: &[],
-    environment_color: None,
+    environment_colour: None,
     expected: "never",
 })]
 #[case::profile_over_file(GlobalCase {
     contents: "color = \"always\"\n[profile.ci]\ncolor = \"never\"\n",
     arguments: &["--profile", "ci"],
-    environment_color: None,
+    environment_colour: None,
     expected: "never",
 })]
 #[case::profile_and_environment(GlobalCase {
     contents: "color = \"always\"\n[profile.ci]\ncolor = \"never\"\n",
     arguments: &["--profile", "ci"],
-    environment_color: Some("always"),
+    environment_colour: Some("always"),
     expected: "always",
 })]
 #[case::cli_wins(GlobalCase {
     contents: "color = \"never\"\n",
     arguments: &["--color", "auto"],
-    environment_color: Some("always"),
+    environment_colour: Some("always"),
     expected: "auto",
 })]
 fn global_values_follow_defaults_files_profiles_environment_and_cli(
@@ -68,13 +68,13 @@ fn global_values_follow_defaults_files_profiles_environment_and_cli(
     let GlobalCase {
         contents,
         arguments,
-        environment_color,
+        environment_colour,
         expected,
     } = case;
     let (_directory, path) = temp_config(contents)?;
     let mut environment = MapEnv::new().with_var("THEOREMC_CONFIG_PATH", path.as_path());
-    if let Some(color) = environment_color {
-        environment = environment.with_var("THEOREMC_COLOR", color);
+    if let Some(colour) = environment_colour {
+        environment = environment.with_var("THEOREMC_COLOR", colour);
     }
     let source = Arc::new(environment);
     let mut args = vec![
@@ -87,7 +87,7 @@ fn global_values_follow_defaults_files_profiles_environment_and_cli(
     let loaded = GlobalOptions::load_with_sources(args, source.clone(), source.clone())?;
     ensure!(
         loaded.config().resolve()?.color == expected,
-        "expected color {expected}"
+        "expected colour {expected}"
     );
     Ok(())
 }
@@ -146,7 +146,7 @@ fn global_defaults_are_used_when_sources_omit_a_value() -> Result<()> {
     let loaded = GlobalOptions::load_with_sources(["cargo-theorem"], source.clone(), source)?;
     ensure!(
         loaded.config().resolve()?.color == "auto",
-        "omitted color must resolve to auto"
+        "omitted colour must resolve to auto"
     );
     Ok(())
 }
@@ -267,7 +267,7 @@ fn selected_namespace_rejects_unknown_keys() {
 #[rstest]
 #[case("color = \"sepia\"\n", "expected `auto`, `always`, or `never`")]
 #[case("unknown = true\n", "unknown field")]
-#[case("[cmds.contxt]\nlevel = 4\n", "unknown command namespace")]
+#[case("[cmds.nonexistent]\nlevel = 4\n", "unknown command namespace")]
 #[case(
     "[profile.ci]\ncmds = {}\n",
     "must not define the forbidden key 'cmds'"

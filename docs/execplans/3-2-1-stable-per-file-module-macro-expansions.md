@@ -218,7 +218,7 @@ Observable success:
 - 2026-04-10: snapshot testing should target a deterministic internal expansion
   helper rather than unstable shell tooling. Rationale: the acceptance
   criterion is stable macro expansion, not a specific external expansion
-  command, and existing repository practice already favors checked-in string
+  command, and existing repository practice already favours checked-in string
   snapshots.
 
 ## Outcomes & Retrospective

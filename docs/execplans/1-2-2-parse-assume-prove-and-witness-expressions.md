@@ -500,7 +500,7 @@ All steps are additive and re-runnable. No destructive operations. If a
 milestone fails, fix the issue and re-run
 `make check-fmt && make lint && make test` from the repo root.
 
-## Artifacts and notes
+## Artefacts and notes
 
 Key file paths (all relative to repo root):
 

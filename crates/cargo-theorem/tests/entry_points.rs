@@ -267,20 +267,20 @@ fn direct_invocation_without_the_theorem_token_is_a_usage_failure() -> Result<()
 fn missing_global_value_preserves_a_following_json_flag() -> Result<()> {
     let directory = tempfile::tempdir()?;
     let path = isolated_path(directory.path())?;
-    let missing_color_value = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+    let missing_colour_value = isolated_command(OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "context", "--color", "--json"])
         .output()?;
     ensure!(
-        missing_color_value.status.code() == Some(2),
+        missing_colour_value.status.code() == Some(2),
         "missing option value must keep exit 2"
     );
     ensure!(
-        missing_color_value.stdout.is_empty(),
+        missing_colour_value.stdout.is_empty(),
         "JSON parse failure must not use stdout"
     );
-    let missing_color_diagnostic: Value = serde_json::from_slice(&missing_color_value.stderr)?;
+    let missing_colour_diagnostic: Value = serde_json::from_slice(&missing_colour_value.stderr)?;
     ensure!(
-        missing_color_diagnostic
+        missing_colour_diagnostic
             .get("error")
             .and_then(|error| error.get("code"))
             .and_then(Value::as_str)

@@ -253,7 +253,7 @@ Create the `src/schema/` module tree:
         Mapping(IndexMap<String, TheoremValue>),
     }
 
-With a hand-written `impl<'de> serde::Deserialize<'de> for TheoremValue` that
+With a handwritten `impl<'de> serde::Deserialize<'de> for TheoremValue` that
 walks the YAML value types and rejects null.
 
 `src/schema/types.rs` — define all schema structs exactly following
@@ -436,7 +436,7 @@ milestone fails, fix the issue and re-run
 `make check-fmt && make lint && make test` from the repo root. The project can
 be reset to its initial state via `git checkout -- .` (all changes are tracked).
 
-## Artifacts and notes
+## Artefacts and notes
 
 Key file paths (all relative to repo root):
 

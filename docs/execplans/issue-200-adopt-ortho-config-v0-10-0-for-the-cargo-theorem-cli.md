@@ -273,7 +273,7 @@ Rust 1.89 application check when Cargo could not write two files under
 `/tmp/msrv-4589bf31-6003-42c5-b78f-652d6e7b79c1-issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli-m2-24.out`.
 Investigation found adequate free disk space and inodes, a healthy build-limit
 supervisor, no active Cargo or cleanup process in this worktree, and missing
-individual hashed artifact directories under otherwise populated targets. The
+individual hashed artefact directories under otherwise populated targets. The
 cause is not established. The focused M2-25 retry passed both Rust-version
 checks (717 seconds), followed by `make build`, `make release` (671 seconds),
 and `mbake validate Makefile`. The release build compiled successfully. Its
@@ -521,7 +521,7 @@ scrutineer run M2-22; logs are under `/tmp/` with the `m2-22` suffix. The first
 CodeRabbit review reported four findings, grouped into three underlying
 defects. All three are fixed. M2-24 passed all source gates other than the Rust
 1.89 application half of `make msrv`, which failed while writing target
-artifacts; M2-25 then passed both MSRV checks and the build, release,
+artefacts; M2-25 then passed both MSRV checks and the build, release,
 formatting, docs, Mermaid, and Makefile checks. The subsequent review of
 `8fd5082` found parse-error JSON, command-namespace validation, and imported-
 guide relative-link issues. M2-29 passed the full gate sequence after those
@@ -880,7 +880,7 @@ that gate before proceeding. Never discard unrelated changes.
 - 2026-10-26: M2-17 passed every gate except the Rust 1.88 library check. The
   pre-existing `serde-saphyr = "1.0.1"` caret requirement resolved to 1.3.0,
   whose declared floor is 1.89. Keep library MSRVs unchanged and resolve to a
-  release that compiles on 1.88; rerun the full gate sequence afterward.
+  release that compiles on 1.88; rerun the full gate sequence afterwards.
 - 2026-10-26: Updated the core crate's caret minimum to
   `serde-saphyr = "1.1.0"` and locked the workspace to 1.1.0, preserving the
   Rust 1.88 library policy. The MSRV gate must prove this release compiles

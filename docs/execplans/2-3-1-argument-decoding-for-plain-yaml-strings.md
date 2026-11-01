@@ -70,9 +70,9 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
 
 - Risk: The custom `Deserialize` for `TheoremValue` is used to build
   `ActionCall.args`. Changing the args type to `ArgValue` means serde must
-  deserialise YAML into `ArgValue` directly, or a post-deserialisation
+  deserialize YAML into `ArgValue` directly, or a post-deserialization
   conversion step is needed. Severity: high. Likelihood: certain (by design).
-  Mitigation: use a two-stage approach — serde deserialises into `TheoremValue`
+  Mitigation: use a two-stage approach — serde deserializes into `TheoremValue`
   in the raw layer as before, then a conversion function
   `decode_arg_value(param_name, value)` runs during the raw-to-public
   conversion step in `RawTheoremDoc::to_theorem_doc()`. Keep the helper
@@ -101,7 +101,7 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
   action types from the new module. Alternatively, the existing `LetBinding`,
   `Step`, and related types in `raw.rs` already use the public `ActionCall`
   directly (they are `use super::types::{...LetBinding, Step...}`). Instead of
-  duplicating all wrapper types, consider deserialising `ActionCall` with
+  duplicating all wrapper types, consider deserializing `ActionCall` with
   `TheoremValue` args via an intermediate serde approach, then converting in
   `to_theorem_doc()`. The preferred approach is: keep `raw.rs` importing the
   serde-compatible raw step/let types from a new `raw_action.rs` module.

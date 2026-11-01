@@ -129,7 +129,7 @@ fn manifest_dir_from_env_supports_expansion_from_valid_manifest_dir()
 #[test]
 fn expansion_snapshot_matches_golden_output() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = make_single_theorem_fixture(&TheoremSpec {
-        name: "SnapshotThm",
+        name: "SnapshotTheorem",
         about: "Snapshot coverage",
     });
     let path = Utf8Path::new("theorems/snapshot.theorem");

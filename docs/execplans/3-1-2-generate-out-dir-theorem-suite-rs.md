@@ -556,7 +556,7 @@ If a partial implementation breaks the crate, the recovery path is to revert
 the include wiring first, then the build-script generation call, returning the
 repository to the already-complete Step `3.1.1` state.
 
-## Artifacts and notes
+## Artefacts and notes
 
 The most important implementation artefacts should be:
 

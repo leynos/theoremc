@@ -1,4 +1,4 @@
-//! Shared parsing and canonicalisation for Rust type strings.
+//! Shared parsing and canonicalization for Rust type strings.
 
 use quote::ToTokens;
 use syn::{

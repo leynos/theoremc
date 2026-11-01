@@ -5,7 +5,7 @@
 
 This guide describes how to use the `cargo theorem` command-line interface
 (CLI). It covers the tasks a caller performs: installing and first use,
-initialising a project, creating and inspecting theorems, checking a project,
+initializing a project, creating and inspecting theorems, checking a project,
 installing and pinning proof backends, running proofs, reading reports, and
 migrating from `rust-prover-tools`.
 
@@ -78,7 +78,7 @@ names fail with an error that lists the valid package identifiers. Mutation
 commands require one unambiguous target unless their contract explicitly
 supports workspace-wide changes.
 
-## Initialising a project
+## Initializing a project
 
 `cargo theorem init` calculates and applies one project integration plan. The
 plan may:
@@ -95,7 +95,7 @@ The default is additive: existing files are preserved unless theoremc can prove
 that a managed fragment can be updated safely.
 
 `--dry-run` returns a structured plan containing create, edit, unchanged,
-conflict, and manual-action entries, and writes nothing. `--force` authorises
+conflict, and manual-action entries, and writes nothing. `--force` authorizes
 only the specific conflicts named in that plan. It does not turn arbitrary
 source rewriting into an accepted operation.
 
@@ -139,7 +139,7 @@ Without an explicit path, the scaffold is written to
 use that ID with `get` and with stable-ID selectors.
 
 An explicit `--path` is resolved relative to the selected workspace when it is
-not absolute. Before any file is written, theoremc canonicalises the workspace
+not absolute. Before any file is written, theoremc canonicalizes the workspace
 root and the path, resolving existing symlinks, and then verifies that the
 target remains within the canonical workspace. The default `theorems/` path
 receives the same containment check. External paths are not supported, so there
@@ -244,7 +244,7 @@ A run performs these stages:
 1. Resolve workspace, configuration, profile, and theorem selection.
 2. Validate theorem sources and stable IDs.
 3. Check required backend installations and pins without changing them.
-4. Materialise an immutable execution plan and input digest.
+4. Materialize an immutable execution plan and input digest.
 5. Create a run directory and ledger record.
 6. Execute backend jobs with bounded parallelism.
 7. Parse backend-native results into canonical theorem outcomes.
@@ -326,7 +326,7 @@ cucumber
 
 Multiple `--format` values require `--deliver` to a directory or a filename
 pattern. Machine-facing formats retain stable codes and English fallback text;
-localised strings are optional projections and do not replace invariant fields.
+localized strings are optional projections and do not replace invariant fields.
 
 `replay <run-id>` selects a failed theorem and delegates to the owning
 backend's replay capability. With one replayable failure, the selector is
@@ -399,7 +399,7 @@ are captured rather than inherited, and the result includes paths to full logs
 and artefacts instead of embedding unbounded output.
 
 Schema identifiers, diagnostic codes, exit classes, backend names, and status
-values are never localised.
+values are never localized.
 
 The stable application exit codes are:
 
@@ -592,7 +592,7 @@ deprecate. `cargo theorem` is the surface from the outset.
 Legacy `KANI`, `VERUS_*`, and `INPUT_*` environment variables are accepted only
 by the migration adapter, only for the corresponding backend command, and they
 emit a deprecation diagnostic in human mode. In JSON mode the legacy source is
-recorded in a non-localised `warnings` array rather than contaminating stdout
+recorded in a non-localized `warnings` array rather than contaminating stdout
 with prose.
 
 The legacy `--kani-command` override becomes a typed executable plus argument
@@ -607,7 +607,7 @@ remains available.
 ## Where to go next
 
 - [`cargo theorem` CLI design](cargo-theorem-cli-design.md) — the normative
-  definition of every command, contract, and boundary summarised here.
+  definition of every command, contract, and boundary summarized here.
 - [Theoremc development roadmap](roadmap.md) — the implementation sequence,
   including Phase 3.1 for the CLI foundation and Step 5.4 for migration
   completion.
