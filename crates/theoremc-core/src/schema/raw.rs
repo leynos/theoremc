@@ -8,12 +8,16 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, de::Error};
 use serde_saphyr::{Location, Spanned};
 
-use super::arg_value::ArgDecodeError;
+use crate::canonical_action_name::InvalidCanonicalActionName;
+
 use super::newtypes::{ForallVar, TheoremName};
-use super::raw_action::{self, RawLetBinding, RawStep};
+use super::raw_action::{RawActionCallDecodeError, RawLetBinding, RawStep};
 use super::types::{Evidence, KaniEvidence, KaniExpectation, TheoremDoc};
 use super::validation_reason::{IndexedValidationField, ValidationReasonKind};
 use super::value::TheoremValue;
+
+#[path = "raw_convert.rs"]
+mod raw_convert;
 
 /// Errors raised during the raw-to-public conversion in
 /// [`RawTheoremDoc::to_theorem_doc`].
@@ -25,14 +29,24 @@ use super::value::TheoremValue;
 /// [`SchemaError::ValidationFailed`](super::error::SchemaError::ValidationFailed).
 #[derive(Debug, Clone, thiserror::Error)]
 pub(crate) enum RawDocDecodeError {
+    /// An `Actions` map key failed canonical action-name validation.
+    #[error("Actions entry '{action}': {source}")]
+    ActionSignature {
+        /// Rejected action-name string.
+        action: String,
+        /// Underlying typed validation failure.
+        #[source]
+        source: InvalidCanonicalActionName,
+    },
+
     /// An argument in a `Let` binding failed decoding.
     #[error("Let binding '{name}': {source}")]
     LetBinding {
         /// The binding name from the `Let` map.
         name: String,
-        /// The underlying argument decoding failure.
+        /// The underlying action-call decoding failure.
         #[source]
-        source: ArgDecodeError,
+        source: Box<RawActionCallDecodeError>,
     },
 
     /// An argument in a `Do` step failed decoding.
@@ -40,9 +54,9 @@ pub(crate) enum RawDocDecodeError {
     DoStep {
         /// One-based step index in the `Do` list.
         index: usize,
-        /// The underlying argument decoding failure.
+        /// The underlying action-call decoding failure.
         #[source]
-        source: ArgDecodeError,
+        source: Box<RawActionCallDecodeError>,
     },
 }
 
@@ -51,6 +65,9 @@ impl RawDocDecodeError {
     #[must_use]
     pub(crate) fn param(&self) -> &str {
         match self {
+            // An invalid `Actions` key has no argument breadcrumb; the
+            // caller falls back to the theorem-level location.
+            Self::ActionSignature { .. } => "",
             Self::LetBinding { source, .. } | Self::DoStep { source, .. } => source.param(),
         }
     }
@@ -60,7 +77,7 @@ impl RawDocDecodeError {
     pub(crate) fn let_binding_name(&self) -> Option<&str> {
         match self {
             Self::LetBinding { name, .. } => Some(name),
-            Self::DoStep { .. } => None,
+            Self::DoStep { .. } | Self::ActionSignature { .. } => None,
         }
     }
 
@@ -68,7 +85,7 @@ impl RawDocDecodeError {
     #[must_use]
     pub(crate) const fn do_step_index(&self) -> Option<usize> {
         match self {
-            Self::LetBinding { .. } => None,
+            Self::LetBinding { .. } | Self::ActionSignature { .. } => None,
             Self::DoStep { index, .. } => Some(*index),
         }
     }
@@ -165,8 +182,9 @@ impl RawTheoremDoc {
     /// Returns [`RawDocDecodeError`] when an argument value fails
     /// decoding (e.g., an invalid `{ ref: ... }` target).
     pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, RawDocDecodeError> {
-        let let_bindings = convert_let_bindings(&self.let_bindings)?;
-        let do_steps = convert_steps(&self.do_steps)?;
+        let actions = raw_convert::convert_actions(&self.actions)?;
+        let let_bindings = raw_convert::convert_let_bindings(&self.let_bindings)?;
+        let do_steps = raw_convert::convert_steps(&self.do_steps)?;
 
         Ok(TheoremDoc {
             schema: self.schema,
@@ -175,7 +193,7 @@ impl RawTheoremDoc {
             tags: self.tags.clone(),
             given: self.given.clone(),
             forall: self.forall.clone(),
-            actions: self.actions.clone(),
+            actions,
             assume: self
                 .assume
                 .iter()
@@ -314,39 +332,6 @@ impl RawKaniEvidence {
     }
 }
 
-// ── Argument decoding helpers ────────────────────────────────────────
-
-/// Converts a map of raw `Let` bindings, decoding argument values.
-fn convert_let_bindings(
-    raw: &IndexMap<String, RawLetBinding>,
-) -> Result<IndexMap<String, super::types::LetBinding>, RawDocDecodeError> {
-    let mut out = IndexMap::with_capacity(raw.len());
-    for (name, binding) in raw {
-        let converted = raw_action::convert_let_binding(binding).map_err(|source| {
-            RawDocDecodeError::LetBinding {
-                name: name.clone(),
-                source,
-            }
-        })?;
-        out.insert(name.clone(), converted);
-    }
-    Ok(out)
-}
-
-/// Converts a list of raw `Do` steps, decoding argument values.
-fn convert_steps(raw: &[RawStep]) -> Result<Vec<super::types::Step>, RawDocDecodeError> {
-    let mut out = Vec::with_capacity(raw.len());
-    for (i, step) in raw.iter().enumerate() {
-        let converted =
-            raw_action::convert_step(step).map_err(|source| RawDocDecodeError::DoStep {
-                index: i + 1,
-                source,
-            })?;
-        out.push(converted);
-    }
-    Ok(out)
-}
-
 /// Deserializes optional `allow_vacuous` values as `Option<Spanned<bool>>`.
 ///
 /// This helper is used with `#[serde(default)]`, so omitted fields deserialize
@@ -371,3 +356,7 @@ where
 #[cfg(test)]
 #[path = "raw_location_tests.rs"]
 mod location_tests;
+
+#[cfg(test)]
+#[path = "raw_action_name_tests.rs"]
+mod action_name_tests;

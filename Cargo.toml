@@ -24,6 +24,8 @@ theoremc-macros = { version = "0.1.0", path = "crates/theoremc-macros" }
 theoremc-build-support = { version = "0.1.0", path = "crates/theoremc-build-support" }
 
 [dev-dependencies]
+googletest = "0.14.3"
+pretty_assertions = "1.4.1"
 proptest = { version = "1.11.0", default-features = false, features = ["std"] }
 rstest = "0.28.0"
 rstest-bdd = "0.6.0"

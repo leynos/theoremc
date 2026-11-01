@@ -233,13 +233,19 @@ This section is intentionally informative and maps current module placement.
 
 Table 1: Current schema layer to module mapping (informative).
 
-| Layer                       | Current primary modules                                                          |
-| --------------------------- | -------------------------------------------------------------------------------- |
-| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier`       |
-| Raw anti-corruption adapter | `schema::raw` (planned extraction from current loader-side deserialization path) |
-| Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                               |
-| Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::str_newtype`        |
-| Diagnostic infrastructure   | `schema::diagnostic` (currently `schema::error`)                                 |
+| Layer                       | Current primary modules                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::arg_value`, `schema::identifier`                          |
+| Raw anti-corruption adapter | `schema::raw`, `schema::raw_action`                                                                                      |
+| Validator (domain rules)    | `schema::validate` (with private `validate_*` rule modules), `schema::validation_reason`, `schema::expr`, `schema::step` |
+| Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::loader_message`, `schema::str_newtype`                      |
+| Diagnostic infrastructure   | `schema::diagnostic` (currently `schema::error`)                                                                         |
+
+Parser-error anchoring is owned by the private `schema::loader_message` module.
+It interprets `serde_saphyr` messages only at the loader boundary and is not a
+shared diagnostic API. Other schema validation paths use typed
+`ValidationReasonKind` values and raw source spans instead of parsing those
+messages.
 
 ______________________________________________________________________
 

@@ -9,6 +9,7 @@ use quote::quote;
 use syn::{LitStr, parse_macro_input};
 use theoremc_core::{
     TheoremFileLoadError,
+    canonical_action_name::CanonicalActionName,
     collision::{referenced_actions, referenced_types},
     load_theorem_file_from_manifest_dir,
     mangle::{mangle_action_name, mangle_module_path, mangle_theorem_harness},
@@ -233,26 +234,27 @@ fn generated_action_probes(
     theorem_docs: &[TheoremDoc],
 ) -> Result<Vec<GeneratedActionProbe>, MacroExpansionError> {
     let referenced = referenced_actions(theorem_docs);
-    let signature_index = ActionSignatureIndex::for_actions(theorem_docs, &referenced)?;
+    let canonical_names: Vec<&str> = referenced.iter().map(|name| name.as_str()).collect();
+    let signature_index = ActionSignatureIndex::for_actions(theorem_docs, &canonical_names)?;
     referenced
         .iter()
         .map(|canonical| {
-            let signature = signature_index.signature_for(canonical)?;
+            let signature = signature_index.signature_for(canonical.as_str())?;
             action_probe(canonical, signature)
         })
         .collect()
 }
 
 fn action_probe(
-    canonical: &str,
+    canonical: &CanonicalActionName,
     signature: &ActionSignature,
 ) -> Result<GeneratedActionProbe, MacroExpansionError> {
     let param_types = signature
         .params
         .values()
-        .map(|param| parse_action_type(canonical, param))
+        .map(|param| parse_action_type(canonical.as_str(), param))
         .collect::<Result<Vec<_>, _>>()?;
-    let return_type = parse_action_type(canonical, &signature.returns)?;
+    let return_type = parse_action_type(canonical.as_str(), &signature.returns)?;
 
     Ok(GeneratedActionProbe {
         ident: identifier(mangle_action_name(canonical).identifier()),

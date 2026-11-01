@@ -22,7 +22,7 @@ use super::super::MacroExpansionError;
 use super::super::tests_support::{TheoremFixture, expand_fixture};
 use camino::Utf8Path;
 use rstest::rstest;
-use theoremc_core::mangle::mangle_action_name;
+use theoremc_core::mangle::try_mangle_action_name;
 
 #[path = "reference_provenance.rs"]
 mod reference_provenance;
@@ -221,7 +221,8 @@ fn equivalent_signature_reference_expands_at_any_depth(
     // equivalent pair into a conflict. What remains to check is that accepting
     // the pair still generated the probe for the agreed signature.
     let expanded = expand_fixture(Utf8Path::new(&path), &fixture)?;
-    let mangled_action = mangle_action_name("account.deposit");
+    let mangled_action =
+        try_mangle_action_name("account.deposit").expect("test action name should be valid");
     let probe_identifier = mangled_action.identifier();
     assert!(
         expanded.contains(&format!("crate::theorem_actions::{probe_identifier}")),
