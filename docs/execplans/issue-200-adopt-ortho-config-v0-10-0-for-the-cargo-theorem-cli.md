@@ -1066,3 +1066,11 @@ that gate before proceeding. Never discard unrelated changes.
   and exported cases explicitly, and renames the closure binding. No assertion
   changes meaning. The remaining gates must be re-run from `make lint` onward
   against this commit.
+- 2026-11-01: CodeScene failed the quality gate on `config_tests.rs` with
+  "String Heavy Function Arguments" (code health 9.69), because the new
+  precedence cases were passed as bare positional lists. Commit `122fe18`
+  groups each case row into a named struct supplied through a single
+  `#[case]` parameter; `cs review` now reports 10.00 with no findings and all
+  61 `cargo-theorem` library tests pass. The check remains advisory in
+  branch-protection terms, but the skill requires outstanding CodeScene
+  issues to be cleared before a merge.
