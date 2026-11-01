@@ -1,11 +1,8 @@
 //! Argument decoding and source-preserving raw document conversion errors.
 
-use indexmap::IndexMap;
+use crate::canonical_action_name::InvalidCanonicalActionName;
 
-use crate::canonical_action_name::{CanonicalActionName, InvalidCanonicalActionName};
-
-use super::super::raw_action::{self, RawActionCallDecodeError, RawLetBinding, RawStep};
-use super::super::types::ActionSignature;
+use super::super::raw_action::RawActionCallDecodeError;
 
 /// Errors raised during the raw-to-public conversion in
 /// [`RawTheoremDoc::to_theorem_doc`](super::RawTheoremDoc::to_theorem_doc).
@@ -77,56 +74,4 @@ impl RawDocDecodeError {
             Self::DoStep { index, .. } => Some(*index),
         }
     }
-}
-
-// ── Domain conversion helpers ────────────────────────────────────────
-
-/// Converts raw action signature keys into canonical action-name keys.
-pub(super) fn convert_actions(
-    raw: &IndexMap<String, ActionSignature>,
-) -> Result<IndexMap<CanonicalActionName, ActionSignature>, RawDocDecodeError> {
-    let mut out = IndexMap::with_capacity(raw.len());
-    for (action, signature) in raw {
-        let canonical = CanonicalActionName::new(action).map_err(|source| {
-            RawDocDecodeError::ActionSignature {
-                action: action.clone(),
-                source,
-            }
-        })?;
-        out.insert(canonical, signature.clone());
-    }
-    Ok(out)
-}
-
-/// Converts a map of raw `Let` bindings, decoding argument values.
-pub(super) fn convert_let_bindings(
-    raw: &IndexMap<String, RawLetBinding>,
-) -> Result<IndexMap<String, super::super::types::LetBinding>, RawDocDecodeError> {
-    let mut out = IndexMap::with_capacity(raw.len());
-    for (name, binding) in raw {
-        let converted = raw_action::convert_let_binding(binding).map_err(|source| {
-            RawDocDecodeError::LetBinding {
-                name: name.clone(),
-                source: Box::new(source),
-            }
-        })?;
-        out.insert(name.clone(), converted);
-    }
-    Ok(out)
-}
-
-/// Converts a list of raw `Do` steps, decoding argument values.
-pub(super) fn convert_steps(
-    raw: &[RawStep],
-) -> Result<Vec<super::super::types::Step>, RawDocDecodeError> {
-    let mut out = Vec::with_capacity(raw.len());
-    for (i, step) in raw.iter().enumerate() {
-        let converted =
-            raw_action::convert_step(step).map_err(|source| RawDocDecodeError::DoStep {
-                index: i + 1,
-                source: Box::new(source),
-            })?;
-        out.push(converted);
-    }
-    Ok(out)
 }

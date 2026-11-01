@@ -98,9 +98,9 @@ pub fn load_theorem_docs_with_source(
 
     let mut docs = Vec::with_capacity(raw_docs.len());
     for raw_doc in &raw_docs {
-        let doc = raw_doc
-            .to_theorem_doc()
-            .map_err(|decode_err| attach_decode_failure_diagnostic(decode_err, source, input, raw_doc))?;
+        let doc = raw_doc.to_theorem_doc().map_err(|decode_err| {
+            attach_decode_failure_diagnostic(decode_err, source, input, raw_doc)
+        })?;
         validate_theorem_doc(&doc)
             .map_err(|failure| attach_validation_failure_diagnostic(failure, source, raw_doc))?;
         docs.push(doc);

@@ -61,10 +61,7 @@ fn fixture_error_message_contains_fragment(
 
 #[rstest]
 #[case::parser_failure("invalid_unknown_key.theorem", SchemaDiagnosticCode::ParseFailure)]
-#[case::validation_failure(
-    "invalid_empty_about.theorem",
-    SchemaDiagnosticCode::ValidationFailure
-)]
+#[case::validation_failure("invalid_empty_about.theorem", SchemaDiagnosticCode::ValidationFailure)]
 fn diagnostic_failure_checks_source_path(
     #[case] fixture_name: &str,
     #[case] expected_code: SchemaDiagnosticCode,

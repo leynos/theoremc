@@ -1,7 +1,4 @@
-//! Unit tests for raw-to-domain schema conversion.
-//!
-//! These tests drive the raw adapter boundary directly so invalid canonical
-//! action names are observed before schema validation runs.
+//! Unit tests for raw-to-domain action-name conversion.
 
 use googletest::prelude::*;
 use rstest::rstest;

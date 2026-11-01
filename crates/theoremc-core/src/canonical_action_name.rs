@@ -163,46 +163,40 @@ pub fn validate_canonical_action_name(name: &str) -> Result<(), InvalidCanonical
     }
 
     for (index, segment) in name.split('.').enumerate() {
-        validate_segment(name, segment, index + 1)?;
+        validate_segment(segment, index + 1).map_err(|reason| invalid_name(name, reason))?;
     }
 
     Ok(())
 }
 
 fn validate_segment(
-    name: &str,
     segment: &str,
     position: usize,
-) -> Result<(), InvalidCanonicalActionName> {
+) -> Result<(), CanonicalActionNameInvalidReason> {
     if segment.is_empty() {
-        return Err(invalid_name(
-            name,
-            CanonicalActionNameInvalidReason::EmptySegment { position },
-        ));
+        return Err(CanonicalActionNameInvalidReason::EmptySegment { position });
     }
 
     if !is_valid_ascii_identifier_pattern(segment) {
-        return Err(invalid_name(
-            name,
-            CanonicalActionNameInvalidReason::InvalidIdentifierPattern {
-                position,
-                segment: segment.to_owned(),
-            },
-        ));
+        return Err(CanonicalActionNameInvalidReason::InvalidIdentifierPattern {
+            position,
+            segment: segment.to_owned(),
+        });
     }
 
     if is_rust_reserved_keyword(segment) {
-        return Err(invalid_name(
-            name,
-            CanonicalActionNameInvalidReason::ReservedKeyword {
-                position,
-                segment: segment.to_owned(),
-            },
-        ));
+        return Err(CanonicalActionNameInvalidReason::ReservedKeyword {
+            position,
+            segment: segment.to_owned(),
+        });
     }
 
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "canonical_action_name_test_support.rs"]
+pub(crate) mod test_support;
 
 fn invalid_name(
     name: &str,
@@ -255,7 +249,7 @@ mod tests {
     //! Unit tests for canonical action-name parsing and validation behaviour.
 
     use googletest::prelude::*;
-    use proptest::prelude::{Strategy, prop_assert, prop_assert_eq, proptest};
+    use proptest::prelude::{prop_assert, prop_assert_eq, proptest};
     use rstest::rstest;
 
     use super::{
@@ -317,33 +311,10 @@ mod tests {
         verify_that!(name.as_str(), eq("account.deposit"))
     }
 
-    fn valid_segment_strategy() -> impl Strategy<Value = String> {
-        ("[A-Za-z_]", "[A-Za-z0-9_]{0,8}")
-            .prop_map(|(first, rest)| format!("{first}{rest}"))
-            .prop_filter("segment must not be a Rust keyword", |segment| {
-                !super::is_rust_reserved_keyword(segment)
-            })
-    }
-
-    pub(crate) fn valid_canonical_action_name_strategy() -> impl Strategy<Value = String> {
-        (
-            valid_segment_strategy(),
-            valid_segment_strategy(),
-            proptest::collection::vec(valid_segment_strategy(), 0..4),
-        )
-            .prop_map(|(first, second, rest)| {
-                std::iter::once(first)
-                    .chain(std::iter::once(second))
-                    .chain(rest)
-                    .collect::<Vec<_>>()
-                    .join(".")
-            })
-    }
-
     proptest! {
         #[test]
         fn valid_generated_names_round_trip_through_newtype(
-            name in valid_canonical_action_name_strategy(),
+            name in super::test_support::valid_canonical_action_name_strategy(),
         ) {
             let canonical = CanonicalActionName::new(&name)?;
 
@@ -353,7 +324,7 @@ mod tests {
 
         #[test]
         fn single_generated_segments_are_rejected(
-            segment in valid_segment_strategy(),
+            segment in super::test_support::valid_segment_strategy(),
         ) {
             let error = validate_canonical_action_name(&segment).expect_err("single segment should fail");
 

@@ -77,32 +77,8 @@ mod prop_tests {
         CanonicalActionName, hash12, mangle_action_name, mangle_module_path,
         mangle_theorem_harness, try_action_slug, try_mangle_action_name,
     };
-    use proptest::prelude::{
-        Strategy, prop_assert, prop_assert_eq, prop_assert_ne, prop_assume, proptest,
-    };
-
-    fn valid_segment_strategy() -> impl Strategy<Value = String> {
-        ("[A-Za-z_]", "[A-Za-z0-9_]{0,8}")
-            .prop_map(|(first, rest)| format!("{first}{rest}"))
-            .prop_filter("segment must not be a Rust keyword", |segment| {
-                !crate::canonical_action_name::is_rust_reserved_keyword(segment)
-            })
-    }
-
-    fn valid_canonical_action_name_strategy() -> impl Strategy<Value = String> {
-        (
-            valid_segment_strategy(),
-            valid_segment_strategy(),
-            proptest::collection::vec(valid_segment_strategy(), 0..4),
-        )
-            .prop_map(|(first, second, rest)| {
-                std::iter::once(first)
-                    .chain(std::iter::once(second))
-                    .chain(rest)
-                    .collect::<Vec<_>>()
-                    .join(".")
-            })
-    }
+    use crate::canonical_action_name::test_support::valid_canonical_action_name_strategy;
+    use proptest::prelude::{prop_assert, prop_assert_eq, prop_assert_ne, prop_assume, proptest};
 
     fn is_identifier_safe(identifier: &str) -> bool {
         let mut chars = identifier.chars();
