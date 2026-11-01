@@ -1,6 +1,5 @@
 .PHONY: help all clean test build release lint lint-whitaker typecheck fmt check-fmt markdownlint nixie test-workflow-contracts check-agent-native msrv
 
-
 TARGET ?= cargo-theorem
 
 export PATH := $(HOME)/.cargo/bin:$(HOME)/.bun/bin:$(PATH)

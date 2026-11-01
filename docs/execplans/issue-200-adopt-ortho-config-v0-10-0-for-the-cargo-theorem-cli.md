@@ -140,6 +140,15 @@ published as a draft pull request.
   ADR-010.
 - [x] (2026-10-31) Run the sequential gates for the assessment repair and
   serde-saphyr/MSRV candidate; the gate set passed on commit `5fc2a5f`.
+- [x] (2026-11-01) Remove the `clippy::struct_excessive_bools` expectations by
+  modelling the global switches and resolved switches as `Option<bool>`,
+  preserving the CLI flags, TOML keys, and precedence contract; add a
+  regression test for absence, file survival, and CLI precedence.
+- [x] (2026-11-01) Rebase onto live `main`, which now includes the
+  `serde-saphyr` 2.0.0 bump, the Whitaker lint suite, and hermetic fixture
+  builds.
+- [ ] Rewrite the PR #204 description for the Rust 1.89 dependency decision and
+  rerun the full sequential gate set on the rebased candidate.
 - [ ] Publish the candidate and obtain candidate-bound assessment confirmation
   before readiness.
 
@@ -277,9 +286,12 @@ Clippy diagnostics across the new CLI package. The captured lint log is
 `/tmp/lint-4589bf31-6003-42c5-b78f-652d6e7b79c1-issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli-m2-7.out`.
 The implementation now uses non-shadowing names, borrowed errors, fallible
 diagnostic writes, and structured test assertions. The two renderer/config
-records retain independent boolean CLI switches with narrowly justified
-`clippy::struct_excessive_bools` expectations. Formatting has been reapplied;
-the full sequence must be rerun from the first gate.
+records originally retained independent boolean CLI switches behind
+`clippy::struct_excessive_bools` expectations. Review rejected that
+suppression, and commit `fd99ab5` now models the switches as `Option<bool>`,
+which matches the documented "absence keeps Clap defaults out of the merge"
+convention. Formatting has been reapplied; the full sequence must be rerun from
+the first gate.
 
 The following run passed `make check-fmt` but `make lint` found eight
 `anyhow::Error`/boxed-error mismatches in result-returning source tests and one
@@ -1036,3 +1048,12 @@ that gate before proceeding. Never discard unrelated changes.
   2.0.0 and `theoremc-core` requiring Rust 1.89. Logs use the `issue-200-msrv`
   suffix under `/tmp`. Publishing the candidate and its candidate-bound
   assessment remain pending.
+- 2026-11-01: PR review rejected the two `clippy::struct_excessive_bools`
+  expectations as contrary to issue #200's no-suppression requirement. Commit
+  `fd99ab5` replaces the ten boolean fields with `Option<bool>`, keeps the five
+  global flags through `ArgAction::SetTrue`, and adds a precedence regression
+  test. The branch is rebased onto `origin/main` at `2bb0251`; conflicts in the
+  core manifest and lockfile resolved to `main`'s `serde-saphyr` 2.0.0, and the
+  Makefile keeps both the Whitaker and MSRV targets. PR #204's description
+  still needs the corrected MSRV and dependency record, and the rebased
+  candidate needs a fresh sequential gate run.
