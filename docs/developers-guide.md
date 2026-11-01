@@ -132,14 +132,34 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 
 **Table:** Module layers and responsibilities
 
-| Layer         | Crate                    | Modules                                     | Responsibility                                                                |
-| ------------- | ------------------------ | ------------------------------------------- | ----------------------------------------------------------------------------- |
-| Schema        | `theoremc-core`          | `schema/`                                   | YAML deserialization and semantic validation                                  |
-| Mangle        | `theoremc-core`          | `mangle*.rs`                                | Deterministic identifier generation                                           |
-| Cross-cutting | `theoremc-core`          | `collision.rs`                              | Collision detection across schema and mangle                                  |
-| Proc-macro    | `theoremc-macros`        | `lib.rs`                                    | Proc-macro entry points, theorem-file loading delegation, and code generation |
-| Lowering      | `theoremc`               | `arg_lowering.rs`                           | Test-gated prototype for converting semantic values to Rust token trees       |
-| Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking           |
+| Layer         | Crate                    | Modules                                                | Responsibility                                                                 |
+| ------------- | ------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Schema        | `theoremc-core`          | `schema/loader/`, `schema/raw/`, `schema/validate*.rs` | YAML loading, span-aware conversion, duplicate-key diagnostics, and validation |
+| Mangle        | `theoremc-core`          | `mangle*.rs`                                           | Deterministic identifier generation                                            |
+| Cross-cutting | `theoremc-core`          | `collision.rs`                                         | Collision detection across schema and mangle                                   |
+| Proc-macro    | `theoremc-macros`        | `lib.rs`                                               | Proc-macro entry points, theorem-file loading delegation, and code generation  |
+| Lowering      | `theoremc`               | `arg_lowering.rs`                                      | Test-gated prototype for converting semantic values to Rust token trees        |
+| Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs`            | Theorem file discovery, suite generation, and Cargo change tracking            |
+
+The schema loader entry point is `schema/loader/mod.rs`. It coordinates YAML
+deserialization, duplicate-key checking, raw-to-domain conversion, semantic
+validation, and action-collision checks. Its `duplicate` child is private, and
+`check_duplicate_theorem_keys` is `pub(super)`, so the loader can call it while
+modules outside the loader subtree cannot. The loader declares its sibling test
+files with `#[path = "../loader_tests.rs"]`,
+`#[path = "../loader_action_tests.rs"]`,
+`#[path = "../loader_diagnostic_tests.rs"]`, and
+`#[path = "../loader_duplicate_tests.rs"]`.
+
+The raw span adapter is defined in `schema/raw/mod.rs`, which privately declares
+`schema/raw/decode.rs` and re-exports `RawDocDecodeError` as `pub(crate)`. The
+decode helpers are `pub(super)` and perform raw-to-domain conversion for `Let`
+bindings and `Do` steps. Raw span-location tests stay in the sibling
+`schema/raw_location_tests.rs` file.
+
+Rust-type lifetime unit tests live in `schema/rust_type_tests.rs`. Property
+tests remain in `schema/rust_type_property_tests.rs`, wired separately from
+`rust_type.rs`.
 
 The schema layer must not import from `mangle`, and vice versa. The `collision`
 module exists as a separate top-level module specifically to orchestrate both

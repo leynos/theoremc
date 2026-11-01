@@ -233,13 +233,15 @@ This section is intentionally informative and maps current module placement.
 
 Table 1: Current schema layer to module mapping (informative).
 
-| Layer                       | Current primary modules                                                          |
-| --------------------------- | -------------------------------------------------------------------------------- |
-| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier`       |
-| Raw anti-corruption adapter | `schema::raw` (planned extraction from current loader-side deserialization path) |
-| Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                               |
-| Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::str_newtype`        |
-| Diagnostic infrastructure   | `schema::diagnostic` (currently `schema::error`)                                 |
+| Layer                       | Current primary modules                                                    |
+| --------------------------- | -------------------------------------------------------------------------- |
+| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier` |
+| Raw span adapter            | `schema::raw`                                                              |
+| Raw-to-domain conversion    | `schema::raw::decode`, `schema::raw_action`                                |
+| Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                         |
+| Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::str_newtype`  |
+| Duplicate-key diagnostics   | `schema::loader::duplicate`                                                |
+| Diagnostic infrastructure   | `schema::diagnostic`, `schema::error`                                      |
 
 ______________________________________________________________________
 
@@ -786,11 +788,13 @@ post-deserialization semantic validation (Step 1.2.1 of the roadmap):
   says, "non-empty after trimming" without specifying the algorithm;
   `str::trim()` is the most defensive choice and aligns with Rust's standard
   library semantics.
-- Validation logic is extracted into
-  `crates/theoremc-core/src/schema/validate.rs` to keep
+- Validation logic was extracted into
+  `crates/theoremc-core/src/schema/validate.rs` to keep the then-monolithic
   `crates/theoremc-core/src/schema/loader.rs` under the 400-line limit and to
   improve separation of concerns between deserialization and semantic
-  validation.
+  validation. The current loader entry point is
+  `crates/theoremc-core/src/schema/loader/mod.rs`; duplicate theorem-key checks
+  are implemented in `crates/theoremc-core/src/schema/loader/duplicate.rs`.
 - `unwind: 0` is rejected because the spec (`TFS-6` §6.2) says,
   "positive integer", meaning > 0. The `u32` serde type already rejects
   negatives.
@@ -1040,11 +1044,14 @@ decoding for plain YAML strings (Step 2.3.1 of the roadmap):
   `Spanned<String>` becomes `String` for other fields.
 - Nine raw serde-compatible types (`RawActionCall`, `RawLetCall`, `RawLetMust`,
   `RawLetBinding`, `RawStepCall`, `RawStepMust`, `RawStepMaybe`,
-  `RawMaybeBlock`, `RawStep`) are extracted into
-  `crates/theoremc-core/src/schema/raw_action.rs` to keep
-  `crates/theoremc-core/src/schema/raw.rs` under the 400-line limit. These
-  mirror the public types but retain `TheoremValue` in `args` for serde
-  compatibility.
+  `RawMaybeBlock`, `RawStep`) were extracted into
+  `crates/theoremc-core/src/schema/raw_action.rs` to keep the then-monolithic
+  `crates/theoremc-core/src/schema/raw.rs` under the 400-line limit. The
+  current raw module entry point is
+  `crates/theoremc-core/src/schema/raw/mod.rs`, and raw-to-domain conversion is
+  implemented in `crates/theoremc-core/src/schema/raw/decode.rs`. These types
+  remain in `crates/theoremc-core/src/schema/raw_action.rs`; they mirror the
+  public types but retain `TheoremValue` in `args` for serde compatibility.
 - YAML maps that are not `{ ref: <name> }` are passed through as
   `ArgValue::RawMap(IndexMap<String, TheoremValue>)`, preserving forward
   compatibility for Step 2.3.2 (`{ literal: ... }` wrapper) and Step 2.3.3

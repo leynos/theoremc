@@ -17,6 +17,12 @@ struct DuplicateTheoremCollision {
     duplicates: Vec<DuplicateTheoremLocation>,
 }
 
+/// Builds the typed duplicate-key error and its source-located diagnostics.
+///
+/// For example, a collision for `BidirectionalLinks` in
+/// `theorems/bidirectional.theorem` produces a
+/// `SchemaError::DuplicateTheoremKey` whose key is
+/// `theorems/bidirectional.theorem#BidirectionalLinks`.
 fn build_duplicate_theorem_key_error(
     source: &SourceId,
     theorem: &str,
@@ -59,6 +65,11 @@ fn build_duplicate_theorem_key_error(
     }
 }
 
+/// Rejects repeated theorem identifiers within one source document set.
+///
+/// For example, two raw documents named `BidirectionalLinks` from
+/// `theorems/bidirectional.theorem` return a duplicate-key error; distinct
+/// names return `Ok(())`.
 pub(super) fn check_duplicate_theorem_keys(
     source: &SourceId,
     raw_docs: &[RawTheoremDoc],
@@ -102,6 +113,13 @@ pub(super) fn check_duplicate_theorem_keys(
         })
 }
 
+/// Formats a source-qualified key and all of its duplicate locations.
+///
+/// For example, locations at lines 2 and 8 in
+/// `theorems/bidirectional.theorem` produce `duplicate theorem key
+/// 'theorems/bidirectional.theorem#BidirectionalLinks' appears at
+/// theorems/bidirectional.theorem:2:1,
+/// theorems/bidirectional.theorem:8:1`.
 fn format_duplicate_theorem_key_summary(
     source: &SourceId,
     theorem: &str,
@@ -124,6 +142,10 @@ fn format_duplicate_theorem_key_summary(
     )
 }
 
+/// Renders one source location as a path, line, and column.
+///
+/// For example, line 12, column 4 in `theorems/bidirectional.theorem` becomes
+/// `theorems/bidirectional.theorem:12:4`.
 fn render_duplicate_location(source: &SourceId, location: DuplicateTheoremLocation) -> String {
     format!("{}:{}:{}", source.as_str(), location.line, location.column,)
 }
