@@ -24,7 +24,7 @@
   `rust-prover-tools`.
 - [`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md) -
   Task-oriented guide for callers of the planned CLI, covering installation,
-  project initialisation, theorem creation, checking, backend management,
+  project initialization, theorem creation, checking, backend management,
   execution, reports, JSON output, exit classes, and migration.
 
 ## Architecture and design

@@ -644,7 +644,7 @@ Cargo, such as `check --compile` and `run`, execute the package's normal
 
 The CLI's caller-facing contract is documented separately from its design. The
 [`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md) is the
-task-oriented guide for installation, project initialisation, theorem creation,
+task-oriented guide for installation, project initialization, theorem creation,
 checking, backend management, execution, reports, JSON output, exit classes,
 and migration from `rust-prover-tools`. It states its proposed status until the
 commands it describes ship. The design document remains the normative source,

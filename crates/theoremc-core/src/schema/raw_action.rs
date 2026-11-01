@@ -138,9 +138,10 @@ impl RawActionCallDecodeError {
     #[must_use]
     pub(crate) fn param(&self) -> &str {
         match self {
-            // An invalid action name has no argument breadcrumb; the caller
-            // falls back to the theorem-level location.
-            Self::InvalidActionName { .. } => "",
+            // The action name lives under the `action:` key, so the Let/Do
+            // scanners locate the offending line by that key rather than
+            // falling back to the theorem-level location.
+            Self::InvalidActionName { .. } => "action",
             Self::Arg { source } => source.param(),
         }
     }

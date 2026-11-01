@@ -323,17 +323,6 @@ project:
 - Use GitHub-flavoured Markdown footnotes (`[^1]`) for references and
   footnotes.
 
-## Project documentation
-
-Record design decisions in the design document. Where a decision is
-substantive, record it in an ADR document following the documentation style
-guide, then reference that ADR from the design document.
-
-Update `docs/users-guide.md` for any change to application behaviour or user
-interface that a user should know about. Document internally facing interfaces
-or practices in the relevant component architecture document. Document
-internally facing conventions or practices in `docs/developers-guide.md`.
-
 ## Additional tooling
 
 The following tooling is available in this environment:

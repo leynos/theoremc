@@ -105,3 +105,35 @@ Witness:
     );
     assert_eq!(diagnostic.location.line, 15);
 }
+
+#[rstest]
+fn invalid_action_names_locate_the_action_key() {
+    let yaml = r"
+Theorem: BadActionName
+About: Invalid action name
+Let:
+  x:
+    call:
+      action: deposit
+      args: {}
+Prove:
+  - assert: 'true'
+    because: trivial
+Evidence:
+  kani:
+    unwind: 1
+    expect: SUCCESS
+Witness:
+  - cover: 'true'
+    because: reachable
+";
+    let error = load_theorem_docs_with_source(&SourceId::new("bad_action.theorem"), yaml)
+        .expect_err("malformed action name should fail decoding");
+
+    let diagnostic = error.diagnostic().expect("diagnostic expected");
+
+    assert_eq!(
+        diagnostic.location.line, 7,
+        "diagnostic should point at the action key, not the theorem header: {diagnostic:?}"
+    );
+}
