@@ -49,25 +49,19 @@ impl CargoGuard<'_> {
     }
 }
 
-/// Serializes all fixture `cargo` invocations.
+/// Serializes fixture Cargo commands within a libtest process.
 ///
-/// `cargo` writes lock files, registry caches, and incremental artefacts to
-/// paths derived from the manifest directory. When multiple fixture crates run
-/// `cargo build` concurrently they race on the shared `~/.cargo` registry
-/// cache and on any workspace-level `Cargo.lock`, producing spurious build
-/// failures even with isolated `CARGO_TARGET_DIR` values. A single global
-/// mutex is the minimal correct serialization mechanism for in-process test
-/// parallelism; the alternative--spawning each fixture in a fully isolated
-/// toolchain environment--would require per-test network access and is
-/// disproportionate for a test suite this size.
+/// Nextest runs each test in its own process; its `nested-cargo` test group
+/// supplies serialization across those processes. Cargo also protects the
+/// shared persistent fixture target with its own target-directory lock.
 pub(crate) static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
 
 /// Runs a Cargo subcommand in the fixture crate directory.
 ///
-/// `CARGO_TARGET_DIR` is set to a per-fixture subdirectory to avoid artefact
-/// collisions. The caller must supply a [`CargoGuard`] proving that
-/// `FIXTURE_CARGO_LOCK` is held, because registry cache access and
-/// workspace-level lock files are still shared across invocations.
+/// Dependencies use a persistent workspace fixture target. Source trees remain
+/// unique to each fixture, so Cargo rebuilds each fixture package and build
+/// script while retaining reusable dependency artefacts. The [`CargoGuard`]
+/// supplies serialization for callers running in the same libtest process.
 ///
 /// # Timeout
 ///
@@ -90,7 +84,7 @@ pub(crate) fn cargo_run_output(
     subcommand: CargoSubcommand,
     _guard: &CargoGuard<'_>,
 ) -> Result<String, String> {
-    let target_dir = manifest_dir.join("target");
+    let target_dir = test_helpers::fixture_target_dir();
     let output = hermetic_cargo(manifest_dir, &target_dir)
         .args(subcommand.args())
         .output()

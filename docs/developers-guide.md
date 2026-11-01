@@ -346,6 +346,26 @@ fail, compares all five expected values for exact equality with the typed
 as a substring in the rendered message. It returns the whole rendered message
 so reference-selection cases can compare diagnostics across fixtures.
 
+#### Nested Cargo fixtures
+
+Cargo-building behavioural tests and the macro compile-error suite share the
+`nested-cargo` Nextest group, which runs one such test at a time. Other tests
+retain their normal parallelism. A process-local mutex alone cannot serialize
+Nextest's separate test processes.
+
+Fixture sources remain unique temporary crates under the configured workspace
+target's `fixture-sources` directory (normally `target/fixture-sources`). Their
+dependency builds reuse the workspace Cargo target, normally `target`, so they
+can use artefacts from the main workspace build. Each fixture still compiles
+its own sources and build script. Generated suites are selected from the exact
+root manifest's Cargo JSON messages, rather than by scanning historical shared
+target outputs. Cargo's shared registry cache and compiler admission remain in
+effect.
+
+The optional Kani harness-listing test skips when its `cargo kani --version`
+availability probe fails. After that probe succeeds, fixture-build and
+harness-listing errors propagate as test failures.
+
 ### 3.4 File size limits
 
 No single code file may exceed 400 lines. When a module and its tests grow
