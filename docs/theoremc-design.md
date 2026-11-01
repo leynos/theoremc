@@ -1048,10 +1048,13 @@ decoding for plain YAML strings (Step 2.3.1 of the roadmap):
   `crates/theoremc-core/src/schema/raw_action.rs` to keep the then-monolithic
   `crates/theoremc-core/src/schema/raw.rs` under the 400-line limit. The
   current raw module entry point is
-  `crates/theoremc-core/src/schema/raw/mod.rs`, and raw-to-domain conversion is
-  implemented in `crates/theoremc-core/src/schema/raw/decode.rs`. These types
-  remain in `crates/theoremc-core/src/schema/raw_action.rs`; they mirror the
-  public types but retain `TheoremValue` in `args` for serde compatibility.
+  `crates/theoremc-core/src/schema/raw/mod.rs`, which converts the document via
+  `RawTheoremDoc::to_theorem_doc()`. Its `Let` and `Do` collections are
+  converted by `crates/theoremc-core/src/schema/raw/decode.rs`, while
+  individual actions and steps are converted by
+  `crates/theoremc-core/src/schema/raw_action.rs`. These types remain in
+  `crates/theoremc-core/src/schema/raw_action.rs`; they mirror the public types
+  but retain `TheoremValue` in `args` for serde compatibility.
 - YAML maps that are not `{ ref: <name> }` are passed through as
   `ArgValue::RawMap(IndexMap<String, TheoremValue>)`, preserving forward
   compatibility for Step 2.3.2 (`{ literal: ... }` wrapper) and Step 2.3.3

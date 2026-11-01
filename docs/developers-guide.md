@@ -158,8 +158,8 @@ bindings and `Do` steps. Raw span-location tests stay in the sibling
 `schema/raw_location_tests.rs` file.
 
 Rust-type lifetime unit tests live in `schema/rust_type_tests.rs`. Property
-tests remain in `schema/rust_type_property_tests.rs`, wired separately from
-`rust_type.rs`.
+tests remain in `schema/rust_type_property_tests.rs`, which
+`schema/rust_type.rs` registers through its `property_tests` module.
 
 The schema layer must not import from `mangle`, and vice versa. The `collision`
 module exists as a separate top-level module specifically to orchestrate both
