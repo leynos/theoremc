@@ -1074,3 +1074,17 @@ that gate before proceeding. Never discard unrelated changes.
   `cargo-theorem` library tests pass. The check remains advisory in
   branch-protection terms, but the skill requires outstanding CodeScene issues
   to be cleared before a merge.
+- 2026-11-01: `origin/main` advanced to `563e4d5` ("Split core schema
+  internals into focused modules", PR #183), which made PR #204 conflict in
+  `crates/theoremc-macros` test files. The rebase kept `main`'s side
+  throughout: PR #183 had already replaced the same panicking test helpers this
+  branch had rewritten, so its `googletest` assertions, `harness_definitions`
+  naming and `split_once`-based `redact_hashes` supersede the branch's
+  `ensure_condition` shim. The standalone `tests_stability.rs` was dropped
+  because PR #183 folded the identical repeat-call test into `tests.rs`.
+  `cargo-theorem`'s `rstest` requirement moved from 0.27.0 to 0.28.0 to match
+  the workspace bump in PR #202, leaving one resolved `rstest` version in
+  `Cargo.lock`. A workspace
+  `cargo check -p cargo-theorem --all-targets --all-features` passed on the
+  rebased tree; the sequential gate set and a fresh candidate-bound assessment
+  must now be re-run for the new head.
