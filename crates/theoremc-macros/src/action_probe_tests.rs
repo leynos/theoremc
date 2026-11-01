@@ -42,12 +42,12 @@ fn expansion_emits_typed_action_probe_for_referenced_action()
 
     let expanded = expand_fixture(Utf8Path::new("theorems/action-probe.theorem"), &theorem)?;
 
-    assert!(
-        expanded.contains(concat!(
+    assert_that!(
+        expanded.as_str(),
+        contains_substring(concat!(
             "const_:fn(u64,u32)->bool=crate::theorem_actions::",
             "account__deposit__h05158894bfb4;"
         )),
-        "expected typed action probe in expansion, got: {expanded}"
     );
     Ok(())
 }
@@ -59,7 +59,12 @@ fn expansion_rejects_conflicting_signatures_for_shared_action(
     let (first_param, first_return, second_param, second_return) = match conflict {
         "return" => ("u64", "bool", "u64", "u32"),
         "parameter" => ("u64", "bool", "u32", "bool"),
-        _ => unreachable!("rstest provides known conflict cases"),
+        _ => {
+            return Err(std::io::Error::other(format!(
+                "unexpected action signature conflict case: {conflict:?}"
+            ))
+            .into());
+        }
     };
     let theorem = TheoremFixture(format!(
         concat!(
