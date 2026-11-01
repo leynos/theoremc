@@ -235,6 +235,34 @@ fn command_parse_failure_keeps_usage_status_and_stderr() -> Result<()> {
     Ok(())
 }
 
+/// The wrapper token is required, so its absence must be rejected as usage.
+#[test]
+fn direct_invocation_without_the_theorem_token_is_a_usage_failure() -> Result<()> {
+    let directory = tempfile::tempdir()?;
+    let path = isolated_path(directory.path())?;
+    let output = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+        .args(["context", "--json"])
+        .output()?;
+    ensure!(
+        output.status.code() == Some(2),
+        "a missing external-subcommand token must use exit 2"
+    );
+    ensure!(
+        output.stdout.is_empty(),
+        "a missing external-subcommand token must not use stdout"
+    );
+    let diagnostic = String::from_utf8_lossy(&output.stderr);
+    ensure!(
+        diagnostic.starts_with("error:"),
+        "a missing external-subcommand token must print a usage diagnostic: {diagnostic}"
+    );
+    ensure!(
+        diagnostic.contains("unrecognized subcommand 'context'"),
+        "the usage diagnostic must name the rejected token: {diagnostic}"
+    );
+    Ok(())
+}
+
 #[test]
 fn missing_global_value_preserves_a_following_json_flag() -> Result<()> {
     let directory = tempfile::tempdir()?;

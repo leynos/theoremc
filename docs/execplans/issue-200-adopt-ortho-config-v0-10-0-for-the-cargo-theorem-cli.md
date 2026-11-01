@@ -147,12 +147,29 @@ published as a draft pull request.
 - [x] (2026-11-01) Rebase onto live `main`, which now includes the
   `serde-saphyr` 2.0.0 bump, the Whitaker lint suite, and hermetic fixture
   builds.
-- [ ] Rewrite the PR #204 description for the Rust 1.89 dependency decision and
-  rerun the full sequential gate set on the rebased candidate.
-- [ ] Publish the candidate and obtain candidate-bound assessment confirmation
-  before readiness.
+- [x] (2026-11-01) Rerun the full sequential gate set on the rebased candidate;
+  all eleven gates passed sequentially on head `df9b8bc`.
+- [x] (2026-11-01) Rewrite the PR #204 description for the Rust 1.89 dependency
+  decision, the rebase onto `563e4d5`, and the gate evidence for that head.
+- [x] (2026-11-01) Publish head `df9b8bc` and obtain the candidate-bound
+  assessment in comment 6562732496, which confirmed the implementation and
+  asked for the declared missing-token negative control plus a reconciliation
+  of this record.
+- [x] (2026-11-01) Add the declared CLI-ENTRY negative control: direct
+  invocation without the `theorem` token must exit 2 with empty stdout and a
+  usage diagnostic on stderr.
 
-M2 implementation is now present in the working tree: the dedicated package,
+The candidate for head `df9b8bc` is complete for its accepted scope. All eleven
+deterministic gates passed sequentially, hosted CI run 41303683940 succeeded on
+that head, and the candidate-bound assessment found no in-scope runtime defect.
+The repairs above followed from that assessment; validated readiness and merge
+follow once the repaired head is reassessed.
+
+**Historical (pre-rebase) state.** The paragraph below records the working-tree
+state before ADR-010 unified the MSRV checks and before the rebase onto
+`563e4d5`; it does not describe the current candidate.
+
+M2 implementation was then present in the working tree: the dedicated package,
 Cargo entry wrapper, OrthoConfig configuration model, selected-command adapter,
 agent context, JSON diagnostics, injected-source tests, binary-level entry
 tests, mixed-MSRV CI checks, and Make targets. The user's guide now
@@ -454,10 +471,15 @@ The pre-readiness assessment of `7fc73fe` found a real agent-context invocation
 bug and an ExecPlan acceptance mismatch. The current repair derives the
 `theorem` metadata level from the declared Cargo wrapper, adds a subprocess
 regression that follows the emitted invocation path, and makes the workspace
-boundary explicit. Validation and a renewed assessment remain pending.
+boundary explicit.
 
-Work is in progress. Update this section at each completed milestone and record
-any remaining validation or delivery blocker before completion.
+The candidate is complete for its accepted scope. Head `df9b8bc` passed all
+eleven sequential deterministic gates, hosted CI run 41303683940, and the
+exact-head CodeScene and Gecko checks. The candidate-bound assessment of that
+head confirmed the implementation, named no in-scope runtime defect, and asked
+for one declared negative control and a reconciliation of this record. Both are
+addressed on the repaired head; readiness and merge follow its validation and
+reassessment.
 
 The pre-rebase M2 candidate passed all nine deterministic gates sequentially on
 2026-10-26 (scrutineer run M2-20): `make check-fmt`, `make lint`,
@@ -589,11 +611,11 @@ reported zero findings; the review log is
 The CLI is planned in `docs/cargo-theorem-cli-design.md`; its foundation is
 Phase 3.1 in `docs/roadmap.md`. The current workspace has the `theoremc` facade,
 `theoremc-core`, `theoremc-macros`, build support, and test helpers, all now
-sharing the workspace's Rust 1.89 MSRV. `src/main.rs` is only a greeting
-placeholder. The new application package belongs at `crates/cargo-theorem/` and
-owns command parsing, configuration types, source loading, application error
-handling, and the composition root. Domain crates remain inward-facing and
-configuration-free.
+sharing the workspace's Rust 1.89 MSRV. The root `src/main.rs` was only a
+greeting placeholder and this change deletes it. The new application package
+lives at `crates/cargo-theorem/` and owns command parsing, configuration types,
+source loading, application error handling, and the composition root. Domain
+crates remain inward-facing and configuration-free.
 
 The imported guides are `docs/ortho-config/users-guide.md` and
 `docs/ortho-config/v0-10-0-migration-guide.md`. Their source is the
@@ -734,8 +756,10 @@ link in the terminal `## References` section. Do not merge.
 
 Run commands from the repository root. Use Makefile gates for repository-wide
 validation, and capture their output under `/tmp` as required by `AGENTS.md`.
-The split stable checks clear the repository's nightly-only `RUSTFLAGS` with an
-empty assignment; they do not bypass Rust version checks.
+The workspace-wide MSRV check clears the repository's nightly-only `RUSTFLAGS`
+with an empty assignment; it does not bypass the Rust version check. ADR-010
+supersedes the earlier split library and application checks with the single
+Rust 1.89 workspace check used by `make msrv` and CI.
 
 Expected source provenance:
 
@@ -1088,3 +1112,14 @@ that gate before proceeding. Never discard unrelated changes.
   `cargo check -p cargo-theorem --all-targets --all-features` passed on the
   rebased tree; the sequential gate set and a fresh candidate-bound assessment
   must now be re-run for the new head.
+- 2026-11-01: Head `df9b8bc` passed all eleven sequential deterministic gates,
+  hosted CI run 41303683940, and the exact-head CodeScene and Gecko checks. The
+  PR description was rewritten for the Rust 1.89 dependency decision, the
+  rebase onto `563e4d5`, and that evidence. The candidate-bound assessment
+  reply (comment 6562732496) echoed Assessment-ID
+  `theoremc-204-df9b8bc-completeness-20261101`, confirmed both base and head,
+  and found no in-scope runtime defect. It asked for two repairs: the declared
+  CLI-ENTRY negative control, and a reconciliation of this record and the PR
+  body. The negative control is now a child-process test that runs
+  `cargo-theorem context --json` without the wrapper token and requires exit
+  status 2, empty stdout, and a usage diagnostic on stderr.
