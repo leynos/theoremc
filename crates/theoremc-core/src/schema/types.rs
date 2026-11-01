@@ -3,8 +3,9 @@
 //! This module owns theorem documents and their conditions. Private child
 //! modules group action signature, evidence, and decoded invocation shapes;
 //! their public types are re-exported here for stable schema facade paths.
-//! YAML aliases, defaults, source locations, and raw-to-domain conversion
-//! belong to `raw` and `raw_action`.
+//! `raw` and `raw_action` own YAML aliases, defaults applied while parsing raw
+//! input, source locations, and raw-to-domain conversion. Private `types_*`
+//! children own model-local Serde defaults and helpers.
 
 use indexmap::IndexMap;
 use serde::Deserialize;

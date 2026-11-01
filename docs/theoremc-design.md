@@ -243,6 +243,15 @@ Table 1: Current schema layer to module mapping (informative).
 | Duplicate-key diagnostics   | `schema::loader::duplicate`                                                |
 | Diagnostic infrastructure   | `schema::diagnostic`, `schema::error`                                      |
 
+The public domain types are grouped by ownership in three private children of
+`schema::types`: `types_signature.rs` owns action signatures and semantic type
+comparison; `types_evidence.rs` owns evidence and Kani configuration shapes; and
+`types_invocation.rs` owns decoded invocation shapes shared by `Let` bindings
+and `Do` steps. `types.rs` retains theorem documents and conditions, and
+re-exports these types through the stable `schema::types` paths and the
+`schema` facade. The split is preventive modularization: the baseline schema
+files were below the 400-line limit.
+
 ______________________________________________________________________
 
 ## 4. The `.theorem` file format
