@@ -9,6 +9,8 @@
 //! modules group action signature, evidence, and decoded invocation shapes;
 //! their public types are re-exported here for stable schema facade paths.
 //!
+//! `raw`, `raw_action`, and `raw_evidence` own YAML aliases, defaults applied
+//! while parsing raw input, source locations, and raw-to-domain conversion.
 //! The domain types deliberately carry no serde derives: spelling, aliases,
 //! and defaults belong to the raw adapter, which keeps the public schema
 //! surface independent of the YAML implementation (ADR-003).

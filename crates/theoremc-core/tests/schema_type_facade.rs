@@ -60,64 +60,37 @@ fn kani_evidence() -> schema::KaniEvidence {
     }
 }
 
-#[derive(Debug)]
-struct BackendCase {
-    has_kani: bool,
-    has_verus: bool,
-    has_stateright: bool,
-    expected: bool,
+#[derive(Debug, Clone, Copy)]
+enum Backend {
+    Kani,
+    Verus,
+    Stateright,
 }
 
-impl BackendCase {
-    const NO_BACKEND: Self = Self {
-        has_kani: false,
-        has_verus: false,
-        has_stateright: false,
-        expected: false,
-    };
-
-    const KANI_ONLY: Self = Self {
-        has_kani: true,
-        has_verus: false,
-        has_stateright: false,
-        expected: true,
-    };
-
-    const VERUS_ONLY: Self = Self {
-        has_kani: false,
-        has_verus: true,
-        has_stateright: false,
-        expected: true,
-    };
-
-    const STATERIGHT_ONLY: Self = Self {
-        has_kani: false,
-        has_verus: false,
-        has_stateright: true,
-        expected: true,
-    };
+#[derive(Debug, Clone, Copy)]
+struct BackendCase {
+    backend: Option<Backend>,
+    expected_any_backend: bool,
 }
 
 #[rstest]
-#[case::no_backend(BackendCase::NO_BACKEND)]
-#[case::kani_only(BackendCase::KANI_ONLY)]
-#[case::verus_only(BackendCase::VERUS_ONLY)]
-#[case::stateright_only(BackendCase::STATERIGHT_ONLY)]
+#[case::no_backend(BackendCase { backend: None, expected_any_backend: false })]
+#[case::kani_only(BackendCase { backend: Some(Backend::Kani), expected_any_backend: true })]
+#[case::verus_only(BackendCase { backend: Some(Backend::Verus), expected_any_backend: true })]
+#[case::stateright_only(BackendCase { backend: Some(Backend::Stateright), expected_any_backend: true })]
 fn evidence_reports_each_supported_backend(
-    #[case] backends: BackendCase,
+    #[case] case: BackendCase,
     kani_evidence: schema::KaniEvidence,
 ) {
     let evidence = schema::Evidence {
-        kani: backends.has_kani.then_some(kani_evidence),
-        verus: backends
-            .has_verus
+        kani: matches!(case.backend, Some(Backend::Kani)).then_some(kani_evidence),
+        verus: matches!(case.backend, Some(Backend::Verus))
             .then_some(schema::TheoremValue::Bool(true)),
-        stateright: backends
-            .has_stateright
+        stateright: matches!(case.backend, Some(Backend::Stateright))
             .then_some(schema::TheoremValue::Bool(true)),
     };
 
-    assert_eq!(evidence.has_any_backend(), backends.expected);
+    assert_eq!(evidence.has_any_backend(), case.expected_any_backend);
 }
 
 #[test]
