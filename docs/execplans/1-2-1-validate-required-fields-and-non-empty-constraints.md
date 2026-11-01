@@ -402,6 +402,12 @@ Key file paths (all relative to repo root):
 No new dependencies. This plan uses only the existing dependency set from Step
 1.1.
 
+The interface below records the design at the time this plan was implemented.
+Milestone 4 of `code-base-audit-2026-06-05.md` later replaced the string-bearing
+`SchemaError` return with `ValidationFailure`, which carries a
+`ValidationReasonKind` and a human-readable reason; `schema::loader` now
+renders the public error at the boundary.
+
 Internal interface added:
 
 ```rust

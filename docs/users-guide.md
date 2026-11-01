@@ -243,9 +243,10 @@ The loader validates the structural constraints of `Let` bindings and `Do`
 steps:
 
 - Every `ActionCall.action` field (in both `Let` bindings and `Do` steps) must
-  be non-empty after trimming. Blank action names are rejected.
-- Every non-blank `ActionCall.action` must follow canonical action-name
-  grammar: `Segment ("." Segment)+` (at least one `.` separator).
+  follow canonical action-name grammar: `Segment ("." Segment)+` (at least one
+  `.` separator). A blank action name fails this check and is reported as
+  `invalid canonical action name '': must contain at least two dot-separated
+  segments`.
 - Each canonical action-name segment must match
   `^[A-Za-z_][A-Za-z0-9_]*$` and must not be a Rust reserved keyword.
 - Every `MaybeBlock.because` field must be non-empty after trimming.

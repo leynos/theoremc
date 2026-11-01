@@ -8,13 +8,16 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, de::Error};
 use serde_saphyr::{Location, Spanned};
 
-use crate::canonical_action_name::{CanonicalActionName, InvalidCanonicalActionName};
+use crate::canonical_action_name::InvalidCanonicalActionName;
 
 use super::newtypes::{ForallVar, TheoremName};
-use super::raw_action::{self, RawActionCallDecodeError, RawLetBinding, RawStep};
-use super::types::{ActionSignature, Evidence, KaniEvidence, KaniExpectation, TheoremDoc};
+use super::raw_action::{RawActionCallDecodeError, RawLetBinding, RawStep};
+use super::types::{Evidence, KaniEvidence, KaniExpectation, TheoremDoc};
 use super::validation_reason::{IndexedValidationField, ValidationReasonKind};
 use super::value::TheoremValue;
+
+#[path = "raw_convert.rs"]
+mod raw_convert;
 
 /// Errors raised during the raw-to-public conversion in
 /// [`RawTheoremDoc::to_theorem_doc`].
@@ -179,9 +182,9 @@ impl RawTheoremDoc {
     /// Returns [`RawDocDecodeError`] when an argument value fails
     /// decoding (e.g., an invalid `{ ref: ... }` target).
     pub(crate) fn to_theorem_doc(&self) -> Result<TheoremDoc, RawDocDecodeError> {
-        let actions = convert_actions(&self.actions)?;
-        let let_bindings = convert_let_bindings(&self.let_bindings)?;
-        let do_steps = convert_steps(&self.do_steps)?;
+        let actions = raw_convert::convert_actions(&self.actions)?;
+        let let_bindings = raw_convert::convert_let_bindings(&self.let_bindings)?;
+        let do_steps = raw_convert::convert_steps(&self.do_steps)?;
 
         Ok(TheoremDoc {
             schema: self.schema,
@@ -329,56 +332,6 @@ impl RawKaniEvidence {
     }
 }
 
-// ── Domain conversion helpers ────────────────────────────────────────
-
-/// Converts raw action signature keys into canonical action-name keys.
-fn convert_actions(
-    raw: &IndexMap<String, ActionSignature>,
-) -> Result<IndexMap<CanonicalActionName, ActionSignature>, RawDocDecodeError> {
-    let mut out = IndexMap::with_capacity(raw.len());
-    for (action, signature) in raw {
-        let canonical = CanonicalActionName::new(action).map_err(|source| {
-            RawDocDecodeError::ActionSignature {
-                action: action.clone(),
-                source,
-            }
-        })?;
-        out.insert(canonical, signature.clone());
-    }
-    Ok(out)
-}
-
-/// Converts a map of raw `Let` bindings, decoding argument values.
-fn convert_let_bindings(
-    raw: &IndexMap<String, RawLetBinding>,
-) -> Result<IndexMap<String, super::types::LetBinding>, RawDocDecodeError> {
-    let mut out = IndexMap::with_capacity(raw.len());
-    for (name, binding) in raw {
-        let converted = raw_action::convert_let_binding(binding).map_err(|source| {
-            RawDocDecodeError::LetBinding {
-                name: name.clone(),
-                source: Box::new(source),
-            }
-        })?;
-        out.insert(name.clone(), converted);
-    }
-    Ok(out)
-}
-
-/// Converts a list of raw `Do` steps, decoding argument values.
-fn convert_steps(raw: &[RawStep]) -> Result<Vec<super::types::Step>, RawDocDecodeError> {
-    let mut out = Vec::with_capacity(raw.len());
-    for (i, step) in raw.iter().enumerate() {
-        let converted =
-            raw_action::convert_step(step).map_err(|source| RawDocDecodeError::DoStep {
-                index: i + 1,
-                source: Box::new(source),
-            })?;
-        out.push(converted);
-    }
-    Ok(out)
-}
-
 /// Deserializes optional `allow_vacuous` values as `Option<Spanned<bool>>`.
 ///
 /// This helper is used with `#[serde(default)]`, so omitted fields deserialize
@@ -405,100 +358,5 @@ where
 mod location_tests;
 
 #[cfg(test)]
-mod tests {
-    //! Unit tests for raw-to-domain schema conversion.
-
-    use googletest::prelude::*;
-    use rstest::rstest;
-
-    use super::{RawDocDecodeError, RawTheoremDoc};
-
-    const VALID_DOCUMENT: &str = r"
-Theorem: RawBoundary
-About: Exercises raw conversion
-Actions:
-  account.deposit:
-    params: {}
-Do:
-  - call:
-      action: account.deposit
-      args: {}
-Prove:
-  - assert: 'true'
-    because: trivially true
-Evidence:
-  kani:
-    unwind: 1
-    expect: SUCCESS
-Witness:
-  - cover: 'true'
-    because: always reachable
-";
-
-    fn parse_one_raw_doc(yaml: &str) -> RawTheoremDoc {
-        serde_saphyr::from_multiple::<RawTheoremDoc>(yaml)
-            .expect("raw document should deserialize")
-            .into_iter()
-            .next()
-            .expect("test input should contain one document")
-    }
-
-    #[rstest]
-    fn raw_conversion_carries_canonical_action_names_into_domain() {
-        let raw_doc = parse_one_raw_doc(VALID_DOCUMENT);
-        let doc = raw_doc
-            .to_theorem_doc()
-            .expect("valid canonical action names should convert");
-
-        let action = doc
-            .do_steps
-            .first()
-            .and_then(|step| match step {
-                super::super::types::Step::Call(step) => Some(step.call.action.as_str()),
-                _ => None,
-            })
-            .expect("first step should be a call action");
-
-        assert_that!(doc.actions.get("account.deposit"), some(anything()));
-        assert_that!(action, eq("account.deposit"));
-    }
-
-    #[rstest]
-    fn raw_conversion_rejects_invalid_action_signature_key() {
-        let raw_doc = parse_one_raw_doc(&VALID_DOCUMENT.replace("account.deposit:", "deposit:"));
-        let error = raw_doc
-            .to_theorem_doc()
-            .expect_err("invalid Actions key should be rejected");
-
-        assert!(
-            matches!(
-                &error,
-                RawDocDecodeError::ActionSignature { action, .. } if action == "deposit"
-            ),
-            "expected invalid Actions key error, got: {error}",
-        );
-        assert_that!(
-            error.to_string(),
-            contains_substring("must contain at least two dot-separated segments")
-        );
-    }
-
-    #[rstest]
-    fn raw_conversion_rejects_invalid_action_call_name() {
-        let raw_doc = parse_one_raw_doc(
-            &VALID_DOCUMENT.replace("action: account.deposit", "action: deposit"),
-        );
-        let error = raw_doc
-            .to_theorem_doc()
-            .expect_err("invalid action call name should be rejected");
-
-        assert!(
-            matches!(&error, RawDocDecodeError::DoStep { index: 1, .. }),
-            "expected Do step action-name error, got: {error}",
-        );
-        assert_that!(
-            error.to_string(),
-            contains_substring("action 'deposit': invalid canonical action name")
-        );
-    }
-}
+#[path = "raw_action_name_tests.rs"]
+mod action_name_tests;

@@ -51,7 +51,8 @@
 ## Decision records
 
 - [Architecture Decision Record (ADR) 001: theorem symbol stability and
-  non-vacuity policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+  non-vacuity
+  policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
   - Decision record for injective symbol mangling, explicit reference
     semantics, non-vacuity requirements, and theorem ID migration.
 - [Architecture Decision Record (ADR) 002: library-first internationalization

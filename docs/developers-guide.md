@@ -370,6 +370,10 @@ set -o pipefail; make lint | tee /tmp/make-lint.log
 - Use `proptest` for invariants over a generated input space, such as path,
   name, or mangling rules. Keep generated cases focused on the invariant and
   retain example-based tests for named edge cases.
+- Keep shared property strategies under a `#[cfg(test)]` test-support module
+  owned by the domain module whose invariants they generate. Only unit tests
+  within that crate may reuse them; they are not production helpers or an
+  integration-test API.
 - Keep integration fixture helpers in `tests/common/mod.rs`. The common module
   owns fixture loading, fixture source identifiers, successful fixture loading
   assertions, and error-fragment assertions. BDD step functions should return

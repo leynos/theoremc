@@ -237,15 +237,17 @@ fn unique_canonical_names<'a>(
 fn find_mangled_collisions(
     canonical_names: &BTreeSet<&str>,
 ) -> Result<BTreeMap<String, BTreeSet<String>>, SchemaError> {
-    let mut by_identifier: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    for &name in canonical_names {
-        by_identifier
-            .entry(mangle_to_identifier(name)?)
-            .or_default()
-            .insert(name.to_owned());
-    }
-    by_identifier.retain(|_, names| names.len() > 1);
-    Ok(by_identifier)
+    let canonical_names = canonical_names
+        .iter()
+        .map(|name| {
+            CanonicalActionName::new(name).map_err(|error| SchemaError::InvalidActionName {
+                action: error.name().to_owned(),
+                reason: error.reason().to_string(),
+            })
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    let canonical_name_refs = canonical_names.iter().collect();
+    find_mangled_collisions_with(&canonical_name_refs, mangle_to_identifier)
 }
 
 /// Groups canonical names by the identifier produced by `mangler`,

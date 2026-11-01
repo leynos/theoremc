@@ -50,8 +50,7 @@ fn referenced_types_collects_forall_params_and_returns_in_first_seen_order(
         "u64".to_owned(),
     );
     doc.actions.insert(
-        CanonicalActionName::new("account.deposit")
-            .expect("test action name should be valid"),
+        CanonicalActionName::new("account.deposit").expect("test action name should be valid"),
         ActionSignature {
             params: IndexMap::from([
                 ("command".to_owned(), "crate::DepositCommand".to_owned()),
@@ -82,8 +81,7 @@ fn referenced_types_deduplicate_by_canonical_type_tokens(boilerplate: DocBoilerp
         "Vec<u8>".to_owned(),
     );
     first.actions.insert(
-        CanonicalActionName::new("payload.write")
-            .expect("test action name should be valid"),
+        CanonicalActionName::new("payload.write").expect("test action name should be valid"),
         ActionSignature {
             params: IndexMap::from([("buffer".to_owned(), "Vec <u8>".to_owned())]),
             returns: "u64".to_owned(),
@@ -92,8 +90,7 @@ fn referenced_types_deduplicate_by_canonical_type_tokens(boilerplate: DocBoilerp
     let mut second = theorem_doc("Second", IndexMap::new(), Vec::new(), &boilerplate)
         .expect("test theorem name should be valid");
     second.actions.insert(
-        CanonicalActionName::new("payload.read")
-            .expect("test action name should be valid"),
+        CanonicalActionName::new("payload.read").expect("test action name should be valid"),
         ActionSignature {
             params: IndexMap::from([("buffer".to_owned(), "Vec<u8>".to_owned())]),
             returns: "u64".to_owned(),

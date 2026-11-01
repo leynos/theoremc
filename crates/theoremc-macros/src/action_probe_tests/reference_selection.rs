@@ -221,8 +221,8 @@ fn equivalent_signature_reference_expands_at_any_depth(
     // equivalent pair into a conflict. What remains to check is that accepting
     // the pair still generated the probe for the agreed signature.
     let expanded = expand_fixture(Utf8Path::new(&path), &fixture)?;
-    let mangled_action = try_mangle_action_name("account.deposit")
-        .expect("test action name should be valid");
+    let mangled_action =
+        try_mangle_action_name("account.deposit").expect("test action name should be valid");
     let probe_identifier = mangled_action.identifier();
     assert!(
         expanded.contains(&format!("crate::theorem_actions::{probe_identifier}")),
