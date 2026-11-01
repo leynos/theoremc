@@ -4,7 +4,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
 and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
-Status: BLOCKED
+Status: APPROVED
 
 ## Purpose / big picture
 
@@ -24,8 +24,10 @@ documents reusable testing and validation patterns in
 newtypes, removes duplicate newtype deserialization boilerplate, and
 centralizes duplicated integration fixture helpers.
 
-The initial deliverable is this plan. Implementation must not begin until the
-plan is explicitly approved.
+The user has explicitly authorized implementation through the
+`sdlc-implementation` workflow. Work proceeds one validated milestone at a
+time, with this plan recording acceptance evidence and any remaining review
+work.
 
 ## Constraints
 
@@ -64,7 +66,7 @@ invariant spans many generated inputs. Do not introduce `kani` or `verus`
 proofs unless the milestone introduces a new invariant or lemma that needs
 bounded or exhaustive proof beyond the existing tests.
 
-## Tolerances
+## Tolerances (exception triggers)
 
 Escalate before proceeding if changing `TheoremDoc.actions` or
 `ActionCall.action` requires more than one compatibility shim for downstream
@@ -141,10 +143,38 @@ tests live under `tests/`, with reusable helpers in `tests/common/` and Gherkin
 feature files under `tests/features/`.
 
 The current code has two separate canonical action-name validators:
-`crates/theoremc-core/src/schema/action_name.rs` returns `SchemaError`, while
-`crates/theoremc-core/src/mangle_validate.rs` returns
-`InvalidCanonicalActionName`. The implementation must replace this duplication
-with one neutral grammar validator and typed wrappers for each caller.
+`crates/theoremc-core/src/canonical_action_name.rs` now owns the neutral
+grammar and newtype used by schema and mangling code. The remaining milestones
+continue from that shared boundary.
+
+## Conformance basis
+
+This plan implements the schema-layer contract in
+`docs/adr-003-architectural-boundary-enforcement.md`, the schema and diagnostic
+requirements in `docs/theorem-file-specification.md`, the action naming rules in
+`docs/name-mangling-rules.md`, and the macro pipeline in
+`docs/theoremc-design.md` §3.2 and §7. The repository's `AGENTS.md` supplies
+the Rust API, test, file-size, formatting, lint, and documentation constraints.
+No separate terms of reference or technical design document governs this audit.
+
+The target trace is: canonical grammar and domain boundary → Milestones 2–3 →
+raw-conversion and mangle tests; typed validation paths → Milestone 4 → source
+location tests and unchanged diagnostic snapshots; raw/domain separation →
+Milestone 5 → schema fixtures and doctests; schema-default contract → Milestone
+6 → omitted/explicit schema tests and documentation; macro separation →
+Milestone 7 → expansion snapshots and trybuild tests.
+
+## Verification plan
+
+Each milestone uses the repository's corresponding `make` gates sequentially.
+Rust changes require `make check-fmt`, `make lint`, and `make test`; Markdown
+changes also require `make fmt`, `make markdownlint`, and `make nixie`. Tests
+must exercise the observable boundary named by that milestone, not only helper
+functions. The core acceptance invariants are stable valid-name mangling,
+rejection of invalid names before domain construction, source/line/column/code
+preservation for diagnostics, unchanged schema semantics, and deterministic
+macro expansion. No new Kani, Verus, or comparable proof is required because
+the milestones do not introduce a proof lemma or bounded state invariant.
 
 ## Milestone 0: plan, branch, and review setup
 
@@ -157,6 +187,7 @@ Validation for this milestone is documentation-focused plus the standard
 repository gates:
 
 ```sh
+set -o pipefail
 make fmt 2>&1 | tee /tmp/fmt-theoremc-code-base-audit-2026-06-05.out
 make check-fmt 2>&1 | tee /tmp/check-fmt-theoremc-code-base-audit-2026-06-05.out
 make markdownlint 2>&1 | tee /tmp/markdownlint-theoremc-code-base-audit-2026-06-05.out
@@ -265,6 +296,10 @@ should describe the failure, for example blank field, empty collection, invalid
 Rust expression, invalid Rust type, missing action signature, zero unwind, or
 missing vacuity reason.
 
+The implementation that landed on `main` realizes this contract as
+`ValidationFailure` with `ValidationReasonKind` and `IndexedValidationField`;
+see the 2026-11-01 Decision Log entry for the rebase-time substitution.
+
 Update `RawTheoremDoc::location_for_validation_reason` into a typed
 location-mapping function. Existing diagnostic snapshots under
 `tests/snapshots/diagnostics/` should either remain unchanged or be updated
@@ -360,6 +395,7 @@ work are documented in `docs/developers-guide.md`.
 Run all final gates:
 
 ```sh
+set -o pipefail
 make fmt 2>&1 | tee /tmp/fmt-theoremc-code-base-audit-2026-06-05-final.out
 make check-fmt 2>&1 | tee /tmp/check-fmt-theoremc-code-base-audit-2026-06-05-final.out
 make markdownlint 2>&1 | tee /tmp/markdownlint-theoremc-code-base-audit-2026-06-05-final.out
@@ -375,6 +411,9 @@ intentional public API or documentation change.
 
 ## Progress
 
+- [x] 2026-11-01: User approved this ExecPlan for continued implementation and
+  requested a rebase onto `origin/main` before Milestone 4 acceptance. The plan
+  status is now `APPROVED`.
 - [x] 2026-06-05: Renamed the branch through GitHub's branch rename endpoint
   and updated the local branch to track `origin/code-base-audit-2026-06-05`.
 - [x] 2026-06-05: Created related follow-up issues #48, #49, #50, and #51 for
@@ -456,9 +495,59 @@ intentional public API or documentation change.
 - [x] 2026-06-05: Milestone 4 deterministic gates passed: `make fmt`,
   `make check-fmt`, `make markdownlint`, `make nixie`, `make lint`, and
   `make test`. The full suite runs 568 nextest tests plus doctests.
+- [x] 2026-10-23: Read-only review verification confirmed that the two critical
+  `source`-field findings are incorrect: `SchemaError::ValidationFailed` has
+  only `theorem`, `reason`, and `diagnostic`. No compatibility field was added.
+- [x] 2026-10-24: Applied the valid M4 review repairs: simplified typed source
+  location dispatch, removed unused validation-helper state, made BDD helper
+  errors return through `Result`, narrowed shared-test dead-code expectations,
+  shared the canonical-name generators, extracted parser diagnostics, and
+  reduced the loader and validator modules below 400 lines. The first Clippy
+  run exposed forbidden `allow` attributes and assertions in result-returning
+  BDD steps; both were corrected. The rerun passed `make check-fmt`,
+  `make markdownlint`, `make nixie`, `make lint`, and `make typecheck`. The
+  `make test` run was refused at compiler launch with
+  `build-limits: the supervisor refused: launch-failed` while compiling
+  `serde_json`; no test diagnostic was emitted. A subsequent supervisor status
+  query timed out. A later test run started after healthy admission and
+  compiled for 4,526 seconds before failing on an unused `proptest::Strategy`
+  import in `canonical_action_name.rs`. The import was removed; rerun the
+  candidate gates before M4 acceptance.
+- [x] 2026-10-23: Moved `raw.rs` unit tests to `raw_tests.rs` during M4 review
+  repair so the edited raw adapter also remains below the repository's 400-line
+  limit. The remaining M5 work still includes raw serde mirrors and conversions.
+- [x] 2026-11-01: Rebased the branch from `8f48abb` onto `origin/main` at
+  `2bb0251` (PR #52 target). `main` had already landed equivalent typed schema
+  validation diagnostics, so the Milestone 4 conflicts were resolved in favour
+  of `main`'s `ValidationFailure` / `ValidationReasonKind` /
+  `IndexedValidationField` design and its split `schema::loader_message` and
+  `schema::loader_decode_location` modules. The branch's near-duplicate
+  `ValidationError` / `ValidationPath` implementation and its superseded
+  `loader/diagnostics.rs`, `raw_tests.rs`, and `validation_error.rs` modules
+  were discarded. Branch-only repairs were retained: shared canonical-name
+  property strategies, canonical construction inside `find_mangled_collisions`,
+  `Result`-returning BDD steps, and the design and developers' guide updates.
+- [x] 2026-11-01: Candidate-bound gates passed on the rebased candidate
+  (`460fbb3` plus the retained repairs) with all evidence captured under
+  `/tmp/*-theoremc-code-base-audit-2026-06-05.out`: `make check-fmt` (53 files
+  unchanged), `make markdownlint` (0 errors), `make nixie` (all diagrams valid),
+  `make lint` (Whitaker then Clippy, exit 0), `make typecheck` (exit 0),
+  `make test-workflow-contracts` (exit 0), and `make test`, which reported
+  `817 tests run: 817 passed (16 slow), 0 skipped` after 4971.811s plus passing
+  doctests. Compile admission stayed healthy throughout; the long runtime
+  reflects a shared compile queue held deep by other agents' builds, not a
+  fault. Two earlier `make test` attempts were invalidated by external SIGTERM,
+  not assertion failures, and were discarded rather than counted.
+- [x] 2026-11-01: Split `schema::raw` during the M4 repair so the module
+  satisfies `module-max-lines`: raw-to-domain conversion moved to
+  `schema/raw_convert.rs` and the canonical action-name tests to
+  `schema/raw_action_name_tests.rs`, leaving `raw.rs` at 362 lines. The new
+  tests cover a valid document, an invalid `Actions` key, and an invalid
+  `ActionCall.action` value, asserting the typed reason text at each boundary.
 - [ ] Milestone 4 implementation is complete, validated, reviewed, and
-  committed. Implementation and deterministic validation are complete, but the
-  required CodeRabbit review is blocked by repeated sandbox-preparation stalls.
+  committed. The rebased candidate now carries `main`'s typed diagnostics plus
+  the retained branch repairs; deterministic gates pass, and the milestone
+  awaits local CodeRabbit review.
 - [ ] Milestone 5 implementation is complete, validated, reviewed, and
   committed.
 - [ ] Milestone 6 implementation is complete, validated, reviewed, and
@@ -476,11 +565,17 @@ intentional public API or documentation change.
 - 2026-06-05: The first `coderabbit review --agent` invocation stayed at
   sandbox preparation for more than five minutes. A bounded retry progressed
   through analysis and review, exited 0, and emitted no finding payload.
+- 2026-11-01: `main` had already landed the substance of Milestone 4: typed
+  `ValidationFailure` values with `ValidationReasonKind`, 0-based indexed
+  section fields, and a loader that renders the public diagnostic at its
+  boundary. Replaying the branch's own `ValidationError` / `ValidationPath`
+  design would have restored a parallel, older implementation, so the rebase
+  adopted `main`'s version and kept only changes `main` lacked.
 - 2026-06-05: Integration tests include `tests/common/mod.rs` independently in
   each test crate, so shared helper functions are unused in some crates even
-  though they are used by the suite as a whole. The common module needs a scoped
-  `dead_code` allowance with a reason unless the helper module is moved into a
-  separate support crate.
+  though they are used by the suite as a whole. The allowance is scoped to each
+  helper function, with the integration-crate ownership reason recorded beside
+  it.
 - 2026-06-05: CodeRabbit caught that the helper regression tests should use
   Result-returning `googletest` assertions instead of panicking or hiding
   failures inside broad helper tests. The new `tests/common_helpers.rs` cases
@@ -510,18 +605,26 @@ intentional public API or documentation change.
   asking the service again.
 - 2026-06-05: The post-backoff Milestone 4 CodeRabbit retry also remained in
   sandbox preparation for more than five minutes and had to be stopped. At this
-  point Milestone 4 is blocked on CodeRabbit service availability, because the
-  plan requires a successful CodeRabbit review before the milestone can be
-  committed or the next milestone can begin.
+  point the review service later recovered and produced a completed local
+  review; the findings are recorded in the 2026-10-23 review disposition.
+- 2026-10-23: The local M4 review returned 12 rows. Nine underlying concerns
+  were valid: redundant validation-helper state, source-location dispatch
+  complexity, a panicking BDD helper, broad test-helper suppression, duplicated
+  property strategies, stale progress text, missing `pipefail`, oversized
+  loader diagnostics, and a historical return-type mismatch. Two critical rows
+  incorrectly claimed `SchemaError::ValidationFailed` has a `source` field;
+  source inspection confirms the variant has only `theorem`, `reason`, and
+  `diagnostic`, so no API change is warranted. Duplicate loader-size rows share
+  one repair.
 
 ## Decision Log
 
 - 2026-06-05: Use a neutral canonical action-name module instead of making the
   schema layer depend on mangle. This preserves ADR-003's layering intent while
   eliminating duplicated grammar code.
-- 2026-06-05: Treat this initial plan as a draft and wait for explicit user
-  approval before implementation. The ExecPlan skill requires this approval
-  gate for non-trivial changes.
+- 2026-06-05: The initial plan was drafted before implementation. The user
+  explicitly authorized implementation later, so the former approval gate is
+  discharged and the plan proceeds through its milestones.
 - 2026-06-05: Track placeholder binary behaviour, build-script path sharing,
   oversized schema modules, and macro conflict provenance as separate GitHub
   issues because they are related audit findings but not part of the direct
@@ -550,8 +653,41 @@ intentional public API or documentation change.
   existing user-facing strings, `ValidationPath` is the machine contract for
   location lookup, and `RawTheoremDoc::location_for_validation_path()` owns the
   source-span mapping.
+- 2026-10-23: Keep parser-message anchoring private to
+  `schema::loader::diagnostics`; it exists only to recover a source location
+  when `serde_saphyr` reports an unknown key at 1:1. Typed semantic validation
+  continues to use `ValidationPath`, and no cross-module diagnostics helper is
+  introduced.
+- 2026-10-23: Reuse canonical action-name property generators only from the
+  `theoremc-core` `#[cfg(test)]` support module. This keeps grammar samples in
+  sync while preventing test strategy helpers from entering the crate API.
+- 2026-10-23: Extract the raw adapter's existing unit tests in M4 rather than
+  waiting for M5. This keeps the M4-edited `raw.rs` under the enforced
+  file-size limit; M5 remains responsible for the planned serde boundary
+  changes.
+- 2026-11-01: Accept the action-name diagnostic wording change produced by the
+  shared canonical-name boundary. Blank and single-segment names are now
+  rejected by the canonical grammar and reported as
+  `invalid canonical action
+  name '<name>': must contain at least two dot-separated segments`,
+  replacing the `action must be non-empty after trimming` message that `main`'s
+  `schema::step` still emits. One grammar owns the rule, the message names the
+  offending value, and `docs/users-guide.md` and the BDD cases were updated to
+  match.
+- 2026-11-01: Supersede the M4 `ValidationError` / `ValidationPath` design with
+  `main`'s landed `ValidationFailure` / `ValidationReasonKind` model. The two
+  designs have the same intent; `main`'s is 0-based, distinguishes repeated
+  section value and `because` fields with `IndexedValidationField`, and is
+  already exercised by the shipped loader. User-facing diagnostic wording is
+  unchanged.
 
 ## Outcomes & Retrospective
 
-No implementation outcomes yet. This section must be updated after each
-milestone and completed during Milestone 8.
+Milestones 1–3 are committed and their gates and local reviews passed. The
+branch has since been rebased onto `main` at `2bb0251`, where `main`'s landed
+typed validation diagnostics supersede the branch's original Milestone 4
+implementation. The rebased candidate carries `main`'s `ValidationFailure` /
+`ValidationReasonKind` design plus the branch repairs `main` lacked, and it
+must pass candidate-bound gates and local review before M4 is accepted.
+Milestones 5–8 remain pending. The final outcome and proof inventory will be
+recorded after the final candidate gates.
