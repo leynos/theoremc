@@ -354,7 +354,7 @@ mod prop_tests {
             );
             let name_refs: BTreeSet<&str> = names.iter().map(String::as_str).collect();
             let collisions = find_mangled_collisions(&name_refs)?;
-            for (_identifier, colliding_names) in &collisions {
+            for colliding_names in collisions.values() {
                 for colliding_name in colliding_names {
                     prop_assert!(
                         names.contains(colliding_name.as_str()),

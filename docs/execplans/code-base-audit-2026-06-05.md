@@ -142,10 +142,10 @@ trybuild fixtures under `crates/theoremc-macros/tests/expand/`. Behavioural
 tests live under `tests/`, with reusable helpers in `tests/common/` and Gherkin
 feature files under `tests/features/`.
 
-The current code has two separate canonical action-name validators:
-`crates/theoremc-core/src/canonical_action_name.rs` now owns the neutral
-grammar and newtype used by schema and mangling code. The remaining milestones
-continue from that shared boundary.
+`crates/theoremc-core/src/canonical_action_name.rs` now owns the single
+canonical action-name grammar and newtype used by both schema and mangling
+code, replacing the two separate validators this audit found. The remaining
+milestones continue from that shared boundary.
 
 ## Conformance basis
 
