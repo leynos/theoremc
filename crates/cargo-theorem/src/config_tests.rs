@@ -26,32 +26,51 @@ fn temp_config(contents: &str) -> Result<(tempfile::TempDir, PathBuf)> {
     Ok((directory, path))
 }
 
+/// One row of the global colour-precedence cases.
+///
+/// The inputs travel together in every case, so naming them keeps the case
+/// list from becoming a row of interchangeable positional arguments.
+struct GlobalCase {
+    contents: &'static str,
+    arguments: &'static [&'static str],
+    environment_color: Option<&'static str>,
+    expected: &'static str,
+}
+
 #[rstest]
-#[case::file_over_default("color = \"never\"\n", &[], None, "never")]
-#[case::profile_over_file(
-    "color = \"always\"\n[profile.ci]\ncolor = \"never\"\n",
-    &["--profile", "ci"],
-    None,
-    "never"
-)]
-#[case::profile_and_environment(
-        "color = \"always\"\n[profile.ci]\ncolor = \"never\"\n",
-        &["--profile", "ci"],
-        Some("always"),
-        "always"
-    )]
-#[case::cli_wins(
-        "color = \"never\"\n",
-        &["--color", "auto"],
-        Some("always"),
-        "auto"
-    )]
+#[case::file_over_default(GlobalCase {
+    contents: "color = \"never\"\n",
+    arguments: &[],
+    environment_color: None,
+    expected: "never",
+})]
+#[case::profile_over_file(GlobalCase {
+    contents: "color = \"always\"\n[profile.ci]\ncolor = \"never\"\n",
+    arguments: &["--profile", "ci"],
+    environment_color: None,
+    expected: "never",
+})]
+#[case::profile_and_environment(GlobalCase {
+    contents: "color = \"always\"\n[profile.ci]\ncolor = \"never\"\n",
+    arguments: &["--profile", "ci"],
+    environment_color: Some("always"),
+    expected: "always",
+})]
+#[case::cli_wins(GlobalCase {
+    contents: "color = \"never\"\n",
+    arguments: &["--color", "auto"],
+    environment_color: Some("always"),
+    expected: "auto",
+})]
 fn global_values_follow_defaults_files_profiles_environment_and_cli(
-    #[case] contents: &str,
-    #[case] arguments: &[&str],
-    #[case] environment_color: Option<&str>,
-    #[case] expected: &str,
+    #[case] case: GlobalCase,
 ) -> Result<()> {
+    let GlobalCase {
+        contents,
+        arguments,
+        environment_color,
+        expected,
+    } = case;
     let (_directory, path) = temp_config(contents)?;
     let mut environment = MapEnv::new().with_var("THEOREMC_CONFIG_PATH", path.as_path());
     if let Some(color) = environment_color {
@@ -73,15 +92,35 @@ fn global_values_follow_defaults_files_profiles_environment_and_cli(
     Ok(())
 }
 
+/// One row of the global-switch precedence cases.
+struct SwitchCase {
+    contents: &'static str,
+    arguments: &'static [&'static str],
+    expected: Option<bool>,
+}
+
 #[rstest]
-#[case::absent_everywhere("", &[], None)]
-#[case::file_value_survives_absent_cli("quiet = true\n", &[], Some(true))]
-#[case::cli_flag_overrides_file("quiet = false\n", &["--quiet"], Some(true))]
-fn global_switches_preserve_absence_and_cli_precedence(
-    #[case] contents: &str,
-    #[case] arguments: &[&str],
-    #[case] expected: Option<bool>,
-) -> Result<()> {
+#[case::absent_everywhere(SwitchCase {
+    contents: "",
+    arguments: &[],
+    expected: None,
+})]
+#[case::file_value_survives_absent_cli(SwitchCase {
+    contents: "quiet = true\n",
+    arguments: &[],
+    expected: Some(true),
+})]
+#[case::cli_flag_overrides_file(SwitchCase {
+    contents: "quiet = false\n",
+    arguments: &["--quiet"],
+    expected: Some(true),
+})]
+fn global_switches_preserve_absence_and_cli_precedence(#[case] case: SwitchCase) -> Result<()> {
+    let SwitchCase {
+        contents,
+        arguments,
+        expected,
+    } = case;
     let (_directory, path) = temp_config(contents)?;
     let source = Arc::new(MapEnv::new());
     let mut args = vec![
