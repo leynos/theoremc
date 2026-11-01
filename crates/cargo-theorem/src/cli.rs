@@ -251,11 +251,11 @@ fn config_arguments(options: &GlobalOptions, profile: Option<&str>) -> Vec<OsStr
         append_text(&mut args, "--width", Some(&width.to_string()));
     }
     append_text(&mut args, "--locale", options.locale.as_deref());
-    append_bool(&mut args, "--quiet", options.quiet);
-    append_bool(&mut args, "--verbose", options.verbose);
-    append_bool(&mut args, "--no-input", options.no_input);
-    append_bool(&mut args, "--plain", options.plain);
-    append_bool(&mut args, "--no-pager", options.no_pager);
+    append_flag(&mut args, "--quiet", options.quiet);
+    append_flag(&mut args, "--verbose", options.verbose);
+    append_flag(&mut args, "--no-input", options.no_input);
+    append_flag(&mut args, "--plain", options.plain);
+    append_flag(&mut args, "--no-pager", options.no_pager);
     if let Some(path) = options.config_path.as_deref() {
         args.push(OsString::from("--config"));
         args.push(path.as_os_str().to_os_string());
@@ -272,9 +272,12 @@ fn append_text(args: &mut Vec<OsString>, name: &str, maybe_value: Option<&str>) 
     }
 }
 
-/// Append a true boolean flag while preserving absence as the default.
-fn append_bool(args: &mut Vec<OsString>, name: &str, value: bool) {
-    if value {
+/// Append a flag only when the operator selected it explicitly.
+///
+/// `None` and `Some(false)` both mean the flag was not selected, so neither is
+/// re-emitted and an absent default cannot override file or environment values.
+fn append_flag(args: &mut Vec<OsString>, name: &str, selected: Option<bool>) {
+    if selected == Some(true) {
         args.push(OsString::from(name));
     }
 }

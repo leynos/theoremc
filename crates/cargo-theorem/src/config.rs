@@ -2,7 +2,7 @@
 
 use std::{collections::BTreeMap, ffi::OsString, path::Path, sync::Arc};
 
-use clap::Args;
+use clap::{ArgAction, Args};
 use ortho_config::{
     EnvSource, OrthoConfig, OrthoError, OrthoResult, ProfileLoadOutcome, SelectedSubcommandMerge,
     SelectedSubcommandMergeError, SharedEnvSource, SharedScanEnvSource, SubcommandFileContext,
@@ -50,13 +50,11 @@ where
 ///
 /// `None` fields keep Clap defaults out of the source merge. Effective renderer
 /// defaults are applied only after files, profiles, environment, and CLI have
-/// been combined.
+/// been combined. The switches are `Option<bool>` for the same reason: `None`
+/// means "not selected here", so a later source or the renderer can still
+/// choose the behaviour.
 #[derive(Debug, Clone, Default, Args, Deserialize, Serialize, OrthoConfig)]
 #[serde(default, deny_unknown_fields)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "These independent switches are the public CLI configuration surface."
-)]
 #[ortho_config(
     prefix = "THEOREMC_",
     discovery(
@@ -100,25 +98,25 @@ pub struct GlobalOptions {
     #[ortho_config(cli_long = "config")]
     pub config_path: Option<std::path::PathBuf>,
     /// Suppress non-essential human-readable output.
-    #[arg(long, global = true)]
+    #[arg(long, global = true, action = ArgAction::SetTrue)]
     #[ortho_config(cli_default_as_absent)]
-    pub quiet: bool,
+    pub quiet: Option<bool>,
     /// Increase diagnostic detail for human-readable output.
-    #[arg(long, global = true)]
+    #[arg(long, global = true, action = ArgAction::SetTrue)]
     #[ortho_config(cli_default_as_absent)]
-    pub verbose: bool,
+    pub verbose: Option<bool>,
     /// Disable prompts for commands that support interaction.
-    #[arg(long, global = true)]
+    #[arg(long, global = true, action = ArgAction::SetTrue)]
     #[ortho_config(cli_default_as_absent)]
-    pub no_input: bool,
+    pub no_input: Option<bool>,
     /// Disable decorative human-renderer output.
-    #[arg(long, global = true)]
+    #[arg(long, global = true, action = ArgAction::SetTrue)]
     #[ortho_config(cli_default_as_absent)]
-    pub plain: bool,
+    pub plain: Option<bool>,
     /// Disable paging for human-readable output.
-    #[arg(long, global = true)]
+    #[arg(long, global = true, action = ArgAction::SetTrue)]
     #[ortho_config(cli_default_as_absent)]
-    pub no_pager: bool,
+    pub no_pager: Option<bool>,
     /// Settings for registered commands; only the selected namespace is read.
     #[arg(skip)]
     #[serde(default)]
@@ -126,12 +124,12 @@ pub struct GlobalOptions {
     pub cmds: BTreeMap<String, Value>,
 }
 
-/// Effective values after the application defaults are applied.
+/// Effective values after the application-owned policy defaults are applied.
+///
+/// Policy fields are concrete because their vocabulary has an application
+/// default. The switches stay optional because the renderer owns their defaults
+/// and neither a file nor the command line need select them.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "This value carries the independent renderer and interaction switches."
-)]
 pub struct ResolvedSettings {
     /// Colour policy used by human renderers.
     pub color: String,
@@ -145,16 +143,16 @@ pub struct ResolvedSettings {
     pub width: Option<usize>,
     /// Optional requested locale.
     pub locale: Option<String>,
-    /// Whether quiet mode is active.
-    pub quiet: bool,
-    /// Whether verbose mode is active.
-    pub verbose: bool,
-    /// Whether interactive prompts are disabled.
-    pub no_input: bool,
-    /// Whether decorative human-renderer output is disabled.
-    pub plain: bool,
-    /// Whether paging is disabled.
-    pub no_pager: bool,
+    /// Whether quiet mode was selected.
+    pub quiet: Option<bool>,
+    /// Whether verbose mode was selected.
+    pub verbose: Option<bool>,
+    /// Whether interactive prompts were disabled.
+    pub no_input: Option<bool>,
+    /// Whether decorative human-renderer output was disabled.
+    pub plain: Option<bool>,
+    /// Whether paging was disabled.
+    pub no_pager: Option<bool>,
 }
 
 impl GlobalOptions {

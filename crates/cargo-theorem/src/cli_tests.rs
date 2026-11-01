@@ -135,7 +135,7 @@ fn configuration_argument_builder_forwards_present_settings() {
     let options = super::GlobalOptions {
         color: Some(String::from("always")),
         width: Some(100),
-        quiet: true,
+        quiet: Some(true),
         config_path: Some("settings.toml".into()),
         ..super::GlobalOptions::default()
     };

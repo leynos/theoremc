@@ -73,6 +73,34 @@ fn global_values_follow_defaults_files_profiles_environment_and_cli(
     Ok(())
 }
 
+#[rstest]
+#[case::absent_everywhere("", &[], None)]
+#[case::file_value_survives_absent_cli("quiet = true\n", &[], Some(true))]
+#[case::cli_flag_overrides_file("quiet = false\n", &["--quiet"], Some(true))]
+fn global_switches_preserve_absence_and_cli_precedence(
+    #[case] contents: &str,
+    #[case] arguments: &[&str],
+    #[case] expected: Option<bool>,
+) -> Result<()> {
+    let (_directory, path) = temp_config(contents)?;
+    let source = Arc::new(MapEnv::new());
+    let mut args = vec![
+        "cargo-theorem",
+        "--config",
+        path.to_str()
+            .ok_or_else(|| anyhow::anyhow!("config path is not UTF-8"))?,
+    ];
+    args.extend_from_slice(arguments);
+    let loaded = GlobalOptions::load_with_sources(args, source.clone(), source.clone())?;
+    let resolved = loaded.config().resolve()?;
+    ensure!(
+        resolved.quiet == expected,
+        "expected quiet {expected:?}, got {:?}",
+        resolved.quiet
+    );
+    Ok(())
+}
+
 #[test]
 fn global_defaults_are_used_when_sources_omit_a_value() -> Result<()> {
     let source = Arc::new(MapEnv::new());
