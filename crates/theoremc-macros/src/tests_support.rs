@@ -9,6 +9,8 @@
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
+use googletest::prelude::*;
+use rstest::rstest;
 use tempfile::TempDir;
 pub(super) use test_helpers::set_cargo_manifest_dir_for_test;
 use theoremc_core::mangle::{mangle_module_path, mangle_theorem_harness};
@@ -73,13 +75,15 @@ pub(super) fn redact_hashes(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     let marker = "__h";
     let mut rest = s;
-    while let Some(pos) = rest.find(marker) {
-        result.push_str(&rest[..pos]);
-        let after_marker = &rest[pos + marker.len()..];
-        let suffix = &after_marker[..after_marker.len().min(12)];
-        if suffix.len() == 12 && suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+    while let Some((prefix, after_marker)) = rest.split_once(marker) {
+        result.push_str(prefix);
+        let hash_remainder = after_marker
+            .get(..12)
+            .filter(|suffix| suffix.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            .and_then(|_| after_marker.get(12..));
+        if let Some(remainder) = hash_remainder {
             result.push_str("__hXXXXXXXXXXXX");
-            rest = &after_marker[12..];
+            rest = remainder;
         } else {
             result.push_str(marker);
             rest = after_marker;
@@ -87,6 +91,14 @@ pub(super) fn redact_hashes(s: &str) -> String {
     }
     result.push_str(rest);
     result
+}
+
+/// Redacts only complete ASCII hash suffixes and safely preserves Unicode.
+#[rstest]
+#[case::complete_hash("prefix__h0123456789ab", "prefix__hXXXXXXXXXXXX")]
+#[case::unicode_suffix("prefix__h0123456789aé", "prefix__h0123456789aé")]
+fn redact_hashes_only_complete_ascii_hash_suffixes(#[case] source: &str, #[case] expected: &str) {
+    assert_eq!(redact_hashes(source), expected);
 }
 
 pub(super) fn expected_expansion(path: &Utf8Path, theorems: &[&str]) -> String {
@@ -114,7 +126,7 @@ pub(super) fn expected_expansion_with_unwinds(
                 .to_owned()
         })
         .collect();
-    let harness_defs = harnesses
+    let harness_definitions = harnesses
         .iter()
         .zip(unwinds)
         .map(|(harness, unwind)| {
@@ -124,7 +136,7 @@ pub(super) fn expected_expansion_with_unwinds(
         })
         .collect::<Vec<_>>()
         .join(" ");
-    let harness_refs = harnesses
+    let harness_references = harnesses
         .iter()
         .map(|harness| format!("kani :: {harness}"))
         .collect::<Vec<_>>()
@@ -135,12 +147,12 @@ pub(super) fn expected_expansion_with_unwinds(
          mod {module_name} {{
             const _: & str = include_str! ( concat! ( env! (\"CARGO_MANIFEST_DIR\") , \"/\" , \"{path}\" ) ) ;
             # [cfg (kani)]
-            pub(super) mod kani {{ {harness_defs} }}
+            pub(super) mod kani {{ {harness_definitions} }}
             # [cfg (kani)]
             const _: [fn(); {}] = [ {} ] ;
         }}",
         harnesses.len(),
-        harness_refs,
+        harness_references,
     ))
 }
 
@@ -172,7 +184,7 @@ pub(super) fn assert_expansion_matches(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let actual = expand_fixture(path, fixture)?;
     let expected = expected_expansion(path, expected_theorems);
-    assert_eq!(actual, expected);
+    assert_that!(actual.as_str(), eq(expected.as_str()));
     Ok(())
 }
 
@@ -182,7 +194,7 @@ pub(super) fn assert_expansion_is_stable(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let first = expand_fixture(path, fixture)?;
     let second = expand_fixture(path, fixture)?;
-    assert_eq!(first, second);
+    assert_that!(first.as_str(), eq(second.as_str()));
     Ok(())
 }
 

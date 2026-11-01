@@ -16,6 +16,8 @@ use super::{
     MacroExpansionError, expand_theorem_file_at, generated_harnesses, manifest_dir_from_env,
 };
 use camino::Utf8Path;
+use googletest::prelude::*;
+use indexmap::IndexMap;
 use proptest::prelude::{prop, prop_assert_eq, proptest};
 use proptest::{prop_assert, prop_assume};
 use rstest::rstest;
@@ -71,7 +73,7 @@ fn multi_document_expansion_preserves_document_order() -> Result<(), Box<dyn std
 
     let actual = expand_fixture(path, &TheoremFixture(theorem.to_owned()))?;
     let expected = expected_expansion_with_unwinds(path, &["FirstMacro", "SecondMacro"], &[1, 3]);
-    assert_eq!(actual, expected);
+    assert_that!(actual.as_str(), eq(expected.as_str()));
     Ok(())
 }
 
@@ -99,9 +101,8 @@ fn expansion_is_stable_for_repeat_calls() -> Result<(), Box<dyn std::error::Erro
 fn manifest_dir_from_env_reports_missing_manifest_dir() {
     let _env = set_cargo_manifest_dir_for_test(None);
 
-    let error = manifest_dir_from_env()
-        .err()
-        .expect("missing CARGO_MANIFEST_DIR should return an error");
+    let error =
+        manifest_dir_from_env().expect_err("missing CARGO_MANIFEST_DIR should return an error");
 
     assert!(matches!(error, MacroExpansionError::MissingManifestDir));
 }
@@ -152,14 +153,14 @@ fn generated_harnesses_reports_missing_kani_evidence() {
         about: "Missing Kani evidence coverage".to_owned(),
         tags: Vec::new(),
         given: Vec::new(),
-        forall: Default::default(),
-        actions: Default::default(),
+        forall: IndexMap::new(),
+        actions: IndexMap::new(),
         assume: Vec::new(),
         witness: vec![WitnessCheck {
             cover: "true".to_owned(),
             because: "reachable".to_owned(),
         }],
-        let_bindings: Default::default(),
+        let_bindings: IndexMap::new(),
         do_steps: Vec::new(),
         prove: vec![Assertion {
             assert_expr: "true".to_owned(),
@@ -190,14 +191,14 @@ fn theorem_doc_with_unwind(name: String, unwind: u32) -> TheoremDoc {
         about: "Generated theorem".to_owned(),
         tags: Vec::new(),
         given: Vec::new(),
-        forall: Default::default(),
-        actions: Default::default(),
+        forall: IndexMap::new(),
+        actions: IndexMap::new(),
         assume: Vec::new(),
         witness: vec![WitnessCheck {
             cover: "true".to_owned(),
             because: "reachable".to_owned(),
         }],
-        let_bindings: Default::default(),
+        let_bindings: IndexMap::new(),
         do_steps: Vec::new(),
         prove: vec![Assertion {
             assert_expr: "true".to_owned(),
@@ -285,14 +286,14 @@ proptest! {
                         about: "Missing kani".to_owned(),
                         tags: Vec::new(),
                         given: Vec::new(),
-                        forall: Default::default(),
-                        actions: Default::default(),
+                        forall: IndexMap::new(),
+                        actions: IndexMap::new(),
                         assume: Vec::new(),
                         witness: vec![WitnessCheck {
                             cover: "true".to_owned(),
                             because: "reachable".to_owned(),
                         }],
-                        let_bindings: Default::default(),
+                        let_bindings: IndexMap::new(),
                         do_steps: Vec::new(),
                         prove: vec![Assertion {
                             assert_expr: "true".to_owned(),
@@ -382,15 +383,19 @@ fn theorem_file_errors_report_expected_compile_error(
 ) {
     let (_temp_dir, fixture_dir) =
         temp_fixture_dir().expect("should create temp fixture dir for error fixture");
-    let path = Utf8Path::new(path);
+    let relative_path = Utf8Path::new(path);
 
     if let Some(content) = fixture_content {
-        write_fixture(&fixture_dir, path, &TheoremFixture(content.to_owned()))
-            .expect("should write theorem fixture");
+        write_fixture(
+            &fixture_dir,
+            relative_path,
+            &TheoremFixture(content.to_owned()),
+        )
+        .expect("should write theorem fixture");
     }
 
-    let error_string =
-        expansion_error_message(&fixture_dir, path).expect("should render expansion error");
+    let error_string = expansion_error_message(&fixture_dir, relative_path)
+        .expect("should render expansion error");
     assert!(
         error_string.contains(expected_fragment),
         "expected '{expected_fragment}' in compile error, got: {error_string}"

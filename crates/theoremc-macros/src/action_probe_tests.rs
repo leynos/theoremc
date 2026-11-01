@@ -42,26 +42,28 @@ fn expansion_emits_typed_action_probe_for_referenced_action()
 
     let expanded = expand_fixture(Utf8Path::new("theorems/action-probe.theorem"), &theorem)?;
 
-    assert!(
-        expanded.contains(concat!(
+    assert_that!(
+        expanded.as_str(),
+        contains_substring(concat!(
             "const_:fn(u64,u32)->bool=crate::theorem_actions::",
             "account__deposit__h05158894bfb4;"
         )),
-        "expected typed action probe in expansion, got: {expanded}"
     );
     Ok(())
 }
 
-#[rstest]
-fn expansion_rejects_conflicting_signatures_for_shared_action(
-    #[values("return", "parameter")] conflict: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let (first_param, first_return, second_param, second_return) = match conflict {
-        "return" => ("u64", "bool", "u64", "u32"),
-        "parameter" => ("u64", "bool", "u32", "bool"),
-        _ => unreachable!("rstest provides known conflict cases"),
-    };
-    let theorem = TheoremFixture(format!(
+/// Builds a two-document fixture whose `account.deposit` declarations differ.
+///
+/// Each document declares and calls the same action, so both declarations are
+/// reachable and expansion must compare their signatures. The caller chooses
+/// where the second document drifts: its parameter type or its return type.
+fn shared_action_conflict_fixture(
+    first_param: &str,
+    first_return: &str,
+    second_param: &str,
+    second_return: &str,
+) -> TheoremFixture {
+    TheoremFixture(format!(
         concat!(
             "Theorem: FirstActionProbe\n",
             "About: First probe\n",
@@ -113,7 +115,25 @@ fn expansion_rejects_conflicting_signatures_for_shared_action(
         first_return = first_return,
         second_param = second_param,
         second_return = second_return,
-    ));
+    ))
+}
+
+#[rstest]
+fn expansion_rejects_conflicting_signatures_for_shared_action(
+    #[values("return", "parameter")] conflict: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (first_param, first_return, second_param, second_return) = match conflict {
+        "return" => ("u64", "bool", "u64", "u32"),
+        "parameter" => ("u64", "bool", "u32", "bool"),
+        _ => {
+            return Err(std::io::Error::other(format!(
+                "unexpected action signature conflict case: {conflict:?}"
+            ))
+            .into());
+        }
+    };
+    let theorem =
+        shared_action_conflict_fixture(first_param, first_return, second_param, second_return);
 
     let expansion = expand_fixture(Utf8Path::new("theorems/conflicting.theorem"), &theorem)
         .expect_err("conflicting shared action signatures should fail expansion");
