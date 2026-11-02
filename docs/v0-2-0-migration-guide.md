@@ -29,11 +29,11 @@ single command, assign an empty value:
 RUSTFLAGS="" cargo build --release
 ```
 
-The Rust 1.88 validation path needs this form, because a stable toolchain
+The Rust 1.89 validation path needs this form, because a stable toolchain
 refuses `-Zthreads=8`:
 
 ```bash
-RUSTFLAGS="" cargo +1.88 check --workspace
+RUSTFLAGS="" cargo +1.89 check --workspace
 ```
 
 ## Borrowed-string newtypes
