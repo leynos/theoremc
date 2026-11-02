@@ -161,6 +161,13 @@ published as a draft pull request.
 - [x] (2026-11-02) Rerun all eleven deterministic gates sequentially on the
   repair head `0c37132`; every gate passed and `make test` reported 893 of 893
   nextest tests passing.
+- [x] (2026-11-02) Publish head `b42f548` and obtain the candidate-bound
+  assessment in comment 6568404862, which closed the assessment with no further
+  in-scope omission or correctness defect.
+- [x] (2026-11-02) Mark the pull request ready and address the first exact-head
+  review, 5731875530, whose three minor findings are applied in `b41028d`; the
+  reviewer confirmed all three repaired and asked only for the PR description
+  to label `b42f548` as the previously validated head.
 
 The reviewed head is `b42f548`, which carries the two assessment repairs — the
 declared missing-token negative control and this record's reconciliation — on
@@ -168,11 +175,23 @@ top of the repair head `0c37132` that passed all eleven deterministic gates
 sequentially with 893 of 893 nextest tests passing. Head `b42f548` was
 published, and hosted CI run 41380632536 concluded `success` for it, as did
 `CodeScene Code Health Review` and `Gecko Security Review`; the pull request is
-ready and GitHub reports it `MERGEABLE`. Its first exact-head CodeRabbit review
-raised three findings — a checkout credential-persistence hardening, the MSRV
-command's need to clear `RUSTFLAGS`, and this paragraph — which the revision
-carrying this text applies. Remaining work is the confirming assessment reply,
-the final approval request, and the merge.
+ready and GitHub reports it `MERGEABLE`.
+
+Head `b41028d` applies the review's three findings: the checkout step clears
+its persisted credentials, the users' guide documents `RUSTFLAGS=""` for the
+MSRV check, and this record was reconciled. Its hosted Format step then failed,
+because the new guide paragraph was hand-wrapped short and `mdtablefix`
+rewrapped it; head `5e69a4c` carries that rewrap. Local `make check-fmt` only
+inspects git-changed files, so it cannot see a committed Markdown edit — the
+changed files were checked with `mdtablefix` directly instead.
+
+Hosted run 41385772361 for `5e69a4c` reached the coverage step and timed out in
+the `theoremc-macros::expand compile_errors` trybuild case, which has a
+180-second per-test limit that coverage instrumentation makes tight on the
+runner. The identical code passed that case on `b42f548`, so the failed job was
+rerun rather than changed.
+
+Remaining work is the final approval request and the merge.
 
 **Historical (pre-rebase) state.** The paragraph below records the working-tree
 state before ADR-010 unified the MSRV checks and before the rebase onto
