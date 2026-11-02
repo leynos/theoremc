@@ -63,16 +63,10 @@ without providing 2.0's current release line.
 2. Every workspace package declares `rust-version = "1.89"`: the root
    `theoremc` facade, `theoremc-core`, `theoremc-macros`,
    `theoremc-build-support`, `test-helpers`, and `cargo-theorem`.
-3. `make msrv` runs
-   `RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features
-   --locked`.
-   Continuous integration installs only the Rust 1.89 toolchain and runs that
-   target. The previous Rust 1.88 library and Rust 1.89 application split is
-   retired.
-4. The workspace sets `resolver = "3"` so Cargo prefers dependency versions
-   compatible with the declared MSRV. The lockfile therefore keeps the dev-only
-   `cargo-platform` on 0.3.2 rather than 0.3.3, which requires Rust 1.91.
-5. ADR-009's mixed-MSRV clauses are superseded. Its application-only
+3. `make msrv` runs `RUSTFLAGS="" cargo +1.89 check --workspace`. Continuous
+   integration installs only the Rust 1.89 toolchain and runs that target. The
+   previous Rust 1.88 library and Rust 1.89 application split is retired.
+4. ADR-009's mixed-MSRV clauses are superseded. Its application-only
    OrthoConfig configuration boundary, discovery and precedence rules, profile
    support, and command metadata decisions remain in force.
 
@@ -81,16 +75,57 @@ without providing 2.0's current release line.
 - Library consumers now require Rust 1.89, the same floor as the CLI.
 - One MSRV check replaces the split checks, and CI no longer installs Rust
   1.88.
-- The MSRV gate covers every target, including tests, because the MSRV-aware
-  resolver keeps the dev-only `cargo-platform` on 0.3.2. A future dependency
-  that needs a newer toolchain will fail the gate rather than silently narrow
-  its scope.
+- The MSRV gate covers library and binary targets. Test-only dependencies are
+  outside the contract because the current `rstest-bdd` stack resolves a
+  `cargo-platform` release that requires a newer toolchain than Rust 1.89.
 - The workspace lockfile resolves `serde-saphyr` 2.0.0 and its
   `granit-parser` 2.0.0 dependency.
 - The existing schema, loader, diagnostic, and behavioural tests remain the
   compatibility evidence for YAML parsing after the upgrade.
 - Downstream crates that require Rust 1.88 must upgrade or remain on the last
   theoremc release that supported that floor.
+
+## Addendum: 2026-11-02
+
+The accepted text above is preserved as recorded. This addendum records the
+follow-up work that widened the MSRV gate and removed the test-only exclusion.
+
+### Resolver 3
+
+The workspace now sets `resolver = "3"` in the root `Cargo.toml`. Cargo's
+MSRV-aware resolver prefers dependency versions whose declared `rust-version`
+is compatible with the workspace MSRV, so a routine `cargo update` no longer
+silently selects a release that the declared floor cannot build.
+
+### `cargo-platform` 0.3.2
+
+The `rstest-bdd` stack pulls `cargo-platform` in as a dev-only dependency.
+`cargo-platform` 0.3.3 declares Rust 1.91, which is above the Rust 1.89 floor;
+0.3.2 is the newest release that builds on Rust 1.89. With resolver 3 the
+lockfile selects 0.3.2, so the test-only exclusion recorded in the accepted
+consequences is no longer needed.
+
+### Expanded `make msrv`
+
+`make msrv` now runs:
+
+```sh
+RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features --locked
+```
+
+- `--all-targets` brings tests, examples, and benches inside the contract, so
+  the dev-only dependency graph is checked at the declared floor.
+- `--all-features` checks every optional feature combination the workspace
+  publishes.
+- `--locked` fails the gate if the lockfile would need to change, so the
+  checked dependency graph is the one that ships.
+
+`RUSTFLAGS=""` is deliberate: it displaces the repository's development
+rustflags, which include nightly-only options and a linker choice that the
+stable Rust 1.89 toolchain does not accept.
+
+The developer's guide and the design documents describe the same command and
+the same resolver decision.
 
 ## Related documents
 
