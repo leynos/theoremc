@@ -412,5 +412,5 @@ on the vertical-slice path.
   boundary](adr-0006-backend-neutral-harness-planning-boundary.md)
 - [ADR-0004: theorem-side action
   signatures](adr-0004-action-signature-specification.md)
-- [Theoremc design specification](theoremc-design.md)
-- [Development roadmap](roadmap.md)
+- [Theoremc design specification](../theoremc-design.md)
+- [Development roadmap](../roadmap.md)

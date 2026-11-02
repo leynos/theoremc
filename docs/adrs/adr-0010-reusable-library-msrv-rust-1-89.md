@@ -135,7 +135,7 @@ the same resolver decision.
 
 - [ADR-0002: library-first Fluent localization](adr-0002-library-first-internationalization-and-localization-with-fluent.md)
 - [ADR-0009: OrthoConfig CLI configuration](adr-0009-ortho-config-cli-configuration.md)
-- [`cargo theorem` CLI design](cargo-theorem-cli-design.md)
-- [Developer's guide](developers-guide.md)
-- [Theoremc design](theoremc-design.md)
-- [Theoremc development roadmap](roadmap.md)
+- [`cargo theorem` CLI design](../cargo-theorem-cli-design.md)
+- [Developer's guide](../developers-guide.md)
+- [Theoremc design](../theoremc-design.md)
+- [Theoremc development roadmap](../roadmap.md)
