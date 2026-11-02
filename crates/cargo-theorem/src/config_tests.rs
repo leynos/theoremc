@@ -37,6 +37,11 @@ struct GlobalCase {
     expected: &'static str,
 }
 
+/// Checks that each configuration source outranks the one below it.
+///
+/// The case table walks the precedence chain from defaults through the file,
+/// the selected profile, the environment, and finally the command line, so a
+/// regression in any single layer fails on its own row.
 #[rstest]
 #[case::file_over_default(GlobalCase {
     contents: "color = \"never\"\n",
@@ -140,6 +145,10 @@ fn global_switches_preserve_absence_and_cli_precedence(#[case] case: SwitchCase)
     Ok(())
 }
 
+/// Checks that an omitted setting falls back to its built-in default.
+///
+/// No file, profile, environment, or command-line source supplies a colour, so
+/// the resolved value must be the default rather than an error.
 #[test]
 fn global_defaults_are_used_when_sources_omit_a_value() -> Result<()> {
     let source = Arc::new(MapEnv::new());

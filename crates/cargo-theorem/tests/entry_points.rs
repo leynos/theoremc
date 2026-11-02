@@ -263,6 +263,12 @@ fn direct_invocation_without_the_theorem_token_is_a_usage_failure() -> Result<()
     Ok(())
 }
 
+/// Checks that a missing option value does not swallow the next flag.
+///
+/// `--color` is given without a value and followed by `--json`. The parser
+/// must report the missing value as a usage failure on standard error, keep
+/// exit code 2, and leave standard output empty so the JSON flag is not
+/// mistaken for the colour value.
 #[test]
 fn missing_global_value_preserves_a_following_json_flag() -> Result<()> {
     let directory = tempfile::tempdir()?;
