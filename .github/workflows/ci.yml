@@ -17,6 +17,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+          # `cargo install cargo-orthohelp` compiles third-party crates and runs
+          # their build scripts. Nothing in this job pushes, so keep the git
+          # token out of `.git/config` while that code executes.
+          persist-credentials: false
       - name: Setup Rust
         uses: leynos/shared-actions/.github/actions/setup-rust@6e99f225cb06684f9e6f89b63a7ca4a04095c067
         with:

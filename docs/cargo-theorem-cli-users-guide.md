@@ -33,8 +33,11 @@ Rust 1.89, because `serde-saphyr` 2.0.0 declares that floor;
 Continuous integration (CI) tests the single workspace contract:
 
 ```console
-cargo +1.89 check --workspace
+RUSTFLAGS="" cargo +1.89 check --workspace
 ```
+
+Clearing `RUSTFLAGS` matters because `.cargo/config.toml` sets the
+nightly-only `-Zthreads=8` frontend flag, which stable Rust 1.89 rejects.
 
 ## Running the command
 

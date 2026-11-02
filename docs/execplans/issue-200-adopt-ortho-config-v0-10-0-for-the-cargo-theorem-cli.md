@@ -162,12 +162,17 @@ published as a draft pull request.
   repair head `0c37132`; every gate passed and `make test` reported 893 of 893
   nextest tests passing.
 
-The candidate for head `0c37132` is complete for its accepted scope. All eleven
-deterministic gates passed sequentially on that head, and the candidate-bound
-assessment for the previous head found no in-scope runtime defect. The two
-assessment repairs — the declared missing-token negative control and this
-record's reconciliation — are committed. Publishing the repair head, observing
-hosted CI, and requesting the confirming assessment precede readiness and merge.
+The reviewed head is `b42f548`, which carries the two assessment repairs — the
+declared missing-token negative control and this record's reconciliation — on
+top of the repair head `0c37132` that passed all eleven deterministic gates
+sequentially with 893 of 893 nextest tests passing. Head `b42f548` was
+published, and hosted CI run 41380632536 concluded `success` for it, as did
+`CodeScene Code Health Review` and `Gecko Security Review`; the pull request is
+ready and GitHub reports it `MERGEABLE`. Its first exact-head CodeRabbit review
+raised three findings — a checkout credential-persistence hardening, the MSRV
+command's need to clear `RUSTFLAGS`, and this paragraph — which the revision
+carrying this text applies. Remaining work is the confirming assessment reply,
+the final approval request, and the merge.
 
 **Historical (pre-rebase) state.** The paragraph below records the working-tree
 state before ADR-010 unified the MSRV checks and before the rebase onto
