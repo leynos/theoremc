@@ -7,23 +7,31 @@ use test_helpers::{
 
 #[test]
 fn fixtures_share_a_target_but_keep_sources_and_generated_output_separate() -> Result<(), String> {
-    let first = FixtureCrate::new(
-        &build_support_fixture_manifest("cache_contract_first"),
-        SUITE_FIXTURE_LIB_RS,
-    )?;
-    let second = FixtureCrate::new(
-        &build_support_fixture_manifest("cache_contract_second"),
-        SUITE_FIXTURE_LIB_RS,
-    )?;
-    first.write(Utf8Path::new("theorems/first.theorem"), TRIVIAL_THEOREM)?;
-    second.write(Utf8Path::new("theorems/second.theorem"), TRIVIAL_THEOREM)?;
+    let first = new_suite_fixture("cache_contract_first", "theorems/first.theorem")?;
+    let second = new_suite_fixture("cache_contract_second", "theorems/second.theorem")?;
 
-    assert_paths_and_isolation(&first, &second)?;
+    assert_sources_are_isolated(&first, &second)?;
     assert_generated_suites_are_isolated(&first, &second)
 }
 
-/// Checks the shared target and the source-level isolation between fixtures.
-fn assert_paths_and_isolation(first: &FixtureCrate, second: &FixtureCrate) -> Result<(), String> {
+/// Creates a build-script-enabled fixture owning exactly one theorem.
+fn new_suite_fixture(package_name: &str, theorem_path: &str) -> Result<FixtureCrate, String> {
+    let fixture = FixtureCrate::new(
+        &build_support_fixture_manifest(package_name),
+        SUITE_FIXTURE_LIB_RS,
+    )?;
+    fixture.write(Utf8Path::new(theorem_path), TRIVIAL_THEOREM)?;
+    Ok(fixture)
+}
+
+/// Checks that the fixtures share a target but not their source directories.
+fn assert_sources_are_isolated(first: &FixtureCrate, second: &FixtureCrate) -> Result<(), String> {
+    assert_path_relationships(first, second)?;
+    assert_second_fixture_is_unbuilt(second)
+}
+
+/// Checks the directory and target relationships between two fixtures.
+fn assert_path_relationships(first: &FixtureCrate, second: &FixtureCrate) -> Result<(), String> {
     let checks = [
         (
             first.manifest_dir() != second.manifest_dir(),
@@ -37,16 +45,6 @@ fn assert_paths_and_isolation(first: &FixtureCrate, second: &FixtureCrate) -> Re
             first.target_dir().file_name() == Some("theoremc-fixture-builds"),
             "fixtures must build into the shared fixture target",
         ),
-        (
-            second
-                .modified_time(Utf8Path::new("theorems/first.theorem"))
-                .is_err(),
-            "writing one fixture must not change another fixture's sources",
-        ),
-        (
-            second.generated_suite_contents().is_err(),
-            "an unbuilt fixture must not read a stale shared suite",
-        ),
     ];
 
     checks.into_iter().try_for_each(|(condition, message)| {
@@ -56,6 +54,23 @@ fn assert_paths_and_isolation(first: &FixtureCrate, second: &FixtureCrate) -> Re
             Err(message.to_owned())
         }
     })
+}
+
+/// Checks that a source written into one fixture is absent from the other.
+///
+/// The suite read must fail before either fixture is built, so a cached suite
+/// from a sibling fixture cannot satisfy it.
+fn assert_second_fixture_is_unbuilt(second: &FixtureCrate) -> Result<(), String> {
+    if second
+        .modified_time(Utf8Path::new("theorems/first.theorem"))
+        .is_ok()
+    {
+        return Err("writing one fixture must not change another fixture's sources".to_owned());
+    }
+    if second.generated_suite_contents().is_ok() {
+        return Err("an unbuilt fixture must not read a stale shared suite".to_owned());
+    }
+    Ok(())
 }
 
 /// Builds both fixtures and checks each suite lists only its own theorem.
