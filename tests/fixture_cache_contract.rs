@@ -6,23 +6,39 @@ use test_helpers::{
     fixture_target_dir,
 };
 
+/// One fixture in the isolation contract: a package owning a single theorem.
+struct FixtureSpec {
+    package_name: &'static str,
+    theorem: &'static str,
+}
+
+const FIRST_FIXTURE: FixtureSpec = FixtureSpec {
+    package_name: "cache_contract_first",
+    theorem: "theorems/first.theorem",
+};
+
+const SECOND_FIXTURE: FixtureSpec = FixtureSpec {
+    package_name: "cache_contract_second",
+    theorem: "theorems/second.theorem",
+};
+
 #[test]
 fn fixtures_share_dependencies_but_keep_sources_and_generated_output_separate() -> Result<(), String>
 {
-    let first = new_suite_fixture("cache_contract_first", "theorems/first.theorem")?;
-    let second = new_suite_fixture("cache_contract_second", "theorems/second.theorem")?;
+    let first = new_suite_fixture(&FIRST_FIXTURE)?;
+    let second = new_suite_fixture(&SECOND_FIXTURE)?;
 
     assert_sources_are_isolated(&first, &second)?;
     assert_generated_suites_are_isolated(&first, &second)
 }
 
 /// Creates a build-script-enabled fixture owning exactly one theorem.
-fn new_suite_fixture(package_name: &str, theorem_path: &str) -> Result<FixtureCrate, String> {
+fn new_suite_fixture(spec: &FixtureSpec) -> Result<FixtureCrate, String> {
     let fixture = FixtureCrate::new(
-        &build_support_fixture_manifest(package_name),
+        &build_support_fixture_manifest(spec.package_name),
         SUITE_FIXTURE_LIB_RS,
     )?;
-    fixture.write(Utf8Path::new(theorem_path), TRIVIAL_THEOREM)?;
+    fixture.write(Utf8Path::new(spec.theorem), TRIVIAL_THEOREM)?;
     Ok(fixture)
 }
 
@@ -75,7 +91,7 @@ fn assert_path_relationships(first: &FixtureCrate, second: &FixtureCrate) -> Res
 /// from a sibling fixture cannot satisfy it.
 fn assert_second_fixture_is_unbuilt(second: &FixtureCrate) -> Result<(), String> {
     if second
-        .modified_time(Utf8Path::new("theorems/first.theorem"))
+        .modified_time(Utf8Path::new(FIRST_FIXTURE.theorem))
         .is_ok()
     {
         return Err("writing one fixture must not change another fixture's sources".to_owned());
@@ -96,26 +112,26 @@ fn assert_generated_suites_are_isolated(
 
     let first_suite = first.generated_suite_contents()?;
     let second_suite = second.generated_suite_contents()?;
-    assert_suite_contains(
-        &first_suite,
-        "theorems/first.theorem",
-        "theorems/second.theorem",
-    )?;
-    assert_suite_contains(
-        &second_suite,
-        "theorems/second.theorem",
-        "theorems/first.theorem",
-    )
+    assert_suite_contains(&first_suite, &FIRST_FIXTURE, &SECOND_FIXTURE)?;
+    assert_suite_contains(&second_suite, &SECOND_FIXTURE, &FIRST_FIXTURE)
 }
 
 /// Checks that `suite` contains `expected` and omits the sibling's theorem.
-fn assert_suite_contains(suite: &str, expected: &str, forbidden: &str) -> Result<(), String> {
-    if !suite.contains(expected) {
-        return Err(format!("generated suite missing {expected}:\n{suite}"));
-    }
-    if suite.contains(forbidden) {
+fn assert_suite_contains(
+    suite: &str,
+    expected: &FixtureSpec,
+    forbidden: &FixtureSpec,
+) -> Result<(), String> {
+    if !suite.contains(expected.theorem) {
         return Err(format!(
-            "generated suite leaked another fixture's theorem {forbidden}:\n{suite}"
+            "generated suite missing {}:\n{suite}",
+            expected.theorem
+        ));
+    }
+    if suite.contains(forbidden.theorem) {
+        return Err(format!(
+            "generated suite leaked another fixture's theorem {}:\n{suite}",
+            forbidden.theorem
         ));
     }
     Ok(())
