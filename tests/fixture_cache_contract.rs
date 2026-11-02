@@ -1,18 +1,29 @@
 //! Regressions for persistent dependency caching with isolated fixture sources.
 
 use camino::Utf8Path;
-use test_helpers::FixtureCrate;
+use test_helpers::{
+    FixtureCrate, SUITE_FIXTURE_LIB_RS, TRIVIAL_THEOREM, build_support_fixture_manifest,
+};
 
 #[test]
 fn fixtures_share_a_target_but_keep_sources_and_generated_output_separate() -> Result<(), String> {
-    let manifest = "[package]\nname = \"cache_contract\"\nversion = \"0.1.0\"\n";
-    let first = FixtureCrate::new(manifest, "//! First source.\n")?;
-    let second = FixtureCrate::new(manifest, "//! Second source.\n")?;
-    first.write(
-        Utf8Path::new("theorems/first.theorem"),
-        "first fixture only",
+    let first = FixtureCrate::new(
+        &build_support_fixture_manifest("cache_contract_first"),
+        SUITE_FIXTURE_LIB_RS,
     )?;
+    let second = FixtureCrate::new(
+        &build_support_fixture_manifest("cache_contract_second"),
+        SUITE_FIXTURE_LIB_RS,
+    )?;
+    first.write(Utf8Path::new("theorems/first.theorem"), TRIVIAL_THEOREM)?;
+    second.write(Utf8Path::new("theorems/second.theorem"), TRIVIAL_THEOREM)?;
 
+    assert_paths_and_isolation(&first, &second)?;
+    assert_generated_suites_are_isolated(&first, &second)
+}
+
+/// Checks the shared target and the source-level isolation between fixtures.
+fn assert_paths_and_isolation(first: &FixtureCrate, second: &FixtureCrate) -> Result<(), String> {
     let checks = [
         (
             first.manifest_dir() != second.manifest_dir(),
@@ -45,4 +56,39 @@ fn fixtures_share_a_target_but_keep_sources_and_generated_output_separate() -> R
             Err(message.to_owned())
         }
     })
+}
+
+/// Builds both fixtures and checks each suite lists only its own theorem.
+fn assert_generated_suites_are_isolated(
+    first: &FixtureCrate,
+    second: &FixtureCrate,
+) -> Result<(), String> {
+    first.cargo_build()?;
+    second.cargo_build()?;
+
+    let first_suite = first.generated_suite_contents()?;
+    let second_suite = second.generated_suite_contents()?;
+    assert_suite_contains(
+        &first_suite,
+        "theorems/first.theorem",
+        "theorems/second.theorem",
+    )?;
+    assert_suite_contains(
+        &second_suite,
+        "theorems/second.theorem",
+        "theorems/first.theorem",
+    )
+}
+
+/// Checks that `suite` contains `expected` and omits the sibling's theorem.
+fn assert_suite_contains(suite: &str, expected: &str, forbidden: &str) -> Result<(), String> {
+    if !suite.contains(expected) {
+        return Err(format!("generated suite missing {expected}:\n{suite}"));
+    }
+    if suite.contains(forbidden) {
+        return Err(format!(
+            "generated suite leaked another fixture's theorem {forbidden}:\n{suite}"
+        ));
+    }
+    Ok(())
 }
