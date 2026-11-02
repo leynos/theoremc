@@ -38,15 +38,15 @@ Observable success:
   entries done once the implementation is complete.
 - `make check-fmt`, `make lint`, and `make test` pass.
 
-This plan covers the normative requirements in `NMR-1`, `ADR-2`, `DES-7`, and
-`TFS-1`. It intentionally excludes report-level alias resolution, which remains
-out of scope until the later reporting work.
+This plan covers the normative requirements in `NMR-1`, `ADR-0001-2`, `DES-7`,
+and `TFS-1`. It intentionally excludes report-level alias resolution, which
+remains out of scope until the later reporting work.
 
 ## Constraints
 
 - The implementation must build on the completed Step 2.2.1 module-mangling
   work in `src/mangle.rs` and must not replace that algorithm.
-- Keep the architectural boundary from ADR 003 intact:
+- Keep the architectural boundary from ADR-0003 intact:
   `schema` remains responsible for loading and validation, `mangle` remains
   responsible for deterministic symbol derivation, and any cross-cutting
   duplicate-theorem-key checking lives outside those two concerns if the
@@ -125,7 +125,7 @@ out of scope until the later reporting work.
 
 ## Progress
 
-- [x] 2026-03-06: reviewed roadmap, name-mangling rules, ADR 001, design
+- [x] 2026-03-06: reviewed roadmap, name-mangling rules, ADR-0001, design
   document sections for Steps 2.1.x and 2.2.1, current `mangle` and collision
   implementations, and current user guide coverage.
 - [x] 2026-03-06: drafted this ExecPlan for deterministic harness naming and
@@ -173,7 +173,7 @@ out of scope until the later reporting work.
 
 - 2026-03-06: this plan covers both harness naming and duplicate theorem-key
   rejection even though the file name is `2-2-2-...`. Rationale: the user asked
-  for the full Step 2.2 implementation slice, and ADR 001 explicitly couples
+  for the full Step 2.2 implementation slice, and ADR-0001 explicitly couples
   harness naming with build-time duplicate theorem-key rejection.
 - 2026-03-06: plan the work as additive public helpers in `theoremc::mangle`
   plus loader-level validation, rather than a monolithic new subsystem.
@@ -415,7 +415,7 @@ Files to use as references without changing unless needed:
 - `tests/module_naming_bdd.rs`
 - `docs/name-mangling-rules.md`
 - `docs/theorem-file-specification.md`
-- `docs/adr-001-theorem-symbol-stability-and-non-vacuity-policy.md`
+- `docs/adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md`
 
 ## Acceptance checklist
 

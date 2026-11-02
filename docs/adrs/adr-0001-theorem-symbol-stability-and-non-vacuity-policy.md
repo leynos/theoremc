@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 001: theorem symbol stability and non-vacuity policy
+# Architectural decision record (ADR) 0001: Theorem symbol stability and non-vacuity policy
 
 - Status: accepted
 - Date: 2026-02-08

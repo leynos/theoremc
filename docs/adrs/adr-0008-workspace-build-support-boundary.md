@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 008: workspace build-support boundary
+# Architectural decision record (ADR) 0008: Workspace build-support boundary
 
 ## Status
 
@@ -24,7 +24,7 @@ specific paths. Moving or reorganizing a module could therefore break a
 separate Cargo compilation context even when the implementation itself was
 unchanged.
 
-[ADR-005](adr-005-vertical-slice-first-roadmap-sequencing.md) deferred
+[ADR-0011](adr-0011-vertical-slice-first-roadmap-sequencing.md) deferred
 build-support crate extraction as noncritical to its Kani vertical-slice gate.
 The issue addressed here is narrower than a general extraction programme: the
 existing discovery and suite-generation code was already shared across
@@ -47,9 +47,9 @@ own tests, and fixture crates that verify Cargo build-script behaviour. Do not
 include support implementation source with `#[path]`.
 
 This decision supersedes only the build-support extraction deferral in
-[ADR-005](adr-005-vertical-slice-first-roadmap-sequencing.md), and only for the
-existing discovery and suite-writing implementation. It does not make broad
-build-support extraction a project policy or reopen any other ADR-005
+[ADR-0011](adr-0011-vertical-slice-first-roadmap-sequencing.md), and only for
+the existing discovery and suite-writing implementation. It does not make broad
+build-support extraction a project policy or reopen any other ADR-0011
 sequencing decision.
 
 ## Consequences

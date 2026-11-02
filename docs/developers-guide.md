@@ -13,18 +13,18 @@ erode these boundaries and make the codebase harder to reason about.
 
 ## Key architecture decision records (ADRs)
 
-- [ADR-001: Theorem symbol stability and non-vacuity
-  policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md) — governs
-  theorem naming and vacuity defaults
-- [ADR-002: Library-first internationalization and localization with
-  Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+- [ADR-0001: Theorem symbol stability and non-vacuity
+  policy](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md) —
+  governs theorem naming and vacuity defaults
+- [ADR-0002: Library-first internationalization and localization with
+  Fluent](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
   — establishes internationalization (i18n) strategy
-- [ADR-003: Architectural boundary
-  enforcement](adr-003-architectural-boundary-enforcement.md) — enforces
+- [ADR-0003: Architectural boundary
+  enforcement](adrs/adr-0003-architectural-boundary-enforcement.md) — enforces
   layered schema boundaries and anti-corruption constraints
-- [ADR-008: Workspace build-support
-  boundary](adr-008-workspace-build-support-boundary.md) — assigns discovery
-  and generated-suite writing to the internal build-support crate
+- [ADR-0008: Workspace build-support
+  boundary](adrs/adr-0008-workspace-build-support-boundary.md) — assigns
+  discovery and generated-suite writing to the internal build-support crate
 
 ## Scope
 
@@ -116,7 +116,7 @@ set so Cargo can detect when the directory is created later.
 Step 3.1.1 (see
 [`execplans/3-1-1-build-rs-scanning-of-theorems.md`](execplans/3-1-1-build-rs-scanning-of-theorems.md))
 introduced discovery and Cargo invalidation; Step 3.1.2 added generated-suite
-writing. ADR-008 records the current ownership boundary: the
+writing. ADR-0008 records the current ownership boundary: the
 `theoremc-build-support` crate performs discovery and writes
 `OUT_DIR/theorem_suite.rs` with `theorem_file!("...")` invocations. The root
 `build.rs` adapter emits the cfg and rerun metadata from the returned
@@ -128,7 +128,7 @@ per-file expansion logic belongs to `crates/theoremc-macros`.
 ## 2. Module architecture
 
 The crate follows the layer boundaries enforced by Architecture Decision Record
-(ADR) [ADR-003](adr-003-architectural-boundary-enforcement.md):
+(ADR) [ADR-0003](adrs/adr-0003-architectural-boundary-enforcement.md):
 
 **Table:** Module layers and responsibilities
 
@@ -168,11 +168,11 @@ action-name validation rules to preserve independence from the schema layer.
 
 ### Accepted harness-planning boundary (pending implementation)
 
-[ADR 005](adr-005-vertical-slice-first-roadmap-sequencing.md) makes a real
-version 1 Kani proof and counterexample the next release gate. Step 4.1
+[ADR-0011](adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md) makes a
+real version 1 Kani proof and counterexample the next release gate. Step 4.1
 introduces the internal `HarnessPlan` in `theoremc-core`; the Kani renderer
 remains in `theoremc-macros`, as specified by
-[ADR 006](adr-006-backend-neutral-harness-planning-boundary.md). Schema
+[ADR-0006](adrs/adr-0006-backend-neutral-harness-planning-boundary.md). Schema
 decoding, semantic validation, planning, and token rendering retain separate
 ownership. All calls, `must` operations, and later law primaries share resolved
 invocations. The plan retains source provenance and stable obligation identity
@@ -181,11 +181,13 @@ predicates are explicitly backend-constrained.
 
 Step 4.4 then adds versioned raw proof-obligation adapters, dedicated domain
 law types, semantic validation, Law IR, and lowering into that same plan.
-[ADR 007](adr-007-verus-backend-preservation-invariants.md) governs backend
-capability checking, evidence distinctions, and additive future Verus bindings.
-The current assertion-only domain and raw lists remain unchanged until that
-step; the public API break requires release and migration documentation. See
-[RFC 0001](rfcs/0001-semantic-law-templates.md#implementation-sequence) and the
+[ADR-0007](adrs/adr-0007-verus-backend-preservation-invariants.md) governs
+backend capability checking, evidence distinctions, and additive future Verus
+bindings. The current assertion-only domain and raw lists remain unchanged
+until that step; the public API break requires release and migration
+documentation. See
+[RFC 0001](rfcs/rfc-0001-semantic-law-templates.md#implementation-sequence) and
+the
 [roadmap](roadmap.md#phase-4-working-kani-proof-path-safety-policy-and-semantic-laws)
 for implementation acceptance criteria.
 
@@ -279,7 +281,7 @@ the root `Cargo.toml` `rust-version` field and repeated in each workspace
 package. This floor is required by `serde-saphyr` 2.0.0 and `ortho_config`
 0.10.0; it also permits the use of let chains in conditionals. The decision to
 raise the reusable libraries from Rust 1.88 is recorded in
-[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md).
+[ADR-0010](adrs/adr-0010-reusable-library-msrv-rust-1-89.md).
 
 The workspace sets `resolver = "3"` so Cargo prefers dependency versions
 compatible with the declared MSRV. That is what keeps the dev-only
@@ -776,8 +778,8 @@ own `RUSTFLAGS`) and for the release target (the coverage exclusion is checked
 in the workflow steps) on a Linux host, and the `setup-rust` steps of the CI
 workflows (each must pass `install-mold`), so a flag lost through a recipe or
 workflow edit fails there. The decision is recorded in
-[ADR 005](adr-005-rust-build-standard.md). The contract runs `make -n`, so a
-direct `cargo test` needs GNU make on the `PATH`. It fails when `make` is
+[ADR-0005](adrs/adr-0005-rust-build-standard.md). The contract runs `make -n`,
+so a direct `cargo test` needs GNU make on the `PATH`. It fails when `make` is
 missing instead of skipping, so a missing tool cannot read as a pass.
 
 ### Cranelift

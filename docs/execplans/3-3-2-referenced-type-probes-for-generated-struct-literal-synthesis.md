@@ -113,7 +113,7 @@ Observable success:
   keeps Kani harnesses under `#[cfg(kani)]`. Referenced-type probes live in the
   per-file module body alongside action probes, not inside the `#[cfg(kani)]`
   submodule, so drift fails in ordinary builds.
-- Preserve ADR-003 schema layering: type traversal lives in `theoremc-core`
+- Preserve ADR-0003 schema layering: type traversal lives in `theoremc-core`
   next to `collision::referenced_actions`; `theoremc-macros` only renders
   tokens. `schema/` and `mangle/` boundaries are not crossed.
 - Probe items must compile without `#[allow(dead_code)]` attributes. Use the
@@ -244,11 +244,11 @@ Observable success:
   `Actions` and `ActionSignature` schema.
 - `TFS-5`: `docs/theorem-file-specification.md` §5.4, struct literal
   synthesis.
-- `ADR-3`: `docs/adr-003-architectural-boundary-enforcement.md`, schema and
-  collision module boundaries that this plan must respect.
-- `ADR-4`: `docs/adr-004-action-signature-specification.md`, theorem-side
-  action signature declarations and the rationale for treating types as
-  theorem-owned contracts.
+- `ADR-0003`: `docs/adrs/adr-0003-architectural-boundary-enforcement.md`,
+  schema and collision module boundaries that this plan must respect.
+- `ADR-0004`: `docs/adrs/adr-0004-action-signature-specification.md`,
+  theorem-side action signature declarations and the rationale for treating
+  types as theorem-owned contracts.
 - Companion ExecPlan:
   `docs/execplans/3-3-1-emit-typed-action-probes.md`, which sets the precedent
   for probe rendering, trybuild fixtures, BDD fixture-crate patterns, and
@@ -768,9 +768,9 @@ and documentation.
 - 2026-06-02: Place the `referenced_types` helper in
   `crates/theoremc-core/src/collision.rs` next to `referenced_actions`, with an
   explicit option to migrate both helpers into a `references.rs` module if
-  `collision.rs` exceeds 350 lines. Rationale: ADR-003 keeps document traversal
-  inside core; mirroring the action-probe precedent preserves layering and
-  reuses the established testing approach.
+  `collision.rs` exceeds 350 lines. Rationale: ADR-0003 keeps document
+  traversal inside core; mirroring the action-probe precedent preserves
+  layering and reuses the established testing approach.
 - 2026-06-02: Introduce `crate::schema::rust_type` for parsing and canonical
   token rendering, and `crate::schema::validate_types` for the shared schema
   validation wrapper. Re-point `validate_action_signatures` and

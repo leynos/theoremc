@@ -59,9 +59,10 @@ Observable success:
   the imported macro implementation behind that callsite.
 - The emitted per-file module name must follow
   `__theoremc__file__{path_mangle(path_stem(P))}__{hash12(P)}` exactly, per
-  `NMR-1` and `ADR-2`.
+  `NMR-1` and `ADR-0001-2`.
 - The emitted harness stub identifier for theorem `T` in file `P` must follow
-  `theorem__{theorem_slug(T)}__h{hash12(P#T)}` exactly, per `NMR-1` and `ADR-2`.
+  `theorem__{theorem_slug(T)}__h{hash12(P#T)}` exactly, per `NMR-1` and
+  `ADR-0001-2`.
 - Multi-document `.theorem` files must preserve theorem document order when
   generating harness stubs. If a file contains documents `A`, then `B`, the
   generated stub order must remain `A`, then `B`.
@@ -544,7 +545,7 @@ This plan satisfies the roadmap item only when all of the following are true:
 - each callsite expands to the stable private per-file module name dictated by
   `NMR-1`,
 - each theorem document in a file produces one stable harness stub identifier
-  dictated by `ADR-2`,
+  dictated by `ADR-0001-2`,
 - the expansion includes theorem source content with `include_str!`,
 - expansion snapshots remain stable across repeated builds,
 - happy and unhappy macro workflows are covered by unit and BDD tests,

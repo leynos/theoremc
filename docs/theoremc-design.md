@@ -6,9 +6,9 @@ no inline Rust blocks in `.theorem`. Primary audience: Rust engineers who want
 behaviour-driven development (BDD)-level legibility for formal checks. Decision
 records:
 
-- [Architecture Decision Record (ADR) 001](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
-- [Architecture Decision Record (ADR) 002](adr-002-library-first-internationalization-and-localization-with-fluent.md)
-- [Architecture Decision Record (ADR) 003](adr-003-architectural-boundary-enforcement.md)
+- [Architectural decision record (ADR) 0001](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- [Architectural decision record (ADR) 0002](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
+- [Architectural decision record (ADR) 0003](adrs/adr-0003-architectural-boundary-enforcement.md)
 
 This specification incorporates several useful structural elements (repo layout
 sketch, risk framing, and some diagrams) from the attached Blitzy exploration,
@@ -26,30 +26,30 @@ reduce drift risk, normative definitions are centralized:
   semantics, argument shaping, and evidence fields.
 - `docs/name-mangling-rules.md` is normative for action and harness mangling,
   collision checks, and external theorem ID rules.
-- `docs/adr-001-theorem-symbol-stability-and-non-vacuity-policy.md` records
-  accepted rationale and trade-offs.
-- `docs/adr-002-library-first-internationalization-and-localization-with-fluent.md`
+- `docs/adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md`
+  records accepted rationale and trade-offs.
+- `docs/adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md`
   is normative for localization architecture, diagnostic rendering boundaries,
   and Fluent backend policy.
-- `docs/adr-003-architectural-boundary-enforcement.md` is normative for schema
-  layer boundaries and architecture enforcement policy.
+- `docs/adrs/adr-0003-architectural-boundary-enforcement.md` is normative for
+  schema layer boundaries and architecture enforcement policy.
 
-- [RFC 0001](rfcs/0001-semantic-law-templates.md) defines accepted schema
+- [RFC 0001](rfcs/rfc-0001-semantic-law-templates.md) defines accepted schema
   version 2 laws; assertion-only descriptions below refer to the version 1
   profile.
-- [ADR 005](adr-005-vertical-slice-first-roadmap-sequencing.md) requires a
-  working version 1 Kani vertical slice before laws and rich reporting.
-- [ADR 006](adr-006-backend-neutral-harness-planning-boundary.md) owns the
-  internal shared `HarnessPlan`: version 1 lowering and later semantic Law IR
-  converge here before Kani rendering. Schema-to-Kani token emission is not the
-  target architecture.
-- [ADR 007](adr-007-verus-backend-preservation-invariants.md) preserves law
-  meaning, primary identity, backend-indexed evidence, and explicit future
+- [ADR-0011](adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md) requires
+  a working version 1 Kani vertical slice before laws and rich reporting.
+- [ADR-0006](adrs/adr-0006-backend-neutral-harness-planning-boundary.md) owns
+  the internal shared `HarnessPlan`: version 1 lowering and later semantic Law
+  IR converge here before Kani rendering. Schema-to-Kani token emission is not
+  the target architecture.
+- [ADR-0007](adrs/adr-0007-verus-backend-preservation-invariants.md) preserves
+  law meaning, primary identity, backend-indexed evidence, and explicit future
   Verus bindings.
-- [ADR 008](adr-008-workspace-build-support-boundary.md) limits
+- [ADR-0008](adrs/adr-0008-workspace-build-support-boundary.md) limits
   `theoremc-build-support` to existing build-script preparation, theorem
   discovery, and generated-suite writing. It leaves the `HarnessPlan` boundary
-  in `theoremc-core` as specified by ADR 006.
+  in `theoremc-core` as specified by ADR-0006.
 
 The accepted law and planning changes remain pending implementation in
 [roadmap steps 4.1 to 4.4](roadmap.md#phase-4-working-kani-proof-path-safety-policy-and-semantic-laws).
@@ -141,9 +141,10 @@ to run verification and produce human/CI reports, and optional enforcement lints
 (`theoremc-dylint`) to discourage bypassing. Kani body/step emission —
 symbolic bindings, assumptions, invocations, assertions, and witnesses — is
 planned as well;
-[ADR 006](adr-006-backend-neutral-harness-planning-boundary.md) fixes the
-harness-planning seam it must land behind, and
-[ADR 005](adr-005-vertical-slice-first-roadmap-sequencing.md) sequences it.
+[ADR-0006](adrs/adr-0006-backend-neutral-harness-planning-boundary.md) fixes
+the harness-planning seam it must land behind, and
+[ADR-0011](adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md) sequences
+it.
 
 The “compile-time theorem loader” pattern uses proc-macro expansion each build
 to generate harness code. Kani harnesses are functions annotated with
@@ -226,9 +227,9 @@ layered architecture with hexagonal influences and an anti-corruption boundary
 between YAML input and domain types.
 
 Normative boundary rules live in
-[ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
+[ADR-0003 §1](adrs/adr-0003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
 and
-[ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
+[ADR-0003 §2](adrs/adr-0003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
 This section is intentionally informative and maps current module placement.
 
 Table 1: Current schema layer to module mapping (informative).
@@ -507,7 +508,7 @@ hazard.[^4]
 
 ### 4.7 Theorem schema internationalization scope
 
-ADR 002 explicitly keeps theorem schema keywords language-stable in this
+ADR-0002 explicitly keeps theorem schema keywords language-stable in this
 release line. Canonical field names in `.theorem` files remain: `Theorem`,
 `Given`, `Let`, `Do`, `Prove`, and `Evidence`.
 
@@ -597,9 +598,9 @@ used for reporting and coverage, not for compile-time resolution.)
 
 Action signatures are specified by theorem documents, not inferred from Rust
 action implementations. This follows
-[ADR 004](adr-004-action-signature-specification.md): `theorem_file!` must
-receive a stable expected signature before Rust type checking, and procedural
-macros cannot query rustc for the resolved type of
+[ADR-0004](adrs/adr-0004-action-signature-specification.md): `theorem_file!`
+must receive a stable expected signature before Rust type checking, and
+procedural macros cannot query rustc for the resolved type of
 `crate::theorem_actions::...` during expansion.
 
 Each theorem document declares the expected signatures for referenced actions
@@ -745,8 +746,8 @@ ______________________________________________________________________
 
 `theoremc-core` uses `serde-saphyr` 2.0.0 to deserialize theorem documents into
 strongly typed Rust structs. That release declares Rust 1.89, which is also the
-workspace MSRV; [ADR-010](adr-010-reusable-library-msrv-rust-1-89.md) records
-the decision to raise the reusable libraries from Rust 1.88.
+workspace MSRV; [ADR-0010](adrs/adr-0010-reusable-library-msrv-rust-1-89.md)
+records the decision to raise the reusable libraries from Rust 1.88.
 
 Motivation: `serde-saphyr` is designed to be panic-free on malformed input and
 avoid unsafe code in the library layer, and it is built atop the `saphyr` YAML
@@ -986,7 +987,7 @@ mangling (Step 2.1.2 of the roadmap):
 - Action mangling is placed in a new top-level `mangle` module
   (`crates/theoremc-core/src/mangle.rs`), separate from the `schema` module,
   because mangling is an action-resolution concern, not a schema concern (see
-  ADR-003 boundary rules). The `schema` and `mangle` modules have no
+  ADR-0003 boundary rules). The `schema` and `mangle` modules have no
   cross-dependency; callers wire them together.
 - The `blake3` crate (version 1.8.3) is added as a regular dependency for
   `hash12` computation. blake3 is deterministic, platform-independent, and
@@ -1009,7 +1010,7 @@ collision detection (Step 2.1.3 of the roadmap):
 
 - Collision detection is placed in a new top-level `collision` module
   (`crates/theoremc-core/src/collision.rs`), separate from both `schema` and
-  `mangle`. This preserves the ADR-003 boundary: `schema` and `mangle` do not
+  `mangle`. This preserves the ADR-0003 boundary: `schema` and `mangle` do not
   cross-depend. The `collision` module wires both together as a cross-cutting
   concern.
 - The collision check detects **mangled-identifier collisions**: different
@@ -1167,7 +1168,7 @@ roadmap):
   `schema`, `mangle`, and `collision`) to house argument-expression lowering
   logic. This module is `#[doc(hidden)] pub` to support integration tests but
   is not part of the stable public API. The lowering layer operates outside the
-  schema boundary per ADR-003: it consumes decoded `ArgValue` instances and
+  schema boundary per ADR-0003: it consumes decoded `ArgValue` instances and
   type information but does not participate in YAML deserialization or semantic
   validation.
 - The lowering API is driven by explicit expected parameter types
@@ -1271,7 +1272,7 @@ boilerplate across the schema and test-support wrappers:
   cohesive line vocabulary and keeps the module's string-argument ratio below
   the CodeScene advisory threshold it would otherwise cross.
 
-### 6.8 Localized diagnostics contract (ADR 002)
+### 6.8 Localized diagnostics contract (ADR-0002)
 
 Theoremc adopts a library-first localization boundary for diagnostics:
 
@@ -1299,7 +1300,7 @@ inspectable diagnostics for tooling and CI.
 ### 6.9 Localization rendering sequence
 
 Figure 1. Diagnostic capture, localization rendering, and report projection
-flow under the ADR 002 library-first localization model.
+flow under the ADR-0002 library-first localization model.
 
 ```mermaid
 sequenceDiagram
@@ -1410,7 +1411,7 @@ Cargo versions and edge cases.
 ### 7.1.1 Current implementation and boundary
 
 Steps 3.1.1 and 3.1.2 introduced discovery, Cargo invalidation, and generated
-suite writing. ADR-008 records why the existing discovery and suite
+suite writing. ADR-0008 records why the existing discovery and suite
 implementation now belongs in a dedicated crate: importing source files with
 `#[path]` coupled build-script compilation to file placement also used by
 library and test compilation. This decision applies only to this existing
@@ -1418,8 +1419,8 @@ build-support functionality; it does not establish a general extraction policy.
 
 Integration tests that build fixture crates around the build-support crate
 share one warm target directory, with unique package names and a seeded lock;
-[ADR-011](adr-011-shared-warm-target-for-fixture-crates.md) records that
-decision.
+[ADR-0012](adrs/adr-0012-shared-warm-target-for-fixture-crates.md) records
+that decision.
 
 The `BuildDiscovery` value contains ordered crate-relative theorem file paths
 and watched directories, normalized to forward slashes. The support crate
@@ -1750,14 +1751,14 @@ ______________________________________________________________________
 ## 10. Enforcement (guardrails, not the primary binding mechanism)
 
 Enforcement is used to discourage bypass and to prevent architectural drift
-inside the schema subsystem. The boundary policy is defined by ADR 003.
+inside the schema subsystem. The boundary policy is defined by ADR-0003.
 
 ### 10.1 Architectural boundary rules
 
 The normative boundary rules are defined in
-[ADR 003 §1](adr-003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
+[ADR-0003 §1](adrs/adr-0003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
 and
-[ADR 003 §2](adr-003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
+[ADR-0003 §2](adrs/adr-0003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
 This section focuses on enforcement tooling and rollout.
 
 ### 10.2 Enforcement stack and priority
@@ -1784,7 +1785,7 @@ cargo clippy --workspace --all-targets --all-features -- \
 ```
 
 Required external tools and expected versions are documented in
-[ADR 003 tooling prerequisites](adr-003-architectural-boundary-enforcement.md#tooling-prerequisites-and-version-alignment).
+[ADR-0003 tooling prerequisites](adrs/adr-0003-architectural-boundary-enforcement.md#tooling-prerequisites-and-version-alignment).
 
 Minimum viable product (MVP) Dylint rules:
 

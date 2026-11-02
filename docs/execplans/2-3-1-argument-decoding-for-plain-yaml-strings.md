@@ -23,13 +23,13 @@ binding named `x` exists. Invalid `{ ref: ... }` values (empty string, keyword,
 non-identifier) are rejected with actionable error messages. `make check-fmt`,
 `make lint`, and `make test` pass.
 
-Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
-(adr-001-theorem-symbol-stability-and-non-vacuity-policy.md decision 3),
-`DES-5` (theoremc-design.md section 5.5.1).
+Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-0001-3`
+(docs/adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md decision
+3), `DES-5` (theoremc-design.md section 5.5.1).
 
 ## Constraints
 
-- ADR-003 boundary rule: domain types (public API) must not import from raw,
+- ADR-0003 boundary rule: domain types (public API) must not import from raw,
   validator, or loader modules. The new `ArgValue` type belongs in the domain
   type layer.
 - Source files must not exceed 400 lines.
@@ -153,7 +153,8 @@ Signposts: `TFS-5` (theorem-file-specification.md section 5), `ADR-3`
   This is where `Spanned<String>` becomes `String` for other fields, so
   `TheoremValue` becoming `ArgValue` follows the same pattern. The `raw.rs`
   module already imports from `super::types`, so importing `ArgValue` from
-  there does not violate ADR-003 boundaries. Date/Author: 2026-03-01 / DevBoxer.
+  there does not violate ADR-0003 boundaries. Date/Author: 2026-03-01 /
+  DevBoxer.
 
 - Decision: for Step 2.3.1, YAML maps that are NOT `{ ref: <name> }` are
   passed through as `ArgValue::RawMap(IndexMap<String, TheoremValue>)`. This
@@ -265,7 +266,7 @@ Create `crates/theoremc-core/src/schema/arg_value.rs` with the following types:
 //! decoding. Plain YAML scalars become `Literal` variants, explicit
 //! `{ ref: <Identifier> }` maps become `Reference` variants, and
 //! other composite forms are preserved as raw values for future
-//! lowering steps (`TFS-5`, `ADR-3`, `DES-5`).
+//! lowering steps (`TFS-5`, `ADR-0001-3`, `DES-5`).
 
 /// A semantically decoded action-call argument value.
 ///
@@ -274,7 +275,7 @@ Create `crates/theoremc-core/src/schema/arg_value.rs` with the following types:
 /// literals from variable references. This encoding ensures that plain
 /// YAML strings are unconditionally treated as string literals and
 /// variable references require the explicit `{ ref: <name> }` wrapper
-/// (`TFS-5` section 5.2, `ADR-3` decision 3).
+/// (`TFS-5` section 5.2, `ADR-0001-3` decision 3).
 #[derive(Debug, Clone, PartialEq)]
 pub enum ArgValue {
     /// A scalar literal value (bool, integer, float, or string).
@@ -542,7 +543,7 @@ Create a test (in the BDD suite or as a dedicated unit test) that:
 5. Defines a third YAML where `param` uses `{ ref: x }` and verifies it
    decodes as `ArgValue::Reference("x")`.
 
-This directly demonstrates the invariant from ADR-3: "adding a new binding
+This directly demonstrates the invariant from ADR-0001-3: "adding a new binding
 cannot alter existing literal argument semantics."
 
 Go/no-go check: acceptance test passes.
