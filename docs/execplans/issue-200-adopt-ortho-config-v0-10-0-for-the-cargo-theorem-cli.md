@@ -158,12 +158,16 @@ published as a draft pull request.
 - [x] (2026-11-01) Add the declared CLI-ENTRY negative control: direct
   invocation without the `theorem` token must exit 2 with empty stdout and a
   usage diagnostic on stderr.
+- [x] (2026-11-02) Rerun all eleven deterministic gates sequentially on the
+  repair head `0c37132`; every gate passed and `make test` reported 893 of 893
+  nextest tests passing.
 
-The candidate for head `df9b8bc` is complete for its accepted scope. All eleven
-deterministic gates passed sequentially, hosted CI run 41303683940 succeeded on
-that head, and the candidate-bound assessment found no in-scope runtime defect.
-The repairs above followed from that assessment; validated readiness and merge
-follow once the repaired head is reassessed.
+The candidate for head `0c37132` is complete for its accepted scope. All eleven
+deterministic gates passed sequentially on that head, and the candidate-bound
+assessment for the previous head found no in-scope runtime defect. The two
+assessment repairs — the declared missing-token negative control and this
+record's reconciliation — are committed. Publishing the repair head, observing
+hosted CI, and requesting the confirming assessment precede readiness and merge.
 
 **Historical (pre-rebase) state.** The paragraph below records the working-tree
 state before ADR-010 unified the MSRV checks and before the rebase onto
@@ -1123,3 +1127,12 @@ that gate before proceeding. Never discard unrelated changes.
   body. The negative control is now a child-process test that runs
   `cargo-theorem context --json` without the wrapper token and requires exit
   status 2, empty stdout, and a usage diagnostic on stderr.
+- 2026-11-02: The repair head `0c37132` passed the eleven sequential
+  deterministic gates: `check-fmt` (66 files unchanged), `markdownlint` (0
+  errors), `nixie`, `lint` (Whitaker, rustdoc, and Clippy), `typecheck`, `msrv`
+  (`RUSTFLAGS="" cargo +1.89 check --workspace`), `test` (893 of 893 nextest
+  tests and all doctests), `build`, `release`, `test-workflow-contracts`, and
+  `check-agent-native` (0 deny findings). Gate runs were unhurried because the
+  shared compiler-admission pool was fully held for much of the run; admission
+  stayed healthy throughout, so the queue was waited out rather than worked
+  around.
