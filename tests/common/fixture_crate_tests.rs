@@ -70,6 +70,10 @@ fn canonicalizes_manifest_paths_containing_lexical_components() -> Result<(), St
         .canonicalize_utf8()
         .map_err(|error| error.to_string())?;
 
-    assert_eq!(canonical, expected);
+    if canonical != expected {
+        return Err(format!(
+            "expected canonical manifest path {expected}, got {canonical}"
+        ));
+    }
     Ok(())
 }
