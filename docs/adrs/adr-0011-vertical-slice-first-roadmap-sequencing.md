@@ -293,5 +293,5 @@ Kani-specific coupling that ADR-0006 is designed to prevent.
   boundary](adr-0006-backend-neutral-harness-planning-boundary.md)
 - [ADR-0007: Verus backend preservation
   invariants](adr-0007-verus-backend-preservation-invariants.md)
-- [Development roadmap](roadmap.md)
-- [Theoremc design specification](theoremc-design.md)
+- [Development roadmap](../roadmap.md)
+- [Theoremc design specification](../theoremc-design.md)

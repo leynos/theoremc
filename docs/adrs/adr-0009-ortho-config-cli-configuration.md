@@ -184,6 +184,6 @@ discovery, environment, precedence, or command namespace rules.
 ## Related documents
 
 - [ADR-0002: library-first Fluent localization](adr-0002-library-first-internationalization-and-localization-with-fluent.md)
-- [`cargo theorem` CLI design](cargo-theorem-cli-design.md)
-- [Theoremc development roadmap](roadmap.md)
-- [OrthoConfig v0.10.0 provenance](ortho-config-v0-10-0-provenance.md)
+- [`cargo theorem` CLI design](../cargo-theorem-cli-design.md)
+- [Theoremc development roadmap](../roadmap.md)
+- [OrthoConfig v0.10.0 provenance](../ortho-config-v0-10-0-provenance.md)

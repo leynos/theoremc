@@ -391,5 +391,5 @@ Capabilities and rendering functions remain explicit until Verus work begins.
 - [RFC 0001: semantic law templates](../rfcs/rfc-0001-semantic-law-templates.md)
 - [ADR-0004: theorem-side action
   signatures](adr-0004-action-signature-specification.md)
-- [Theoremc design specification](theoremc-design.md)
-- [Development roadmap](roadmap.md)
+- [Theoremc design specification](../theoremc-design.md)
+- [Development roadmap](../roadmap.md)
