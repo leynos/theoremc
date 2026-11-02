@@ -9,6 +9,7 @@ use filetime::FileTime;
 use theoremc_core::schema::StrNewtype;
 
 use super::ExpectedFragment;
+use super::fixture_manifest::{canonical_manifest_path, defines_workspace_table};
 use super::hermetic_cargo::hermetic_cargo;
 
 #[path = "fixture_output.rs"]
@@ -91,7 +92,13 @@ impl FixtureCrate {
 
         // The source lives under the repository target tree, but remains an
         // independent package rather than joining the enclosing workspace.
-        let manifest = format!("{cargo_toml}\n[workspace]\n");
+        // Appending unconditionally would redefine a `[workspace]` table the
+        // caller already supplied, which TOML rejects.
+        let manifest = if defines_workspace_table(cargo_toml) {
+            cargo_toml.to_owned()
+        } else {
+            format!("{cargo_toml}\n[workspace]\n")
+        };
         fixture.write(Utf8Path::new("Cargo.toml"), &manifest)?;
         fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
         fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
@@ -253,7 +260,7 @@ impl FixtureCrate {
         if output.status.success() {
             *self.build_out_dir.borrow_mut() = output::root_build_out_dir(
                 &String::from_utf8_lossy(&output.stdout),
-                &self.manifest_dir.join("Cargo.toml"),
+                &canonical_manifest_path(&self.manifest_dir)?,
             )?;
             Ok(BuildLog(log))
         } else {
