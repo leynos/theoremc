@@ -8,7 +8,7 @@ records:
 
 - [Architectural decision record (ADR) 0001](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
 - [Architectural decision record (ADR) 0002](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
-- [Architectural decision record (ADR) 0003](adrs/adr-0003-architectural-boundary-enforcement.md)
+- [Architectural decision record (ADR) 0003](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
 
 This specification incorporates several useful structural elements (repo layout
 sketch, risk framing, and some diagrams) from the attached Blitzy exploration,
@@ -31,12 +31,12 @@ reduce drift risk, normative definitions are centralized:
 - `docs/adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md`
   is normative for localization architecture, diagnostic rendering boundaries,
   and Fluent backend policy.
-- `docs/adrs/adr-0003-architectural-boundary-enforcement.md` is normative for
-  schema layer boundaries and architecture enforcement policy.
+- `docs/adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md`
+  is normative for schema layer boundaries and architecture enforcement policy.
 
-- [RFC 0001](rfcs/rfc-0001-semantic-law-templates.md) defines accepted schema
-  version 2 laws; assertion-only descriptions below refer to the version 1
-  profile.
+- [RFC 0001](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
+  defines accepted schema version 2 laws; assertion-only descriptions below
+  refer to the version 1 profile.
 - [ADR-0011](adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md) requires
   a working version 1 Kani vertical slice before laws and rich reporting.
 - [ADR-0006](adrs/adr-0006-backend-neutral-harness-planning-boundary.md) owns
@@ -227,9 +227,9 @@ layered architecture with hexagonal influences and an anti-corruption boundary
 between YAML input and domain types.
 
 Normative boundary rules live in
-[ADR-0003 §1](adrs/adr-0003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
+[ADR-0003 §1](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md#1-adopt-an-explicit-schema-layer-contract)
 and
-[ADR-0003 §2](adrs/adr-0003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
+[ADR-0003 §2](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md#2-use-module-visibility-as-the-first-enforcement-layer).
 This section is intentionally informative and maps current module placement.
 
 Table 1: Current schema layer to module mapping (informative).
@@ -598,7 +598,7 @@ used for reporting and coverage, not for compile-time resolution.)
 
 Action signatures are specified by theorem documents, not inferred from Rust
 action implementations. This follows
-[ADR-0004](adrs/adr-0004-action-signature-specification.md): `theorem_file!`
+[ADR-0004](adrs/adr-0004-theorem-side-action-signatures.md): `theorem_file!`
 must receive a stable expected signature before Rust type checking, and
 procedural macros cannot query rustc for the resolved type of
 `crate::theorem_actions::...` during expansion.
@@ -746,8 +746,9 @@ ______________________________________________________________________
 
 `theoremc-core` uses `serde-saphyr` 2.0.0 to deserialize theorem documents into
 strongly typed Rust structs. That release declares Rust 1.89, which is also the
-workspace MSRV; [ADR-0010](adrs/adr-0010-reusable-library-msrv-rust-1-89.md)
-records the decision to raise the reusable libraries from Rust 1.88.
+workspace MSRV;
+[ADR-0010](adrs/adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md) records
+the decision to raise the reusable libraries from Rust 1.88.
 
 Motivation: `serde-saphyr` is designed to be panic-free on malformed input and
 avoid unsafe code in the library layer, and it is built atop the `saphyr` YAML
@@ -1756,9 +1757,9 @@ inside the schema subsystem. The boundary policy is defined by ADR-0003.
 ### 10.1 Architectural boundary rules
 
 The normative boundary rules are defined in
-[ADR-0003 §1](adrs/adr-0003-architectural-boundary-enforcement.md#1-adopt-an-explicit-schema-layer-contract)
+[ADR-0003 §1](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md#1-adopt-an-explicit-schema-layer-contract)
 and
-[ADR-0003 §2](adrs/adr-0003-architectural-boundary-enforcement.md#2-use-module-visibility-as-the-first-enforcement-layer).
+[ADR-0003 §2](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md#2-use-module-visibility-as-the-first-enforcement-layer).
 This section focuses on enforcement tooling and rollout.
 
 ### 10.2 Enforcement stack and priority
@@ -1785,7 +1786,7 @@ cargo clippy --workspace --all-targets --all-features -- \
 ```
 
 Required external tools and expected versions are documented in
-[ADR-0003 tooling prerequisites](adrs/adr-0003-architectural-boundary-enforcement.md#tooling-prerequisites-and-version-alignment).
+[ADR-0003 tooling prerequisites](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md#tooling-prerequisites-and-version-alignment).
 
 Minimum viable product (MVP) Dylint rules:
 

@@ -108,9 +108,9 @@ an unrelated `theoremc` executable beside the Cargo subcommand.
 `serde-saphyr` 2.0.0, `ortho_config` 0.10.0, and `cargo-orthohelp` 0.10.0 all
 declare Rust 1.89.0. Every workspace package therefore declares Rust 1.89 as
 its minimum supported Rust version (MSRV).
-[ADR-0010](adrs/adr-0010-reusable-library-msrv-rust-1-89.md) records raising
-the reusable libraries from Rust 1.88;
-[ADR-0009](adrs/adr-0009-ortho-config-cli-configuration.md) continues to keep
+[ADR-0010](adrs/adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md) records
+raising the reusable libraries from Rust 1.88;
+[ADR-0009](adrs/adr-0009-orthoconfig-cli-configuration.md) continues to keep
 the application's OrthoConfig dependencies outside the library packages.
 
 Continuous integration tests the single contract:
@@ -1500,7 +1500,7 @@ stable CLI:
 [^ortho-agent-native]:
     [`leynos/ortho-config` agent-native CLI assistance
     design][ortho-agent-native]. The adopted dependency and localization
-    boundary are recorded in [ADR-0009](adrs/adr-0009-ortho-config-cli-configuration.md).
+    boundary are recorded in [ADR-0009](adrs/adr-0009-orthoconfig-cli-configuration.md).
 
 [agent-native]: https://trevinsays.com/p/10-principles-for-agent-native-clis
 [ortho-agent-native]: https://github.com/leynos/ortho-config/blob/main/docs/agent-native-cli-design.md

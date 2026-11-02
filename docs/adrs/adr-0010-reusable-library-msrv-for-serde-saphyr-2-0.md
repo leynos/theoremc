@@ -4,7 +4,7 @@
 
 Accepted. Adopt `serde-saphyr` 2.0.0 and declare Rust 1.89 as the minimum
 supported Rust version (MSRV) for every workspace package. This supersedes the
-mixed-MSRV boundary in [ADR-0009](adr-0009-ortho-config-cli-configuration.md);
+mixed-MSRV boundary in [ADR-0009](adr-0009-orthoconfig-cli-configuration.md);
 ADR-0009's application-only OrthoConfig configuration boundary remains accepted.
 
 ## Date
@@ -134,7 +134,7 @@ the same resolver decision.
 ## Related documents
 
 - [ADR-0002: library-first Fluent localization](adr-0002-library-first-internationalization-and-localization-with-fluent.md)
-- [ADR-0009: OrthoConfig CLI configuration](adr-0009-ortho-config-cli-configuration.md)
+- [ADR-0009: OrthoConfig CLI configuration](adr-0009-orthoconfig-cli-configuration.md)
 - [`cargo theorem` CLI design](../cargo-theorem-cli-design.md)
 - [Developer's guide](../developers-guide.md)
 - [Theoremc design](../theoremc-design.md)

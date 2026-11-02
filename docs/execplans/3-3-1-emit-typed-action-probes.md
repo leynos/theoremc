@@ -55,7 +55,7 @@ Observable success:
    happy-path builds, missing actions, and signature drift.
 9. Compile-fail tests cover generated-code diagnostics for missing action
    exports and incompatible signatures.
-10. `docs/adrs/adr-0004-action-signature-specification.md`,
+10. `docs/adrs/adr-0004-theorem-side-action-signatures.md`,
     `docs/theoremc-design.md`, `docs/theorem-file-specification.md`,
     `docs/users-guide.md`, and `docs/developers-guide.md` describe the
     implemented probe contract.
@@ -88,7 +88,7 @@ Observable success:
   resolution, or reflection. DES-5 permits metadata for future reporting, but
   Step 3.3.1 must remain a compile-time binding check.
 - Use the theorem-side `Actions` signature declarations specified by
-  `docs/adrs/adr-0004-action-signature-specification.md`. Do not broaden the
+  `docs/adrs/adr-0004-theorem-side-action-signatures.md`. Do not broaden the
   `.theorem` syntax beyond that declaration shape while implementing this step.
 - Keep new public API narrow. Prefer a small `theoremc-core` helper that
   returns distinct referenced actions over exposing collision internals.
@@ -203,7 +203,7 @@ Observable success:
 - `TFS-4`: `docs/theorem-file-specification.md` §4, step and action schemas.
 - `TFS-5`: `docs/theorem-file-specification.md` §5, value forms and explicit
   reference semantics.
-- `ADR-0004`: `docs/adrs/adr-0004-action-signature-specification.md`,
+- `ADR-0004`: `docs/adrs/adr-0004-theorem-side-action-signatures.md`,
   theorem-side action signature declarations and rejected inference approaches.
 - `docs/rust-testing-with-rstest-fixtures.md` for unit-test style.
 - `docs/reliable-testing-in-rust-via-dependency-injection.md` for fixture
@@ -481,7 +481,7 @@ and documentation.
   `coderabbit review --agent` for the blocked-state ExecPlan update. CodeRabbit
   reported zero findings.
 - [x] 2026-05-25: Drafted and finalized
-  `docs/adrs/adr-0004-action-signature-specification.md`, using Firecrawl
+  `docs/adrs/adr-0004-theorem-side-action-signatures.md`, using Firecrawl
   prior-art research and local Rust experiments to decide on theorem-side
   `Actions` declarations instead of inference from Rust action implementations.
 - [x] 2026-05-25: Updated `docs/theoremc-design.md`,

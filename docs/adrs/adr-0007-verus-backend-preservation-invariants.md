@@ -235,8 +235,8 @@ Run records must identify at least:
 - generated artefact references where available.
 
 The terminal statuses and their meanings follow the run-status contract in
-[RFC 0001](../rfcs/rfc-0001-semantic-law-templates.md#non-vacuity-policy). In
-particular, verifier resource exhaustion is `undetermined` with reason
+[RFC 0001](../rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md#non-vacuity-policy).
+In particular, verifier resource exhaustion is `undetermined` with reason
 `resource_exhaustion`, while an operational verifier or runner failure is
 `execution_error`. Neither is a proof outcome.
 
@@ -405,12 +405,12 @@ on the vertical-slice path.
 
 ## Related documents
 
-- [RFC 0001: semantic law templates](../rfcs/rfc-0001-semantic-law-templates.md)
+- [RFC 0001: semantic law templates](../rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
 - [ADR-0011: vertical-slice-first roadmap
   sequencing](adr-0011-vertical-slice-first-roadmap-sequencing.md)
 - [ADR-0006: backend-neutral harness planning
   boundary](adr-0006-backend-neutral-harness-planning-boundary.md)
 - [ADR-0004: theorem-side action
-  signatures](adr-0004-action-signature-specification.md)
+  signatures](adr-0004-theorem-side-action-signatures.md)
 - [Theoremc design specification](../theoremc-design.md)
 - [Development roadmap](../roadmap.md)

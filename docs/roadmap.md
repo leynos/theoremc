@@ -98,19 +98,19 @@ Use these signposts to trace each roadmap task to the defining requirement.
   [ADR-0002 decision 5](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
   (parser keyword internationalization deferred to future ADR).
 - `ADR-0003-1`:
-  [ADR-0003 decision 1](adrs/adr-0003-architectural-boundary-enforcement.md)
+  [ADR-0003 decision 1](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
   (explicit schema layer contract and dependency direction).
 - `ADR-0003-2`:
-  [ADR-0003 decision 2](adrs/adr-0003-architectural-boundary-enforcement.md)
+  [ADR-0003 decision 2](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
   (module visibility as first-layer enforcement).
 - `ADR-0003-3`:
-  [ADR-0003 decision 3](adrs/adr-0003-architectural-boundary-enforcement.md)
+  [ADR-0003 decision 3](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
   (baseline CI architecture checks).
 - `ADR-0003-4`:
-  [ADR-0003 decision 4](adrs/adr-0003-architectural-boundary-enforcement.md)
+  [ADR-0003 decision 4](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
   (custom Dylint checks for forbidden edges).
 - `ADR-0003-5`:
-  [ADR-0003 decision 5](adrs/adr-0003-architectural-boundary-enforcement.md)
+  [ADR-0003 decision 5](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
   (optional `cargo-deny` dependency policy checks).
 - `ADR-0011`:
   [ADR-0011](adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md)
@@ -125,8 +125,8 @@ Use these signposts to trace each roadmap task to the defining requirement.
   [ADR-0008](adrs/adr-0008-workspace-build-support-boundary.md) (workspace
   build support boundary).
 - `RFC-0001`:
-  [RFC 0001](rfcs/rfc-0001-semantic-law-templates.md) (versioned proof
-  obligations and semantic law templates).
+  [RFC 0001](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
+  (versioned proof obligations and semantic law templates).
 
 ## Phase 1: schema and validation foundation
 

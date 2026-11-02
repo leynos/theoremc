@@ -5,7 +5,7 @@
 Accepted. The application-only configuration boundary, discovery and precedence
 rules, profile support, and command metadata decisions remain in force. Its
 mixed-MSRV boundary was superseded on 2026-10-31 by
-[ADR-0010](adr-0010-reusable-library-msrv-rust-1-89.md).
+[ADR-0010](adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md).
 
 ## Date
 

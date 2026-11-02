@@ -896,4 +896,4 @@ Costs and trade-offs:
 - [Theoremc design specification](../theoremc-design.md)
 - [Development roadmap](../roadmap.md)
 - [ADR-0004: theorem-side action
-  signatures](../adrs/adr-0004-action-signature-specification.md)
+  signatures](../adrs/adr-0004-theorem-side-action-signatures.md)
