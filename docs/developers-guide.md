@@ -349,6 +349,13 @@ is committed. `typos.local.toml` holds narrow repository-specific exceptions
 only: exact or full-line patterns for identifiers and terms the policy cannot
 correct, never bare accepted words. Never edit `typos.toml` by hand.
 
+The target needs `uv`, taken from the `UV` make variable (`UV ?= uv`), so a
+contributor without `uv` on `PATH` can run `make UV=/path/to/uv spelling`. `uv`
+provisions the pinned Python 3.14 interpreter, so no separate Python
+installation is needed. The builder inspects git-tracked files only: stage a
+new document before running the gate, because an unstaged file is invisible to
+it locally while CI checks it once committed.
+
 ### 3.3 Test conventions
 
 - Use `rstest` fixtures for shared setup.
