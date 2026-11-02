@@ -1,11 +1,11 @@
-# Architectural Decision Record (ADR) 009: OrthoConfig CLI configuration
+# Architectural decision record (ADR) 0009: OrthoConfig CLI configuration
 
 ## Status
 
 Accepted. The application-only configuration boundary, discovery and precedence
 rules, profile support, and command metadata decisions remain in force. Its
 mixed-MSRV boundary was superseded on 2026-10-31 by
-[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md).
+[ADR-0010](adr-0010-reusable-library-msrv-rust-1-89.md).
 
 ## Date
 
@@ -24,7 +24,7 @@ sources, Cargo external-subcommand entry support, command behaviour metadata,
 and Fluent-backed parsing. Its default features include TOML and the JSON merge
 representation. Disabling default features is unsupported in this release.
 
-ADR-002 specifies library-first localization through an injected `Localizer`
+ADR-0002 specifies library-first localization through an injected `Localizer`
 and Fluent. The reusable theoremc crates do not currently contain a Fluent
 runtime or OrthoConfig dependency. The application can use the localizer
 re-exported by OrthoConfig without raising the library MSRV.
@@ -47,13 +47,13 @@ releases declare Rust 1.89.0, so the application package declares that MSRV.
 The root facade, `theoremc-core`, `theoremc-macros`, and build-support crates
 remained configuration-free and retained Rust 1.88, with CI and local
 validation checking the library workspace on Rust 1.88 and the application
-package on Rust 1.89. ADR-010 retires that floor and moves every package to
+package on Rust 1.89. ADR-0010 retires that floor and moves every package to
 Rust 1.89; the configuration-boundary decision in this section is unchanged.
 
 The CLI uses the OrthoConfig facade's Fluent APIs. Reusable libraries do not
 adopt a direct `ortho_l10n` dependency, and their Rust 1.89 floor comes from
-ADR-010 rather than localization. Their localization boundary remains the
-injected, library-owned `Localizer` contract from ADR-002. If a library later
+ADR-0010 rather than localization. Their localization boundary remains the
+injected, library-owned `Localizer` contract from ADR-0002. If a library later
 needs an independent Fluent runtime, that dependency and its MSRV impact
 require a separate compatibility decision.
 
@@ -144,10 +144,10 @@ check against the CLI package; it does not infer behaviour from command names.
 ## Consequences
 
 - The application package has a separate Rust 1.89 MSRV; reusable consumers
-  remain on Rust 1.88. ADR-010 retires this split and moves every package to
+  remain on Rust 1.88. ADR-0010 retires this split and moves every package to
   Rust 1.89.
 - The workspace lockfile contains the CLI's OrthoConfig dependency graph, but
-  the library package check must still succeed on Rust 1.88. ADR-010 replaces
+  the library package check must still succeed on Rust 1.88. ADR-0010 replaces
   that check with one workspace-wide Rust 1.89 check.
 - Configuration loading is testable without process-global environment
   mutation by using OrthoConfig's `_with_sources` entry points and `MapEnv`.
@@ -183,7 +183,7 @@ discovery, environment, precedence, or command namespace rules.
 
 ## Related documents
 
-- [ADR-002: library-first Fluent localization](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+- [ADR-0002: library-first Fluent localization](adr-0002-library-first-internationalization-and-localization-with-fluent.md)
 - [`cargo theorem` CLI design](cargo-theorem-cli-design.md)
 - [Theoremc development roadmap](roadmap.md)
 - [OrthoConfig v0.10.0 provenance](ortho-config-v0-10-0-provenance.md)

@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 007: Verus backend preservation invariants
+# Architectural decision record (ADR) 0007: Verus backend preservation invariants
 
 ## Status
 
@@ -109,8 +109,8 @@ capability diagnostic, not guessed behaviour.
 
 ### Invariant 3: theorem-side action signatures remain executable contracts
 
-ADR 004 `Actions` declarations specify the executable Rust action contract used
-for rustc probes and Kani invocation shaping.
+ADR-0004 `Actions` declarations specify the executable Rust action contract
+used for rustc probes and Kani invocation shaping.
 
 They do not imply:
 
@@ -235,7 +235,7 @@ Run records must identify at least:
 - generated artefact references where available.
 
 The terminal statuses and their meanings follow the run-status contract in
-[RFC 0001](rfcs/0001-semantic-law-templates.md#non-vacuity-policy). In
+[RFC 0001](../rfcs/rfc-0001-semantic-law-templates.md#non-vacuity-policy). In
 particular, verifier resource exhaustion is `undetermined` with reason
 `resource_exhaustion`, while an operational verifier or runner failure is
 `execution_error`. Neither is a proof outcome.
@@ -405,12 +405,12 @@ on the vertical-slice path.
 
 ## Related documents
 
-- [RFC 0001: semantic law templates](rfcs/0001-semantic-law-templates.md)
-- [ADR 005: vertical-slice-first roadmap
-  sequencing](adr-005-vertical-slice-first-roadmap-sequencing.md)
-- [ADR 006: backend-neutral harness planning
-  boundary](adr-006-backend-neutral-harness-planning-boundary.md)
-- [ADR 004: theorem-side action
-  signatures](adr-004-action-signature-specification.md)
+- [RFC 0001: semantic law templates](../rfcs/rfc-0001-semantic-law-templates.md)
+- [ADR-0011: vertical-slice-first roadmap
+  sequencing](adr-0011-vertical-slice-first-roadmap-sequencing.md)
+- [ADR-0006: backend-neutral harness planning
+  boundary](adr-0006-backend-neutral-harness-planning-boundary.md)
+- [ADR-0004: theorem-side action
+  signatures](adr-0004-action-signature-specification.md)
 - [Theoremc design specification](theoremc-design.md)
 - [Development roadmap](roadmap.md)

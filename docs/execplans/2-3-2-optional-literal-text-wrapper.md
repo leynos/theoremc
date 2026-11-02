@@ -33,7 +33,7 @@ containing `{ literal: 42 }` fails with an error message containing
 
 ## Constraints
 
-- ADR-003 boundary rule: domain types (public API) must not import from raw,
+- ADR-0003 boundary rule: domain types (public API) must not import from raw,
   validator, or loader modules. All changes stay within
   `src/schema/arg_value.rs` (domain layer) and `src/schema/raw_action.rs` (raw
   adapter layer). No new cross-boundary imports are introduced.
@@ -722,6 +722,7 @@ Files modified (11 total):
     (create)
 
 [^1]: `TFS-5` (theorem-file-specification.md sections 5.2 and 5.3)
-[^2]: `ADR-3` (adr-001-theorem-symbol-stability-and-non-vacuity-policy.md
+[^2]: `ADR-0001-3`
+      (docs/adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md
     decision 3 -- "Literal wrappers remain supported")
 [^3]: `DES-5` (theoremc-design.md section 5.5.1)

@@ -176,7 +176,7 @@ remaining distinguishable in the parsed document.
 ### Accepted schema evolution (pending implementation)
 
 The table above describes the current assertion-only API. Accepted
-[RFC 0001](rfcs/0001-semantic-law-templates.md) fixes omitted `Schema` as
+[RFC 0001](rfcs/rfc-0001-semantic-law-templates.md) fixes omitted `Schema` as
 version 1 permanently and adds explicit `Schema: 2` for mixed opaque assertions
 and structured laws. Merely setting `Schema: 2` does not enable law support in
 the current implementation.
@@ -904,8 +904,8 @@ build with the platform linker directly, assign an empty `RUSTFLAGS`:
 RUSTFLAGS="" cargo build --release
 ```
 
-The decision is recorded in [ADR 005](adr-005-rust-build-standard.md). The
-contract tests that guard these defaults run `make -n`, so a direct
+The decision is recorded in [ADR-0005](adrs/adr-0005-rust-build-standard.md).
+The contract tests that guard these defaults run `make -n`, so a direct
 `cargo test` needs GNU make on the `PATH`. The tests fail when `make` is
 missing instead of skipping, so a missing tool cannot read as a pass.
 

@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 003: architectural boundary enforcement for schema layers
+# Architectural decision record (ADR) 0003: Architectural boundary enforcement for schema layers
 
 - Status: proposed
 - Date: 2026-02-23

@@ -18,8 +18,9 @@ name (e.g., `account.deposit`) into a stable mangled Rust identifier
 `crate::theorem_actions`. The mangling is injective: different canonical names
 always produce different identifiers.
 
-This fulfils signposts `NMR-1`, `ADR-1`, and `DES-5` for the mangling slice.
-Collision detection remains a separate follow-up step (roadmap Step 2.1.3).
+This fulfils signposts `NMR-1`, `ADR-0001-1`, and `DES-5` for the mangling
+slice. Collision detection remains a separate follow-up step (roadmap Step
+2.1.3).
 
 Observable success:
 
@@ -129,7 +130,7 @@ Observable success:
 
 - Decision: place mangling in a new top-level `src/mangle.rs` module, not
   inside `src/schema/`. Rationale: mangling is an action-resolution concern,
-  not a schema concern (ADR-003 boundary rules). The `schema` module validates
+  not a schema concern (ADR-0003 boundary rules). The `schema` module validates
   action name grammar; the `mangle` module transforms validated names into Rust
   identifiers. Keeping them separate preserves architectural boundaries.
   Date/Author: 2026-02-25 / DevBoxer.

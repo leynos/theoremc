@@ -30,7 +30,7 @@ classes are detected. `make check-fmt`, `make lint`, and `make test` pass.
 
 ## Constraints
 
-- ADR-003 boundary rule: the `schema` module and the `mangle` module must not
+- ADR-0003 boundary rule: the `schema` module and the `mangle` module must not
   cross-depend. Collision detection requires both, so it must live in a
   separate top-level module that imports from both.
 - Source files must not exceed 400 lines.
@@ -110,7 +110,7 @@ classes are detected. `make check-fmt`, `make lint`, and `make test` pass.
 - Decision: place collision detection in a new top-level module
   `src/collision.rs`, not inside `schema` or `mangle`. Rationale: collision
   detection requires importing from both `schema::types` (to traverse
-  `TheoremDoc`) and `mangle` (to compute mangled identifiers). ADR-003
+  `TheoremDoc`) and `mangle` (to compute mangled identifiers). ADR-0003
   prohibits cross-dependency between `schema` and `mangle`. A new top-level
   module that wires both together is the cleanest architectural choice and
   follows the same pattern used when `mangle` was created as a peer of
@@ -137,7 +137,7 @@ classes are detected. `make check-fmt`, `make lint`, and `make test` pass.
   loader already orchestrates parse, validate, and return. Adding collision
   detection as a final pass before returning `Ok(docs)` is a natural extension.
   The loader imports `crate::collision::check_action_collisions`, which is a
-  top-level module import — this does not violate ADR-003 because the schema
+  top-level module import — this does not violate ADR-0003 because the schema
   module's types and validation logic do not themselves depend on mangle. Only
   the loader orchestration calls into collision, which in turn calls into
   mangle. Date/Author: 2026-02-27 / DevBoxer.
@@ -183,7 +183,7 @@ Quality-gate result:
 Retrospective:
 
 - Placing collision detection in its own top-level module (`src/collision.rs`)
-  preserved ADR-003 boundaries cleanly. The module depends on both `schema` and
+  preserved ADR-0003 boundaries cleanly. The module depends on both `schema` and
   `mangle` without either depending on the other.
 - The mangled-identifier collision check is a defensive safety net. No real
   collision could be triggered through the loader because the mangling

@@ -55,7 +55,7 @@ Observable success:
    happy-path builds, missing actions, and signature drift.
 9. Compile-fail tests cover generated-code diagnostics for missing action
    exports and incompatible signatures.
-10. `docs/adr-004-action-signature-specification.md`,
+10. `docs/adrs/adr-0004-action-signature-specification.md`,
     `docs/theoremc-design.md`, `docs/theorem-file-specification.md`,
     `docs/users-guide.md`, and `docs/developers-guide.md` describe the
     implemented probe contract.
@@ -88,7 +88,7 @@ Observable success:
   resolution, or reflection. DES-5 permits metadata for future reporting, but
   Step 3.3.1 must remain a compile-time binding check.
 - Use the theorem-side `Actions` signature declarations specified by
-  `docs/adr-004-action-signature-specification.md`. Do not broaden the
+  `docs/adrs/adr-0004-action-signature-specification.md`. Do not broaden the
   `.theorem` syntax beyond that declaration shape while implementing this step.
 - Keep new public API narrow. Prefer a small `theoremc-core` helper that
   returns distinct referenced actions over exposing collision internals.
@@ -118,8 +118,8 @@ Observable success:
 - Approval: if this plan is not explicitly approved, do not make implementation
   changes.
 - Signature source: the maintainable source of expected action signatures is
-  now ADR-004 theorem-side `Actions` declarations. If implementation cannot use
-  that source without inventing a second manifest, source scanner, or
+  now ADR-0004 theorem-side `Actions` declarations. If implementation cannot
+  use that source without inventing a second manifest, source scanner, or
   attribute-macro side channel, stop and reassess.
 - Scope: if implementation requires changing `.theorem` syntax, build-suite
   generation, Step 3.2 Kani harness layout, or Phase 4 harness bodies, stop and
@@ -149,13 +149,13 @@ Observable success:
 ## Risks
 
 - Risk: the current code schema stores action names and argument values, but
-  does not yet implement the ADR-004 `Actions` signature field. Severity: high.
-  Likelihood: high. Mitigation: make schema support for `ActionSignature` the
-  first implementation step and keep typed probes dependent on it.
+  does not yet implement the ADR-0004 `Actions` signature field. Severity:
+  high. Likelihood: high. Mitigation: make schema support for `ActionSignature`
+  the first implementation step and keep typed probes dependent on it.
 
 - Risk: Rust procedural macros cannot ask the Rust type checker for a
   function's signature during expansion. Severity: high. Likelihood: high.
-  Mitigation: rely only on explicit, parseable ADR-004 action signature
+  Mitigation: rely only on explicit, parseable ADR-0004 action signature
   declarations and do not attempt runtime reflection or source scanning.
 
 - Risk: direct probes in non-Kani builds will make existing fixture crates fail
@@ -203,8 +203,8 @@ Observable success:
 - `TFS-4`: `docs/theorem-file-specification.md` §4, step and action schemas.
 - `TFS-5`: `docs/theorem-file-specification.md` §5, value forms and explicit
   reference semantics.
-- `ADR-004`: `docs/adr-004-action-signature-specification.md`, theorem-side
-  action signature declarations and rejected inference approaches.
+- `ADR-0004`: `docs/adrs/adr-0004-action-signature-specification.md`,
+  theorem-side action signature declarations and rejected inference approaches.
 - `docs/rust-testing-with-rstest-fixtures.md` for unit-test style.
 - `docs/reliable-testing-in-rust-via-dependency-injection.md` for fixture
   isolation and external process boundaries.
@@ -240,9 +240,9 @@ Use the existing `trybuild` harness in
 `crates/theoremc-macros/tests/expand.rs`, staging any `.theorem` fixtures it
 needs.
 
-The signature-source decision is now made by ADR-004. Implement the theorem-side
-`Actions` schema first, and make the initial red tests use declared signatures
-such as:
+The signature-source decision is now made by ADR-0004. Implement the
+theorem-side `Actions` schema first, and make the initial red tests use
+declared signatures such as:
 
 ```yaml
 Actions:
@@ -481,21 +481,21 @@ and documentation.
   `coderabbit review --agent` for the blocked-state ExecPlan update. CodeRabbit
   reported zero findings.
 - [x] 2026-05-25: Drafted and finalized
-  `docs/adr-004-action-signature-specification.md`, using Firecrawl prior-art
-  research and local Rust experiments to decide on theorem-side `Actions`
-  declarations instead of inference from Rust action implementations.
+  `docs/adrs/adr-0004-action-signature-specification.md`, using Firecrawl
+  prior-art research and local Rust experiments to decide on theorem-side
+  `Actions` declarations instead of inference from Rust action implementations.
 - [x] 2026-05-25: Updated `docs/theoremc-design.md`,
-  `docs/theorem-file-specification.md`, and `docs/contents.md` for ADR-004.
+  `docs/theorem-file-specification.md`, and `docs/contents.md` for ADR-0004.
 - [x] 2026-05-25: Cleared the Milestone 0 signature-source blocker in this
-  plan. Implementation can resume with schema support for ADR-004 action
+  plan. Implementation can resume with schema support for ADR-0004 action
   signatures.
 - [x] 2026-05-25: Ran scoped Markdown linting for the changed documents,
   `git diff --check`, `make fmt`, `make markdownlint`, `make nixie`, and
-  `coderabbit review --agent` for the ADR-004 design milestone. Scoped linting,
-  diff checking, and `make nixie` passed. CodeRabbit reported ADR structure,
-  prose, and wrapping findings across review passes; all were fixed, and the
-  final rerun reported zero findings.
-- [x] 2026-05-25 21:05 CEST: Implemented the first core slice for ADR-004 by
+  `coderabbit review --agent` for the ADR-0004 design milestone. Scoped
+  linting, diff checking, and `make nixie` passed. CodeRabbit reported ADR
+  structure, prose, and wrapping findings across review passes; all were fixed,
+  and the final rerun reported zero findings.
+- [x] 2026-05-25 21:05 CEST: Implemented the first core slice for ADR-0004 by
   adding `ActionSignature` schema support, validating declared action names,
   parameter identifiers, and `syn::Type` strings, requiring an `Actions` entry
   for every referenced action, and exposing deterministic `referenced_actions`
@@ -514,7 +514,7 @@ and documentation.
   surfaced a local Kani shared-library failure, then the serialized full-suite
   command passed 551 nextest tests and all workspace doctests; log:
   `/tmp/test-theoremc-3-3-1-core-schema-gate-serial.out`.
-- [x] 2026-05-25 21:22 CEST: Committed the ADR-004 schema and validation
+- [x] 2026-05-25 21:22 CEST: Committed the ADR-0004 schema and validation
   milestone as `0f9cb63` and ran `coderabbit review --agent`; CodeRabbit
   reported zero findings.
 - [x] 2026-05-25 21:27 CEST: Implemented typed action probe emission in
@@ -575,12 +575,12 @@ and documentation.
   definitions such as Cucumber. None supplies a theorem-owned expected
   signature to `theorem_file!`.
 - `make fmt` and `make markdownlint` still report pre-existing Markdown issues
-  outside the ADR-004 change. The current blocking repo-wide
+  outside the ADR-0004 change. The current blocking repo-wide
   `make markdownlint` finding is `docs/developers-guide.md:268:271` (`MD060`
   table column style). `make fmt` also reports existing `MD013` line-length
   findings across older documents after applying formatters. Unrelated
   formatter churn was discarded.
-- ADR-004 schema support makes existing fixtures with `Let` or `Do` action
+- ADR-0004 schema support makes existing fixtures with `Let` or `Do` action
   references fail unless they include matching `Actions` entries. This is
   intentional for Step 3.3.1, but repository fixtures must be migrated as the
   implementation reaches macro and BDD tests.
@@ -627,7 +627,7 @@ and documentation.
   out of scope for this implementation pass. Rationale: deriving the expected
   signature from the current exported function cannot detect drift, and a
   general source resolver is explicitly beyond this ExecPlan's tolerances.
-- 2026-05-25: Resolve the signature-source blocker with ADR-004 theorem-side
+- 2026-05-25: Resolve the signature-source blocker with ADR-0004 theorem-side
   `Actions` declarations. Rationale: the declaration is available to
   `theorem_file!` during expansion, is independent of the current Rust action
   implementation, provides parameter order and types for future argument
@@ -648,7 +648,7 @@ let _: fn(ExpectedArg1, ExpectedArg2) -> ExpectedReturn =
     crate::theorem_actions::mangled_action_identifier;
 ```
 
-ADR-004 now supplies that source through theorem-side `Actions` declarations.
+ADR-0004 now supplies that source through theorem-side `Actions` declarations.
 The implementation remains incomplete, but the design blocker is cleared. The
 next implementation step is to add `ActionSignature` schema support and red
 tests that prove typed probe emission is still absent before Milestone 1

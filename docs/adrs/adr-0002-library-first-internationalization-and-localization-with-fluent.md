@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 002: library-first internationalization and localization with Fluent
+# Architectural decision record (ADR) 0002: Library-first internationalization and localization with Fluent
 
 - Status: proposed
 - Date: 2026-02-11
@@ -134,6 +134,6 @@ effort.
 - `docs/localizable-rust-libraries-with-fluent.md`
 - `docs/theoremc-design.md`
 - `docs/users-guide.md`
-- `docs/adr-001-theorem-symbol-stability-and-non-vacuity-policy.md`
-- `docs/adr-009-ortho-config-cli-configuration.md` — separates the CLI's
+- `docs/adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md`
+- `docs/adrs/adr-0009-ortho-config-cli-configuration.md` — separates the CLI's
   OrthoConfig localization runtime from reusable library localization.
