@@ -1,0 +1,8 @@
+# Nested Cargo commands share the package cache and compiler admission pool.
+# Group only their tests; ordinary tests retain normal parallel execution.
+[test-groups.nested-cargo]
+max-threads = 1
+
+[[profile.default.overrides]]
+filter = 'binary(=build_discovery_bdd) | binary(=build_suite_bdd) | binary(=common_support) | binary(=fixture_cache_contract) | binary(=theorem_file_macro_bdd) | (package(=theoremc-macros) & binary(=expand) & test(=compile_errors))'
+test-group = 'nested-cargo'

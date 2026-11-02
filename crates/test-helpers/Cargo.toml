@@ -9,6 +9,7 @@ camino = "1.2.2"
 cap-std = { version = "4.0.2", features = ["fs_utf8"] }
 derive_more = { version = "2.1.1", features = ["from", "into"], default-features = false }
 filetime = "0.2.29"
+serde_json = "1.0.149"
 tempfile = "3.27.0"
 the-newtype = "0.1.1"
 theoremc-core = { version = "0.1.0", path = "../theoremc-core" }

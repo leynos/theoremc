@@ -1,5 +1,6 @@
 //! Capability-scoped build-fixture helpers for integration tests.
 
+use std::cell::RefCell;
 use std::time::{Duration, SystemTime};
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -8,22 +9,27 @@ use filetime::FileTime;
 use theoremc_core::schema::StrNewtype;
 
 use super::ExpectedFragment;
+use super::fixture_manifest::{canonical_manifest_path, defines_workspace_table};
 use super::hermetic_cargo::hermetic_cargo;
+
+#[path = "fixture_output.rs"]
+mod output;
+
+#[path = "fixture_cache.rs"]
+mod cache;
+
+#[path = "fixture_build_support.rs"]
+mod build_support;
+
+use build_support::{
+    BUILD_SUPPORT_BUILD_SCRIPT_SOURCE, BUILD_SUPPORT_CARGO_TOML, BUILD_SUPPORT_LIB_SOURCE,
+    fixture_build_support_cargo_toml,
+};
+pub use cache::fixture_target_dir;
+use cache::fixture_target_root;
 
 /// Source for the repository build script copied into fixture crates.
 pub const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
-
-/// Manifest for the internal build-support crate copied into fixture crates.
-pub const BUILD_SUPPORT_CARGO_TOML: &str =
-    include_str!("../../crates/theoremc-build-support/Cargo.toml");
-
-/// Root source for the internal build-support crate copied into fixture crates.
-pub const BUILD_SUPPORT_LIB_SOURCE: &str =
-    include_str!("../../crates/theoremc-build-support/src/lib.rs");
-
-/// Build-script source for the internal build-support crate copied into fixtures.
-pub const BUILD_SUPPORT_BUILD_SCRIPT_SOURCE: &str =
-    include_str!("../../crates/theoremc-build-support/src/build_script.rs");
 
 /// Discovery source for the internal build-support crate copied into fixtures.
 pub const BUILD_DISCOVERY_SOURCE: &str =
@@ -54,6 +60,7 @@ pub struct FixtureCrate {
     _temp_dir: tempfile::TempDir,
     manifest_dir: Utf8PathBuf,
     dir: Dir,
+    build_out_dir: RefCell<Option<Utf8PathBuf>>,
 }
 
 impl FixtureCrate {
@@ -64,7 +71,13 @@ impl FixtureCrate {
     /// Returns an error when the temporary directory cannot be created or when
     /// fixture files cannot be written.
     pub fn new(cargo_toml: &str, lib_rs: &str) -> Result<Self, String> {
-        let temp_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
+        let source_root = fixture_target_root().join("fixture-sources");
+        Dir::create_ambient_dir_all(&source_root, ambient_authority())
+            .map_err(|error| error.to_string())?;
+        let temp_dir = tempfile::Builder::new()
+            .prefix("crate-")
+            .tempdir_in(&source_root)
+            .map_err(|error| error.to_string())?;
         let manifest_dir = Utf8Path::from_path(temp_dir.path())
             .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
             .to_path_buf();
@@ -74,9 +87,19 @@ impl FixtureCrate {
             _temp_dir: temp_dir,
             manifest_dir,
             dir,
+            build_out_dir: RefCell::new(None),
         };
 
-        fixture.write(Utf8Path::new("Cargo.toml"), cargo_toml)?;
+        // The source lives under the repository target tree, but remains an
+        // independent package rather than joining the enclosing workspace.
+        // Appending unconditionally would redefine a `[workspace]` table the
+        // caller already supplied, which TOML rejects.
+        let manifest = if defines_workspace_table(cargo_toml) {
+            cargo_toml.to_owned()
+        } else {
+            format!("{cargo_toml}\n[workspace]\n")
+        };
+        fixture.write(Utf8Path::new("Cargo.toml"), &manifest)?;
         fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
         fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
         fixture.write(
@@ -221,9 +244,11 @@ impl FixtureCrate {
     /// Returns the combined Cargo output when the command fails or cannot be
     /// executed.
     pub fn cargo_build_log(&self) -> Result<BuildLog, String> {
-        // Read back from `target/debug/build`, so the fixture owns its target.
-        let output = hermetic_cargo(&self.manifest_dir, &self.manifest_dir.join("target"))
-            .args(["build", "-vv", "--color", "never"])
+        *self.build_out_dir.borrow_mut() = None;
+        // The fixture shares the workspace target so dependencies are reused,
+        // but reads its own generated output back from Cargo's JSON messages.
+        let output = hermetic_cargo(&self.manifest_dir, &fixture_target_dir())
+            .args(["build", "-vv", "--color", "never", "--message-format=json"])
             .output()
             .map_err(|error| error.to_string())?;
         let log = format!(
@@ -233,6 +258,10 @@ impl FixtureCrate {
         );
 
         if output.status.success() {
+            *self.build_out_dir.borrow_mut() = output::root_build_out_dir(
+                &String::from_utf8_lossy(&output.stdout),
+                &canonical_manifest_path(&self.manifest_dir)?,
+            )?;
             Ok(BuildLog(log))
         } else {
             Err(log)
@@ -246,23 +275,14 @@ impl FixtureCrate {
     /// Returns an error when the build output cannot be inspected or no
     /// generated theorem suite is present.
     pub fn generated_suite_contents(&self) -> Result<String, String> {
-        let build_dir = Utf8Path::new("target/debug/build");
-        for entry_result in self
-            .dir
-            .read_dir(build_dir)
-            .map_err(|error| error.to_string())?
-        {
-            let entry = entry_result.map_err(|error| error.to_string())?;
-            let suite_path = build_dir
-                .join(entry.file_name().map_err(|error| error.to_string())?)
-                .join("out/theorem_suite.rs");
-            match self.dir.read_to_string(&suite_path) {
-                Ok(contents) => return Ok(contents),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(error.to_string()),
-            }
-        }
-        Err("generated theorem_suite.rs was not found".to_owned())
+        let output = self.build_out_dir.borrow();
+        let out_dir = output.as_ref().ok_or_else(|| {
+            "fixture build did not report its build-script output directory".to_owned()
+        })?;
+        let dir = Dir::open_ambient_dir(out_dir, ambient_authority())
+            .map_err(|error| error.to_string())?;
+        dir.read_to_string("theorem_suite.rs")
+            .map_err(|error| error.to_string())
     }
 
     fn advance_parent_mtime(&self, path: &Utf8Path) -> Result<(), String> {
@@ -281,34 +301,6 @@ impl FixtureCrate {
             .ok_or_else(|| "advanced modification time overflowed".to_owned())?;
         filetime::set_file_mtime(&absolute_path, FileTime::from_system_time(advanced_mtime))
             .map_err(|error| error.to_string())
-    }
-}
-
-fn fixture_build_support_cargo_toml(manifest: &str) -> Result<String, String> {
-    let mut removed_lints = false;
-    let mut inside_lints = false;
-    let mut retained_lines = Vec::new();
-
-    for line in manifest.lines() {
-        let trimmed_line = line.trim();
-        let is_section_header = trimmed_line.starts_with('[') && trimmed_line.ends_with(']');
-        if is_section_header {
-            inside_lints = false;
-            if trimmed_line == "[lints]" {
-                removed_lints = true;
-                inside_lints = true;
-                continue;
-            }
-        }
-        if !inside_lints {
-            retained_lines.push(line);
-        }
-    }
-
-    if removed_lints {
-        Ok(format!("{}\n", retained_lines.join("\n")))
-    } else {
-        Err("build-support manifest must contain a [lints] table".to_owned())
     }
 }
 
