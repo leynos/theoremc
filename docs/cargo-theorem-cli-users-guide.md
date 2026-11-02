@@ -36,8 +36,8 @@ Continuous integration (CI) tests the single workspace contract:
 RUSTFLAGS="" cargo +1.89 check --workspace
 ```
 
-Clearing `RUSTFLAGS` matters because `.cargo/config.toml` sets the
-nightly-only `-Zthreads=8` frontend flag, which stable Rust 1.89 rejects.
+Clearing `RUSTFLAGS` matters because `.cargo/config.toml` sets the nightly-only
+`-Zthreads=8` frontend flag, which stable Rust 1.89 rejects.
 
 ## Running the command
 
