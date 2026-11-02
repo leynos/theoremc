@@ -33,7 +33,7 @@ The Rust 1.89 validation path needs this form, because a stable toolchain
 refuses `-Zthreads=8`:
 
 ```bash
-RUSTFLAGS="" cargo +1.89 check --workspace
+RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features --locked
 ```
 
 ## Borrowed-string newtypes

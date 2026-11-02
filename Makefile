@@ -50,7 +50,7 @@ check-agent-native: ## Check OrthoConfig agent-native command policy
 	cargo orthohelp --check-agent-native --package cargo-theorem
 
 msrv: ## Check the workspace minimum supported Rust version
-	RUSTFLAGS="" $(CARGO) +1.89 check --workspace
+	RUSTFLAGS="" $(CARGO) +1.89 check --workspace --all-targets --all-features --locked
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary

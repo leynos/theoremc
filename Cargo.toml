@@ -6,7 +6,7 @@ members = [
     "crates/theoremc-core",
     "crates/theoremc-macros",
 ]
-resolver = "2"
+resolver = "3"
 
 [package]
 name = "theoremc"

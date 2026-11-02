@@ -279,10 +279,20 @@ the root `Cargo.toml` `rust-version` field and repeated in each workspace
 package. This floor is required by `serde-saphyr` 2.0.0 and `ortho_config`
 0.10.0; it also permits the use of let chains in conditionals. The decision to
 raise the reusable libraries from Rust 1.88 is recorded in
-[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md). The `msrv` target checks
-library and binary targets; test-only dependencies are outside the MSRV
-contract because the current `rstest-bdd` stack resolves a `cargo-platform`
-release that requires a newer toolchain.
+[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md).
+
+The workspace sets `resolver = "3"` so Cargo prefers dependency versions
+compatible with the declared MSRV. That is what keeps the dev-only
+`cargo-platform` on 0.3.2 instead of 0.3.3, which needs Rust 1.91, so the MSRV
+check can cover every target, including tests.
+
+`make msrv` runs
+`RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features
+--locked`.
+The empty `RUSTFLAGS` displaces the nightly-only `-Zthreads=8` flag and the
+mold linker from the repository's Cargo configuration, which a stable toolchain
+refuses before it checks any package. The test suite still runs once, in
+`make test`.
 
 ### 3.2 Quality gates
 
@@ -637,7 +647,7 @@ not depend on application configuration, but every package now declares the
 same Rust 1.89 MSRV. CI and local validation run one workspace check:
 
 ```console
-RUSTFLAGS="" cargo +1.89 check --workspace
+RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features --locked
 ```
 
 The empty `RUSTFLAGS` matters: repository Cargo configuration carries the
