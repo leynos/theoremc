@@ -63,8 +63,8 @@ core schema or macro expansion logic owned by the workspace crates.
 | `docs/theoremc-design.md`                                                          | Architecture, design rationale, and current versus planned system shape  |
 | `docs/cargo-theorem-cli-design.md`                                                 | `cargo theorem` CLI contract, boundaries, and implementation sequence    |
 | `docs/cargo-theorem-cli-users-guide.md`                                            | User guide for the implemented `context` foundation and planned commands |
-| `docs/adrs/adr-0009-ortho-config-cli-configuration.md`                             | Application-only OrthoConfig configuration boundary                      |
-| `docs/adrs/adr-0010-reusable-library-msrv-rust-1-89.md`                            | Workspace-wide Rust 1.89 MSRV decision for serde-saphyr 2.0              |
+| `docs/adrs/adr-0009-orthoconfig-cli-configuration.md`                              | Application-only OrthoConfig configuration boundary                      |
+| `docs/adrs/adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md`                 | Workspace-wide Rust 1.89 MSRV decision for serde-saphyr 2.0              |
 | `docs/ortho-config/`                                                               | Imported OrthoConfig guides and local redirects to pinned upstream docs  |
 | `docs/ortho-config/users-guide.md`                                                 | Imported OrthoConfig v0.10.0 users' guide                                |
 | `docs/ortho-config/v0-10-0-migration-guide.md`                                     | Imported v0.10.0 migration reference                                     |

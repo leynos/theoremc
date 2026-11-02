@@ -135,5 +135,5 @@ effort.
 - `docs/theoremc-design.md`
 - `docs/users-guide.md`
 - `docs/adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md`
-- `docs/adrs/adr-0009-ortho-config-cli-configuration.md` — separates the CLI's
+- `docs/adrs/adr-0009-orthoconfig-cli-configuration.md` — separates the CLI's
   OrthoConfig localization runtime from reusable library localization.

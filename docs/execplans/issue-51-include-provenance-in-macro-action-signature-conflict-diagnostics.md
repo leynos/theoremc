@@ -555,7 +555,7 @@ Upstream artefacts:
   error"; its "Validation expectations" are unit tests for the typed conflict
   data, trybuild coverage for the public compile error, and snapshot tests only
   if the format becomes substantial.
-- `docs/adrs/adr-0004-action-signature-specification.md` (ADR-0004), which
+- `docs/adrs/adr-0004-theorem-side-action-signatures.md` (ADR-0004), which
   rules that a signature declared more than once within one `theorem_file!`
   expansion must be semantically equivalent, and that probes are emitted as
   anonymous `const _` items.

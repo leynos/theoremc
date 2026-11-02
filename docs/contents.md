@@ -60,14 +60,14 @@
     localizers, structured diagnostic codes, and deterministic fallback policy.
 - [Architectural decision record (ADR) 0003: architectural boundary
   enforcement for schema
-  layers](adrs/adr-0003-architectural-boundary-enforcement.md)
+  layers](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
   - Decision record for schema layering constraints, module boundary policy,
     and an incremental architecture-enforcement stack.
 - [Architectural decision record (ADR) 0004: theorem-side action
-  signatures](adrs/adr-0004-action-signature-specification.md)
+  signatures](adrs/adr-0004-theorem-side-action-signatures.md)
   - Decision record for explicit theorem-side action signatures used by typed
     action probes and future argument shaping.
-- [Architectural decision record (ADR) 0005: Rust build standard](adrs/adr-0005-rust-build-standard.md)
+- [Architectural decision record (ADR) 0005: Rust build standard](adrs/adr-0005-adopt-the-rust-build-standard-for-development-builds.md)
   - Decision record for the repository-wide Rust build commands and warning
     policy used during development.
 - [Architectural decision record (ADR) 0006: backend-neutral harness planning
@@ -84,12 +84,12 @@
   - Decision record for the narrow crate boundary around theorem discovery
     and generated-suite writing.
 - [Architectural decision record (ADR) 0009: OrthoConfig CLI
-  configuration](adrs/adr-0009-ortho-config-cli-configuration.md)
+  configuration](adrs/adr-0009-orthoconfig-cli-configuration.md)
   - Decision record for the application-only configuration boundary, source
     precedence, and profile support; its mixed-MSRV boundary is superseded by
     ADR-0010.
 - [Architectural decision record (ADR) 0010: reusable-library MSRV for
-  serde-saphyr 2.0](adrs/adr-0010-reusable-library-msrv-rust-1-89.md)
+  serde-saphyr 2.0](adrs/adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md)
   - Decision record for adopting serde-saphyr 2.0.0 and raising every
     workspace package to Rust 1.89.
 - [Architectural decision record (ADR) 0011: vertical-slice-first roadmap
@@ -108,7 +108,7 @@
 ## Requests for comments
 
 - [Request for Comments (RFC) 0001: semantic law templates over composable
-  primaries](rfcs/rfc-0001-semantic-law-templates.md)
+  primaries](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
   - Accepted proposal for schema version 2 structured laws, composable
     primaries, semantic Law IR, and staged Kani lowering.
 - [RFCs](rfcs/) - Accepted and proposed requests for comments that define

@@ -288,7 +288,7 @@ Kani-specific coupling that ADR-0006 is designed to prevent.
 
 ## Related documents
 
-- [RFC 0001: semantic law templates](../rfcs/rfc-0001-semantic-law-templates.md)
+- [RFC 0001: semantic law templates](../rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
 - [ADR-0006: backend-neutral harness planning
   boundary](adr-0006-backend-neutral-harness-planning-boundary.md)
 - [ADR-0007: Verus backend preservation

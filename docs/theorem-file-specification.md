@@ -3,12 +3,13 @@
 Decision context for symbol stability and vacuity policy is recorded in
 [Architecture Decision Record (ADR) 0001](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
 
-[RFC 0001](rfcs/rfc-0001-semantic-law-templates.md) is accepted and defines
-schema version 2. This specification records that target contract as well as
-the version 1 compatibility profile. Version 2 implementation is pending
-roadmap step 4.4, after the working version 1 Kani vertical slice. The current
-public model and raw adapter still use assertion-only proof lists; accepted
-syntax below must not be read as a claim of current parser or backend support.
+[RFC 0001](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
+is accepted and defines schema version 2. This specification records that
+target contract as well as the version 1 compatibility profile. Version 2
+implementation is pending roadmap step 4.4, after the working version 1 Kani
+vertical slice. The current public model and raw adapter still use
+assertion-only proof lists; accepted syntax below must not be read as a claim
+of current parser or backend support.
 
 ## 1. YAML schema reference (versions 1 and 2)
 
@@ -278,7 +279,7 @@ Each `Step` is exactly one of:
 Each entry declares the expected Rust function signature for an action named by
 `Let` or `Do`. The theorem document, not the current Rust implementation, is
 the source of this expected contract. This follows
-[ADR-0004](adrs/adr-0004-action-signature-specification.md).
+[ADR-0004](adrs/adr-0004-theorem-side-action-signatures.md).
 
 Example:
 
@@ -419,7 +420,7 @@ Prove:
 The fragment requires the usual theorem metadata, a `config` binding, evidence,
 and explicit witnesses to form a complete document. Full examples for every law
 are in
-[RFC 0001's catalogue](rfcs/rfc-0001-semantic-law-templates.md#initial-law-catalogue).
+[RFC 0001's catalogue](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md#initial-law-catalogue).
 
 ### 3.10.3 Validation, lowering, and evidence (version 2)
 

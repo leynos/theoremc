@@ -20,8 +20,8 @@ erode these boundaries and make the codebase harder to reason about.
   Fluent](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
   — establishes internationalization (i18n) strategy
 - [ADR-0003: Architectural boundary
-  enforcement](adrs/adr-0003-architectural-boundary-enforcement.md) — enforces
-  layered schema boundaries and anti-corruption constraints
+  enforcement](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
+  — enforces layered schema boundaries and anti-corruption constraints
 - [ADR-0008: Workspace build-support
   boundary](adrs/adr-0008-workspace-build-support-boundary.md) — assigns
   discovery and generated-suite writing to the internal build-support crate
@@ -128,7 +128,8 @@ per-file expansion logic belongs to `crates/theoremc-macros`.
 ## 2. Module architecture
 
 The crate follows the layer boundaries enforced by Architecture Decision Record
-(ADR) [ADR-0003](adrs/adr-0003-architectural-boundary-enforcement.md):
+(ADR)
+[ADR-0003](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md):
 
 **Table:** Module layers and responsibilities
 
@@ -223,8 +224,8 @@ backend capability checking, evidence distinctions, and additive future Verus
 bindings. The current assertion-only domain and raw lists remain unchanged
 until that step; the public API break requires release and migration
 documentation. See
-[RFC 0001](rfcs/rfc-0001-semantic-law-templates.md#implementation-sequence) and
-the
+[RFC 0001](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md#implementation-sequence)
+and the
 [roadmap](roadmap.md#phase-4-working-kani-proof-path-safety-policy-and-semantic-laws)
 for implementation acceptance criteria.
 
@@ -348,7 +349,7 @@ the root `Cargo.toml` `rust-version` field and repeated in each workspace
 package. This floor is required by `serde-saphyr` 2.0.0 and `ortho_config`
 0.10.0; it also permits the use of let chains in conditionals. The decision to
 raise the reusable libraries from Rust 1.88 is recorded in
-[ADR-0010](adrs/adr-0010-reusable-library-msrv-rust-1-89.md).
+[ADR-0010](adrs/adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md).
 
 The workspace sets `resolver = "3"` so Cargo prefers dependency versions
 compatible with the declared MSRV. That is what keeps the dev-only
@@ -886,9 +887,10 @@ own `RUSTFLAGS`) and for the release target (the coverage exclusion is checked
 in the workflow steps) on a Linux host, and the `setup-rust` steps of the CI
 workflows (each must pass `install-mold`), so a flag lost through a recipe or
 workflow edit fails there. The decision is recorded in
-[ADR-0005](adrs/adr-0005-rust-build-standard.md). The contract runs `make -n`,
-so a direct `cargo test` needs GNU make on the `PATH`. It fails when `make` is
-missing instead of skipping, so a missing tool cannot read as a pass.
+[ADR-0005](adrs/adr-0005-adopt-the-rust-build-standard-for-development-builds.md).
+The contract runs `make -n`, so a direct `cargo test` needs GNU make on the
+`PATH`. It fails when `make` is missing instead of skipping, so a missing tool
+cannot read as a pass.
 
 ### Cranelift
 

@@ -244,9 +244,10 @@ Observable success:
   `Actions` and `ActionSignature` schema.
 - `TFS-5`: `docs/theorem-file-specification.md` §5.4, struct literal
   synthesis.
-- `ADR-0003`: `docs/adrs/adr-0003-architectural-boundary-enforcement.md`,
+- `ADR-0003`:
+  `docs/adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md`,
   schema and collision module boundaries that this plan must respect.
-- `ADR-0004`: `docs/adrs/adr-0004-action-signature-specification.md`,
+- `ADR-0004`: `docs/adrs/adr-0004-theorem-side-action-signatures.md`,
   theorem-side action signature declarations and the rationale for treating
   types as theorem-owned contracts.
 - Companion ExecPlan:
