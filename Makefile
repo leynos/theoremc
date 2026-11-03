@@ -101,7 +101,7 @@ SPELLING_REPOSITORY ?= .
 SPELLING_SCOPE ?= all
 SPELLING_COMMAND = $(UV_ENV) $(UV) tool run --python 3.14 \
 	--from "$(SPELLING_BUILDER)@$(SPELLING_BUILDER_REF)" \
-	typos-config-builder gate --repository $(SPELLING_REPOSITORY) --scope $(SPELLING_SCOPE)
+	typos-config-builder gate --repository "$(SPELLING_REPOSITORY)" --scope $(SPELLING_SCOPE)
 
 spelling: ## Check spelling and shared phrase corrections
 	$(SPELLING_COMMAND)
