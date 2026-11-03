@@ -306,7 +306,7 @@ where available, and run the direct Cargo invocations for specialized checks:
 
 | Gate                 | Command                                                                                            | What it checks                                                               |
 | -------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Formatting           | `make check-fmt`                                                                                   | `cargo fmt --all -- --check`                                                 |
+| Formatting           | `make check-fmt`                                                                                   | Checks Rust and Markdown table formatting                                    |
 | Linting              | `make lint`                                                                                        | Whitaker (`make lint-whitaker`), then Clippy with `-D warnings` plus rustdoc |
 | Type checking        | `make typecheck`                                                                                   | `cargo check --all-targets --all-features`                                   |
 | Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                                     |
