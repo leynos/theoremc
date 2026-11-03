@@ -50,6 +50,8 @@ jobs:
         run: make test-workflow-contracts
       - name: Format
         run: make check-fmt
+      - name: Check ADR/RFC names and links
+        run: make check-adr-rfc-names
       - name: Markdown lint
         # The action reads .markdownlint-cli2.jsonc from the workspace, so
         # the rules and ignores (target, dist) match `make markdownlint`.
