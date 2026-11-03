@@ -347,14 +347,45 @@ Because the dictionary is live, `typos.toml` changes whenever shared policy
 changes; CI runs the gate rather than a drift check, and the regenerated file
 is committed. `typos.local.toml` holds narrow repository-specific exceptions
 only: exact or full-line patterns for identifiers and terms the policy cannot
-correct, never bare accepted words. Never edit `typos.toml` by hand.
+correct, never bare accepted words. Its one file exclusion covers the spelling
+policy's own fixture data, whose purpose is to contain rejected spellings; the
+builder rejects broad exclusions. Never edit `typos.toml` by hand.
 
 The target needs `uv`, taken from the `UV` make variable (`UV ?= uv`), so a
 contributor without `uv` on `PATH` can run `make UV=/path/to/uv spelling`. `uv`
 provisions the pinned Python 3.14 interpreter, so no separate Python
-installation is needed. The builder inspects git-tracked files only: stage a
-new document before running the gate because an unstaged file is invisible to
-it locally while CI checks it once committed.
+installation is needed. The whole invocation lives in `SPELLING_COMMAND`, so
+the recipe and its overrides stay in one place:
+
+- `SPELLING_BUILDER` (default
+  `git+https://github.com/leynos/typos-config-builder.git`) and
+  `SPELLING_BUILDER_REF` (default `v0.1.3`) select the builder revision.
+- `SPELLING_REPOSITORY` (default `.`) is the repository the gate inspects.
+- `SPELLING_SCOPE` (default `all`) is the file scope the gate checks.
+
+`make spelling SPELLING_REPOSITORY=/path/to/checkout` therefore checks another
+working tree without editing the recipe. The same command exports
+`UV_CACHE_DIR=.uv-cache` and `UV_TOOL_DIR=.uv-tools`, so the gate's uv cache
+and installed tools stay inside the repository; both directories are
+git-ignored. The builder inspects git-tracked files only: stage a new document
+before running the gate because an unstaged file is invisible to it locally
+while CI checks it once committed.
+
+Two integration tests guard the wiring and the overlay.
+`spelling_gate_contract` reads the Makefile and CI workflow to check the pinned
+command, its defaults, the recipe, and the ordering after Markdown lint.
+`spelling_command_contract` runs the recipe against a stub `uv` and needs no
+network. `spelling_policy` runs the real pinned builder against temporary
+tracked fixtures: one exercises every `typos.local.toml` pattern and must pass,
+and one adds a misspelling and must fail. The fixture prose lives under
+`tests/fixtures/spelling/`, which the overlay excludes from the repository gate
+because it must contain the spellings the gate rejects; the copy staged in the
+temporary repository is not excluded, so the patterns are still exercised. The
+test sets `TYPOS_CONFIG_BUILDER_OFFLINE`, so the dictionary comes from the
+builder's bundled snapshot. The builder package itself is fetched from the
+pinned tag on first use, so the first run needs network or a warm uv cache;
+`make spelling` warms the same cache, and CI runs the gate before the test
+suite.
 
 ### 3.3 Test conventions
 

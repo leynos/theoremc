@@ -64,3 +64,11 @@ ignore = [
   # A commit hash quoted in a historical execplan; the hash is not prose.
   '`d06ba1e`',
 ]
+
+[files]
+# The policy test's fixture data deliberately contains the American spellings
+# and the misspelling that the gate must reject, so the gate skips this
+# directory. The test copies the prose into a temporary repository under
+# `prose.md`, which the exclusion does not match, so every pattern above is
+# still exercised.
+exclude = ["tests/fixtures/spelling/"]

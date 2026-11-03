@@ -1,0 +1,18 @@
+The mold linker installs mold.
+`install-mold` and `-fuse-ld=mold` are flags.
+The `mold` name is fixed.
+The reader matches the literal string "mold" here.
+CARGO_TERM_COLOR and FORCE_COLOR are environment names.
+color = "always"
+color: auto
+value.color
+"color"
+THEOREMC_COLOR
+types: [opened, reopened, synchronize, labeled, ready_for_review]
+`d06ba1e`
+The reader gets mold wrong; the build takes mold; losing mold; naming mold.
+A fixture comments not mold.
+Reaches mold alone; mold never reaches; mold reaches; mold would reach; mold beyond; mold in `[build]`; mold on Linux; mold in a Linux table.
+mold, which ships for Linux. Set mold the default.
+That is mold. The exception is explicit.
+The linker is expected mold in the Linux table and lost mold.
