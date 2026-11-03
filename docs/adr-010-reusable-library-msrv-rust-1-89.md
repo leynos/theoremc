@@ -94,8 +94,11 @@ follow-up work that widened the MSRV gate and removed the test-only exclusion.
 
 The workspace now sets `resolver = "3"` in the root `Cargo.toml`. Cargo's
 MSRV-aware resolver prefers dependency versions whose declared `rust-version`
-is compatible with the workspace MSRV, so a routine `cargo update` no longer
-silently selects a release that the declared floor cannot build.
+is compatible with the workspace MSRV whenever such a version satisfies the
+requirement. When no compatible version satisfies it, Cargo may still select an
+incompatible release, so a routine `cargo update` can still raise the effective
+floor. `make msrv` remains the verification step: it checks the resolved graph
+at the declared floor.
 
 ### `cargo-platform` 0.3.2
 
@@ -115,8 +118,9 @@ RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features --locked
 
 - `--all-targets` brings tests, examples, and benches inside the contract, so
   the dev-only dependency graph is checked at the declared floor.
-- `--all-features` checks every optional feature combination the workspace
-  publishes.
+- `--all-features` enables every optional feature together. That is the
+  maximal feature set, not every subset combination, and it does not by itself
+  prove the default build with `test-support` disabled.
 - `--locked` fails the gate if the lockfile would need to change, so the
   checked dependency graph is the one that ships.
 
