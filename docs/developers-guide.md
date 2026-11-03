@@ -316,10 +316,16 @@ where available, and run the direct Cargo invocations for specialized checks:
 | Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                                         |
 | Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                                         |
 | Spelling             | `make spelling`                                                                                    | Regenerates `typos.toml`, then checks spelling and shared phrase corrections |
+| ADR/RFC names        | `make check-adr-rfc-names`                                                                         | Checks canonical filenames, unique serials, titles, and local record links   |
 | Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all`, then mdtablefix and markdownlint-cli2 `--fix`             |
 
 When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 `make nixie` must also pass.
+
+The style guide's `typos` check and tested-example loader describe upstream
+tooling guidance and are not current Theoremc gates. Its migration-guide naming
+rule applies to releases that change observable behaviour; the existing project
+migration guide follows that convention.
 
 `make lint` runs the Whitaker Dylint suite through the `whitaker` wrapper
 (`make lint-whitaker`) before rustdoc and Clippy. Install it with
@@ -780,9 +786,9 @@ in the workflow steps) on a Linux host, and the `setup-rust` steps of the CI
 workflows (each must pass `install-mold`), so a flag lost through a recipe or
 workflow edit fails there. The decision is recorded in
 [ADR-0005](adrs/adr-0005-adopt-the-rust-build-standard-for-development-builds.md).
-The contract runs `make -n`, so a direct `cargo test` needs GNU make on the
-`PATH`. It fails when `make` is missing instead of skipping, so a missing tool
-cannot read as a pass.
+The contract runs `make -n`, so a direct `cargo test` command requires GNU
+make to be available on the `PATH`. It fails when `make` is missing instead of
+skipping, so a missing tool cannot read as a pass.
 
 ### Cranelift
 

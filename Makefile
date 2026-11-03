@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv
+.PHONY: help all clean test build release lint lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling check-adr-rfc-names test-workflow-contracts check-agent-native msrv
 
 TARGET ?= cargo-theorem
 
@@ -105,6 +105,10 @@ SPELLING_COMMAND = $(UV_ENV) "$(UV)" tool run --python 3.14 \
 
 spelling: ## Check spelling and shared phrase corrections
 	$(SPELLING_COMMAND)
+
+check-adr-rfc-names: ## Check ADR/RFC filenames, serials, titles, and local links
+	python3 -B -m unittest discover -s tools -p 'test_check_adr_rfc_names.py'
+	python3 -B tools/check_adr_rfc_names.py
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

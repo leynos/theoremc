@@ -4,6 +4,14 @@ This guide outlines conventions for authoring documentation for software
 created by df12 Productions. Apply these rules to keep documentation clear,
 consistent, and easy to maintain across projects.
 
+## Theoremc adoption
+
+Theoremc applies this guide's prose conventions and ADR/RFC naming rules. The
+`typos` check and tested-example loader described below are upstream tooling
+guidance; this repository does not implement or enforce them. The current
+automated documentation gates are listed in the
+[developers' guide](developers-guide.md).
+
 ## Spelling
 
 - Use British English based on the
@@ -182,6 +190,9 @@ this means operators, end users, or integrators.
   that loader between integration tests and behaviour-driven scenarios, so a
   documented example becomes a contract the implementation must satisfy and
   cannot drift from the behaviour it claims.
+
+  **Theoremc adoption:** This tested-example loader is upstream tooling
+  guidance and is not implemented or enforced in this repository.
 
 ### Migration guide
 

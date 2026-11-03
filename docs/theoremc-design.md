@@ -988,7 +988,7 @@ mangling (Step 2.1.2 of the roadmap):
 - Action mangling is placed in a new top-level `mangle` module
   (`crates/theoremc-core/src/mangle.rs`), separate from the `schema` module,
   because mangling is an action-resolution concern, not a schema concern (see
-  ADR-0003 boundary rules). The `schema` and `mangle` modules have no
+  the ADR-0003 boundary rules). The `schema` and `mangle` modules have no
   cross-dependency; callers wire them together.
 - The `blake3` crate (version 1.8.3) is added as a regular dependency for
   `hash12` computation. blake3 is deterministic, platform-independent, and
