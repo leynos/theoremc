@@ -107,7 +107,7 @@ spelling: ## Check spelling and shared phrase corrections
 	$(SPELLING_COMMAND)
 
 check-adr-rfc-names: ## Check ADR/RFC filenames, serials, titles, and local links
-	python3 -B -m unittest discover -s tools -p 'test_check_adr_rfc_names.py'
+	$(UV_ENV) $(UV) run --with 'pytest==8.4.2' -- python -B -m pytest tools/test_check_adr_rfc_names.py
 	python3 -B tools/check_adr_rfc_names.py
 
 help: ## Show available targets

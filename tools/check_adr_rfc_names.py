@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Check project ADR/RFC filenames and links to those records."""
+"""Check canonical ADR/RFC filenames and links to those records.
+
+This checker helps keep record titles, serials, filenames, and local references
+consistent. Run it directly with ``python3 tools/check_adr_rfc_names.py`` or
+through ``make check-adr-rfc-names`` to run its tests and repository checks.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +18,7 @@ from urllib.parse import SplitResult, unquote, urlsplit
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTATION_ROOT = REPOSITORY_ROOT / "docs"
-FENCED_CODE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+FENCED_CODE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+)[^`\n]*?\1")
 INLINE_LINK = re.compile(r"!?\[[^\]\n]*\]\([ \t]*(?:<([^>\n]+)>|([^\s)]+))")
 REFERENCE_LINK = re.compile(
@@ -57,7 +62,11 @@ class RecordKind:
 
 
 def slug_for_title(title: str) -> str:
-    """Return the ASCII kebab-case slug used for an ADR or RFC title."""
+    """Return the ASCII kebab-case slug used for an ADR or RFC title.
+
+    Example: `slug_for_title("Adopt latest guide")` returns
+    `"adopt-latest-guide"`.
+    """
     transliterated = unicodedata.normalize("NFKD", title.translate(SPECIAL_TRANSLITERATIONS))
     without_marks = "".join(char for char in transliterated if not unicodedata.combining(char))
     ascii_title = without_marks.encode("ascii", "ignore").decode("ascii").lower()
@@ -66,7 +75,10 @@ def slug_for_title(title: str) -> str:
 
 
 def first_heading(markdown: str) -> str | None:
-    """Return the text of the first level-one heading, if the document has one."""
+    """Return the text of the first level-one heading, if present.
+
+    Example: `first_heading("# Decision\nBody")` returns `"Decision"`.
+    """
     for line in markdown.splitlines():
         match = re.match(r"^#\s+(.+?)\s*#*\s*$", line)
         if match:
@@ -88,7 +100,7 @@ def _closes_fence(
     marker = fence.group(1)
     if marker[0] != fenced_char:
         return False
-    return len(marker) >= fenced_length
+    return len(marker) >= fenced_length and not fence.group(2).strip()
 
 
 def _visible_markdown(markdown: str) -> str:
@@ -142,7 +154,11 @@ def extract_markdown_destinations(markdown: str) -> list[str]:
 
 
 def is_record_destination(path: str) -> bool:
-    """Return whether a local path refers to a project ADR or RFC filename."""
+    """Return whether a local path refers to a project ADR or RFC filename.
+
+    Example: `is_record_destination("docs/adrs/adr-0001-example.md")` returns
+    `True`.
+    """
     decoded = unquote(path).replace("\\", "/")
     path_parts = [part.lower() for part in Path(decoded).parts]
     basename = path_parts[-1] if path_parts else ""
@@ -254,13 +270,26 @@ def validate_record_files(docs_root: Path) -> list[str]:
 
 
 def markdown_files(repository_root: Path) -> list[Path]:
-    """List repository Markdown files while excluding generated directories."""
+    """List repository Markdown files while excluding generated directories.
+
+    Example: `markdown_files(Path("/repo"))` omits `/repo/target/output.md`.
+    """
     excluded = {".git", ".venv", "dist", "node_modules", "target", ".uv-cache", ".uv-tools"}
-    return sorted(
-        path
-        for path in repository_root.rglob("*.md")
-        if not any(part in excluded for part in path.relative_to(repository_root).parts)
-    )
+    markdown_paths: list[Path] = []
+    directories = [repository_root]
+    while directories:
+        directory = directories.pop()
+        for path in directory.iterdir():
+            if path.is_symlink():
+                if path.suffix == ".md":
+                    markdown_paths.append(path)
+                continue
+            if path.is_dir():
+                if path.name not in excluded:
+                    directories.append(path)
+            elif path.is_file() and path.suffix == ".md":
+                markdown_paths.append(path)
+    return sorted(markdown_paths)
 
 
 def _is_external_destination(parsed_url: SplitResult) -> bool:
@@ -345,11 +374,24 @@ def validate_local_record_links(
 
 
 def main() -> int:
-    """Run the repository's ADR/RFC filename and inbound-link checks."""
-    errors = validate_record_files(DOCUMENTATION_ROOT)
-    paths = markdown_files(REPOSITORY_ROOT)
-    link_errors, checked_links = validate_local_record_links(REPOSITORY_ROOT, paths)
-    errors.extend(link_errors)
+    """Run the repository's ADR/RFC filename and inbound-link checks.
+
+    Example: `main()` returns `0` when every record and local link is valid.
+    """
+    try:
+        errors = validate_record_files(DOCUMENTATION_ROOT)
+        paths = markdown_files(REPOSITORY_ROOT)
+        link_errors, checked_links = validate_local_record_links(REPOSITORY_ROOT, paths)
+        errors.extend(link_errors)
+
+        records = len(list((DOCUMENTATION_ROOT / "adrs").glob("*.md")))
+        records += len(list((DOCUMENTATION_ROOT / "rfcs").glob("*.md")))
+    except (OSError, UnicodeError) as error:
+        print(
+            f"ADR/RFC documentation check could not read repository files: {error}",
+            file=sys.stderr,
+        )
+        return 1
 
     if errors:
         print("ADR/RFC documentation check failed:", file=sys.stderr)
@@ -357,8 +399,6 @@ def main() -> int:
             print(f"- {error}", file=sys.stderr)
         return 1
 
-    records = len(list((DOCUMENTATION_ROOT / "adrs").glob("*.md")))
-    records += len(list((DOCUMENTATION_ROOT / "rfcs").glob("*.md")))
     print(f"Checked {records} ADR/RFC records and {checked_links} local ADR/RFC links.")
     return 0
 
