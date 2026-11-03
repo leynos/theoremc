@@ -32,13 +32,69 @@ const PINNED_RECIPE: &str = concat!(
     "--all-targets --all-features --locked",
 );
 
+/// A Makefile target whose recipe a contract test pins.
+#[derive(Clone, Copy)]
+struct Target(&'static str);
+
+/// A crate whose locked releases a contract test pins.
+#[derive(Clone, Copy)]
+struct Crate(&'static str);
+
+/// One line of a YAML workflow, with its indentation measured once.
+///
+/// CI YAML in this repository is space-indented, so the leading-space count is
+/// the line's nesting depth. Measuring it on construction keeps the block
+/// helpers focused on structure rather than on string arithmetic.
+#[derive(Clone, Copy)]
+struct Line<'a> {
+    text: &'a str,
+    indent: usize,
+}
+
+impl<'a> Line<'a> {
+    /// Measures one line's leading spaces.
+    fn new(text: &'a str) -> Self {
+        Self {
+            text,
+            indent: text.len() - text.trim_start_matches(' ').len(),
+        }
+    }
+
+    /// Reports whether the line carries no content.
+    fn is_blank(self) -> bool {
+        self.text.trim().is_empty()
+    }
+
+    /// Reports whether the line opens a sequence item.
+    fn is_sequence_item(self) -> bool {
+        self.text.trim_start().starts_with("- ")
+    }
+}
+
+/// A YAML mapping key that can silently excuse a failing step.
+#[derive(Clone, Copy)]
+enum BypassKey {
+    If,
+    ContinueOnError,
+}
+
+impl BypassKey {
+    /// Returns the key as it is written in the workflow.
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::If => "if",
+            Self::ContinueOnError => "continue-on-error",
+        }
+    }
+}
+
 /// Returns the recipe lines of a Makefile target, without the target line.
 ///
 /// The leading tab is stripped so a caller compares the command text alone.
 /// An absent target yields an empty list, which fails the equality assertion
 /// rather than panicking.
-fn recipe_lines<'a>(makefile: &'a str, target: &str) -> Vec<&'a str> {
-    let header = format!("{target}:");
+fn recipe_lines(makefile: &str, target: Target) -> Vec<&str> {
+    let header = format!("{}:", target.0);
     let mut lines = makefile.lines();
     if !lines.any(|line| line.starts_with(&header)) {
         return Vec::new();
@@ -101,14 +157,14 @@ fn package_rust_version(package: &serde_json::Value) -> Result<(String, String),
     Ok((name, rust_version))
 }
 
-/// Returns every version of the named package in a `Cargo.lock` document.
+/// Returns every version of the named crate in a `Cargo.lock` document.
 ///
-/// A lockfile lists one `[[package]]` table per resolved package, and a package
+/// A lockfile lists one `[[package]]` table per resolved package, and a crate
 /// can appear more than once when two dependency lines need different major
 /// versions. Each matching table contributes its `version` key, so the caller
 /// can assert on the whole set rather than on whichever table comes first.
-fn locked_versions<'a>(lock: &'a str, package: &str) -> Vec<&'a str> {
-    let name = format!("name = \"{package}\"");
+fn locked_versions(lock: &str, package: Crate) -> Vec<&str> {
+    let name = format!("name = \"{}\"", package.0);
     lock.split("[[package]]")
         .skip(1)
         .filter(|table| table.lines().any(|line| line.trim() == name))
@@ -121,12 +177,9 @@ fn locked_versions<'a>(lock: &'a str, package: &str) -> Vec<&'a str> {
         .collect()
 }
 
-/// Returns the number of leading spaces in a line.
-///
-/// CI YAML in this repository is space-indented, so the count is the line's
-/// nesting depth and blank lines do not affect it.
-fn indentation(line: &str) -> usize {
-    line.len() - line.trim_start_matches(' ').len()
+/// Splits a workflow document into measured lines.
+fn workflow_lines(ci: &str) -> Vec<Line<'_>> {
+    ci.lines().map(Line::new).collect()
 }
 
 /// Reports whether a line declares a mapping key with the given name.
@@ -134,11 +187,11 @@ fn indentation(line: &str) -> usize {
 /// The key must sit at the start of a mapping entry, either directly or after
 /// a sequence marker such as `- if: ...`. Requiring the colon keeps a value
 /// that merely begins with the same word from matching.
-fn declares_key(line: &str, key: &str) -> bool {
-    let entry = line.trim_start();
-    let entry = entry.strip_prefix("- ").unwrap_or(entry);
-    entry
-        .strip_prefix(key)
+fn declares_key(line: Line<'_>, key: BypassKey) -> bool {
+    let mapping_entry = line.text.trim_start();
+    let candidate = mapping_entry.strip_prefix("- ").unwrap_or(mapping_entry);
+    candidate
+        .strip_prefix(key.as_str())
         .is_some_and(|rest| rest.starts_with(':'))
 }
 
@@ -146,8 +199,8 @@ fn declares_key(line: &str, key: &str) -> bool {
 ///
 /// Sequence items are excluded, so a step name does not masquerade as a key
 /// when the job's own keys are located.
-fn is_mapping_key(line: &str) -> bool {
-    let trimmed = line.trim();
+fn is_mapping_key(line: Line<'_>) -> bool {
+    let trimmed = line.text.trim();
     !trimmed.starts_with('-') && trimmed.ends_with(':')
 }
 
@@ -160,28 +213,25 @@ fn is_mapping_key(line: &str) -> bool {
 ///
 /// Returns the reason when the run line is outside the file or belongs to no
 /// sequence item.
-fn step_block(lines: &[&str], run_line: usize) -> Result<Range<usize>, String> {
+fn step_block(lines: &[Line<'_>], run_line: usize) -> Result<Range<usize>, String> {
     let run_indent = lines
         .get(run_line)
-        .map(|line| indentation(line))
+        .map(|line| line.indent)
         .ok_or_else(|| format!("run line {run_line} is outside the CI file"))?;
     let start = (0..run_line)
         .rev()
         .find(|&index| {
-            lines.get(index).is_some_and(|line| {
-                indentation(line) < run_indent && line.trim_start().starts_with("- ")
-            })
+            lines
+                .get(index)
+                .is_some_and(|line| line.indent < run_indent && line.is_sequence_item())
         })
         .ok_or_else(|| "the run key must belong to a steps sequence item".to_owned())?;
-    let step_indent = lines
-        .get(start)
-        .map(|line| indentation(line))
-        .unwrap_or_default();
+    let step_indent = lines.get(start).map_or(0, |line| line.indent);
     let end = (run_line + 1..lines.len())
         .find(|&index| {
             lines
                 .get(index)
-                .is_some_and(|line| !line.trim().is_empty() && indentation(line) <= step_indent)
+                .is_some_and(|line| !line.is_blank() && line.indent <= step_indent)
         })
         .unwrap_or(lines.len());
     Ok(start..end)
@@ -196,24 +246,21 @@ fn step_block(lines: &[&str], run_line: usize) -> Result<Range<usize>, String> {
 ///
 /// Returns the reason when the workflow declares no `jobs:` mapping or the
 /// step sits outside a job.
-fn job_block(lines: &[&str], step_start: usize) -> Result<Range<usize>, String> {
+fn job_block(lines: &[Line<'_>], step_start: usize) -> Result<Range<usize>, String> {
     let jobs_line = lines
         .iter()
-        .position(|line| line.trim() == "jobs:")
+        .position(|line| line.text.trim() == "jobs:")
         .ok_or_else(|| "CI must declare a jobs mapping".to_owned())?;
-    let jobs_indent = lines
-        .get(jobs_line)
-        .map(|line| indentation(line))
-        .unwrap_or_default();
+    let jobs_indent = lines.get(jobs_line).map_or(0, |line| line.indent);
     let candidates = || {
         (jobs_line + 1..step_start).filter(|&index| {
             lines
                 .get(index)
-                .is_some_and(|line| indentation(line) > jobs_indent && is_mapping_key(line))
+                .is_some_and(|line| line.indent > jobs_indent && is_mapping_key(*line))
         })
     };
-    let job_indent = candidates()
-        .filter_map(|index| lines.get(index).map(|line| indentation(line)))
+    let enclosing_indent = candidates()
+        .filter_map(|index| lines.get(index).map(|line| line.indent))
         .min()
         .ok_or_else(|| "the step must sit inside a job".to_owned())?;
     let start = candidates()
@@ -221,14 +268,14 @@ fn job_block(lines: &[&str], step_start: usize) -> Result<Range<usize>, String> 
         .find(|&index| {
             lines
                 .get(index)
-                .is_some_and(|line| indentation(line) == job_indent)
+                .is_some_and(|line| line.indent == enclosing_indent)
         })
         .ok_or_else(|| "the step must sit inside a job".to_owned())?;
     let end = (step_start..lines.len())
         .find(|&index| {
             lines
                 .get(index)
-                .is_some_and(|line| !line.trim().is_empty() && indentation(line) <= job_indent)
+                .is_some_and(|line| !line.is_blank() && line.indent <= enclosing_indent)
         })
         .unwrap_or(lines.len());
     Ok(start..end)
@@ -238,18 +285,20 @@ fn job_block(lines: &[&str], step_start: usize) -> Result<Range<usize>, String> 
 ///
 /// Both `if:` and `continue-on-error:` keys are checked, including when they
 /// are written on a sequence item's own line.
-fn has_bypass_key(lines: &[&str], block: &Range<usize>) -> bool {
+fn has_bypass_key(lines: &[Line<'_>], block: &Range<usize>) -> bool {
     lines
         .get(block.start..block.end)
         .unwrap_or_default()
         .iter()
-        .any(|line| declares_key(line, "if") || declares_key(line, "continue-on-error"))
+        .any(|line| {
+            declares_key(*line, BypassKey::If) || declares_key(*line, BypassKey::ContinueOnError)
+        })
 }
 
 #[test]
 fn msrv_target_runs_the_locked_rust_1_89_check() {
     assert_eq!(
-        recipe_lines(MAKEFILE, "msrv"),
+        recipe_lines(MAKEFILE, Target("msrv")),
         vec![PINNED_RECIPE],
         "the msrv target must run the locked Rust 1.89 check over every target"
     );
@@ -281,7 +330,7 @@ fn the_workspace_uses_the_msrv_aware_resolver() {
 
 #[test]
 fn the_lockfile_selects_the_msrv_compatible_cargo_platform() {
-    let versions = locked_versions(LOCK, "cargo-platform");
+    let versions = locked_versions(LOCK, Crate("cargo-platform"));
     assert!(
         versions.contains(&"0.3.2"),
         "the lockfile must keep the dev-only cargo-platform on 0.3.2, the newest release that builds on Rust 1.89; found {versions:?}"
@@ -294,10 +343,10 @@ fn the_lockfile_selects_the_msrv_compatible_cargo_platform() {
 
 #[test]
 fn ci_runs_the_msrv_gate() -> Result<(), String> {
-    let lines: Vec<&str> = CI.lines().collect();
+    let lines = workflow_lines(CI);
     let run_line = lines
         .iter()
-        .position(|line| line.trim() == "run: make msrv")
+        .position(|line| line.text.trim() == "run: make msrv")
         .ok_or_else(|| "CI must run `make msrv` as its own step".to_owned())?;
     let step = step_block(&lines, run_line)?;
     if has_bypass_key(&lines, &step) {
