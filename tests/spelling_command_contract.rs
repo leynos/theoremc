@@ -58,27 +58,42 @@ impl StubUv {
     }
 }
 
-/// Prepares an isolated stub `uv` and returns it, failing with the reason the
-/// temporary directory could not be created or written.
+/// Creates the stub `uv` under Cargo's integration-test directory.
+///
+/// The stub is executed directly, as the recipe executes a real `uv`, so its
+/// directory must allow execution. A temporary directory may sit on a `noexec`
+/// mount, where Make cannot run the stub; the target directory cannot, because
+/// the test binary itself runs from beneath it.
 #[fixture]
 fn stub_uv() -> Result<StubUv, String> {
-    let temp = tempfile::tempdir().map_err(|error| format!("temp dir: {error}"))?;
+    let root = Path::new(env!("CARGO_TARGET_TMPDIR"));
+    Dir::create_ambient_dir_all(root, ambient_authority())
+        .map_err(|error| format!("create stub root: {error}"))?;
+    let temp = tempfile::Builder::new()
+        .prefix("spelling-stub-")
+        .tempdir_in(root)
+        .map_err(|error| format!("temp dir: {error}"))?;
     let dir = Dir::open_ambient_dir(temp.path(), ambient_authority())
         .map_err(|error| format!("open temp dir: {error}"))?;
     write_stub(&dir)?;
     Ok(StubUv { temp, dir })
 }
 
-/// Runs the `spelling` target with the stub as `UV` and `repository` as the
-/// path handed to the builder.
+/// Runs the `spelling` target with `uv` as `UV` and `repository` as the path
+/// handed to the builder.
 ///
 /// The stub writes its argument log to `arguments.log` and its environment log
-/// to `environment.log` beside the stub; `stub_exit` selects the status it
+/// to `environment.log` under `root`; `stub_exit` selects the status it
 /// reports.
-fn run_spelling(root: &Path, stub_exit: u32, repository: &str) -> Result<Output, String> {
+fn run_spelling(
+    root: &Path,
+    uv: &Path,
+    stub_exit: u32,
+    repository: &str,
+) -> Result<Output, String> {
     let makefile = repository_root().join("Makefile");
     let mut uv_assignment = OsString::from("UV=");
-    uv_assignment.push(root.join("uv"));
+    uv_assignment.push(uv);
     Command::new("make")
         .arg("--no-print-directory")
         .arg("-f")
@@ -143,7 +158,7 @@ fn assert_pinned_arguments(recorded: &[String], repository: &str) -> Result<(), 
 #[rstest]
 fn recipe_passes_the_pinned_arguments_to_uv(stub_uv: Result<StubUv, String>) -> Result<(), String> {
     let stub = stub_uv?;
-    let output = run_spelling(stub.path(), 0, ".")?;
+    let output = run_spelling(stub.path(), &stub.path().join("uv"), 0, ".")?;
     if !output.status.success() {
         return Err(make_failure(&output));
     }
@@ -171,7 +186,7 @@ fn a_repository_path_with_spaces_stays_one_argument(
     let repository = spaced_repository
         .to_str()
         .ok_or_else(|| "the temporary path must be valid UTF-8".to_owned())?;
-    let output = run_spelling(stub.path(), 0, repository)?;
+    let output = run_spelling(stub.path(), &stub.path().join("uv"), 0, repository)?;
     if !output.status.success() {
         return Err(make_failure(&output));
     }
@@ -179,9 +194,29 @@ fn a_repository_path_with_spaces_stays_one_argument(
 }
 
 #[rstest]
+fn a_uv_path_with_spaces_stays_one_argument(stub_uv: Result<StubUv, String>) -> Result<(), String> {
+    let stub = stub_uv?;
+    let uv_directory = stub.path().join("uv bin");
+    stub.dir
+        .create_dir("uv bin")
+        .map_err(|error| format!("create uv directory: {error}"))?;
+    let uv_dir = Dir::open_ambient_dir(&uv_directory, ambient_authority())
+        .map_err(|error| format!("open uv directory: {error}"))?;
+    write_stub(&uv_dir)?;
+    let output = run_spelling(stub.path(), &uv_directory.join("uv"), 0, ".")?;
+    if !output.status.success() {
+        return Err(make_failure(&output));
+    }
+    assert_pinned_arguments(&read_lines(&stub.dir, "arguments.log")?, ".")
+}
+
+#[rstest]
 fn a_failing_stub_fails_the_make_target(stub_uv: Result<StubUv, String>) -> Result<(), String> {
     let stub = stub_uv?;
-    let output = run_spelling(stub.path(), 3, ".")?;
+    let output = run_spelling(stub.path(), &stub.path().join("uv"), 3, ".")?;
+    // Requiring the argument log proves the stub ran and reported the
+    // failure, so make failing for another reason cannot satisfy this test.
+    assert_pinned_arguments(&read_lines(&stub.dir, "arguments.log")?, ".")?;
     if output.status.success() {
         return Err("make must fail when the spelling command fails".to_owned());
     }

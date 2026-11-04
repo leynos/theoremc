@@ -99,7 +99,7 @@ SPELLING_BUILDER ?= git+https://github.com/leynos/typos-config-builder.git
 SPELLING_BUILDER_REF ?= v0.1.3
 SPELLING_REPOSITORY ?= .
 SPELLING_SCOPE ?= all
-SPELLING_COMMAND = $(UV_ENV) $(UV) tool run --python 3.14 \
+SPELLING_COMMAND = $(UV_ENV) "$(UV)" tool run --python 3.14 \
 	--from "$(SPELLING_BUILDER)@$(SPELLING_BUILDER_REF)" \
 	typos-config-builder gate --repository "$(SPELLING_REPOSITORY)" --scope $(SPELLING_SCOPE)
 

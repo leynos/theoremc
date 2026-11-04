@@ -86,6 +86,8 @@ fn spelling_target_runs_the_pinned_gate() {
         "@$(SPELLING_BUILDER_REF)",
         "--python 3.14",
         "typos-config-builder gate",
+        // Quoting keeps a `UV` override containing a space a single argument.
+        "\"$(UV)\"",
         // Quoting keeps an override containing a space a single argument.
         "--repository \"$(SPELLING_REPOSITORY)\"",
         "--scope $(SPELLING_SCOPE)",
