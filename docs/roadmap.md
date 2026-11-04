@@ -842,7 +842,7 @@ Out of scope: production deployment templates.
   Signposts: `TFS-5`, `ADR-3`, `ADR-4`, `DES-4`, `CLI-DES`.
 - [ ] Keep the [`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md)
   aligned with each shipped command, including installation and first use,
-  project initialisation, theorem creation, checking, backend installation
+  project initialization, theorem creation, checking, backend installation
   rules, execution, reports, jobs, profiles, JSON output, exit classes, bounded
   results, and migration from `rust-prover-tools`. Acceptance: every released
   command has a documented task path, and the guide states its proposed status

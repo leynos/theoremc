@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint lint-whitaker typecheck fmt check-fmt markdownlint nixie test-workflow-contracts check-agent-native msrv
+.PHONY: help all clean test build release lint lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv
 
 TARGET ?= cargo-theorem
 
@@ -57,7 +57,7 @@ release: target/release/$(TARGET) ## Build release binary
 
 all: check-fmt lint test test-workflow-contracts ## Perform a comprehensive check of code
 
-clean: ## Remove build artifacts
+clean: ## Remove build artefacts
 	$(CARGO) clean
 
 test: ## Run tests with warnings treated as errors
@@ -91,6 +91,20 @@ markdownlint: ## Lint Markdown files
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
+
+# The spelling gate's pinned builder. The defaults are the adopted baseline;
+# the overrides let a contributor point the same recipe at another builder
+# revision, repository, or scope without editing it.
+SPELLING_BUILDER ?= git+https://github.com/leynos/typos-config-builder.git
+SPELLING_BUILDER_REF ?= v0.1.3
+SPELLING_REPOSITORY ?= .
+SPELLING_SCOPE ?= all
+SPELLING_COMMAND = $(UV_ENV) "$(UV)" tool run --python 3.14 \
+	--from "$(SPELLING_BUILDER)@$(SPELLING_BUILDER_REF)" \
+	typos-config-builder gate --repository "$(SPELLING_REPOSITORY)" --scope $(SPELLING_SCOPE)
+
+spelling: ## Check spelling and shared phrase corrections
+	$(SPELLING_COMMAND)
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

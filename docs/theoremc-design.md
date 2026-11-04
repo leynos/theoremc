@@ -1255,7 +1255,7 @@ boilerplate across the schema and test-support wrappers:
   is a workspace-internal path dependency, not a published crate. Should such a
   context appear later, restore an inherent `const` pair on the affected
   wrapper alone — the same trade the three siblings below already make.
-- Three further `&'a str` wrappers keep their hand-written pairs:
+- Three further `&'a str` wrappers keep their handwritten pairs:
   `schema::loader_message::{FieldName, ErrorMessage}` and
   `schema::arg_value::ParamName`. Their `new`/`as_str` are `const fn`, and a
   blanket trait implementation cannot be `const`, so adopting the trait would
@@ -1606,7 +1606,7 @@ which treats insignificant whitespace differences such as `Vec<u8>` and
 declared `syn::Type` expression, including nested generic arguments and
 references, as Rust sees it in the theorem owner crate. It does not inspect
 struct fields, decompose generic arguments for field-level checks, or
-synthesise struct literals; Phase 4 harness emission owns those behaviours.
+synthesize struct literals; Phase 4 harness emission owns those behaviours.
 
 This ensures that renames, signature drift, or missing re-exports fail
 compilation immediately, not “later when running theoremd”.

@@ -1,0 +1,74 @@
+# Repository-specific spelling policy.
+#
+# The shared en-GB-oxendict dictionary is authoritative. This overlay carries
+# only terms and identifiers that the policy cannot correct: the `mold` linker
+# name, environment variables, a GitHub event keyword, and a quoted commit
+# hash. Every entry is a narrow pattern that masks one collocation, so ordinary
+# prose remains checked. Bare accepted words are deliberately absent.
+
+schema = 1
+
+[patterns]
+ignore = [
+  # The linker name in inline code, as in `mold` linker.
+  '`mold`',
+  # The linker flag, including the split `-C` form in the build fixtures.
+  '-fuse-ld=mold',
+  # The setup-rust action input that installs the linker.
+  'install-mold',
+  # Prose: a host, workflow or fixture installs the linker.
+  'installs mold',
+  # Prose naming the linker after an article.
+  'mold linker',
+  # The configuration reader's diagnostic for a misplaced linker flag.
+  'gets mold wrong',
+  # Prose: a coverage or build step takes the linker.
+  'takes mold',
+  # Reader-case prose about a lost linker flag.
+  'losing mold',
+  # Reader-case prose about naming the linker outside a Linux table.
+  'naming mold',
+  # A fixture comment contrasting a warning policy with the linker.
+  'not mold',
+  # Prose placing the linker in the Linux table alone.
+  'mold alone',
+  # Positional prose: reaches, never reaches, on Linux, beyond, and so on.
+  'mold (never reaches|reaches|would reach|on Linux|in a Linux table|beyond|in `\[build\]`)',
+  # Prose: the linker ships for Linux alone.
+  'mold, which ships',
+  # Rustdoc: "on Linux, mold the default".
+  'mold the',
+  # Rust source: the reader matches the literal string "mold".
+  '"mold"',
+  # Rustdoc: "mold. The exception is explicit in the step".
+  'mold\. The exception',
+  # Rustdoc: the linker is expected in the Linux table alone.
+  'mold in the Linux table',
+  # A fixture comment about a Linux table that lost the linker.
+  'lost mold',
+  # CARGO_TERM_COLOR is an environment-variable name; its spelling is fixed.
+  '\bCARGO_TERM_COLOR\b',
+  # FORCE_COLOR is an environment-variable name; its spelling is fixed.
+  '\bFORCE_COLOR\b',
+  # `color` is the CLI's API spelling. The documentation style guide keeps US
+  # spelling in APIs, so these patterns mask the configuration key, the
+  # environment variable, and the Rust fields that carry them. Prose still
+  # takes the Oxford `colour`.
+  '\bcolor = ',
+  '\bcolor:',
+  '\.color\b',
+  '"color"',
+  '\bTHEOREMC_COLOR\b',
+  # `labeled` is a GitHub event keyword; the API spelling is fixed.
+  'types: \[opened, reopened, synchronize, labeled, ready_for_review\]',
+  # A commit hash quoted in a historical execplan; the hash is not prose.
+  '`d06ba1e`',
+]
+
+[files]
+# The policy test's fixture data deliberately contains the American spellings
+# and the misspelling that the gate must reject, so the gate skips this
+# directory. The test copies the prose into a temporary repository under
+# `prose.md`, which the exclusion does not match, so every pattern above is
+# still exercised.
+exclude = ["tests/fixtures/spelling/"]

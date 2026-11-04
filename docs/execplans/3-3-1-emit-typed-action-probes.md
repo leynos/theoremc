@@ -511,7 +511,7 @@ and documentation.
   against a locally installed but unusable Kani compiler.
 - [x] 2026-05-25 21:13 CEST: Re-ran deterministic gates for the first core
   slice. `make check-fmt` and `make lint` passed. The default `make test`
-  surfaced a local Kani shared-library failure, then the serialised full-suite
+  surfaced a local Kani shared-library failure, then the serialized full-suite
   command passed 551 nextest tests and all workspace doctests; log:
   `/tmp/test-theoremc-3-3-1-core-schema-gate-serial.out`.
 - [x] 2026-05-25 21:22 CEST: Committed the ADR-004 schema and validation
@@ -596,7 +596,7 @@ and documentation.
 - The default parallel `make test` path can also make local `cargo kani list`
   fail with `Broken pipe` panics in dependency build scripts. That is another
   installed-but-unusable Kani state, not a theoremc proof-harness failure, so
-  the BDD skip guard now recognises it.
+  the BDD skip guard now recognizes it.
 
 ## Decision Log
 

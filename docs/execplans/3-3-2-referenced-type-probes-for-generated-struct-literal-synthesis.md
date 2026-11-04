@@ -448,7 +448,7 @@ Implementation notes:
   module, even when many types are probed; the renderer must not emit one
   helper per probe statement.
 - Treat `__theoremc_assert_referenced` as the stable renderer anchor for the
-  generated block so a theorem author running `cargo expand` can recognise the
+  generated block so a theorem author running `cargo expand` can recognize the
   probe immediately. The helper name must remain stable if proc-macro output
   formatting changes; record any future anchor change in the Decision Log.
 - Probes live outside the `#[cfg(kani)]` backend module so ordinary builds

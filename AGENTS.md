@@ -267,7 +267,7 @@ project:
 - In production code and shared fixtures, avoid `.expect()` entirely: return
   `Result` and use `?` to propagate errors instead of panicking.
 - Keep `expect_used` **strict**; do not suppress the lint.
-- Recognise that `allow-expect-in-tests = true` **doesn’t cover** helpers
+- Recognize that `allow-expect-in-tests = true` **doesn’t cover** helpers
   outside `#[cfg(test)]` or `#[test]`; avoid `expect` in such fixtures.
 - Use `anyhow`/`eyre` with `.context(...)` to **preserve backtraces** and
   provide clear, typed failure paths.
@@ -296,7 +296,7 @@ project:
   user input, request IDs, paths with unbounded parameters, or raw error
   strings into labels.
 - Libraries may emit `metrics` and `tracing` instrumentation, but must not
-  install global recorders or subscribers. Applications should initialise
+  install global recorders or subscribers. Applications should initialize
   exporters/subscribers once, as early as practical in startup.
 
 ## Markdown guidance
@@ -311,6 +311,22 @@ project:
 - Use dashes (`-`) for list bullets.
 - Use GitHub-flavoured Markdown footnotes (`[^1]`) for references and
   footnotes.
+
+<!-- typos-config-builder:agents-md:start -->
+
+## Spelling
+
+- `make spelling` runs the pinned `typos-config-builder gate`, which
+  regenerates `typos.toml` from the shared en-GB-oxendict dictionary and
+  `typos.local.toml`, then checks spelling and the shared phrase corrections.
+- `typos.toml` is generated: never edit it by hand. Put narrow
+  repository-specific exceptions in `typos.local.toml`, as exact or full-line
+  patterns rather than bare accepted words.
+- When `make spelling` changes `typos.toml`, commit the regenerated file. If
+  the change is unrelated to your work, commit it in a separate base pull
+  request and stack your branch on it, so each review diff stays focused.
+
+<!-- typos-config-builder:agents-md:end -->
 
 ## Additional tooling
 

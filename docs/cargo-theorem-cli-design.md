@@ -1389,7 +1389,7 @@ descriptor; none carries caller text. `theoremc_backend_cache_total` uses
 Command submission, state transitions, retries, cancellation, crash recovery,
 lock failure, cache decisions, resource truncation, and delivery each emit a
 structured event carrying `command`, a `run_id` or `job_id` correlation,
-`backend`, `attempt`, `elapsed`, `state`, and a categorised error. Events
+`backend`, `attempt`, `elapsed`, `state`, and a categorized error. Events
 exclude secrets, payloads, paths, theorem IDs, and raw error text, in line with
 §16. Correlation identifiers are event fields and never metric labels.
 

@@ -169,7 +169,7 @@ fn lower_sequence(
 /// This helper recursively decodes and lowers nested values that appear
 /// inside sequences and maps. Scalar values are lowered directly; maps
 /// are first decoded via [`decode_arg_value`] so that sentinel wrappers
-/// (`{ ref: <Ident> }`, `{ literal: "..." }`) are recognised and lowered
+/// (`{ ref: <Ident> }`, `{ literal: "..." }`) are recognized and lowered
 /// to references or literals respectively. Only genuinely non-sentinel
 /// maps (decoded as `ArgValue::RawMap`) are rejected, since struct literal
 /// synthesis requires type information not available at this nesting depth.
