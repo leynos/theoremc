@@ -12,6 +12,7 @@
 
 use cap_std::ambient_authority;
 use cap_std::fs::{Dir, Permissions, PermissionsExt};
+use rstest::{fixture, rstest};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
@@ -39,6 +40,33 @@ fn write_stub(directory: &Dir) -> Result<(), String> {
     directory
         .set_permissions("uv", Permissions::from_mode(0o755))
         .map_err(|error| format!("make stub executable: {error}"))
+}
+
+/// A temporary directory holding an executable stub `uv`.
+///
+/// The directory must outlive the test that consumes it, so the fixture owns
+/// both the temporary directory and the capability handle opened on it.
+struct StubUv {
+    temp: tempfile::TempDir,
+    dir: Dir,
+}
+
+impl StubUv {
+    /// Returns the stub directory as an ambient path for `make`.
+    fn path(&self) -> &Path {
+        self.temp.path()
+    }
+}
+
+/// Prepares an isolated stub `uv` and returns it, failing with the reason the
+/// temporary directory could not be created or written.
+#[fixture]
+fn stub_uv() -> Result<StubUv, String> {
+    let temp = tempfile::tempdir().map_err(|error| format!("temp dir: {error}"))?;
+    let dir = Dir::open_ambient_dir(temp.path(), ambient_authority())
+        .map_err(|error| format!("open temp dir: {error}"))?;
+    write_stub(&dir)?;
+    Ok(StubUv { temp, dir })
 }
 
 /// Runs the `spelling` target with the stub as `UV` and `repository` as the
@@ -112,18 +140,15 @@ fn assert_pinned_arguments(recorded: &[String], repository: &str) -> Result<(), 
     ))
 }
 
-#[test]
-fn recipe_passes_the_pinned_arguments_to_uv() -> Result<(), String> {
-    let directory = tempfile::tempdir().map_err(|error| format!("temp dir: {error}"))?;
-    let fixture = Dir::open_ambient_dir(directory.path(), ambient_authority())
-        .map_err(|error| format!("open temp dir: {error}"))?;
-    write_stub(&fixture)?;
-    let output = run_spelling(directory.path(), 0, ".")?;
+#[rstest]
+fn recipe_passes_the_pinned_arguments_to_uv(stub_uv: Result<StubUv, String>) -> Result<(), String> {
+    let stub = stub_uv?;
+    let output = run_spelling(stub.path(), 0, ".")?;
     if !output.status.success() {
         return Err(make_failure(&output));
     }
-    assert_pinned_arguments(&read_lines(&fixture, "arguments.log")?, ".")?;
-    let recorded_environment = read_lines(&fixture, "environment.log")?;
+    assert_pinned_arguments(&read_lines(&stub.dir, "arguments.log")?, ".")?;
+    let recorded_environment = read_lines(&stub.dir, "environment.log")?;
     for expected in ["UV_CACHE_DIR=.uv-cache", "UV_TOOL_DIR=.uv-tools"] {
         if !recorded_environment.iter().any(|line| line == expected) {
             return Err(format!(
@@ -134,33 +159,29 @@ fn recipe_passes_the_pinned_arguments_to_uv() -> Result<(), String> {
     Ok(())
 }
 
-#[test]
-fn a_repository_path_with_spaces_stays_one_argument() -> Result<(), String> {
-    let directory = tempfile::tempdir().map_err(|error| format!("temp dir: {error}"))?;
-    let fixture = Dir::open_ambient_dir(directory.path(), ambient_authority())
-        .map_err(|error| format!("open temp dir: {error}"))?;
-    write_stub(&fixture)?;
-    fixture
+#[rstest]
+fn a_repository_path_with_spaces_stays_one_argument(
+    stub_uv: Result<StubUv, String>,
+) -> Result<(), String> {
+    let stub = stub_uv?;
+    stub.dir
         .create_dir("spelling checkout")
         .map_err(|error| format!("create checkout: {error}"))?;
-    let spaced_repository = directory.path().join("spelling checkout");
+    let spaced_repository = stub.path().join("spelling checkout");
     let repository = spaced_repository
         .to_str()
         .ok_or_else(|| "the temporary path must be valid UTF-8".to_owned())?;
-    let output = run_spelling(directory.path(), 0, repository)?;
+    let output = run_spelling(stub.path(), 0, repository)?;
     if !output.status.success() {
         return Err(make_failure(&output));
     }
-    assert_pinned_arguments(&read_lines(&fixture, "arguments.log")?, repository)
+    assert_pinned_arguments(&read_lines(&stub.dir, "arguments.log")?, repository)
 }
 
-#[test]
-fn a_failing_stub_fails_the_make_target() -> Result<(), String> {
-    let directory = tempfile::tempdir().map_err(|error| format!("temp dir: {error}"))?;
-    let fixture = Dir::open_ambient_dir(directory.path(), ambient_authority())
-        .map_err(|error| format!("open temp dir: {error}"))?;
-    write_stub(&fixture)?;
-    let output = run_spelling(directory.path(), 3, ".")?;
+#[rstest]
+fn a_failing_stub_fails_the_make_target(stub_uv: Result<StubUv, String>) -> Result<(), String> {
+    let stub = stub_uv?;
+    let output = run_spelling(stub.path(), 3, ".")?;
     if output.status.success() {
         return Err("make must fail when the spelling command fails".to_owned());
     }
