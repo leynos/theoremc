@@ -18,6 +18,9 @@ from urllib.parse import SplitResult, unquote, urlsplit
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 DOCUMENTATION_ROOT = REPOSITORY_ROOT / "docs"
+EXCLUDED_MARKDOWN_DIRECTORIES = frozenset(
+    {".git", ".venv", "dist", "node_modules", "target", ".uv-cache", ".uv-tools"}
+)
 FENCED_CODE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+)[^`\n]*?\1")
 INLINE_LINK = re.compile(r"!?\[[^\]\n]*\]\([ \t]*(?:<([^>\n]+)>|([^\s)]+))")
@@ -269,26 +272,37 @@ def validate_record_files(docs_root: Path) -> list[str]:
     return errors
 
 
+def _is_markdown_path(path: Path) -> bool:
+    """Return whether a path is a Markdown file or symlink.
+
+    Example: a symlink named `guide.md` is included in the scan.
+    """
+    return path.suffix == ".md" and (path.is_symlink() or path.is_file())
+
+
+def _is_traversable_markdown_directory(path: Path) -> bool:
+    """Return whether a real directory should be included in the scan.
+
+    Example: a `target/` directory is not traversable.
+    """
+    return (
+        not path.is_symlink()
+        and path.is_dir()
+        and path.name not in EXCLUDED_MARKDOWN_DIRECTORIES
+    )
+
+
 def markdown_files(repository_root: Path) -> list[Path]:
     """List repository Markdown files while excluding generated directories.
 
     Example: `markdown_files(Path("/repo"))` omits `/repo/target/output.md`.
     """
-    excluded = {".git", ".venv", "dist", "node_modules", "target", ".uv-cache", ".uv-tools"}
     markdown_paths: list[Path] = []
     directories = [repository_root]
     while directories:
-        directory = directories.pop()
-        for path in directory.iterdir():
-            if path.is_symlink():
-                if path.suffix == ".md":
-                    markdown_paths.append(path)
-                continue
-            if path.is_dir():
-                if path.name not in excluded:
-                    directories.append(path)
-            elif path.is_file() and path.suffix == ".md":
-                markdown_paths.append(path)
+        entries = tuple(directories.pop().iterdir())
+        markdown_paths.extend(filter(_is_markdown_path, entries))
+        directories.extend(filter(_is_traversable_markdown_directory, entries))
     return sorted(markdown_paths)
 
 
