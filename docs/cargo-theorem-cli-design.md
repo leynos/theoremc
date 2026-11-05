@@ -116,7 +116,7 @@ application's OrthoConfig dependencies outside the library packages.
 Continuous integration tests the single contract:
 
 ```console
-RUSTFLAGS="" cargo +1.89 check --workspace
+RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features --locked
 ```
 
 ### 4.3 Retirement of `theoremd`

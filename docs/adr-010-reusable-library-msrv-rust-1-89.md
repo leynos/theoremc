@@ -85,6 +85,52 @@ without providing 2.0's current release line.
 - Downstream crates that require Rust 1.88 must upgrade or remain on the last
   theoremc release that supported that floor.
 
+## Addendum: 2026-11-02
+
+The accepted text above is preserved as recorded. This addendum records the
+follow-up work that widened the MSRV gate and removed the test-only exclusion.
+
+### Resolver 3
+
+The workspace now sets `resolver = "3"` in the root `Cargo.toml`. Cargo's
+MSRV-aware resolver prefers dependency versions whose declared `rust-version`
+is compatible with the workspace MSRV whenever such a version satisfies the
+requirement. When no compatible version satisfies it, Cargo may still select an
+incompatible release, so a routine `cargo update` can still raise the effective
+floor. `make msrv` remains the verification step: it checks the resolved graph
+at the declared floor.
+
+### `cargo-platform` 0.3.2
+
+The `rstest-bdd` stack pulls `cargo-platform` in as a dev-only dependency.
+`cargo-platform` 0.3.3 declares Rust 1.91, which is above the Rust 1.89 floor;
+0.3.2 is the newest release that builds on Rust 1.89. With resolver 3 the
+lockfile selects 0.3.2, so the test-only exclusion recorded in the accepted
+consequences is no longer needed.
+
+### Expanded `make msrv`
+
+`make msrv` now runs:
+
+```sh
+RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features --locked
+```
+
+- `--all-targets` brings tests, examples, and benches inside the contract, so
+  the dev-only dependency graph is checked at the declared floor.
+- `--all-features` enables every optional feature together. That is the
+  maximal feature set, not every subset combination, and it does not by itself
+  prove the default build with `test-support` disabled.
+- `--locked` fails the gate if the lockfile would need to change, so the
+  checked dependency graph is the one that ships.
+
+`RUSTFLAGS=""` is deliberate: it displaces the repository's development
+rustflags, which include nightly-only options and a linker choice that the
+stable Rust 1.89 toolchain does not accept.
+
+The developer's guide and the design documents describe the same command and
+the same resolver decision.
+
 ## Related documents
 
 - [ADR-002: library-first Fluent localization](adr-002-library-first-internationalization-and-localization-with-fluent.md)

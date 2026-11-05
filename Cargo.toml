@@ -6,7 +6,7 @@ members = [
     "crates/theoremc-core",
     "crates/theoremc-macros",
 ]
-resolver = "2"
+resolver = "3"
 
 [package]
 name = "theoremc"
@@ -36,6 +36,7 @@ proptest = { version = "1.11.0", default-features = false, features = ["std"] }
 rstest = "0.28.0"
 rstest-bdd = "0.6.0"
 rstest-bdd-macros = "0.6.0"
+serde_json.workspace = true
 tempfile = "3.15.0"
 camino = "1.2.2"
 cap-std = { version = "4.0.2", features = ["fs_utf8"] }
