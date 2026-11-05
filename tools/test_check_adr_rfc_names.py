@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from check_adr_rfc_names import (
+from adr_rfc_names import (
     extract_markdown_destinations,
     markdown_files,
     slug_for_title,
@@ -225,8 +225,11 @@ def _create_repository(root: Path) -> Path:
     (docs_root / "adrs").mkdir(parents=True)
     (docs_root / "rfcs").mkdir()
     tools_root.mkdir()
+    for module_name in ("check_adr_rfc_names.py", "adr_rfc_names.py"):
+        shutil.copyfile(
+            Path(__file__).with_name(module_name), tools_root / module_name
+        )
     checker = tools_root / "check_adr_rfc_names.py"
-    shutil.copyfile(Path(__file__).with_name("check_adr_rfc_names.py"), checker)
     (docs_root / "adrs" / "adr-0001-example.md").write_text(
         "# Architectural decision record (ADR) 0001: Example\n", encoding="utf-8"
     )
