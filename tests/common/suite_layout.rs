@@ -83,7 +83,9 @@ mod tests {
         let build_dir =
             Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
         let out = format!("{output_dir}/out");
-        build_dir.create_dir_all(&out).expect("create the output directory");
+        build_dir
+            .create_dir_all(&out)
+            .expect("create the output directory");
         build_dir
             .write(format!("{out}/theorem_suite.rs"), "// suite")
             .expect("write the generated suite");
