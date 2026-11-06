@@ -47,19 +47,19 @@ fn validate_segment(name: &str, seg: &str, pos: usize) -> Result<(), InvalidCano
     if !first.is_ascii_alphabetic() && first != '_' {
         return Err(InvalidCanonicalActionName {
             name: name.to_owned(),
-            reason: format!("segment {pos} ('{seg}') must start with a letter or underscore",),
+            reason: format!("segment {pos} ('{seg}') must start with a letter or underscore"),
         });
     }
     if !chars.all(|c| c.is_ascii_alphanumeric() || c == '_') {
         return Err(InvalidCanonicalActionName {
             name: name.to_owned(),
-            reason: format!("segment {pos} ('{seg}') contains invalid characters",),
+            reason: format!("segment {pos} ('{seg}') contains invalid characters"),
         });
     }
     if RUST_KEYWORDS.contains(&seg) {
         return Err(InvalidCanonicalActionName {
             name: name.to_owned(),
-            reason: format!("segment {pos} ('{seg}') is a Rust reserved keyword",),
+            reason: format!("segment {pos} ('{seg}') is a Rust reserved keyword"),
         });
     }
     Ok(())

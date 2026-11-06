@@ -62,14 +62,17 @@ pub(super) fn first_unused_suffix(
     }
 }
 
-/// Returns whether `target_dir` already holds build directories for `suffix`.
+/// Returns whether `target_dir` already holds build directories for `suffix`,
+/// in the classic layout (`build/fx_<suffix>-<hash>`) or the newer one
+/// (`build/fx_<suffix>/<hash>`).
 ///
 /// # Errors
 ///
 /// Returns an error when the build directory exists but cannot be read; a build
 /// directory that does not exist yet holds nothing.
 pub(super) fn suffix_is_taken(target_dir: &Utf8Path, suffix: &str) -> Result<bool, String> {
-    let prefix = format!("fx_{suffix}-");
+    let package = format!("fx_{suffix}");
+    let prefix = format!("{package}-");
     let build = match Dir::open_ambient_dir(target_dir.join("debug/build"), ambient_authority()) {
         Ok(build) => build,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
@@ -79,7 +82,7 @@ pub(super) fn suffix_is_taken(target_dir: &Utf8Path, suffix: &str) -> Result<boo
         let name = listing
             .and_then(|found| found.file_name())
             .map_err(|error| error.to_string())?;
-        if name.starts_with(&prefix) {
+        if name.starts_with(&prefix) || name == package {
             return Ok(true);
         }
     }

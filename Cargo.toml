@@ -134,5 +134,9 @@ missing_docs                        = "deny"
 [workspace.lints.rustdoc]
 missing_crate_level_docs            = "deny"
 
+[profile.dev]
+incremental = false
+debug = 0
+
 [lints]
 workspace = true

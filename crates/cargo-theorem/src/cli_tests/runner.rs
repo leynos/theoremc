@@ -217,7 +217,7 @@ fn process_source_wrapper_keeps_help_independent_of_configuration() {
             .windows(b"Usage:".len())
             .any(|part| part == b"Usage:")
     );
-    assert!(stderr.is_empty());
+    assert_eq!(stderr.len(), 0, "unexpected stderr: {stderr:?}");
 }
 
 #[test]

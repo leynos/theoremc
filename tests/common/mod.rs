@@ -8,6 +8,7 @@ mod fixture_crate;
 mod fixture_isolation;
 mod hermetic_cargo;
 mod schema_fixtures;
+mod suite_layout;
 
 pub use build_log::{BuildLog, toml_section};
 pub use build_support_fixture::build_support_fixture_manifest;

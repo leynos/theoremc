@@ -26,6 +26,26 @@ fn can_returns_invalid_action_name(#[case] name: &str) {
     );
 }
 
+#[rstest]
+#[case::valid("account.deposit")]
+#[case::invalid_missing_separator("deposit")]
+#[case::invalid_keyword("account.fn")]
+fn parse_agrees_with_new_and_try_from(#[case] name: &str) {
+    let parsed = name.parse::<CanonicalActionName>();
+    assert_eq!(parsed.is_ok(), can(name).is_ok());
+    assert_eq!(
+        parsed.as_ref().map(CanonicalActionName::as_str),
+        CanonicalActionName::try_from(name)
+            .as_ref()
+            .map(CanonicalActionName::as_str),
+    );
+    assert_eq!(
+        parsed.is_ok(),
+        name == "account.deposit",
+        "only the well-formed name parses"
+    );
+}
+
 // ── Action name mangling ──────────────────────────────────────────
 
 #[rstest]

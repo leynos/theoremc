@@ -51,7 +51,6 @@ impl From<ortho_config::LoadGlobalsAndSelectedSubcommandError<std::convert::Infa
 
 impl ApplicationError {
     /// Return the stable application exit class for this failure.
-    #[must_use]
     pub fn exit_code(&self) -> ExitCode {
         match self {
             Self::Configuration(_) => ExitCode::from(3),

@@ -11,8 +11,8 @@ fn given_representative_canonical_action_names() {}
 fn then_each_name_produces_the_expected_mangled_identifier() {
     for (canonical, expected_slug, expected_hash) in ACTION_GOLDEN_TRIPLES {
         let m = mangle_action_name(canonical);
-        assert_eq!(m.slug(), *expected_slug, "slug mismatch for {canonical}",);
-        assert_eq!(m.hash(), *expected_hash, "hash mismatch for {canonical}",);
+        assert_eq!(m.slug(), *expected_slug, "slug mismatch for {canonical}");
+        assert_eq!(m.hash(), *expected_hash, "hash mismatch for {canonical}");
         let expected_ident = format!("{expected_slug}__h{expected_hash}");
         assert_eq!(
             m.identifier(),
@@ -72,7 +72,7 @@ fn then_the_resolution_path_begins_with_resolution_target() {
             m.path(),
         );
         // The hash suffix must match an independent hash12 call.
-        assert_eq!(m.hash(), hash12(name), "hash mismatch for {name}",);
+        assert_eq!(m.hash(), hash12(name), "hash mismatch for {name}");
     }
 }
 

@@ -133,7 +133,7 @@ fn assert_expected_error(
     if matches_expected {
         Ok(())
     } else {
-        Err(std::io::Error::other(format!("expected {expected:?}, got {result:?}",)).into())
+        Err(std::io::Error::other(format!("expected {expected:?}, got {result:?}")).into())
     }
 }
 
@@ -169,9 +169,7 @@ fn open_manifest_dir_error_when_directory_is_absent() -> Result<(), Box<dyn std:
         load_theorem_file_from_manifest_dir(&missing_utf8, Utf8Path::new("theorems/any.theorem"));
     match &result {
         Err(TheoremFileLoadError::OpenManifestDir { .. }) => Ok(()),
-        _ => {
-            Err(std::io::Error::other(format!("expected OpenManifestDir, got {result:?}",)).into())
-        }
+        _ => Err(std::io::Error::other(format!("expected OpenManifestDir, got {result:?}")).into()),
     }
 }
 

@@ -126,6 +126,8 @@ pub mod golden;
 
 #[path = "mangle_harness.rs"]
 mod harness;
+#[path = "mangle_parse.rs"]
+mod parse;
 #[path = "mangle_path.rs"]
 mod path;
 

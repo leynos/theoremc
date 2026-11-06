@@ -44,6 +44,14 @@ pub struct Tools {
     pub keys: &'static [&'static str],
 }
 
+/// Returns whether a command line runs Whitaker rather than naming it.
+fn runs_whitaker(command: &str) -> bool {
+    compiles(command)
+        && command
+            .split_whitespace()
+            .any(|word| names_program(word, "whitaker"))
+}
+
 /// Returns the complaint about a development command that assigns no `RUSTFLAGS`.
 fn bare_problem(target: Target<'_>, host: Host, command: &str) -> String {
     format!(
@@ -230,6 +238,10 @@ pub fn development_problems_expecting(
         problems.extend(
             commands
                 .iter()
+                // Whitaker runs under the toolchain its installer manages and
+                // assigns its own flags, so the development standard is not
+                // asked of it.
+                .filter(|command| !runs_whitaker(&command.text))
                 .filter_map(|command| development_problem(target, host, pin, &command.assignment)),
         );
         problems.extend(test_policy_problems(target, host, &commands));

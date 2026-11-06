@@ -12,6 +12,7 @@ use super::fixture_isolation::{
     with_unique_package_name,
 };
 use super::hermetic_cargo::hermetic_cargo;
+use super::suite_layout::{package_directories, read_suite};
 
 /// Source for the repository build script copied into fixture crates.
 pub const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
@@ -307,35 +308,6 @@ impl FixtureCrate {
             .ok_or_else(|| "advanced modification time overflowed".to_owned())?;
         filetime::set_file_mtime(&absolute_path, FileTime::from_system_time(advanced_mtime))
             .map_err(|error| error.to_string())
-    }
-}
-
-/// Names the build directories that belong to the package `package_name`.
-///
-/// The target directory is shared, so only directories named after the
-/// fixture's unique package can hold its suite. The separator is part of the
-/// match: `fx_ab` must not claim `fx_abc-<hash>`.
-fn package_directories(build_dir: &Dir, package_name: &str) -> Result<Vec<String>, String> {
-    let prefix = format!("{package_name}-");
-    let mut names = Vec::new();
-    for listing in build_dir.entries().map_err(|error| error.to_string())? {
-        let name = listing
-            .and_then(|found| found.file_name())
-            .map_err(|error| error.to_string())?;
-        if name.starts_with(&prefix) {
-            names.push(name);
-        }
-    }
-    names.sort();
-    Ok(names)
-}
-
-/// Reads a build directory's generated suite, or `None` when it has none.
-fn read_suite(build_dir: &Dir, name: &str) -> Result<Option<String>, String> {
-    match build_dir.read_to_string(format!("{name}/out/theorem_suite.rs")) {
-        Ok(contents) => Ok(Some(contents)),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(error.to_string()),
     }
 }
 

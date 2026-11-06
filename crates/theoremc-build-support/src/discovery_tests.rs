@@ -65,7 +65,7 @@ fn rerun_paths(discovery: &BuildDiscovery) -> Vec<&str> {
 }
 
 fn assert_root_watch_only(discovery: &BuildDiscovery) {
-    assert!(discovered_paths(discovery).is_empty());
+    assert_eq!(discovered_paths(discovery).len(), 0);
     assert_eq!(watched_directories(discovery), vec!["theorems"]);
     assert_eq!(rerun_paths(discovery), vec!["theorems"]);
 }
