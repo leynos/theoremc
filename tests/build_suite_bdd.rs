@@ -119,59 +119,72 @@ fn a_single_theorem_file_is_included_automatically() {}
 )]
 fn multiple_theorem_files_compile_in_deterministic_suite_order() {}
 
-/// Fixtures that declare the same package name still keep their artefacts
-/// apart in the shared target directory: each reads only its own suite.
-#[test]
-fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(), String> {
-    let first = FixtureCrate::new(
+/// Builds a fixture whose only theorem is `theorems/<name>.theorem`.
+fn fixture_with_theorem(name: &str) -> Result<FixtureCrate, String> {
+    let fixture = FixtureCrate::new(
         &build_support_fixture_manifest("build_suite_fixture"),
         FIXTURE_LIB_RS,
     )?;
-    first.write(
-        Utf8Path::new("theorems/only_first.theorem"),
+    fixture.write(
+        Utf8Path::new(&format!("theorems/{name}.theorem")),
         TRIVIAL_THEOREM,
     )?;
-    let second = FixtureCrate::new(
-        &build_support_fixture_manifest("build_suite_fixture"),
-        FIXTURE_LIB_RS,
-    )?;
-    second.write(
-        Utf8Path::new("theorems/only_second.theorem"),
-        TRIVIAL_THEOREM,
-    )?;
+    Ok(fixture)
+}
 
-    if first.target_dir() != second.target_dir()
-        || !first
+/// Requires both fixtures to build into the warm target and start from the
+/// workspace lock.
+fn require_shared_target_and_lock(fixtures: [&FixtureCrate; 2]) -> Result<(), String> {
+    let [first, second] = fixtures;
+    let shared = first.target_dir() == second.target_dir()
+        && first
             .target_dir()
             .as_str()
-            .ends_with("theoremc-fixture-builds")
-    {
+            .ends_with("theoremc-fixture-builds");
+    if !shared {
         return Err(format!(
             "fixtures must share the warm target, got {} and {}",
             first.target_dir(),
             second.target_dir()
         ));
     }
-    for fixture in [&first, &second] {
-        if fixture.read_to_string(Utf8Path::new("Cargo.lock"))? != include_str!("../Cargo.lock") {
+    for fixture in fixtures {
+        let lock = fixture.read_to_string(Utf8Path::new("Cargo.lock"))?;
+        if lock != include_str!("../Cargo.lock") {
             return Err("a fixture must start from the workspace lock".to_owned());
         }
     }
+    Ok(())
+}
+
+/// Requires `suite` to mention its own theorem and not the other fixture's.
+fn require_only_own_theorem(suite: &str, own: &str, other: &str) -> Result<(), String> {
+    if suite.contains(own) && !suite.contains(other) {
+        Ok(())
+    } else {
+        Err(format!("the {own} suite read another fixture's:\n{suite}"))
+    }
+}
+
+/// Fixtures that declare the same package name still keep their artefacts
+/// apart in the shared target directory: each reads only its own suite.
+#[test]
+fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(), String> {
+    let first = fixture_with_theorem("only_first")?;
+    let second = fixture_with_theorem("only_second")?;
+    require_shared_target_and_lock([&first, &second])?;
 
     first.cargo_build()?;
     second.cargo_build()?;
-    let first_suite = generated_suite_contents(&first)?;
-    let second_suite = generated_suite_contents(&second)?;
 
-    if !first_suite.contains("only_first") || first_suite.contains("only_second") {
-        return Err(format!(
-            "the first suite read another fixture's:\n{first_suite}"
-        ));
-    }
-    if !second_suite.contains("only_second") || second_suite.contains("only_first") {
-        return Err(format!(
-            "the second suite read another fixture's:\n{second_suite}"
-        ));
-    }
-    Ok(())
+    require_only_own_theorem(
+        &generated_suite_contents(&first)?,
+        "only_first",
+        "only_second",
+    )?;
+    require_only_own_theorem(
+        &generated_suite_contents(&second)?,
+        "only_second",
+        "only_first",
+    )
 }
