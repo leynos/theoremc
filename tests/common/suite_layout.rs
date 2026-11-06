@@ -31,8 +31,11 @@ pub fn package_directories(build_dir: &Dir, package_name: &str) -> Result<Vec<St
 
 /// Lists the per-hash directories below a package directory (newer layout).
 fn hash_directories(build_dir: &Dir, package_dir: &str) -> Result<Vec<String>, String> {
-    let Ok(children) = build_dir.read_dir(package_dir) else {
-        return Ok(Vec::new());
+    let children = match build_dir.read_dir(package_dir) {
+        Ok(children) => children,
+        // A package directory that is really a file has no per-hash children.
+        Err(error) if is_missing_path(&error) => return Ok(Vec::new()),
+        Err(error) => return Err(format!("read {package_dir}: {error}")),
     };
     children
         .map(|entry| {
@@ -109,6 +112,25 @@ mod tests {
     #[test]
     fn the_nested_layout_yields_its_suite() {
         assert_suite_found("pkg/0123abcd");
+    }
+
+    /// A package directory that is a file has no per-hash children, and a
+    /// missing one is simply absent.
+    #[test]
+    fn a_package_directory_that_is_a_file_lists_no_children() {
+        let scratch = tempfile::tempdir().expect("create a scratch directory");
+        let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
+            .expect("the scratch directory path should be UTF-8");
+        let build_dir =
+            Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
+        build_dir
+            .write("pkg", "not a directory")
+            .expect("write a file");
+
+        assert_eq!(
+            package_directories(&build_dir, "pkg").expect("list the package directories"),
+            Vec::<String>::new()
+        );
     }
 
     /// A package with no output reads as having no suite.
