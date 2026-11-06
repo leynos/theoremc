@@ -1,0 +1,48 @@
+//! Locates where a build script wrote `theorem_suite.rs` inside a fixture.
+//!
+//! Cargo's classic layout keeps a build script's output at
+//! `build/<package>-<hash>/out`; newer nightlies add a directory level,
+//! `build/<package>/<hash>/out`. Both places are candidates.
+
+use camino::{Utf8Path, Utf8PathBuf};
+use cap_std::fs_utf8::Dir;
+
+/// Lists where a build script may have written `theorem_suite.rs`.
+///
+/// # Errors
+///
+/// Returns an error when the build directory cannot be listed.
+pub fn generated_suite_candidates(dir: &Dir) -> Result<Vec<Utf8PathBuf>, String> {
+    let build_dir = Utf8Path::new("target/debug/build");
+    let mut candidates = Vec::new();
+    for entry_result in dir.read_dir(build_dir).map_err(|error| error.to_string())? {
+        let entry = entry_result.map_err(|error| error.to_string())?;
+        let package_dir = build_dir.join(entry.file_name().map_err(|error| error.to_string())?);
+        candidates.push(package_dir.join("out/theorem_suite.rs"));
+        candidates.extend(nested_suite_candidates(dir, &package_dir)?);
+    }
+    Ok(candidates)
+}
+
+/// Lists the per-hash output directories below one package directory.
+fn nested_suite_candidates(dir: &Dir, package_dir: &Utf8Path) -> Result<Vec<Utf8PathBuf>, String> {
+    let Ok(nested) = dir.read_dir(package_dir) else {
+        return Ok(Vec::new());
+    };
+    nested
+        .map(|entry| {
+            let name = entry
+                .and_then(|found| found.file_name())
+                .map_err(|error| error.to_string())?;
+            Ok(package_dir.join(name).join("out/theorem_suite.rs"))
+        })
+        .collect()
+}
+
+/// Whether a read failed because the path (or a parent) does not exist.
+pub fn is_missing_path(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+    )
+}

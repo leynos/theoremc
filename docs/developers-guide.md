@@ -322,8 +322,9 @@ When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 (`make lint-whitaker`) before rustdoc and Clippy. Install it with
 `whitaker-installer` so that `whitaker` is on `PATH`, and never call
 `cargo dylint` directly. The recipe sets `DYLINT_RUSTFLAGS="-D warnings"` so
-findings fail the gate, and restates the build-standard flags because an
-assigned `RUSTFLAGS` displaces the Cargo configuration. CI installs Whitaker
+findings fail the gate, and assigns an empty `RUSTFLAGS`, because Whitaker runs
+under the toolchain its installer manages and takes none of the development
+standard (no `-Zthreads=8`, no `mold`, no Cranelift). CI installs Whitaker
 through the shared `install-whitaker` action, pinned to a revision concordat
 QG-002 approves; that pin fixes the installer, while the lint suite itself
 follows Whitaker's rolling release. Whitaker does not replace the custom
@@ -771,7 +772,16 @@ on this host as well and one more under Cranelift, so the suite is not shown to
 pass under it. Revisit on the next toolchain bump: measure the whole suite
 under the backend, with CI's environment, and adopt it if every test passes.
 
-The pinned toolchain is now `nightly-2026-10-30`. No measurement has been taken
-on it, so the exception stands on the 2026-10-02 result; the whole suite is
-re-measured under both backends in the next build-standard change for this
-repository.
+Recorded state: the pin is `nightly-2026-11-05` and no measurement has been
+taken on it, so the exception stands on the 2026-10-02 result. The review is
+deferred to 1 April 2027, when the whole suite is re-measured under both
+backends.
+
+### Development build footprint
+
+The development profile sets `incremental = false` and `debug = 0` in
+`Cargo.toml`, so a dev build keeps no incremental state or debug information.
+To debug, set `CARGO_PROFILE_DEV_DEBUG=true`; to rebuild incrementally, set
+`CARGO_INCREMENTAL=1`. `.cargo/config.toml` also sets
+`[unstable] embed-metadata = false`, the native Cargo key for nightlies from
+2026-07-31. `tests/build_footprint_contract.rs` holds the settings.

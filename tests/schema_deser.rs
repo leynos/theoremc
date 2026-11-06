@@ -282,8 +282,8 @@ Witness:
     let doc = docs.first().expect("should have one document");
     assert_eq!(doc.tags.len(), 0);
     assert_eq!(doc.given.len(), 0);
-    assert!(doc.forall.is_empty());
+    assert_eq!(doc.forall.len(), 0);
     assert_eq!(doc.assume.len(), 0);
-    assert!(doc.let_bindings.is_empty());
+    assert_eq!(doc.let_bindings.len(), 0);
     assert_eq!(doc.do_steps.len(), 0);
 }

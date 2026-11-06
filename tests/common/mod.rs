@@ -6,6 +6,7 @@ mod build_support_fixture;
 mod fixture_crate;
 mod hermetic_cargo;
 mod schema_fixtures;
+mod suite_layout;
 
 pub use build_support_fixture::build_support_fixture_manifest;
 pub use fixture_crate::{
