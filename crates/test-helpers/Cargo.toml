@@ -13,5 +13,8 @@ tempfile = "3.27.0"
 the-newtype = "0.1.1"
 theoremc-core = { version = "0.1.0", path = "../theoremc-core" }
 
+[dev-dependencies]
+proptest = { version = "1.11.0", default-features = false, features = ["std"] }
+
 [lints]
 workspace = true

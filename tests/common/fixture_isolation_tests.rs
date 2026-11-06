@@ -2,6 +2,7 @@
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
+use proptest::prelude::*;
 
 use super::{first_unused_suffix, suffix_is_taken, unique_suffix, with_unique_package_name};
 
@@ -81,10 +82,17 @@ fn a_suffix_a_stale_build_directory_already_uses_is_skipped() {
 
     let chosen = first_unused_suffix(
         || offered.next().expect("a free suffix is offered"),
-        |suffix| suffix.ends_with("taken"),
+        |suffix| Ok(suffix.ends_with("taken")),
     );
 
-    assert_eq!(chosen, "free");
+    assert_eq!(chosen, Ok("free".to_owned()));
+}
+
+#[test]
+fn a_scan_that_fails_stops_the_allocation_instead_of_calling_the_name_free() {
+    let chosen = first_unused_suffix(|| "any".to_owned(), |_| Err("cannot read".to_owned()));
+
+    assert_eq!(chosen, Err("cannot read".to_owned()));
 }
 
 #[test]
@@ -95,11 +103,56 @@ fn leftover_build_directories_make_a_suffix_taken_and_only_that_one() {
     dir.create_dir_all("debug/build/fx_ab_1_0001-0123abcd/out")
         .expect("leave a stale build directory");
 
-    assert!(suffix_is_taken(root, "ab_1_0001"));
-    assert!(
-        !suffix_is_taken(root, "ab_1_000"),
+    assert_eq!(suffix_is_taken(root, "ab_1_0001"), Ok(true));
+    assert_eq!(
+        suffix_is_taken(root, "ab_1_000"),
+        Ok(false),
         "a prefix of a suffix is not the suffix"
     );
-    assert!(!suffix_is_taken(root, "ab_2_0001"));
-    assert!(!suffix_is_taken(&root.join("missing"), "ab_1_0001"));
+    assert_eq!(suffix_is_taken(root, "ab_2_0001"), Ok(false));
+    assert_eq!(
+        suffix_is_taken(&root.join("missing"), "ab_1_0001"),
+        Ok(false)
+    );
+}
+
+#[test]
+fn a_build_directory_that_cannot_be_listed_is_an_error_not_an_absence() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let root = Utf8Path::from_path(temp.path()).expect("temp dir path is UTF-8");
+    let dir = Dir::open_ambient_dir(root, ambient_authority()).expect("open temp dir");
+    dir.create_dir_all("debug").expect("create debug");
+    // A file where the build directory belongs: it exists, but is not a directory.
+    dir.write("debug/build", "not a directory")
+        .expect("write file");
+
+    assert!(suffix_is_taken(root, "ab_1_0001").is_err());
+}
+
+proptest! {
+    /// Whatever stale names exist and however the clock and process ids
+    /// repeat, the suffix chosen is never a stale one.
+    #[test]
+    fn a_stale_suffix_is_never_chosen_across_pid_reuse_and_clock_wrap(
+        offered in proptest::collection::vec(0u16..40, 1..60),
+        stale in proptest::collection::hash_set(0u16..40, 0..39),
+    ) {
+        let free = (0u16..40)
+            .find(|candidate| !stale.contains(candidate))
+            .expect("a free name");
+        let mut sequence = offered
+            .into_iter()
+            .map(u32::from)
+            .chain(std::iter::repeat(u32::from(free)));
+        let taken: std::collections::HashSet<String> =
+            stale.iter().map(|value| format!("s{value}")).collect();
+
+        let chosen = first_unused_suffix(
+            || format!("s{}", sequence.next().expect("an endless sequence")),
+            |candidate| Ok(taken.contains(candidate)),
+        )
+        .expect("the model scan cannot fail");
+
+        prop_assert!(!taken.contains(&chosen), "{chosen} is stale");
+    }
 }

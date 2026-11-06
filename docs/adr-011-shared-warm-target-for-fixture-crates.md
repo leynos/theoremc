@@ -49,6 +49,16 @@ builds that serial group could not finish inside the job.
   nextest group, one at a time, with explicit timeouts. The compile-fail unit
   test that starts `rustc` itself also carries its own deadline.
 
+## Addendum (2026-11-06): how a name is kept unique
+
+The decision above says the clock separates runs that reuse a process id. It
+does not, on its own: sixteen clock bits wrap, so a reused process id could
+meet its own earlier name. A fixture therefore also takes the first suffix for
+which the shared target holds no `fx_<suffix>-*` build directory, and a scan
+that cannot read the build directory fails the fixture instead of calling the
+name free. The clock and sequence number make a clash unlikely; the directory
+check makes it impossible.
+
 ## Consequences
 
 - A run on a warm target takes seconds; the first run pays for the dependencies

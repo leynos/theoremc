@@ -1416,6 +1416,11 @@ implementation now belongs in a dedicated crate: importing source files with
 library and test compilation. This decision applies only to this existing
 build-support functionality; it does not establish a general extraction policy.
 
+Integration tests that build fixture crates around the build-support crate
+share one warm target directory, with unique package names and a seeded lock;
+[ADR-011](adr-011-shared-warm-target-for-fixture-crates.md) records that
+decision.
+
 The `BuildDiscovery` value contains ordered crate-relative theorem file paths
 and watched directories, normalized to forward slashes. The support crate
 writes the suite from those paths and returns whether it contains any theorems,

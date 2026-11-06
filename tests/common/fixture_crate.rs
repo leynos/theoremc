@@ -77,7 +77,7 @@ impl FixtureCrate {
     pub fn new(cargo_toml: &str, lib_rs: &str) -> Result<Self, String> {
         let target_dir = shared_target_dir()?;
         let suffix =
-            first_unused_suffix(unique_suffix, |taken| suffix_is_taken(&target_dir, taken));
+            first_unused_suffix(unique_suffix, |taken| suffix_is_taken(&target_dir, taken))?;
         let (manifest, package_name) = with_unique_package_name(cargo_toml, &suffix)?;
         let temp_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
         let manifest_dir = Utf8Path::from_path(temp_dir.path())

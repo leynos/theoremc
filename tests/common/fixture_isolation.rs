@@ -44,30 +44,45 @@ pub(super) fn unique_suffix() -> String {
 /// A name is taken when the shared target already holds build directories for
 /// it, left by an earlier process whose id was reused. Checking the directory
 /// makes a name safe by construction instead of by probability.
+///
+/// # Errors
+///
+/// Returns the first error `in_use` reports: a scan that failed cannot say a
+/// name is free.
 pub(super) fn first_unused_suffix(
     mut next: impl FnMut() -> String,
-    in_use: impl Fn(&str) -> bool,
-) -> String {
+    mut in_use: impl FnMut(&str) -> Result<bool, String>,
+) -> Result<String, String> {
     loop {
         let suffix = next();
-        if !in_use(&suffix) {
-            return suffix;
+        if !in_use(&suffix)? {
+            return Ok(suffix);
         }
     }
 }
 
 /// Returns whether `target_dir` already holds build directories for `suffix`.
-pub(super) fn suffix_is_taken(target_dir: &Utf8Path, suffix: &str) -> bool {
+///
+/// # Errors
+///
+/// Returns an error when the build directory exists but cannot be read; a build
+/// directory that does not exist yet holds nothing.
+pub(super) fn suffix_is_taken(target_dir: &Utf8Path, suffix: &str) -> Result<bool, String> {
     let prefix = format!("fx_{suffix}-");
-    Dir::open_ambient_dir(target_dir.join("debug/build"), ambient_authority())
-        .and_then(|build| build.entries())
-        .is_ok_and(|mut entries| {
-            entries.any(|listing| {
-                listing
-                    .and_then(|found| found.file_name())
-                    .is_ok_and(|name| name.starts_with(&prefix))
-            })
-        })
+    let build = match Dir::open_ambient_dir(target_dir.join("debug/build"), ambient_authority()) {
+        Ok(build) => build,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.to_string()),
+    };
+    for listing in build.entries().map_err(|error| error.to_string())? {
+        let name = listing
+            .and_then(|found| found.file_name())
+            .map_err(|error| error.to_string())?;
+        if name.starts_with(&prefix) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Reads the value of a `name = "..."` line.
