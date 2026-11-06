@@ -11,12 +11,10 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 from urllib.parse import SplitResult, unquote, urlsplit
 
 
-EXCLUDED_MARKDOWN_DIRECTORIES = frozenset(
-    {".git", ".venv", "dist", "node_modules", "target", ".uv-cache", ".uv-tools"}
-)
 FENCED_CODE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+)[^`\n]*?\1")
 INLINE_LINK = re.compile(r"!?\[[^\]\n]*\]\([ \t]*(?:<([^>\n]+)>|([^\s)]+))")
@@ -47,6 +45,30 @@ SPECIAL_TRANSLITERATIONS = str.maketrans(
         "ß": "ss",
     }
 )
+
+
+class RecordReader(Protocol):
+    """Read the filesystem inputs the ADR/RFC checks need.
+
+    Example: `PathRecordReader` in ``adr_rfc_repository.py`` supplies the
+    repository's real filesystem reads.
+    """
+
+    def record_files(self, directory: Path) -> list[Path]:
+        """Return the Markdown records in a directory."""
+        ...
+
+    def markdown_paths(self, repository_root: Path) -> list[Path]:
+        """Return every repository Markdown file to inspect."""
+        ...
+
+    def read_text(self, path: Path) -> str:
+        """Return a file's UTF-8 text."""
+        ...
+
+    def is_file(self, path: Path) -> bool:
+        """Return whether a resolved link target is a regular file."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -200,6 +222,7 @@ def _register_serial(
 
 
 def _record_heading_errors(
+    reader: RecordReader,
     path: Path,
     serial: str,
     filename_slug: str,
@@ -210,7 +233,7 @@ def _record_heading_errors(
     Example: a heading for `0001: Example` requires the slug `example`.
     """
     relative_path = path.relative_to(record_kind.docs_root.parent)
-    heading = first_heading(path.read_text(encoding="utf-8"))
+    heading = first_heading(reader.read_text(path))
     title = record_kind.title_pattern.fullmatch(heading or "")
     if not title:
         return [
@@ -233,7 +256,7 @@ def _record_heading_errors(
     return errors
 
 
-def validate_record_files(docs_root: Path) -> list[str]:
+def validate_record_files(reader: RecordReader, docs_root: Path) -> list[str]:
     """Check record serials, heading numbers, and title slugs.
 
     Example: duplicate serials or a slug that disagrees with a title are errors.
@@ -245,7 +268,7 @@ def validate_record_files(docs_root: Path) -> list[str]:
     )
     for record_kind in record_kinds:
         serials: dict[str, Path] = {}
-        for path in sorted(record_kind.directory.glob("*.md")):
+        for path in reader.record_files(record_kind.directory):
             match = _record_file_match(path, record_kind.file_pattern)
             if match is None:
                 errors.append(
@@ -259,6 +282,7 @@ def validate_record_files(docs_root: Path) -> list[str]:
                 errors.append(serial_error)
             errors.extend(
                 _record_heading_errors(
+                    reader,
                     path,
                     serial,
                     match.group("slug"),
@@ -266,40 +290,6 @@ def validate_record_files(docs_root: Path) -> list[str]:
                 )
             )
     return errors
-
-
-def _is_markdown_path(path: Path) -> bool:
-    """Return whether a path is a Markdown file or symlink.
-
-    Example: a symlink named `guide.md` is included in the scan.
-    """
-    return path.suffix == ".md" and (path.is_symlink() or path.is_file())
-
-
-def _is_traversable_markdown_directory(path: Path) -> bool:
-    """Return whether a real directory should be included in the scan.
-
-    Example: a `target/` directory is not traversable.
-    """
-    return (
-        not path.is_symlink()
-        and path.is_dir()
-        and path.name not in EXCLUDED_MARKDOWN_DIRECTORIES
-    )
-
-
-def markdown_files(repository_root: Path) -> list[Path]:
-    """List repository Markdown files while excluding generated directories.
-
-    Example: `markdown_files(Path("/repo"))` omits `/repo/target/output.md`.
-    """
-    markdown_paths: list[Path] = []
-    directories = [repository_root]
-    while directories:
-        entries = tuple(directories.pop().iterdir())
-        markdown_paths.extend(filter(_is_markdown_path, entries))
-        directories.extend(filter(_is_traversable_markdown_directory, entries))
-    return sorted(markdown_paths)
 
 
 def _is_external_destination(parsed_url: SplitResult) -> bool:
@@ -341,6 +331,7 @@ def _local_record_target(
 
 
 def _local_record_link_error(
+    reader: RecordReader,
     repository_root: Path,
     source: Path,
     target: Path,
@@ -355,12 +346,13 @@ def _local_record_link_error(
         target.relative_to(repository_root.resolve())
     except ValueError:
         return f"{relative_source}: record link escapes the repository: {destination}"
-    if target.is_file():
+    if reader.is_file(target):
         return None
     return f"{relative_source}: local ADR/RFC link target does not exist: {destination}"
 
 
 def validate_local_record_links(
+    reader: RecordReader,
     repository_root: Path,
     markdown_paths: list[Path],
 ) -> tuple[list[str], int]:
@@ -371,13 +363,15 @@ def validate_local_record_links(
     errors: list[str] = []
     checked_links = 0
     for source in markdown_paths:
-        markdown = source.read_text(encoding="utf-8")
+        markdown = reader.read_text(source)
         for destination in extract_markdown_destinations(markdown):
             target = _local_record_target(repository_root, source, destination)
             if target is None:
                 continue
             checked_links += 1
-            error = _local_record_link_error(repository_root, source, target, destination)
+            error = _local_record_link_error(
+                reader, repository_root, source, target, destination
+            )
             if error:
                 errors.append(error)
     return errors, checked_links

@@ -1465,8 +1465,8 @@ build-support functionality; it does not establish a general extraction policy.
 
 Integration tests that build fixture crates around the build-support crate
 share one warm target directory, with unique package names and a seeded lock;
-[ADR-0012](adrs/adr-0012-shared-warm-target-for-fixture-crates.md) records
-that decision.
+[ADR-0012](adrs/adr-0012-shared-warm-target-for-fixture-crates.md) records that
+decision.
 
 The `BuildDiscovery` value contains ordered crate-relative theorem file paths
 and watched directories, normalized to forward slashes. The support crate
