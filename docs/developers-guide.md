@@ -409,6 +409,24 @@ suite.
 - Cargo build-script rerun tests must use explicit fixture mtime helpers such
   as `FixtureCrate::write_with_advanced_mtime()` after an initial build rather
   than sleeping for a filesystem timestamp tick.
+- Fixture crates that tests build with `cargo` share one warm target directory,
+  `theoremc-fixture-builds` inside `$CARGO_TARGET_DIR` (or the repository's
+  `target`), so third-party dependencies compile once per run instead of once
+  per fixture. Each fixture's package gets a short unique name (`fx_` and a
+  run-and-sequence suffix; short because Kani derives a file name from the
+  crate name), which keeps its build artefacts apart in that directory;
+  `generated_suite_contents` reads only the directories named after the
+  fixture. The workspace `Cargo.lock` is copied into each fixture so every
+  fixture resolves the versions the workspace already built, and the fixture's
+  `cargo` runs with `CARGO_NET_OFFLINE=true`, with `CARGO_BUILD_TARGET_DIR` and
+  `CARGO_BUILD_BUILD_DIR` removed so a caller's environment cannot move the
+  artefacts or share a lock. A fixture that needs a private target must say so
+  here and in its helper.
+- Tests that start a child `cargo` or `rustc` (the fixture suites, the macros
+  crate's trybuild suite and the `rustc` compile-fail unit test) run in the
+  `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,
+  with an explicit `slow-timeout` and a `global-timeout` for the run. Add a new
+  test of that kind to the group's filter.
 - Integration tests under `tests/` are separate crates and inherit
   package lint policy. Note that `expect_used = "deny"` fires in integration
   tests but not in `#[cfg(test)]` modules.

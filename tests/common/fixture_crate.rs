@@ -5,11 +5,14 @@ use std::time::{Duration, SystemTime};
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use filetime::FileTime;
-use theoremc_core::schema::StrNewtype;
 
-use super::ExpectedFragment;
+use super::BuildLog;
+use super::fixture_isolation::{
+    WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, suffix_is_taken, unique_suffix,
+    with_unique_package_name,
+};
 use super::hermetic_cargo::hermetic_cargo;
-use super::suite_layout::{generated_suite_candidates, is_missing_path};
+use super::suite_layout::{package_directories, read_suite};
 
 /// Source for the repository build script copied into fixture crates.
 pub const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
@@ -54,17 +57,29 @@ pub const TRIVIAL_THEOREM: &str = concat!(
 pub struct FixtureCrate {
     _temp_dir: tempfile::TempDir,
     manifest_dir: Utf8PathBuf,
+    target_dir: Utf8PathBuf,
+    package_name: String,
     dir: Dir,
 }
 
 impl FixtureCrate {
     /// Creates a fixture crate with the supplied manifest and library source.
     ///
+    /// The crate builds into a target directory shared by every fixture, so
+    /// third-party dependencies compile once per run rather than once per
+    /// fixture. Its package gets a short unique name, which keeps each
+    /// fixture's build artefacts apart inside that directory, and the
+    /// workspace lock is copied in so every fixture resolves the same versions.
+    ///
     /// # Errors
     ///
-    /// Returns an error when the temporary directory cannot be created or when
-    /// fixture files cannot be written.
+    /// Returns an error when the temporary directory cannot be created, when
+    /// the manifest names no package, or when fixture files cannot be written.
     pub fn new(cargo_toml: &str, lib_rs: &str) -> Result<Self, String> {
+        let target_dir = shared_target_dir()?;
+        let suffix =
+            first_unused_suffix(unique_suffix, |taken| suffix_is_taken(&target_dir, taken))?;
+        let (manifest, package_name) = with_unique_package_name(cargo_toml, &suffix)?;
         let temp_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
         let manifest_dir = Utf8Path::from_path(temp_dir.path())
             .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
@@ -74,10 +89,13 @@ impl FixtureCrate {
         let fixture = Self {
             _temp_dir: temp_dir,
             manifest_dir,
+            target_dir,
+            package_name,
             dir,
         };
 
-        fixture.write(Utf8Path::new("Cargo.toml"), cargo_toml)?;
+        fixture.write(Utf8Path::new("Cargo.toml"), &manifest)?;
+        fixture.write(Utf8Path::new("Cargo.lock"), WORKSPACE_LOCK)?;
         fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
         fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
         fixture.write(
@@ -102,6 +120,17 @@ impl FixtureCrate {
         )?;
 
         Ok(fixture)
+    }
+
+    /// Reads a file relative to the fixture crate root.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the file cannot be read.
+    pub fn read_to_string(&self, path: &Utf8Path) -> Result<String, String> {
+        self.dir
+            .read_to_string(path.as_str())
+            .map_err(|error| error.to_string())
     }
 
     /// Writes `contents` to a path relative to the fixture crate root.
@@ -205,6 +234,12 @@ impl FixtureCrate {
         &self.manifest_dir
     }
 
+    /// Returns the target directory every fixture crate builds into.
+    #[must_use]
+    pub fn target_dir(&self) -> &Utf8Path {
+        &self.target_dir
+    }
+
     /// Runs `cargo build` in the fixture crate.
     ///
     /// # Errors
@@ -222,8 +257,7 @@ impl FixtureCrate {
     /// Returns the combined Cargo output when the command fails or cannot be
     /// executed.
     pub fn cargo_build_log(&self) -> Result<BuildLog, String> {
-        // Read back from `target/debug/build`, so the fixture owns its target.
-        let output = hermetic_cargo(&self.manifest_dir, &self.manifest_dir.join("target"))
+        let output = hermetic_cargo(&self.manifest_dir, &self.target_dir)
             .args(["build", "-vv", "--color", "never"])
             .output()
             .map_err(|error| error.to_string())?;
@@ -247,11 +281,12 @@ impl FixtureCrate {
     /// Returns an error when the build output cannot be inspected or no
     /// generated theorem suite is present.
     pub fn generated_suite_contents(&self) -> Result<String, String> {
-        for suite_path in generated_suite_candidates(&self.dir)? {
-            match self.dir.read_to_string(&suite_path) {
-                Ok(contents) => return Ok(contents),
-                Err(error) if is_missing_path(&error) => {}
-                Err(error) => return Err(error.to_string()),
+        let build_dir =
+            Dir::open_ambient_dir(self.target_dir.join("debug/build"), ambient_authority())
+                .map_err(|error| error.to_string())?;
+        for name in package_directories(&build_dir, &self.package_name)? {
+            if let Some(contents) = read_suite(&build_dir, &name)? {
+                return Ok(contents);
             }
         }
         Err("generated theorem_suite.rs was not found".to_owned())
@@ -302,84 +337,6 @@ fn fixture_build_support_cargo_toml(manifest: &str) -> Result<String, String> {
     } else {
         Err("build-support manifest must contain a [lints] table".to_owned())
     }
-}
-
-/// Combined stdout and stderr emitted by a fixture `cargo build` run.
-pub struct BuildLog(String);
-
-impl BuildLog {
-    /// Returns whether the build script emitted its theorem-directory rerun
-    /// instruction.
-    #[must_use]
-    pub fn ran(&self) -> bool {
-        self.0.contains("cargo::rerun-if-changed=theorems")
-    }
-
-    /// Asserts that the build log contains `needle`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an actionable diff-style message when `needle` is missing.
-    pub fn contains(&self, needle: ExpectedFragment<'_>) -> Result<(), String> {
-        self.check(true, needle)
-    }
-
-    /// Asserts that the build log omits `needle`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an actionable diff-style message when `needle` is present.
-    pub fn omits(&self, needle: ExpectedFragment<'_>) -> Result<(), String> {
-        self.check(false, needle)
-    }
-
-    /// Returns the raw combined build log.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-
-    fn check(&self, expect_present: bool, needle: ExpectedFragment<'_>) -> Result<(), String> {
-        let found = self.0.contains(needle.as_str());
-        if found == expect_present {
-            Ok(())
-        } else {
-            let verb = if expect_present { "contain" } else { "omit" };
-            Err(format!(
-                "expected build log to {verb} '{}', got:\n{}",
-                needle.as_str(),
-                self.0
-            ))
-        }
-    }
-}
-
-/// Extracts the body of a top-level TOML section from a document.
-///
-/// The returned string preserves the section body exactly, including comments
-/// and blank lines, and ends with a trailing newline. This helper is intended
-/// for fixture manifests that need to copy a known section from the repository
-/// manifest without adding a TOML parser as a test dependency.
-#[must_use]
-pub fn toml_section(document: &str, section_name: &str) -> Option<String> {
-    let header_line = format!("[{section_name}]");
-    let mut in_section = false;
-    let mut body_lines = Vec::new();
-
-    for line in document.lines() {
-        if !in_section {
-            in_section = line == header_line;
-            continue;
-        }
-
-        if line.starts_with('[') {
-            break;
-        }
-
-        body_lines.push(line);
-    }
-
-    in_section.then(|| format!("{}\n", body_lines.join("\n")))
 }
 
 #[cfg(test)]

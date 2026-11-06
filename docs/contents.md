@@ -46,6 +46,10 @@
   serde-saphyr 2.0](adr-010-reusable-library-msrv-rust-1-89.md)
   - Decision record for adopting serde-saphyr 2.0.0 and raising every
     workspace package to Rust 1.89.
+- [Architecture Decision Record (ADR) 011: a shared warm target for fixture
+  crates](adr-011-shared-warm-target-for-fixture-crates.md)
+  - Decision record for sharing one warm target between fixture crates, their
+    unique package names, the seeded lock and offline builds.
 - [Request for Comments (RFC) 0001: semantic law templates over composable
   primaries](rfcs/0001-semantic-law-templates.md)
   - Accepted proposal for schema version 2 structured laws, composable

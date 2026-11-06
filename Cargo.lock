@@ -2084,6 +2084,7 @@ dependencies = [
  "cap-std",
  "derive_more",
  "filetime",
+ "proptest",
  "tempfile",
  "the-newtype",
  "theoremc-core",
