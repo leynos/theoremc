@@ -39,6 +39,37 @@ pub(super) fn unique_suffix() -> String {
     format!("{:x}_{sequence:x}_{clock:04x}", std::process::id())
 }
 
+/// Returns the first suffix `in_use` does not report as taken.
+///
+/// A name is taken when the shared target already holds build directories for
+/// it, left by an earlier process whose id was reused. Checking the directory
+/// makes a name safe by construction instead of by probability.
+pub(super) fn first_unused_suffix(
+    mut next: impl FnMut() -> String,
+    in_use: impl Fn(&str) -> bool,
+) -> String {
+    loop {
+        let suffix = next();
+        if !in_use(&suffix) {
+            return suffix;
+        }
+    }
+}
+
+/// Returns whether `target_dir` already holds build directories for `suffix`.
+pub(super) fn suffix_is_taken(target_dir: &Utf8Path, suffix: &str) -> bool {
+    let prefix = format!("fx_{suffix}-");
+    Dir::open_ambient_dir(target_dir.join("debug/build"), ambient_authority())
+        .and_then(|build| build.entries())
+        .is_ok_and(|mut entries| {
+            entries.any(|listing| {
+                listing
+                    .and_then(|found| found.file_name())
+                    .is_ok_and(|name| name.starts_with(&prefix))
+            })
+        })
+}
+
 /// Reads the value of a `name = "..."` line.
 fn quoted_name(line: &str) -> Option<&str> {
     let value = line

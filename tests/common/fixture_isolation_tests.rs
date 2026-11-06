@@ -1,6 +1,9 @@
 //! Regression tests for fixture package naming.
 
-use super::{unique_suffix, with_unique_package_name};
+use camino::Utf8Path;
+use cap_std::{ambient_authority, fs_utf8::Dir};
+
+use super::{first_unused_suffix, suffix_is_taken, unique_suffix, with_unique_package_name};
 
 #[test]
 fn renames_only_the_package_name() {
@@ -68,4 +71,35 @@ fn a_fixture_name_stays_short_enough_for_the_files_tools_derive_from_it() {
         .expect("the manifest names its package");
 
     assert!(name.len() <= 20, "{name} is too long to be a safe prefix");
+}
+
+#[test]
+fn a_suffix_a_stale_build_directory_already_uses_is_skipped() {
+    let mut offered = ["taken", "also_taken", "free"]
+        .into_iter()
+        .map(str::to_owned);
+
+    let chosen = first_unused_suffix(
+        || offered.next().expect("a free suffix is offered"),
+        |suffix| suffix.ends_with("taken"),
+    );
+
+    assert_eq!(chosen, "free");
+}
+
+#[test]
+fn leftover_build_directories_make_a_suffix_taken_and_only_that_one() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let root = Utf8Path::from_path(temp.path()).expect("temp dir path is UTF-8");
+    let dir = Dir::open_ambient_dir(root, ambient_authority()).expect("open temp dir");
+    dir.create_dir_all("debug/build/fx_ab_1_0001-0123abcd/out")
+        .expect("leave a stale build directory");
+
+    assert!(suffix_is_taken(root, "ab_1_0001"));
+    assert!(
+        !suffix_is_taken(root, "ab_1_000"),
+        "a prefix of a suffix is not the suffix"
+    );
+    assert!(!suffix_is_taken(root, "ab_2_0001"));
+    assert!(!suffix_is_taken(&root.join("missing"), "ab_1_0001"));
 }

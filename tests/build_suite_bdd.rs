@@ -140,6 +140,24 @@ fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(),
         TRIVIAL_THEOREM,
     )?;
 
+    if first.target_dir() != second.target_dir()
+        || !first
+            .target_dir()
+            .as_str()
+            .ends_with("theoremc-fixture-builds")
+    {
+        return Err(format!(
+            "fixtures must share the warm target, got {} and {}",
+            first.target_dir(),
+            second.target_dir()
+        ));
+    }
+    for fixture in [&first, &second] {
+        if fixture.read_to_string(Utf8Path::new("Cargo.lock"))? != include_str!("../Cargo.lock") {
+            return Err("a fixture must start from the workspace lock".to_owned());
+        }
+    }
+
     first.cargo_build()?;
     second.cargo_build()?;
     let first_suite = generated_suite_contents(&first)?;

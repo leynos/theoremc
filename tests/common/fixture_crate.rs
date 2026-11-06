@@ -8,7 +8,8 @@ use filetime::FileTime;
 
 use super::BuildLog;
 use super::fixture_isolation::{
-    WORKSPACE_LOCK, shared_target_dir, unique_suffix, with_unique_package_name,
+    WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, suffix_is_taken, unique_suffix,
+    with_unique_package_name,
 };
 use super::hermetic_cargo::hermetic_cargo;
 
@@ -74,8 +75,10 @@ impl FixtureCrate {
     /// Returns an error when the temporary directory cannot be created, when
     /// the manifest names no package, or when fixture files cannot be written.
     pub fn new(cargo_toml: &str, lib_rs: &str) -> Result<Self, String> {
-        let (manifest, package_name) = with_unique_package_name(cargo_toml, &unique_suffix())?;
         let target_dir = shared_target_dir()?;
+        let suffix =
+            first_unused_suffix(unique_suffix, |taken| suffix_is_taken(&target_dir, taken));
+        let (manifest, package_name) = with_unique_package_name(cargo_toml, &suffix)?;
         let temp_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
         let manifest_dir = Utf8Path::from_path(temp_dir.path())
             .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
@@ -116,6 +119,17 @@ impl FixtureCrate {
         )?;
 
         Ok(fixture)
+    }
+
+    /// Reads a file relative to the fixture crate root.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the file cannot be read.
+    pub fn read_to_string(&self, path: &Utf8Path) -> Result<String, String> {
+        self.dir
+            .read_to_string(path.as_str())
+            .map_err(|error| error.to_string())
     }
 
     /// Writes `contents` to a path relative to the fixture crate root.
