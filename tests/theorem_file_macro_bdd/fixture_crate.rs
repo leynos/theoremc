@@ -39,11 +39,21 @@ impl FixtureCrate {
     }
 
     pub(crate) fn cargo_kani_list(&self, guard: &CargoGuard<'_>) -> Result<String, String> {
-        cargo_run_output(self.inner.manifest_dir(), CargoSubcommand::KaniList, guard)
+        cargo_run_output(
+            self.inner.manifest_dir(),
+            self.inner.target_dir(),
+            CargoSubcommand::KaniList,
+            guard,
+        )
     }
 
     fn cargo_run(&self, subcommand: CargoSubcommand, guard: &CargoGuard<'_>) -> Result<(), String> {
-        cargo_run(self.inner.manifest_dir(), subcommand, guard)
+        cargo_run(
+            self.inner.manifest_dir(),
+            self.inner.target_dir(),
+            subcommand,
+            guard,
+        )
     }
 }
 

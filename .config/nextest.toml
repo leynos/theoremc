@@ -1,0 +1,39 @@
+# cargo-nextest configuration for theoremc.
+#
+# Scope: every `cargo nextest` invocation, including `make test` and the
+# coverage lane. nextest does not run doctests, which `make test` runs
+# separately with `cargo test --doc`.
+#
+# Policy: no blanket retries. A test that fails intermittently is a defect to
+# diagnose, not to paper over with re-runs.
+
+[profile.default]
+# Surface hangs without failing legitimately slow suites. Warn after 60 s and
+# terminate a test that has run for five warning periods (300 s). This governs
+# every test no override matches; none of them starts a compiler.
+slow-timeout = { period = "60s", terminate-after = 5 }
+# The whole run. Each test is bounded by its own allowance, but a run whose
+# tests each stay inside theirs can still exceed the job. This stays strictly
+# above the largest per-test allowance (600 s, below). Measured: a cold local
+# run of all 818 tests took 420 s with the compiler tests running together.
+global-timeout = "30m"
+
+[test-groups.nested-cargo-builds]
+# These tests start a child `cargo` or `rustc` of their own: temporary fixture
+# crates that depend on the build-support crate, trybuild fixtures, and a
+# compile-fail unit test that runs rustc directly. Each pays for Cargo's
+# package-cache lock and for compiler work inside its own allowance, so run
+# beside each other they block on the same locks and a cold build looks like a
+# hang. One at a time, each is bounded by its own work.
+max-threads = 1
+
+[[profile.default.overrides]]
+# Every test that does compiler work inside its body: the fixture-crate suites,
+# the macros crate's trybuild suite and the rustc compile-fail unit test.
+# Measured on a cold, contended local run (31 October): fixture suites took up
+# to 290 s and the trybuild suite 417 s, both against the 300 s default, so the
+# group gets ten warning periods (600 s). That is twice the default and the
+# largest allowance in this file.
+filter = 'binary(=build_discovery_bdd) | binary(=build_suite_bdd) | binary(=theorem_file_macro_bdd) | binary_id(=theoremc-macros::expand) | (package(=theoremc) & test(/^arg_lowering_compile_fail_tests::/))'
+test-group = "nested-cargo-builds"
+slow-timeout = { period = "60s", terminate-after = 10 }
