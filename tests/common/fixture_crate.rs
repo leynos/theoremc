@@ -266,25 +266,33 @@ impl FixtureCrate {
     /// Returns an error when the build output cannot be inspected or no
     /// generated theorem suite is present.
     pub fn generated_suite_contents(&self) -> Result<String, String> {
-        // The target directory is shared, so only this fixture's own build
-        // directories (named after its unique package) can hold its suite.
-        let prefix = format!("{}-", self.package_name);
         let build_dir =
             Dir::open_ambient_dir(self.target_dir.join("debug/build"), ambient_authority())
                 .map_err(|error| error.to_string())?;
-        for entry_result in build_dir.entries().map_err(|error| error.to_string())? {
-            let entry = entry_result.map_err(|error| error.to_string())?;
-            let name = entry.file_name().map_err(|error| error.to_string())?;
-            if !name.starts_with(&prefix) {
-                continue;
-            }
-            match build_dir.read_to_string(format!("{name}/out/theorem_suite.rs")) {
-                Ok(contents) => return Ok(contents),
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                Err(error) => return Err(error.to_string()),
+        for name in self.own_build_directories(&build_dir)? {
+            if let Some(contents) = read_suite(&build_dir, &name)? {
+                return Ok(contents);
             }
         }
         Err("generated theorem_suite.rs was not found".to_owned())
+    }
+
+    /// Names the build directories of this fixture's own package.
+    ///
+    /// The target directory is shared, so only directories named after the
+    /// fixture's unique package can hold its suite.
+    fn own_build_directories(&self, build_dir: &Dir) -> Result<Vec<String>, String> {
+        let prefix = format!("{}-", self.package_name);
+        let mut names = Vec::new();
+        for listing in build_dir.entries().map_err(|error| error.to_string())? {
+            let name = listing
+                .and_then(|found| found.file_name())
+                .map_err(|error| error.to_string())?;
+            if name.starts_with(&prefix) {
+                names.push(name);
+            }
+        }
+        Ok(names)
     }
 
     fn advance_parent_mtime(&self, path: &Utf8Path) -> Result<(), String> {
@@ -303,6 +311,15 @@ impl FixtureCrate {
             .ok_or_else(|| "advanced modification time overflowed".to_owned())?;
         filetime::set_file_mtime(&absolute_path, FileTime::from_system_time(advanced_mtime))
             .map_err(|error| error.to_string())
+    }
+}
+
+/// Reads a build directory's generated suite, or `None` when it has none.
+fn read_suite(build_dir: &Dir, name: &str) -> Result<Option<String>, String> {
+    match build_dir.read_to_string(format!("{name}/out/theorem_suite.rs")) {
+        Ok(contents) => Ok(Some(contents)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.to_string()),
     }
 }
 
