@@ -17,7 +17,9 @@ from urllib.parse import SplitResult, unquote, urlsplit
 
 FENCED_CODE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 INLINE_CODE = re.compile(r"(`+)[^`\n]*?\1")
-INLINE_LINK = re.compile(r"!?\[[^\]\n]*\]\([ \t]*(?:<([^>\n]+)>|([^\s)]+))")
+INLINE_LINK = re.compile(
+    r"!?\[[^\]]*?\]\([ \t]*(?:\n[ \t]*)?(?:<([^>\n]+)>|([^\s)]+))"
+)
 REFERENCE_LINK = re.compile(
     r"^ {0,3}\[(?!\^)[^\]]+\]:[ \t]*(?:<([^>\n]+)>|([^\s\n]+))",
     re.MULTILINE,
@@ -66,6 +68,18 @@ class RecordReader(Protocol):
         """Return a file's UTF-8 text."""
         ...
 
+    def resolve_link(
+        self,
+        repository_root: Path,
+        source: Path,
+        link_path: str,
+    ) -> Path | None:
+        """Resolve a local link path, or return `None` when it is malformed.
+
+        Example: `adrs/adr-0001-example.md` resolves relative to the source.
+        """
+        ...
+
     def is_file(self, path: Path) -> bool:
         """Return whether a resolved link target is a regular file."""
         ...
@@ -92,7 +106,7 @@ class RecordLink:
 
     repository_root: Path
     source: Path
-    target: Path
+    target: Path | None
     destination: str
 
 
@@ -309,18 +323,8 @@ def _is_external_destination(parsed_url: SplitResult) -> bool:
     return bool(parsed_url.scheme) or bool(parsed_url.netloc)
 
 
-def _resolve_local_target(repository_root: Path, source: Path, link_path: str) -> Path:
-    """Resolve a Markdown path from its source or repository root.
-
-    Example: `/docs/adrs/adr-0001-example.md` resolves from the repository root.
-    """
-    decoded_path = unquote(link_path)
-    if decoded_path.startswith("/"):
-        return (repository_root / decoded_path.lstrip("/")).resolve()
-    return (source.parent / decoded_path).resolve()
-
-
 def _local_record_link(
+    reader: RecordReader,
     repository_root: Path,
     source: Path,
     destination: str,
@@ -330,14 +334,19 @@ def _local_record_link(
     Example: an HTTP link returns `None`; a relative ADR link returns its
     resolved target.
     """
-    parsed_url = urlsplit(destination)
+    try:
+        parsed_url = urlsplit(destination)
+    except ValueError:
+        # A malformed URL such as `http://[abc` is not a usable link. The
+        # Markdown linter reports it, so the record checker ignores it.
+        return None
     if _is_external_destination(parsed_url):
         return None
     if not parsed_url.path:
         return None
     if not is_record_destination(parsed_url.path):
         return None
-    target = _resolve_local_target(repository_root, source, parsed_url.path)
+    target = reader.resolve_link(repository_root, source, parsed_url.path)
     return RecordLink(repository_root, source, target, destination)
 
 
@@ -347,6 +356,8 @@ def _local_record_link_error(reader: RecordReader, link: RecordLink) -> str | No
     Example: a link to an absent ADR returns a path-specific error.
     """
     relative_source = link.source.relative_to(link.repository_root)
+    if link.target is None:
+        return f"{relative_source}: malformed local record link: {link.destination}"
     try:
         link.target.relative_to(link.repository_root.resolve())
     except ValueError:
@@ -373,7 +384,7 @@ def validate_local_record_links(
     for source in markdown_paths:
         markdown = reader.read_text(source)
         for destination in extract_markdown_destinations(markdown):
-            link = _local_record_link(repository_root, source, destination)
+            link = _local_record_link(reader, repository_root, source, destination)
             if link is None:
                 continue
             checked_links += 1

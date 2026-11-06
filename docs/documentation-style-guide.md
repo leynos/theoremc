@@ -6,10 +6,10 @@ consistent, and easy to maintain across projects.
 
 ## Theoremc adoption
 
-Theoremc applies this guide's prose conventions and ADR/RFC naming rules. The
-`typos` check and tested-example loader described below are upstream tooling
-guidance; this repository does not implement or enforce them. The current
-automated documentation gates are listed in the
+Theoremc applies this guide's prose conventions and ADR/RFC naming rules. This
+repository runs the `typos` check through `make spelling`. The tested-example
+loader described below is upstream tooling guidance and is not a Theoremc gate.
+The current automated documentation gates are listed in the
 [developers' guide](developers-guide.md).
 
 ## Spelling

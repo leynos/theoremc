@@ -8,6 +8,7 @@ by the command-line entry point, so discovery and reads stay outside the rules.
 from __future__ import annotations
 
 from pathlib import Path
+from urllib.parse import unquote
 
 from adr_rfc_names import RecordReader
 
@@ -74,6 +75,27 @@ class PathRecordReader(RecordReader):
         Example: `read_text(record)` returns the record's Markdown source.
         """
         return path.read_text(encoding="utf-8")
+
+    def resolve_link(
+        self,
+        repository_root: Path,
+        source: Path,
+        link_path: str,
+    ) -> Path | None:
+        """Resolve a local link path, or report a malformed path as `None`.
+
+        Example: a root-relative `/docs/adrs/adr-0001-example.md` resolves from
+        the repository root.
+        """
+        try:
+            decoded_path = unquote(link_path)
+            if decoded_path.startswith("/"):
+                return (repository_root / decoded_path.lstrip("/")).resolve()
+            return (source.parent / decoded_path).resolve()
+        except (OSError, ValueError):
+            # Encoded null bytes and unresolvable symlink chains are reported
+            # by the rules as diagnostics rather than aborting the check.
+            return None
 
     def is_file(self, path: Path) -> bool:
         """Return whether a resolved link target is a regular file.
