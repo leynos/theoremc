@@ -18,12 +18,16 @@ const INHERITED_BUILD_LOCATIONS: [&str; 2] = ["CARGO_BUILD_TARGET_DIR", "CARGO_B
 ///
 /// `CARGO_TARGET_DIR` is set explicitly, so an exported value cannot win, and
 /// the two variables that would split or share the build directory are removed.
+/// The command runs offline: a fixture's lock is seeded from the workspace's and
+/// its dependencies are already in the registry cache, so it needs no network
+/// and must not wait on the index.
 #[must_use]
 pub fn hermetic_cargo(manifest_dir: &Utf8Path, target_dir: &Utf8Path) -> Command {
     let mut command = Command::new("cargo");
     command
         .current_dir(manifest_dir)
-        .env("CARGO_TARGET_DIR", target_dir.as_str());
+        .env("CARGO_TARGET_DIR", target_dir.as_str())
+        .env("CARGO_NET_OFFLINE", "true");
     for variable in INHERITED_BUILD_LOCATIONS {
         command.env_remove(variable);
     }

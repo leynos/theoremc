@@ -64,8 +64,9 @@ pub(crate) static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
 
 /// Runs a Cargo subcommand in the fixture crate directory.
 ///
-/// `CARGO_TARGET_DIR` is set to a per-fixture subdirectory to avoid artefact
-/// collisions. The caller must supply a [`CargoGuard`] proving that
+/// `CARGO_TARGET_DIR` is set to the target directory every fixture shares, so
+/// third-party dependencies compile once per run; fixtures keep their own
+/// artefacts apart through unique package names. The caller must supply a [`CargoGuard`] proving that
 /// `FIXTURE_CARGO_LOCK` is held, because registry cache access and
 /// workspace-level lock files are still shared across invocations.
 ///
@@ -79,19 +80,20 @@ pub(crate) static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
 /// (e.g. GitHub Actions' `timeout-minutes`) provides the outer bound.
 pub(crate) fn cargo_run(
     manifest_dir: &Utf8Path,
+    target_dir: &Utf8Path,
     subcommand: CargoSubcommand,
     guard: &CargoGuard<'_>,
 ) -> Result<(), String> {
-    cargo_run_output(manifest_dir, subcommand, guard).map(|_| ())
+    cargo_run_output(manifest_dir, target_dir, subcommand, guard).map(|_| ())
 }
 
 pub(crate) fn cargo_run_output(
     manifest_dir: &Utf8Path,
+    target_dir: &Utf8Path,
     subcommand: CargoSubcommand,
     _guard: &CargoGuard<'_>,
 ) -> Result<String, String> {
-    let target_dir = manifest_dir.join("target");
-    let output = hermetic_cargo(manifest_dir, &target_dir)
+    let output = hermetic_cargo(manifest_dir, target_dir)
         .args(subcommand.args())
         .output()
         .map_err(|error| error.to_string())?;

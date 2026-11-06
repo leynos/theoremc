@@ -63,3 +63,14 @@ fn runs_in_the_fixture_directory() {
         Some(std::path::Path::new("/fixture"))
     );
 }
+
+#[test]
+fn runs_offline() {
+    let command = hermetic_cargo(Utf8Path::new("/fixture"), Utf8Path::new("/fixture/target"));
+
+    assert_eq!(
+        environment(&command, "CARGO_NET_OFFLINE"),
+        EnvState::Exported("true".to_owned()),
+        "a fixture build must not wait on the registry index",
+    );
+}

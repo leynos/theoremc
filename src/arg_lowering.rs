@@ -320,3 +320,7 @@ mod tests;
 #[cfg(test)]
 #[path = "arg_lowering_compile_fail_tests.rs"]
 mod compile_fail_tests;
+
+#[cfg(test)]
+#[path = "arg_lowering_rustc_deadline.rs"]
+mod rustc_deadline;

@@ -11,6 +11,7 @@ use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use indexmap::IndexMap;
 
+use super::rustc_deadline::{RUSTC_DEADLINE, run_within_deadline};
 use crate::schema::TheoremValue;
 use crate::schema::arg_value::ArgValue;
 
@@ -82,18 +83,18 @@ fn compile_snippet(code: &str) -> Result<(bool, String), Box<dyn std::error::Err
     let dir = Dir::open_ambient_dir(temp_dir_utf8, ambient_authority())?;
     dir.write("test.rs", code)?;
 
-    let output = Command::new("rustc")
+    // nested-cargo-allow: timed the spawn below has its own deadline, and the test
+    // runs in the serial, bounded `nested-cargo-builds` nextest group
+    let mut command = Command::new("rustc");
+    command
         .arg(source_path.as_str())
         .arg("--crate-type=lib")
         .arg("--edition=2024")
         // Emit output inside the temp dir so artefacts don't pollute the
         // project root.
         .arg("--out-dir")
-        .arg(temp_dir_utf8.as_str())
-        .output()?;
-
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    Ok((output.status.success(), stderr))
+        .arg(temp_dir_utf8.as_str());
+    run_within_deadline(command, RUSTC_DEADLINE).map_err(Into::into)
 }
 
 /// Generates a simple test harness for a lowered expression.
