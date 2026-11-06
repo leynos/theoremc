@@ -269,30 +269,12 @@ impl FixtureCrate {
         let build_dir =
             Dir::open_ambient_dir(self.target_dir.join("debug/build"), ambient_authority())
                 .map_err(|error| error.to_string())?;
-        for name in self.own_build_directories(&build_dir)? {
+        for name in package_directories(&build_dir, &self.package_name)? {
             if let Some(contents) = read_suite(&build_dir, &name)? {
                 return Ok(contents);
             }
         }
         Err("generated theorem_suite.rs was not found".to_owned())
-    }
-
-    /// Names the build directories of this fixture's own package.
-    ///
-    /// The target directory is shared, so only directories named after the
-    /// fixture's unique package can hold its suite.
-    fn own_build_directories(&self, build_dir: &Dir) -> Result<Vec<String>, String> {
-        let prefix = format!("{}-", self.package_name);
-        let mut names = Vec::new();
-        for listing in build_dir.entries().map_err(|error| error.to_string())? {
-            let name = listing
-                .and_then(|found| found.file_name())
-                .map_err(|error| error.to_string())?;
-            if name.starts_with(&prefix) {
-                names.push(name);
-            }
-        }
-        Ok(names)
     }
 
     fn advance_parent_mtime(&self, path: &Utf8Path) -> Result<(), String> {
@@ -312,6 +294,26 @@ impl FixtureCrate {
         filetime::set_file_mtime(&absolute_path, FileTime::from_system_time(advanced_mtime))
             .map_err(|error| error.to_string())
     }
+}
+
+/// Names the build directories that belong to the package `package_name`.
+///
+/// The target directory is shared, so only directories named after the
+/// fixture's unique package can hold its suite. The separator is part of the
+/// match: `fx_ab` must not claim `fx_abc-<hash>`.
+fn package_directories(build_dir: &Dir, package_name: &str) -> Result<Vec<String>, String> {
+    let prefix = format!("{package_name}-");
+    let mut names = Vec::new();
+    for listing in build_dir.entries().map_err(|error| error.to_string())? {
+        let name = listing
+            .and_then(|found| found.file_name())
+            .map_err(|error| error.to_string())?;
+        if name.starts_with(&prefix) {
+            names.push(name);
+        }
+    }
+    names.sort();
+    Ok(names)
 }
 
 /// Reads a build directory's generated suite, or `None` when it has none.
