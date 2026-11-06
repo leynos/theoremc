@@ -802,4 +802,4 @@ The development profile sets `incremental = false` and `debug = 0` in
 To debug, set `CARGO_PROFILE_DEV_DEBUG=true`; to rebuild incrementally, set
 `CARGO_INCREMENTAL=1`. `.cargo/config.toml` also sets
 `[unstable] embed-metadata = false`, the native Cargo key for nightlies from
-2026-07-31. `tests/build_footprint_contract.rs` holds the settings.
+2026-07-31.
