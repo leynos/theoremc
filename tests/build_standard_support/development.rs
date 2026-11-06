@@ -29,7 +29,7 @@ const EXPECTED_TOOLS: &[Tools] = &[
     },
     Tools {
         target: "lint",
-        keys: &["cargo clippy"],
+        keys: &["cargo clippy", "whitaker"],
     },
     Tools {
         target: "build",

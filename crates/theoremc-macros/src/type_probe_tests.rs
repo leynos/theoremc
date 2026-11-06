@@ -2,6 +2,7 @@
 
 use super::tests_support::{TheoremFixture, expand_fixture};
 use camino::Utf8Path;
+use googletest::prelude::*;
 use rstest::{fixture, rstest};
 
 const THEOREM_TRAILER: &str = concat!(
@@ -188,27 +189,23 @@ fn expansion_emits_referenced_type_probes(
     let expanded = expand_fixture(Utf8Path::new(case.path), &theorem)?;
 
     if case.expected_probes.is_empty() {
-        assert!(
-            !expanded.contains("__theoremc_assert_referenced"),
-            "expected no referenced-type probe block, got: {expanded}",
-        );
+        assert_that!(!expanded.contains("__theoremc_assert_referenced"), eq(true));
     } else {
         for expected_probe in case.expected_probes {
-            assert!(
-                expanded.contains(expected_probe),
-                "expected probe {expected_probe:?} in expansion, got: {expanded}",
-            );
+            assert_that!(expanded.as_str(), contains_substring(*expected_probe));
         }
     }
 
     if matches!(case.fixture, ProbeFixture::WhitespaceEquivalent) {
-        assert_eq!(
-            expanded
-                .match_indices("let_=__theoremc_assert_referenced::<Vec<u8>>;")
-                .count(),
-            1,
-            "expected one canonical Vec<u8> probe, got: {expanded}",
-        );
+        let canonical_probe_count = expanded
+            .match_indices("let_=__theoremc_assert_referenced::<Vec<u8>>;")
+            .count();
+        if canonical_probe_count != 1 {
+            return Err(std::io::Error::other(format!(
+                "expected one canonical Vec<u8> probe, got: {expanded}"
+            ))
+            .into());
+        }
     }
     Ok(())
 }

@@ -255,7 +255,7 @@ pub struct ActionSignature {
 
 impl ActionSignature {
     /// Returns `true` when `self` and `other` describe the same Rust signature
-    /// once parameter and return types are canonicalised.
+    /// once parameter and return types are canonicalized.
     ///
     /// Raw string equality treats `Vec<u8>` and `Vec <u8>` as distinct, which
     /// is wrong: schema validation already accepts both as the same Rust type.

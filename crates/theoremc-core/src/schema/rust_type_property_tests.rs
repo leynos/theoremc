@@ -3,7 +3,7 @@
 //! [`free_named_lifetime`] recurses through nested type forms and must report
 //! the first free named lifetime while ignoring reserved (`'static`, `'_`) and
 //! `for<..>`-bound lifetimes. The `rstest` tables in [`super`] pin individual
-//! forms; these properties generalise them over generated callable and nested
+//! forms; these properties generalize them over generated callable and nested
 //! shapes, so a regression in the recursion or in the `syn 3` argument wrappers
 //! cannot hide behind hand-picked examples.
 //!

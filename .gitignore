@@ -12,3 +12,10 @@ rustc-ice-*.txt
 .vtcode/
 *.swo
 *~
+# The repo-local uv cache and tool directories used by the pinned gates.
+.uv-cache/
+.uv-tools/
+# The spelling gate's untracked cache of the shared dictionary and its refresh
+# metadata.
+.typos-oxendict-base.json
+.typos-oxendict-base.toml

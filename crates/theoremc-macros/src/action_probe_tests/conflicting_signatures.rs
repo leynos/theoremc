@@ -329,9 +329,10 @@ fn whitespace_only_signature_drift_does_not_conflict() -> Result<(), Box<dyn std
     let expanded = expand_fixture(Utf8Path::new("theorems/whitespace-drift.theorem"), &theorem)?;
     let mangled_action = mangle_action_name("payload.write");
     let probe_identifier = mangled_action.identifier();
-    assert!(
-        expanded.contains(&format!("crate::theorem_actions::{probe_identifier}")),
-        "expected the payload.write probe in the expansion, got: {expanded}",
+    let expected_probe = format!("crate::theorem_actions::{probe_identifier}");
+    assert_that!(
+        expanded.as_str(),
+        contains_substring(expected_probe.as_str()),
     );
     Ok(())
 }

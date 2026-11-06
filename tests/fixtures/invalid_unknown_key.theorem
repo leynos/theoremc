@@ -1,5 +1,5 @@
 Theorem: Bad
-About: Has an unrecognised top-level key
+About: Has an unrecognized top-level key
 SpuriousKey: should not be here
 Prove:
   - assert: "true"

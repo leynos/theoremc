@@ -1,18 +1,21 @@
 # `cargo theorem` user's guide
 
-- Status: proposed
+- Status: foundation implemented; full command surface proposed
 - Audience: users, integrators, and automation authors
 
 This guide describes how to use the `cargo theorem` command-line interface
 (CLI). It covers the tasks a caller performs: installing and first use,
-initialising a project, creating and inspecting theorems, checking a project,
+initializing a project, creating and inspecting theorems, checking a project,
 installing and pinning proof backends, running proofs, reading reports, and
 migrating from `rust-prover-tools`.
 
-The command surface is **planned, not shipped**. It is defined normatively in
-the [`cargo theorem` CLI design](cargo-theorem-cli-design.md); where this guide
-and that design disagree, the design wins. Nothing here is a compatibility
-promise for a released binary.
+The Phase 3.1.1 foundation is implemented in this branch and registers only
+`context`. It is not yet a released binary. The remaining command surface is
+planned; later commands appear as their roadmap slices ship. The target surface
+is defined normatively in the
+[`cargo theorem` CLI design](cargo-theorem-cli-design.md); where this guide and
+that design disagree, the design wins. Nothing here is a compatibility promise
+for a released binary.
 
 ## Before you begin
 
@@ -23,19 +26,18 @@ in place:
 - Rust, installed through [Rustup](https://rustup.rs/), at a version that
   satisfies the CLI's own minimum supported Rust version (MSRV).
 
-The CLI is its own package, `cargo-theorem`, and it declares its own MSRV. The
-CLI requires Rust 1.89, because `ortho_config` 0.9.0 requires it, while the
-theoremc library packages stay on Rust 1.88 until a separate compatibility
-decision raises theirs. Continuous integration (CI) tests the two contracts
-separately:
+The CLI is its own package, `cargo-theorem`, and it requires Rust 1.89 because
+`ortho_config` 0.10.0 requires it. The theoremc library packages also require
+Rust 1.89, because `serde-saphyr` 2.0.0 declares that floor;
+[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md) records the decision.
+Continuous integration (CI) tests the single workspace contract:
 
 ```console
-cargo +1.88 check --workspace --exclude cargo-theorem
-cargo +1.89 check -p cargo-theorem
+RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features --locked
 ```
 
-Adding the CLI must not silently increase the compiler version required by
-theoremc library consumers, which is why the split is tested explicitly.
+Clearing `RUSTFLAGS` matters because `.cargo/config.toml` sets the nightly-only
+`-Zthreads=8` frontend flag, which stable Rust 1.89 rejects.
 
 ## Running the command
 
@@ -46,9 +48,23 @@ cargo theorem <command> [options]
 ```
 
 The distributable package and executable are both named `cargo-theorem`. Cargo
-discovers that executable on `PATH` and exposes it as `cargo theorem`. Direct
-invocation as `cargo-theorem` is supported for tests and unusual execution
-environments, but documentation and diagnostics use `cargo theorem`.
+dispatches `cargo theorem <args>` as `cargo-theorem theorem <args>`. Direct
+invocation uses the same injected `theorem` token; documentation and
+diagnostics use `cargo theorem`.
+
+The currently registered command is:
+
+```console
+cargo theorem context --json
+cargo-theorem theorem context --json
+```
+
+Both forms emit the same compact agent-context document. Its invocation paths
+include the executable and injected token, such as
+`["cargo-theorem", "theorem", "context"]`; append the required `--json` flag
+when following that path. Project inspection, mutation, backend, proof,
+reporting, profile-management, and feedback commands remain planned and are not
+accepted by this foundation.
 
 Commands that inspect or mutate a Cargo project accept these global selectors:
 
@@ -62,7 +78,7 @@ names fail with an error that lists the valid package identifiers. Mutation
 commands require one unambiguous target unless their contract explicitly
 supports workspace-wide changes.
 
-## Initialising a project
+## Initializing a project
 
 `cargo theorem init` calculates and applies one project integration plan. The
 plan may:
@@ -79,7 +95,7 @@ The default is additive: existing files are preserved unless theoremc can prove
 that a managed fragment can be updated safely.
 
 `--dry-run` returns a structured plan containing create, edit, unchanged,
-conflict, and manual-action entries, and writes nothing. `--force` authorises
+conflict, and manual-action entries, and writes nothing. `--force` authorizes
 only the specific conflicts named in that plan. It does not turn arbitrary
 source rewriting into an accepted operation.
 
@@ -123,7 +139,7 @@ Without an explicit path, the scaffold is written to
 use that ID with `get` and with stable-ID selectors.
 
 An explicit `--path` is resolved relative to the selected workspace when it is
-not absolute. Before any file is written, theoremc canonicalises the workspace
+not absolute. Before any file is written, theoremc canonicalizes the workspace
 root and the path, resolving existing symlinks, and then verifies that the
 target remains within the canonical workspace. The default `theorems/` path
 receives the same containment check. External paths are not supported, so there
@@ -228,7 +244,7 @@ A run performs these stages:
 1. Resolve workspace, configuration, profile, and theorem selection.
 2. Validate theorem sources and stable IDs.
 3. Check required backend installations and pins without changing them.
-4. Materialise an immutable execution plan and input digest.
+4. Materialize an immutable execution plan and input digest.
 5. Create a run directory and ledger record.
 6. Execute backend jobs with bounded parallelism.
 7. Parse backend-native results into canonical theorem outcomes.
@@ -310,7 +326,7 @@ cucumber
 
 Multiple `--format` values require `--deliver` to a directory or a filename
 pattern. Machine-facing formats retain stable codes and English fallback text;
-localised strings are optional projections and do not replace invariant fields.
+localized strings are optional projections and do not replace invariant fields.
 
 `replay <run-id>` selects a failed theorem and delegates to the owning
 backend's replay capability. With one replayable failure, the selector is
@@ -383,7 +399,7 @@ are captured rather than inherited, and the result includes paths to full logs
 and artefacts instead of embedding unbounded output.
 
 Schema identifiers, diagnostic codes, exit classes, backend names, and status
-values are never localised.
+values are never localized.
 
 The stable application exit codes are:
 
@@ -458,8 +474,28 @@ delivery. Unknown schemes enumerate the supported values.
 
 ## Configuration and precedence
 
-The canonical project configuration file is `theoremc.toml` at the Cargo
-workspace root. An explicit `--config <path>` suppresses discovery.
+Configuration files use TOML. Automatic discovery stacks system, user, and
+project scopes in that order, with more-specific scopes overriding earlier
+ones. On Unix and Redox, system files come from each `$XDG_CONFIG_DIRS` entry
+(default `/etc/xdg`) and user files come from `$XDG_CONFIG_HOME`, falling back
+to `$HOME/.config`; both use `theoremc/theoremc.toml`. User discovery also
+checks `~/.theoremc.toml`. On other platforms OrthoConfig uses the home
+directory and native configuration directory supplied by its `EnvSource`, where
+available. The project file is `theoremc.toml` at the Cargo workspace root. At
+this foundation stage, `context --json` does not invoke `cargo metadata` and
+skips automatic file discovery, including project, user, and system scopes. It
+emits its metadata without loading ordinary configuration values or profiles.
+An explicit `--config` or `THEOREMC_CONFIG_PATH` still selects and validates
+one required file. Project commands will resolve the workspace root with
+`cargo metadata` and pass it to OrthoConfig. `--manifest-path` will select the
+manifest used for that resolution.
+
+An explicit `--config <path>` or `THEOREMC_CONFIG_PATH` suppresses automatic
+discovery and selects one required file; `--config` takes precedence if both
+selectors are set. A missing file found during automatic discovery is optional;
+a selected file that is missing, unreadable, or malformed is an actionable
+configuration error. TOML `extends` entries can layer parent files, with
+relative paths resolved from the declaring file. Unknown keys are rejected.
 
 Resolved values follow this precedence, from lowest to highest:
 
@@ -472,21 +508,45 @@ built-in defaults
 ```
 
 The selected subcommand receives only its relevant merged configuration.
-Configuration for `backend install` must not leak into `run`, and a `run`
-profile must not alter project mutation commands unless it declares those
-fields explicitly.
+Configuration for `backend install` must not leak into `run`. OrthoConfig
+0.10.0 forbids `cmds` inside profile bodies, so named profiles can override
+global settings but cannot override command-specific settings. Global values
+follow the full precedence order above; command-specific values follow defaults
+< files < environment < explicit command-line values.
 
 User-level configuration may provide renderer and installation-cache defaults,
 but project proof policy must live in the project file or in theorem evidence.
 
+No legacy `rust-prover-tools` file is discovered. Its `KANI`, `VERUS_*`, and
+`INPUT_*` variables are handled only by the corresponding later backend
+migration command, not by general configuration loading.
+
+The foundation resolves renderer defaults, but `context` does not render human
+output. Persistent project policy, backend pins and executable settings, run
+limits, and installation-cache defaults become configurable as their commands
+are implemented. One-shot command selection, theorem and package selectors,
+`--json`, `--deliver`, `--dry-run`, `--force`, `--compile`, `--config`, and
+`--profile` remain command-line inputs. Where a setting appears on both
+surfaces, a parser default is treated as absent so files and environment
+variables can override it.
+
+Each command's settings live under `[cmds.<command>]`. For example,
+`[cmds.run]` is selected only by `run`; its environment variables use the
+`THEOREMC_CMDS__RUN__` prefix. Namespace names must match registered or planned
+top-level commands; unknown names are configuration errors. Settings for
+planned commands are not applied until those command handlers are implemented,
+and settings never leak between sibling commands.
+
 ## Working with profiles
 
-A profile is a named configuration overlay. It sits between discovered
-configuration files and `THEOREMC_*` environment variables in the precedence
-order listed under Configuration and precedence, so it can specialise a project
-default without editing `theoremc.toml` and without exporting variables. The
-selected subcommand receives only its relevant merged configuration, and a
-profile applies only to the commands it declares fields for.
+A profile is a named configuration overlay selected by `--profile <name>` or
+`THEOREMC_PROFILE`. It sits between discovered configuration files and
+`THEOREMC_*` environment variables for global settings, so it can specialize a
+project default without editing `theoremc.toml` and without exporting
+variables. OrthoConfig 0.10.0 rejects `cmds` and `inherits` in a profile body;
+profiles therefore apply to global settings only. The selected subcommand
+receives only its relevant merged command-specific configuration, which has no
+profile tier.
 
 Four subcommands manage the profile store:
 
@@ -505,9 +565,9 @@ names and non-secret fields only, and never secret values.
 
 Profile read-modify-write transactions are atomic under the profile lock, so a
 concurrent reader observes either the previous state or the complete new state.
-Configuration for one subcommand must not leak into another: configuration for
-`backend install` must not leak into `run`, and a `run` profile must not alter
-project mutation commands unless it declares those fields explicitly.
+Configuration for one subcommand must not leak into another. For example,
+configuration for `backend install` must not affect `run`. Profiles apply only
+to global settings and cannot change either command's settings.
 
 ## Migrating from `rust-prover-tools`
 
@@ -532,7 +592,7 @@ deprecate. `cargo theorem` is the surface from the outset.
 Legacy `KANI`, `VERUS_*`, and `INPUT_*` environment variables are accepted only
 by the migration adapter, only for the corresponding backend command, and they
 emit a deprecation diagnostic in human mode. In JSON mode the legacy source is
-recorded in a non-localised `warnings` array rather than contaminating stdout
+recorded in a non-localized `warnings` array rather than contaminating stdout
 with prose.
 
 The legacy `--kani-command` override becomes a typed executable plus argument
@@ -547,7 +607,7 @@ remains available.
 ## Where to go next
 
 - [`cargo theorem` CLI design](cargo-theorem-cli-design.md) — the normative
-  definition of every command, contract, and boundary summarised here.
+  definition of every command, contract, and boundary summarized here.
 - [Theoremc development roadmap](roadmap.md) — the implementation sequence,
   including Phase 3.1 for the CLI foundation and Step 5.4 for migration
   completion.

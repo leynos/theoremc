@@ -9,6 +9,7 @@ use std::process::Command;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use camino::Utf8Path;
+use test_helpers::hermetic_cargo;
 
 #[derive(Clone, Copy)]
 pub(crate) enum CargoSubcommand {
@@ -90,9 +91,7 @@ pub(crate) fn cargo_run_output(
     _guard: &CargoGuard<'_>,
 ) -> Result<String, String> {
     let target_dir = manifest_dir.join("target");
-    let output = Command::new("cargo")
-        .current_dir(manifest_dir)
-        .env("CARGO_TARGET_DIR", target_dir.as_str())
+    let output = hermetic_cargo(manifest_dir, &target_dir)
         .args(subcommand.args())
         .output()
         .map_err(|error| error.to_string())?;

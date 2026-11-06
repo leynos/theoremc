@@ -132,14 +132,34 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 
 **Table:** Module layers and responsibilities
 
-| Layer         | Crate                    | Modules                                     | Responsibility                                                                |
-| ------------- | ------------------------ | ------------------------------------------- | ----------------------------------------------------------------------------- |
-| Schema        | `theoremc-core`          | `schema/`                                   | YAML deserialization and semantic validation                                  |
-| Mangle        | `theoremc-core`          | `mangle*.rs`                                | Deterministic identifier generation                                           |
-| Cross-cutting | `theoremc-core`          | `collision.rs`                              | Collision detection across schema and mangle                                  |
-| Proc-macro    | `theoremc-macros`        | `lib.rs`                                    | Proc-macro entry points, theorem-file loading delegation, and code generation |
-| Lowering      | `theoremc`               | `arg_lowering.rs`                           | Test-gated prototype for converting semantic values to Rust token trees       |
-| Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs` | Theorem file discovery, suite generation, and Cargo change tracking           |
+| Layer         | Crate                    | Modules                                                | Responsibility                                                                 |
+| ------------- | ------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Schema        | `theoremc-core`          | `schema/loader/`, `schema/raw/`, `schema/validate*.rs` | YAML loading, span-aware conversion, duplicate-key diagnostics, and validation |
+| Mangle        | `theoremc-core`          | `mangle*.rs`                                           | Deterministic identifier generation                                            |
+| Cross-cutting | `theoremc-core`          | `collision.rs`                                         | Collision detection across schema and mangle                                   |
+| Proc-macro    | `theoremc-macros`        | `lib.rs`                                               | Proc-macro entry points, theorem-file loading delegation, and code generation  |
+| Lowering      | `theoremc`               | `arg_lowering.rs`                                      | Test-gated prototype for converting semantic values to Rust token trees        |
+| Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs`            | Theorem file discovery, suite generation, and Cargo change tracking            |
+
+The schema loader entry point is `schema/loader/mod.rs`. It coordinates YAML
+deserialization, duplicate-key checking, raw-to-domain conversion, semantic
+validation, and action-collision checks. Its `duplicate` child is private, and
+`check_duplicate_theorem_keys` is `pub(super)`, so the loader can call it while
+modules outside the loader subtree cannot. The loader declares its sibling test
+files with `#[path = "../loader_tests.rs"]`,
+`#[path = "../loader_action_tests.rs"]`,
+`#[path = "../loader_diagnostic_tests.rs"]`, and
+`#[path = "../loader_duplicate_tests.rs"]`.
+
+The raw span adapter is defined in `schema/raw/mod.rs`, which privately declares
+`schema/raw/decode.rs` and re-exports `RawDocDecodeError` as `pub(crate)`. The
+decode helpers are `pub(super)` and perform raw-to-domain conversion for `Let`
+bindings and `Do` steps. Raw span-location tests stay in the sibling
+`schema/raw_location_tests.rs` file.
+
+Rust-type lifetime unit tests live in `schema/rust_type_tests.rs`. Property
+tests remain in `schema/rust_type_property_tests.rs`, which
+`schema/rust_type.rs` registers through its `property_tests` module.
 
 The schema layer must not import from `mangle`, and vice versa. The `collision`
 module exists as a separate top-level module specifically to orchestrate both
@@ -254,10 +274,25 @@ depend directly on private implementation details such as
 
 ### 3.1 Rust toolchain policy
 
-The workspace minimum supported Rust version (MSRV) is Rust 1.88, declared via
-the root `Cargo.toml` `rust-version` field. This floor permits the use of let
-chains in conditionals while keeping the compiler requirement explicit for
-contributors and downstream automation.
+The workspace minimum supported Rust version (MSRV) is Rust 1.89, declared via
+the root `Cargo.toml` `rust-version` field and repeated in each workspace
+package. This floor is required by `serde-saphyr` 2.0.0 and `ortho_config`
+0.10.0; it also permits the use of let chains in conditionals. The decision to
+raise the reusable libraries from Rust 1.88 is recorded in
+[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md).
+
+The workspace sets `resolver = "3"` so Cargo prefers dependency versions
+compatible with the declared MSRV. That is what keeps the dev-only
+`cargo-platform` on 0.3.2 instead of 0.3.3, which needs Rust 1.91, so the MSRV
+check can cover every target, including tests.
+
+`make msrv` runs
+`RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features
+--locked`.
+The empty `RUSTFLAGS` displaces the nightly-only `-Zthreads=8` flag and the
+mold linker from the repository's Cargo configuration, which a stable toolchain
+refuses before it checks any package. The test suite still runs once, in
+`make test`.
 
 ### 3.2 Quality gates
 
@@ -266,21 +301,33 @@ where available, and run the direct Cargo invocations for specialized checks:
 
 **Table:** Quality gates and their commands
 
-| Gate                 | Command                                                                                            | What it checks                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Formatting           | `make check-fmt`                                                                                   | `cargo fmt --all -- --check`                                       |
-| Linting              | `make lint`                                                                                        | Clippy with `-D warnings` plus rustdoc                             |
-| Type checking        | `make typecheck`                                                                                   | `cargo check --all-targets --all-features`                         |
-| Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                           |
-| Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit           |
-| Architecture linting | `cargo dylint theoremc_arch_lint --all -- -D warnings`                                             | Flags schema layer boundary and other architecture rule violations |
-| Tests                | `make test`                                                                                        | nextest test binaries plus Cargo doctests                          |
-| Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                               |
-| Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                               |
-| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all` plus mdformat                                    |
+| Gate                 | Command                                                                                            | What it checks                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Formatting           | `make check-fmt`                                                                                   | `cargo fmt --all -- --check`                                                 |
+| Linting              | `make lint`                                                                                        | Whitaker (`make lint-whitaker`), then Clippy with `-D warnings` plus rustdoc |
+| Type checking        | `make typecheck`                                                                                   | `cargo check --all-targets --all-features`                                   |
+| Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                                     |
+| Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit                     |
+| Architecture linting | planned: `theoremc_arch_lint` (see the roadmap)                                                    | Will flag schema layer boundary and other architecture rule violations       |
+| Tests                | `make test`                                                                                        | nextest test binaries plus Cargo doctests                                    |
+| Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                                         |
+| Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                                         |
+| Spelling             | `make spelling`                                                                                    | Regenerates `typos.toml`, then checks spelling and shared phrase corrections |
+| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all`, then mdtablefix and markdownlint-cli2 `--fix`             |
 
 When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 `make nixie` must also pass.
+
+`make lint` runs the Whitaker Dylint suite through the `whitaker` wrapper
+(`make lint-whitaker`) before rustdoc and Clippy. Install it with
+`whitaker-installer` so that `whitaker` is on `PATH`, and never call
+`cargo dylint` directly. The recipe sets `DYLINT_RUSTFLAGS="-D warnings"` so
+findings fail the gate, and restates the build-standard flags because an
+assigned `RUSTFLAGS` displaces the Cargo configuration. CI installs Whitaker
+through the shared `install-whitaker` action, pinned to a revision concordat
+QG-002 approves; that pin fixes the installer, while the lint suite itself
+follows Whitaker's rolling release. Whitaker does not replace the custom
+`theoremc_arch_lint` architecture rules, which are still planned.
 
 `make test` is intentionally nextest-backed for test binaries, followed by a
 Cargo doctest pass for Rustdoc examples. It runs
@@ -289,9 +336,9 @@ Cargo doctest pass for Rustdoc examples. It runs
 with options supported by cargo-nextest, and use `DOCTEST_FLAGS` for doctest
 scope.
 
-CI runs `make check-fmt`, `make lint`, `make typecheck`, and `make test`. A
-separate coverage measurement step precedes `make test` and installs
-`cargo-nextest`.
+CI runs `make check-fmt`, the markdownlint-cli2 action, `make spelling`,
+`make lint`, `make typecheck`, and `make test`. A separate coverage measurement
+step precedes `make test` and installs `cargo-nextest`.
 
 Capture long command output through `tee` with `set -o pipefail` to avoid
 losing truncated results:
@@ -299,6 +346,56 @@ losing truncated results:
 ```sh
 set -o pipefail; make lint | tee /tmp/make-lint.log
 ```
+
+#### The spelling gate
+
+`make spelling` runs the pinned `typos-config-builder gate`, which regenerates
+the tracked `typos.toml` from the live shared en-GB-oxendict dictionary on the
+`main` branch of `leynos/agent-helper-scripts`, merges the repository's
+`typos.local.toml`, and then runs Typos and the shared phrase corrections.
+Because the dictionary is live, `typos.toml` changes whenever shared policy
+changes; CI runs the gate rather than a drift check, and the regenerated file
+is committed. `typos.local.toml` holds narrow repository-specific exceptions
+only: exact or full-line patterns for identifiers and terms the policy cannot
+correct, never bare accepted words. Its one file exclusion covers the spelling
+policy's own fixture data, whose purpose is to contain rejected spellings; the
+builder rejects broad exclusions. Never edit `typos.toml` by hand.
+
+The target needs `uv`, taken from the `UV` make variable (`UV ?= uv`), so a
+contributor without `uv` on `PATH` can run `make UV=/path/to/uv spelling`. `uv`
+provisions the pinned Python 3.14 interpreter, so no separate Python
+installation is needed. The whole invocation lives in `SPELLING_COMMAND`, so
+the recipe and its overrides stay in one place:
+
+- `SPELLING_BUILDER` (default
+  `git+https://github.com/leynos/typos-config-builder.git`) and
+  `SPELLING_BUILDER_REF` (default `v0.1.3`) select the builder revision.
+- `SPELLING_REPOSITORY` (default `.`) is the repository the gate inspects.
+- `SPELLING_SCOPE` (default `all`) is the file scope the gate checks.
+
+`make spelling SPELLING_REPOSITORY=/path/to/checkout` therefore checks another
+working tree without editing the recipe. The same command exports
+`UV_CACHE_DIR=.uv-cache` and `UV_TOOL_DIR=.uv-tools`, so the gate's uv cache
+and installed tools stay inside the repository; both directories are
+git-ignored. The builder inspects git-tracked files only: stage a new document
+before running the gate because an unstaged file is invisible to it locally
+while CI checks it once committed.
+
+Two integration tests guard the wiring and the overlay.
+`spelling_gate_contract` reads the Makefile and CI workflow to check the pinned
+command, its defaults, the recipe, and the ordering after Markdown lint.
+`spelling_command_contract` runs the recipe against a stub `uv` and needs no
+network. `spelling_policy` runs the real pinned builder against temporary
+tracked fixtures: one exercises every `typos.local.toml` pattern and must pass,
+and one adds a misspelling and must fail. The fixture prose lives under
+`tests/fixtures/spelling/`, which the overlay excludes from the repository gate
+because it must contain the spellings the gate rejects; the copy staged in the
+temporary repository is not excluded, so the patterns are still exercised. The
+test sets `TYPOS_CONFIG_BUILDER_OFFLINE`, so the dictionary comes from the
+builder's bundled snapshot. The builder package itself is fetched from the
+pinned tag on first use, so the first run needs network or a warm uv cache;
+`make spelling` warms the same cache, and CI runs the gate before the test
+suite.
 
 ### 3.3 Test conventions
 
@@ -533,24 +630,44 @@ failure exits 2 rather than passing.
 
 ### 3.8 `cargo theorem` application boundary
 
-The planned [`cargo theorem` CLI design](cargo-theorem-cli-design.md) adds a
-dedicated `crates/cargo-theorem/` application package. It owns the Cargo
-external-subcommand entry point, OrthoConfig command and configuration types,
-dispatch, application rendering, and exit-code mapping. Reusable theorem,
-project, execution, and report services remain in library packages rather than
-moving into the CLI.
+The [`cargo theorem` CLI foundation](cargo-theorem-cli-design.md) adds a
+dedicated `crates/cargo-theorem/` application package. Its initial registered
+command is `context --json`; later roadmap slices add operational commands. The
+package owns the Cargo external-subcommand entry point, OrthoConfig command and
+configuration types, dispatch, application rendering, and exit-code mapping.
+Reusable theorem, project, execution, and report services remain in library
+packages rather than moving into the CLI.
 
-The planned CLI package has a separate MSRV from the libraries because
-OrthoConfig 0.9.0 requires Rust 1.89. That package is not in the workspace yet:
-all current packages, including the root `theoremc` crate, use Rust 1.88.
-Validate the current workspace with
-`RUSTFLAGS="" cargo +1.88 check --workspace`. The empty `RUSTFLAGS` matters:
-the repository's Cargo configuration carries the nightly-only `-Zthreads=8`,
-which a stable toolchain refuses before it checks any package, and an assigned
-`RUSTFLAGS` displaces the configuration's flags. After the CLI package lands,
-introduce split validation with
-`RUSTFLAGS="" cargo +1.88 check --workspace --exclude cargo-theorem` and
-`RUSTFLAGS="" cargo +1.89 check -p cargo-theorem`.
+The `cargo-theorem` package uses `ortho_config` and `cargo-orthohelp` 0.10.0.
+The CLI's `agent_context.rs` calls cargo-orthohelp at runtime to convert
+generated command metadata into the agent-context schema. Keep both
+dependencies in the application package. The facade, `theoremc-core`,
+`theoremc-macros`, and build-support crates remain configuration-free and do
+not depend on application configuration, but every package now declares the
+same Rust 1.89 MSRV. CI and local validation run one workspace check:
+
+```console
+RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features --locked
+```
+
+The empty `RUSTFLAGS` matters: repository Cargo configuration carries the
+nightly-only `-Zthreads=8`, which stable Rust refuses before checking a
+package. An assigned `RUSTFLAGS` displaces the configuration's flags, so the
+empty assignment allows the stable checks to run without the nightly-only
+setting.
+
+Configuration, CLI parsing, and process error handling belong to
+`crates/cargo-theorem`. Its OrthoConfig-derived types resolve files, profiles,
+environment, and selected command settings before handing validated values to
+application services. The application resolves the file chain once because
+OrthoConfig 0.10.0's selected-subcommand helper cannot consume the canonical
+`theoremc.toml` filename or explicit `--config` path. An application-owned
+`SelectedSubcommandMerge` adapter passes only the selected `cmds.<name>` values
+from that resolved chain. Tests inject `MapEnv` and explicit file sources
+rather than changing the test process environment. The `cargo-theorem` entry
+point uses a single `theorem` subcommand wrapper so Cargo dispatch and direct
+`cargo-theorem theorem ...` invocation share one parser. Do not add OrthoConfig
+or `ortho_l10n` to the facade or reusable theorem crates.
 
 Backend integration uses narrow ports. Backend lifecycle concerns (discovery,
 resolution, installation, and health checks) must remain separate from backend
@@ -571,7 +688,7 @@ Cargo, such as `check --compile` and `run`, execute the package's normal
 
 The CLI's caller-facing contract is documented separately from its design. The
 [`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md) is the
-task-oriented guide for installation, project initialisation, theorem creation,
+task-oriented guide for installation, project initialization, theorem creation,
 checking, backend management, execution, reports, JSON output, exit classes,
 and migration from `rust-prover-tools`. It states its proposed status until the
 commands it describes ship. The design document remains the normative source,

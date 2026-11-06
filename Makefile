@@ -1,16 +1,16 @@
-.PHONY: help all clean test build release lint typecheck fmt check-fmt markdownlint nixie test-workflow-contracts
+.PHONY: help all clean test build release lint lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv
 
-
-TARGET ?= theoremc
+TARGET ?= cargo-theorem
 
 export PATH := $(HOME)/.cargo/bin:$(HOME)/.bun/bin:$(PATH)
 
 CARGO ?= cargo
+WHITAKER ?= whitaker
 BUILD_JOBS ?=
 RUST_FLAGS ?= -D warnings
 RUSTDOC_FLAGS ?= -D warnings
 CARGO_FLAGS ?= --all-targets --all-features
-CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
+CLIPPY_FLAGS ?= --workspace $(CARGO_FLAGS) -- $(RUST_FLAGS)
 NEXTEST_FLAGS ?= --workspace $(CARGO_FLAGS)
 DOCTEST_FLAGS ?= --workspace --all-features --doc
 MDLINT ?= markdownlint-cli2
@@ -46,12 +46,18 @@ STANDARD_RUSTFLAGS := -Zthreads=8$(if $(filter Linux,$(BUILD_HOST_OS)), -Clink-a
 test-workflow-contracts: ## Check the CV-005 CodeScene workflow contracts
 	$(CV005_CONTRACTS) check --repository .
 
+check-agent-native: ## Check OrthoConfig agent-native command policy
+	cargo orthohelp --check-agent-native --package cargo-theorem
+
+msrv: ## Check the workspace minimum supported Rust version
+	RUSTFLAGS="" $(CARGO) +1.89 check --workspace --all-targets --all-features --locked
+
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary
 
 all: check-fmt lint test test-workflow-contracts ## Perform a comprehensive check of code
 
-clean: ## Remove build artifacts
+clean: ## Remove build artefacts
 	$(CARGO) clean
 
 test: ## Run tests with warnings treated as errors
@@ -59,11 +65,14 @@ test: ## Run tests with warnings treated as errors
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test $(DOCTEST_FLAGS) $(BUILD_JOBS)
 
 target/%/$(TARGET): ## Build binary in debug or release mode
-	$(if $(findstring release,$(@)),RUSTFLAGS="$${RUSTFLAGS-}",RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)") $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) --bin $(TARGET)
+	$(if $(findstring release,$(@)),RUSTFLAGS="$${RUSTFLAGS-}",RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)") $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) -p cargo-theorem --bin $(TARGET)
 
-lint: ## Run Clippy with warnings denied
+lint: lint-whitaker ## Run rustdoc, Clippy and the Whitaker suite with warnings denied
 	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) doc --no-deps
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
+
+lint-whitaker: ## Run the Whitaker Dylint suite through its wrapper with warnings denied
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" DYLINT_RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
 
 typecheck: ## Run type checking for all targets and features
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) check $(CARGO_FLAGS)
@@ -82,6 +91,20 @@ markdownlint: ## Lint Markdown files
 
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
+
+# The spelling gate's pinned builder. The defaults are the adopted baseline;
+# the overrides let a contributor point the same recipe at another builder
+# revision, repository, or scope without editing it.
+SPELLING_BUILDER ?= git+https://github.com/leynos/typos-config-builder.git
+SPELLING_BUILDER_REF ?= v0.1.3
+SPELLING_REPOSITORY ?= .
+SPELLING_SCOPE ?= all
+SPELLING_COMMAND = $(UV_ENV) "$(UV)" tool run --python 3.14 \
+	--from "$(SPELLING_BUILDER)@$(SPELLING_BUILDER_REF)" \
+	typos-config-builder gate --repository "$(SPELLING_REPOSITORY)" --scope $(SPELLING_SCOPE)
+
+spelling: ## Check spelling and shared phrase corrections
+	$(SPELLING_COMMAND)
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?##' $(MAKEFILE_LIST) | \

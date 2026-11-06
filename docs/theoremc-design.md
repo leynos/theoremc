@@ -233,13 +233,15 @@ This section is intentionally informative and maps current module placement.
 
 Table 1: Current schema layer to module mapping (informative).
 
-| Layer                       | Current primary modules                                                          |
-| --------------------------- | -------------------------------------------------------------------------------- |
-| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier`       |
-| Raw anti-corruption adapter | `schema::raw` (planned extraction from current loader-side deserialization path) |
-| Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                               |
-| Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::str_newtype`        |
-| Diagnostic infrastructure   | `schema::diagnostic` (currently `schema::error`)                                 |
+| Layer                       | Current primary modules                                                    |
+| --------------------------- | -------------------------------------------------------------------------- |
+| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier` |
+| Raw span adapter            | `schema::raw`                                                              |
+| Raw-to-domain conversion    | `schema::raw::decode`, `schema::raw_action`                                |
+| Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                         |
+| Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::str_newtype`  |
+| Duplicate-key diagnostics   | `schema::loader::duplicate`                                                |
+| Diagnostic infrastructure   | `schema::diagnostic`, `schema::error`                                      |
 
 ______________________________________________________________________
 
@@ -741,8 +743,10 @@ ______________________________________________________________________
 
 ### 6.1 YAML parsing with `serde-saphyr`
 
-`theoremc-core` uses `serde-saphyr` to deserialize theorem documents into
-strongly typed Rust structs.
+`theoremc-core` uses `serde-saphyr` 2.0.0 to deserialize theorem documents into
+strongly typed Rust structs. That release declares Rust 1.89, which is also the
+workspace MSRV; [ADR-010](adr-010-reusable-library-msrv-rust-1-89.md) records
+the decision to raise the reusable libraries from Rust 1.88.
 
 Motivation: `serde-saphyr` is designed to be panic-free on malformed input and
 avoid unsafe code in the library layer, and it is built atop the `saphyr` YAML
@@ -786,11 +790,13 @@ post-deserialization semantic validation (Step 1.2.1 of the roadmap):
   says, "non-empty after trimming" without specifying the algorithm;
   `str::trim()` is the most defensive choice and aligns with Rust's standard
   library semantics.
-- Validation logic is extracted into
-  `crates/theoremc-core/src/schema/validate.rs` to keep
+- Validation logic was extracted into
+  `crates/theoremc-core/src/schema/validate.rs` to keep the then-monolithic
   `crates/theoremc-core/src/schema/loader.rs` under the 400-line limit and to
   improve separation of concerns between deserialization and semantic
-  validation.
+  validation. The current loader entry point is
+  `crates/theoremc-core/src/schema/loader/mod.rs`; duplicate theorem-key checks
+  are implemented in `crates/theoremc-core/src/schema/loader/duplicate.rs`.
 - `unwind: 0` is rejected because the spec (`TFS-6` §6.2) says,
   "positive integer", meaning > 0. The `u32` serde type already rejects
   negatives.
@@ -1040,11 +1046,17 @@ decoding for plain YAML strings (Step 2.3.1 of the roadmap):
   `Spanned<String>` becomes `String` for other fields.
 - Nine raw serde-compatible types (`RawActionCall`, `RawLetCall`, `RawLetMust`,
   `RawLetBinding`, `RawStepCall`, `RawStepMust`, `RawStepMaybe`,
-  `RawMaybeBlock`, `RawStep`) are extracted into
-  `crates/theoremc-core/src/schema/raw_action.rs` to keep
-  `crates/theoremc-core/src/schema/raw.rs` under the 400-line limit. These
-  mirror the public types but retain `TheoremValue` in `args` for serde
-  compatibility.
+  `RawMaybeBlock`, `RawStep`) were extracted into
+  `crates/theoremc-core/src/schema/raw_action.rs` to keep the then-monolithic
+  `crates/theoremc-core/src/schema/raw.rs` under the 400-line limit. The
+  current raw module entry point is
+  `crates/theoremc-core/src/schema/raw/mod.rs`, which converts the document via
+  `RawTheoremDoc::to_theorem_doc()`. Its `Let` and `Do` collections are
+  converted by `crates/theoremc-core/src/schema/raw/decode.rs`, while
+  individual actions and steps are converted by
+  `crates/theoremc-core/src/schema/raw_action.rs`. These types remain in
+  `crates/theoremc-core/src/schema/raw_action.rs`; they mirror the public types
+  but retain `TheoremValue` in `args` for serde compatibility.
 - YAML maps that are not `{ ref: <name> }` are passed through as
   `ArgValue::RawMap(IndexMap<String, TheoremValue>)`, preserving forward
   compatibility for Step 2.3.2 (`{ literal: ... }` wrapper) and Step 2.3.3
@@ -1243,7 +1255,7 @@ boilerplate across the schema and test-support wrappers:
   is a workspace-internal path dependency, not a published crate. Should such a
   context appear later, restore an inherent `const` pair on the affected
   wrapper alone — the same trade the three siblings below already make.
-- Three further `&'a str` wrappers keep their hand-written pairs:
+- Three further `&'a str` wrappers keep their handwritten pairs:
   `schema::loader_message::{FieldName, ErrorMessage}` and
   `schema::arg_value::ParamName`. Their `new`/`as_str` are `const fn`, and a
   blanket trait implementation cannot be `const`, so adopting the trait would
@@ -1594,7 +1606,7 @@ which treats insignificant whitespace differences such as `Vec<u8>` and
 declared `syn::Type` expression, including nested generic arguments and
 references, as Rust sees it in the theorem owner crate. It does not inspect
 struct fields, decompose generic arguments for field-level checks, or
-synthesise struct literals; Phase 4 harness emission owns those behaviours.
+synthesize struct literals; Phase 4 harness emission owns those behaviours.
 
 This ensures that renames, signature drift, or missing re-exports fail
 compilation immediately, not “later when running theoremd”.
@@ -1948,7 +1960,7 @@ reference (field-by-field) and the precise mangling rules for action names and
 harness names. The remaining work is mostly engineering.
 
 [^1]: <https://docs.rs/crate/serde-saphyr/latest?utm_source=chatgpt.com>
-      "serde-saphyr 0.0.7"
+      "serde-saphyr 2.0.0"
 [^2]: <https://model-checking.github.io/kani/reference/attributes.html?utm_source=chatgpt.com>
        "Attributes - The Kani Rust Verifier"
 [^3]: <https://docs.rs/serde-saphyr?utm_source=chatgpt.com> "serde_saphyr -
