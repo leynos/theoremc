@@ -82,6 +82,20 @@ class RecordKind:
     name: str
 
 
+@dataclass(frozen=True)
+class RecordLink:
+    """Describe a local Markdown link that targets a candidate record.
+
+    Example: `[x](adrs/adr-0001-example.md)` yields a link whose `target` is the
+    resolved path of that ADR.
+    """
+
+    repository_root: Path
+    source: Path
+    target: Path
+    destination: str
+
+
 def slug_for_title(title: str) -> str:
     """Return the ASCII kebab-case slug used for an ADR or RFC title.
 
@@ -224,8 +238,7 @@ def _register_serial(
 def _record_heading_errors(
     reader: RecordReader,
     path: Path,
-    serial: str,
-    filename_slug: str,
+    filename_match: re.Match[str],
     record_kind: RecordKind,
 ) -> list[str]:
     """Check one record heading against its filename serial and title slug.
@@ -241,6 +254,8 @@ def _record_heading_errors(
             f"{record_kind.name} title"
         ]
 
+    serial = filename_match.group("serial")
+    filename_slug = filename_match.group("slug")
     errors: list[str] = []
     if title.group("serial") != serial:
         errors.append(
@@ -281,13 +296,7 @@ def validate_record_files(reader: RecordReader, docs_root: Path) -> list[str]:
             if serial_error:
                 errors.append(serial_error)
             errors.extend(
-                _record_heading_errors(
-                    reader,
-                    path,
-                    serial,
-                    match.group("slug"),
-                    record_kind,
-                )
+                _record_heading_errors(reader, path, match, record_kind)
             )
     return errors
 
@@ -311,14 +320,15 @@ def _resolve_local_target(repository_root: Path, source: Path, link_path: str) -
     return (source.parent / decoded_path).resolve()
 
 
-def _local_record_target(
+def _local_record_link(
     repository_root: Path,
     source: Path,
     destination: str,
-) -> Path | None:
+) -> RecordLink | None:
     """Resolve a local ADR/RFC destination, or return `None` when unrelated.
 
-    Example: an HTTP link returns `None`; a relative ADR link returns its path.
+    Example: an HTTP link returns `None`; a relative ADR link returns its
+    resolved target.
     """
     parsed_url = urlsplit(destination)
     if _is_external_destination(parsed_url):
@@ -327,28 +337,26 @@ def _local_record_target(
         return None
     if not is_record_destination(parsed_url.path):
         return None
-    return _resolve_local_target(repository_root, source, parsed_url.path)
+    target = _resolve_local_target(repository_root, source, parsed_url.path)
+    return RecordLink(repository_root, source, target, destination)
 
 
-def _local_record_link_error(
-    reader: RecordReader,
-    repository_root: Path,
-    source: Path,
-    target: Path,
-    destination: str,
-) -> str | None:
+def _local_record_link_error(reader: RecordReader, link: RecordLink) -> str | None:
     """Describe a local record link that escapes the repository or is missing.
 
     Example: a link to an absent ADR returns a path-specific error.
     """
-    relative_source = source.relative_to(repository_root)
+    relative_source = link.source.relative_to(link.repository_root)
     try:
-        target.relative_to(repository_root.resolve())
+        link.target.relative_to(link.repository_root.resolve())
     except ValueError:
-        return f"{relative_source}: record link escapes the repository: {destination}"
-    if reader.is_file(target):
+        return f"{relative_source}: record link escapes the repository: {link.destination}"
+    if reader.is_file(link.target):
         return None
-    return f"{relative_source}: local ADR/RFC link target does not exist: {destination}"
+    return (
+        f"{relative_source}: local ADR/RFC link target does not exist: "
+        f"{link.destination}"
+    )
 
 
 def validate_local_record_links(
@@ -365,13 +373,11 @@ def validate_local_record_links(
     for source in markdown_paths:
         markdown = reader.read_text(source)
         for destination in extract_markdown_destinations(markdown):
-            target = _local_record_target(repository_root, source, destination)
-            if target is None:
+            link = _local_record_link(repository_root, source, destination)
+            if link is None:
                 continue
             checked_links += 1
-            error = _local_record_link_error(
-                reader, repository_root, source, target, destination
-            )
+            error = _local_record_link_error(reader, link)
             if error:
                 errors.append(error)
     return errors, checked_links
