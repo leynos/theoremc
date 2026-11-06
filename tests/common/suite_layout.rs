@@ -46,3 +46,63 @@ pub fn is_missing_path(error: &std::io::Error) -> bool {
         std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
     )
 }
+
+#[cfg(test)]
+mod tests {
+    //! Locates the generated suite in each build-directory layout Cargo uses.
+
+    use camino::Utf8PathBuf;
+    use cap_std::{ambient_authority, fs_utf8::Dir};
+
+    use super::{generated_suite_candidates, is_missing_path};
+
+    /// Asserts that exactly one candidate for a suite written under
+    /// `build/<output_dir>` is readable.
+    fn assert_one_readable_candidate(output_dir: &str) {
+        let scratch = tempfile::tempdir().expect("create a scratch directory");
+        let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
+            .expect("the scratch directory path should be UTF-8");
+        let dir =
+            Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
+        let output = format!("target/debug/build/{output_dir}");
+        dir.create_dir_all(&output)
+            .expect("create the output directory");
+        dir.write(format!("{output}/theorem_suite.rs"), "// suite")
+            .expect("write the generated suite");
+
+        let candidates = generated_suite_candidates(&dir).expect("list the candidates");
+
+        let readable: Vec<_> = candidates
+            .iter()
+            .filter(|path| dir.read_to_string(path).is_ok())
+            .collect();
+        assert_eq!(readable.len(), 1, "candidates: {candidates:?}");
+    }
+
+    /// The classic layout: `build/<package>-<hash>/out`.
+    #[test]
+    fn a_readable_candidate_exists_for_the_direct_layout() {
+        assert_one_readable_candidate("pkg-0123abcd/out");
+    }
+
+    /// The newer layout: `build/<package>/<hash>/out`.
+    #[test]
+    fn a_readable_candidate_exists_for_the_nested_layout() {
+        assert_one_readable_candidate("pkg/0123abcd/out");
+    }
+
+    #[test]
+    fn a_missing_path_is_reported_as_missing() {
+        let scratch = tempfile::tempdir().expect("create a scratch directory");
+        let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
+            .expect("the scratch directory path should be UTF-8");
+        let dir =
+            Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
+
+        let error = dir
+            .read_to_string("target/debug/build/none/out/theorem_suite.rs")
+            .expect_err("the suite does not exist");
+
+        assert!(is_missing_path(&error));
+    }
+}
