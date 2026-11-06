@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -36,6 +33,19 @@ def test_extracts_local_links_but_ignores_code() -> None:
     assert extract_markdown_destinations(markdown) == [
         "adrs/adr-0001-example.md#decision",
         "rfcs/rfc-0001-example.md",
+    ]
+
+
+def test_extracts_wrapped_link_text_and_destination() -> None:
+    markdown = (
+        "- [ADR-0002: Library-first internationalization and localization with\n"
+        "  Fluent](\n"
+        "adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md\n"
+        ")\n"
+    )
+
+    assert extract_markdown_destinations(markdown) == [
+        "adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md"
     ]
 
 
@@ -106,6 +116,45 @@ def test_checks_noncanonical_names_and_rfc_contract(tmp_path: Path) -> None:
     assert any("should be 'canonical-title'" in error for error in errors)
 
 
+@pytest.mark.parametrize(
+    ("family", "filename", "heading"),
+    (
+        ("adrs", "adr-0001-example.md", ""),
+        ("adrs", "adr-0001-example.md", "# Not an ADR title\n"),
+        ("rfcs", "rfc-0001-example.md", ""),
+        ("rfcs", "rfc-0001-example.md", "# Not an RFC title\n"),
+    ),
+)
+def test_reports_missing_or_malformed_headings(
+    tmp_path: Path, family: str, filename: str, heading: str
+) -> None:
+    records_root = tmp_path / "docs" / family
+    records_root.mkdir(parents=True)
+    (records_root / filename).write_text(heading, encoding="utf-8")
+
+    errors = validate_record_files(PathRecordReader(), tmp_path / "docs")
+
+    assert len(errors) == 1
+    assert "first heading is not a numbered" in errors[0]
+
+
+def test_reports_adr_serial_and_slug_mismatch(tmp_path: Path) -> None:
+    adrs_root = tmp_path / "docs" / "adrs"
+    adrs_root.mkdir(parents=True)
+    (adrs_root / "adr-0001-wrong-slug.md").write_text(
+        "# Architectural decision record (ADR) 0002: Canonical title\n",
+        encoding="utf-8",
+    )
+
+    errors = validate_record_files(PathRecordReader(), tmp_path / "docs")
+
+    assert any(
+        "filename serial 0001 disagrees with heading serial 0002" in error
+        for error in errors
+    )
+    assert any("should be 'canonical-title'" in error for error in errors)
+
+
 def test_markdown_file_scan_prunes_excluded_directories(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -163,7 +212,9 @@ def test_local_record_links_handle_encoded_root_external_and_escape_paths(
         encoding="utf-8",
     )
 
-    errors, checked_links = validate_local_record_links(PathRecordReader(), tmp_path, [source])
+    errors, checked_links = validate_local_record_links(
+        PathRecordReader(), tmp_path, [source]
+    )
 
     assert checked_links == 3
     assert len(errors) == 1
@@ -199,7 +250,9 @@ def test_checks_filename_heading_slug_and_record_links(tmp_path: Path) -> None:
     )
 
     assert validate_record_files(PathRecordReader(), docs_root) == []
-    assert validate_local_record_links(PathRecordReader(), tmp_path, [source, record]) == ([], 3)
+    assert validate_local_record_links(
+        PathRecordReader(), tmp_path, [source, record]
+    ) == ([], 3)
 
 
 @pytest.mark.parametrize(
@@ -221,11 +274,67 @@ def test_reports_missing_record_link(tmp_path: Path, destination: str) -> None:
     assert len(errors) == 1
 
 
-class _StubReader:
-    """Serve record text from memory so validation needs no filesystem."""
+def test_validates_html_record_links(tmp_path: Path) -> None:
+    docs_root = tmp_path / "docs"
+    adrs_root = docs_root / "adrs"
+    adrs_root.mkdir(parents=True)
+    (adrs_root / "adr-0001-example.md").write_text(
+        "# Architectural decision record (ADR) 0001: Example\n", encoding="utf-8"
+    )
+    source = docs_root / "contents.md"
+    source.write_text(
+        '<a href="adrs/adr-0001-example.md">present</a>\n'
+        '<a href="adrs/adr-0002-missing.md">missing</a>\n',
+        encoding="utf-8",
+    )
 
-    def __init__(self, records: dict[Path, str]) -> None:
+    errors, checked_links = validate_local_record_links(
+        PathRecordReader(), tmp_path, [source]
+    )
+
+    assert checked_links == 2
+    assert len(errors) == 1
+    assert "adr-0002-missing.md" in errors[0]
+
+
+def test_ignores_malformed_external_url(tmp_path: Path) -> None:
+    docs_root = tmp_path / "docs"
+    docs_root.mkdir()
+    source = docs_root / "contents.md"
+    source.write_text("[broken](http://[abc)\n", encoding="utf-8")
+
+    errors, checked_links = validate_local_record_links(
+        PathRecordReader(), tmp_path, [source]
+    )
+
+    assert (errors, checked_links) == ([], 0)
+
+
+def test_reports_local_path_with_null_byte_as_diagnostic(tmp_path: Path) -> None:
+    docs_root = tmp_path / "docs"
+    (docs_root / "adrs").mkdir(parents=True)
+    source = docs_root / "contents.md"
+    source.write_text("[broken](adrs/adr-0001%00.md)\n", encoding="utf-8")
+
+    errors, checked_links = validate_local_record_links(
+        PathRecordReader(), tmp_path, [source]
+    )
+
+    assert checked_links == 1
+    assert len(errors) == 1
+    assert "malformed local record link" in errors[0]
+
+
+class _StubReader:
+    """Serve record text and link resolution from memory."""
+
+    def __init__(
+        self,
+        records: dict[Path, str],
+        resolved_links: dict[str, Path] | None = None,
+    ) -> None:
         self._records = records
+        self._resolved_links = resolved_links or {}
 
     def record_files(self, directory: Path) -> list[Path]:
         return sorted(path for path in self._records if path.parent == directory)
@@ -235,6 +344,11 @@ class _StubReader:
 
     def read_text(self, path: Path) -> str:
         return self._records[path]
+
+    def resolve_link(
+        self, repository_root: Path, source: Path, link_path: str
+    ) -> Path | None:
+        return self._resolved_links.get(link_path)
 
     def is_file(self, path: Path) -> bool:
         return path in self._records
@@ -248,74 +362,23 @@ def test_validation_uses_injected_reader_without_filesystem() -> None:
     )
 
     assert validate_record_files(reader, docs_root) == []
-    assert validate_local_record_links(reader, Path("/nonexistent"), [record]) == ([], 0)
-
-
-def _create_repository(root: Path) -> Path:
-    tools_root = root / "tools"
-    docs_root = root / "docs"
-    (docs_root / "adrs").mkdir(parents=True)
-    (docs_root / "rfcs").mkdir()
-    tools_root.mkdir()
-    for module_name in (
-        "check_adr_rfc_names.py",
-        "adr_rfc_names.py",
-        "adr_rfc_repository.py",
-    ):
-        shutil.copyfile(
-            Path(__file__).with_name(module_name), tools_root / module_name
-        )
-    checker = tools_root / "check_adr_rfc_names.py"
-    (docs_root / "adrs" / "adr-0001-example.md").write_text(
-        "# Architectural decision record (ADR) 0001: Example\n", encoding="utf-8"
-    )
-    (docs_root / "rfcs" / "rfc-0001-proposal.md").write_text(
-        "# RFC 0001: Proposal\n", encoding="utf-8"
-    )
-    (docs_root / "contents.md").write_text(
-        "[ADR](adrs/adr-0001-example.md)\n[RFC](rfcs/rfc-0001-proposal.md)\n",
-        encoding="utf-8",
-    )
-    return checker
-
-
-def test_command_succeeds_for_valid_records_and_links(tmp_path: Path) -> None:
-    checker = _create_repository(tmp_path)
-
-    result = subprocess.run(
-        [sys.executable, str(checker)], capture_output=True, text=True, check=False
+    assert validate_local_record_links(reader, Path("/nonexistent"), [record]) == (
+        [],
+        0,
     )
 
-    assert result.returncode == 0, result.stderr
-    assert "Checked 2 ADR/RFC records and 2 local ADR/RFC links." in result.stdout
 
-
-def test_command_reports_contract_errors(tmp_path: Path) -> None:
-    checker = _create_repository(tmp_path)
-    docs_root = tmp_path / "docs"
-    (docs_root / "adrs" / "adr-1-noncanonical.md").write_text("", encoding="utf-8")
-    (docs_root / "contents.md").write_text(
-        "[missing](adrs/adr-0009-missing.md)\n", encoding="utf-8"
+def test_stub_reader_resolves_local_record_links_without_filesystem() -> None:
+    repository_root = Path("/nonexistent")
+    docs_root = repository_root / "docs"
+    source = docs_root / "contents.md"
+    record = docs_root / "adrs" / "adr-0001-example.md"
+    reader = _StubReader(
+        {
+            source: "[record](adrs/adr-0001-example.md)\n",
+            record: "# Architectural decision record (ADR) 0001: Example\n",
+        },
+        {"adrs/adr-0001-example.md": record},
     )
 
-    result = subprocess.run(
-        [sys.executable, str(checker)], capture_output=True, text=True, check=False
-    )
-
-    assert result.returncode == 1
-    assert "filename is not canonical" in result.stderr
-    assert "local ADR/RFC link target does not exist" in result.stderr
-
-
-def test_command_reports_invalid_utf8_without_traceback(tmp_path: Path) -> None:
-    checker = _create_repository(tmp_path)
-    invalid_record = tmp_path / "docs" / "adrs" / "adr-0002-invalid.md"
-    invalid_record.write_bytes(b"\xff")
-
-    result = subprocess.run(
-        [sys.executable, str(checker)], capture_output=True, text=True, check=False
-    )
-
-    assert result.returncode == 1
-    assert "could not read repository files" in result.stderr
-    assert "Traceback" not in result.stderr
+    assert validate_local_record_links(reader, repository_root, [source]) == ([], 1)

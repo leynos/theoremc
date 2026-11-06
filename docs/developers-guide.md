@@ -17,11 +17,12 @@ erode these boundaries and make the codebase harder to reason about.
   policy](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md) —
   governs theorem naming and vacuity defaults
 - [ADR-0002: Library-first internationalization and localization with
-  Fluent](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
-  — establishes internationalization (i18n) strategy
-- [ADR-0003: Architectural boundary
-  enforcement](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
-  — enforces layered schema boundaries and anti-corruption constraints
+  Fluent](
+  adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md
+  ) — establishes internationalization (i18n) strategy
+- [ADR-0003: Architectural boundary enforcement](
+  adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md) —
+  enforces layered schema boundaries and anti-corruption constraints
 - [ADR-0008: Workspace build-support
   boundary](adrs/adr-0008-workspace-build-support-boundary.md) — assigns
   discovery and generated-suite writing to the internal build-support crate
@@ -389,10 +390,37 @@ where available, and run the direct Cargo invocations for specialized checks:
 When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 `make nixie` must also pass.
 
-The style guide's `typos` check and tested-example loader describe upstream
-tooling guidance and are not current Theoremc gates. Its migration-guide naming
-rule applies to releases that change observable behaviour; the existing project
-migration guide follows that convention.
+The style guide's tested-example loader is upstream tooling guidance and is not
+a current Theoremc gate. The `make spelling` gate runs Typos and the shared
+phrase corrections. The migration-guide naming rule applies to releases that
+change observable behaviour; the existing project migration guide follows that
+convention.
+
+#### ADR/RFC documentation checker
+
+`make check-adr-rfc-names` enforces the record naming contract in
+`docs/documentation-style-guide.md`. It runs the `tools/` pytest suite and then
+the checker command, both under a uv-managed Python 3.13 interpreter, and needs
+only `uv` on `PATH`.
+
+The checker is split along a port-and-adapter boundary:
+
+- `tools/adr_rfc_names.py` holds the pure rules: filename and heading patterns,
+  slug generation, Markdown destination extraction, and the `RecordReader` port
+  that supplies record names, Markdown paths, file text, and resolved link
+  targets. It never touches the filesystem directly.
+- `tools/adr_rfc_repository.py` implements that port as `PathRecordReader` and
+  owns Markdown discovery, file reads, and path resolution, including symlink
+  and encoded-path handling.
+- `tools/check_adr_rfc_names.py` is the composition root. It wires the adapter
+  into the rules and returns a `DocumentationCheck` value whose `read_error`
+  field reports an unreadable file instead of raising.
+
+The rules report canonical filenames, unique serials, heading serials, title
+slugs, and local ADR/RFC links that escape the repository or are missing. A
+malformed local destination becomes an error diagnostic rather than a
+traceback. Link resolution failures are reported through the port, so a test
+double can supply resolved targets without a filesystem.
 
 `make lint` is the aggregate entry point, locally and in CI. It runs three
 stages in order — rustdoc, Clippy, then Whitaker — and recurses through

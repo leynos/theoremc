@@ -6,9 +6,13 @@ no inline Rust blocks in `.theorem`. Primary audience: Rust engineers who want
 behaviour-driven development (BDD)-level legibility for formal checks. Decision
 records:
 
-- [Architectural decision record (ADR) 0001](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
-- [Architectural decision record (ADR) 0002](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
-- [Architectural decision record (ADR) 0003](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
+- [Architectural decision record (ADR) 0001](
+  adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- [Architectural decision record (ADR) 0002](
+adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md
+)
+- [Architectural decision record (ADR) 0003](
+  adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
 
 This specification incorporates several useful structural elements (repo layout
 sketch, risk framing, and some diagrams) from the attached Blitzy exploration,
