@@ -11,11 +11,11 @@ import pytest
 
 from adr_rfc_names import (
     extract_markdown_destinations,
-    markdown_files,
     slug_for_title,
     validate_local_record_links,
     validate_record_files,
 )
+from adr_rfc_repository import PathRecordReader, markdown_files
 
 
 def test_slug_transliterates_accents_and_keeps_kebab_case() -> None:
@@ -75,7 +75,7 @@ def test_reports_duplicate_record_serials(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    errors = validate_record_files(tmp_path / "docs")
+    errors = validate_record_files(PathRecordReader(), tmp_path / "docs")
 
     assert len(errors) == 1
     assert "duplicate ADR serial 0001" in errors[0]
@@ -98,7 +98,7 @@ def test_checks_noncanonical_names_and_rfc_contract(tmp_path: Path) -> None:
         "# RFC 0004: Canonical title\n", encoding="utf-8"
     )
 
-    errors = validate_record_files(tmp_path / "docs")
+    errors = validate_record_files(PathRecordReader(), tmp_path / "docs")
 
     assert sum("filename is not canonical" in error for error in errors) == 2
     assert any("duplicate RFC serial 0001" in error for error in errors)
@@ -163,7 +163,7 @@ def test_local_record_links_handle_encoded_root_external_and_escape_paths(
         encoding="utf-8",
     )
 
-    errors, checked_links = validate_local_record_links(tmp_path, [source])
+    errors, checked_links = validate_local_record_links(PathRecordReader(), tmp_path, [source])
 
     assert checked_links == 3
     assert len(errors) == 1
@@ -198,8 +198,8 @@ def test_checks_filename_heading_slug_and_record_links(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert validate_record_files(docs_root) == []
-    assert validate_local_record_links(tmp_path, [source, record]) == ([], 3)
+    assert validate_record_files(PathRecordReader(), docs_root) == []
+    assert validate_local_record_links(PathRecordReader(), tmp_path, [source, record]) == ([], 3)
 
 
 @pytest.mark.parametrize(
@@ -213,10 +213,42 @@ def test_reports_missing_record_link(tmp_path: Path, destination: str) -> None:
     source = docs_root / "contents.md"
     source.write_text(f"[record]({destination})\n", encoding="utf-8")
 
-    errors, checked_links = validate_local_record_links(tmp_path, [source])
+    errors, checked_links = validate_local_record_links(
+        PathRecordReader(), tmp_path, [source]
+    )
 
     assert checked_links == 1
     assert len(errors) == 1
+
+
+class _StubReader:
+    """Serve record text from memory so validation needs no filesystem."""
+
+    def __init__(self, records: dict[Path, str]) -> None:
+        self._records = records
+
+    def record_files(self, directory: Path) -> list[Path]:
+        return sorted(path for path in self._records if path.parent == directory)
+
+    def markdown_paths(self, repository_root: Path) -> list[Path]:
+        return sorted(self._records)
+
+    def read_text(self, path: Path) -> str:
+        return self._records[path]
+
+    def is_file(self, path: Path) -> bool:
+        return path in self._records
+
+
+def test_validation_uses_injected_reader_without_filesystem() -> None:
+    docs_root = Path("/nonexistent/docs")
+    record = docs_root / "adrs" / "adr-0001-example.md"
+    reader = _StubReader(
+        {record: "# Architectural decision record (ADR) 0001: Example\n"}
+    )
+
+    assert validate_record_files(reader, docs_root) == []
+    assert validate_local_record_links(reader, Path("/nonexistent"), [record]) == ([], 0)
 
 
 def _create_repository(root: Path) -> Path:
@@ -225,7 +257,11 @@ def _create_repository(root: Path) -> Path:
     (docs_root / "adrs").mkdir(parents=True)
     (docs_root / "rfcs").mkdir()
     tools_root.mkdir()
-    for module_name in ("check_adr_rfc_names.py", "adr_rfc_names.py"):
+    for module_name in (
+        "check_adr_rfc_names.py",
+        "adr_rfc_names.py",
+        "adr_rfc_repository.py",
+    ):
         shutil.copyfile(
             Path(__file__).with_name(module_name), tools_root / module_name
         )
