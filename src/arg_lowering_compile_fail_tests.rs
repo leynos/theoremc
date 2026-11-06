@@ -5,14 +5,13 @@
 
 use std::error::Error;
 use std::io;
-use std::io::Read;
-use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::process::Command;
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use indexmap::IndexMap;
 
+use super::rustc_deadline::{RUSTC_DEADLINE, run_within_deadline};
 use crate::schema::TheoremValue;
 use crate::schema::arg_value::ArgValue;
 
@@ -96,56 +95,6 @@ fn compile_snippet(code: &str) -> Result<(bool, String), Box<dyn std::error::Err
         .arg("--out-dir")
         .arg(temp_dir_utf8.as_str());
     run_within_deadline(command, RUSTC_DEADLINE).map_err(Into::into)
-}
-
-/// How long one snippet may take to compile before the test fails.
-///
-/// A cold `rustc` start on a loaded host takes seconds; this is far above that
-/// and far below the nextest group's allowance, so a hung compiler fails the
-/// test with a message instead of waiting for the runner to terminate it.
-const RUSTC_DEADLINE: Duration = Duration::from_secs(120);
-
-/// How often a running child is checked against its deadline.
-const POLL_INTERVAL: Duration = Duration::from_millis(25);
-
-/// Runs `command`, killing it when it outlives `deadline`.
-///
-/// Returns `(success, stderr)`. The child's stderr is drained on its own thread
-/// so a chatty compiler cannot fill the pipe and stall while this waits.
-fn run_within_deadline(mut command: Command, deadline: Duration) -> io::Result<(bool, String)> {
-    let mut child = command
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()?;
-    let mut pipe = child
-        .stderr
-        .take()
-        .ok_or_else(|| io::Error::other("child stderr was not captured"))?;
-    let reader = std::thread::spawn(move || {
-        let mut text = String::new();
-        // The text is diagnostic only; a read error leaves what was read.
-        pipe.read_to_string(&mut text).ok();
-        text
-    });
-    let started = Instant::now();
-    let status = loop {
-        if let Some(status) = child.try_wait()? {
-            break status;
-        }
-        if started.elapsed() >= deadline {
-            child.kill()?;
-            child.wait()?;
-            return Err(io::Error::new(
-                io::ErrorKind::TimedOut,
-                format!("the compiler did not finish within {deadline:?}"),
-            ));
-        }
-        std::thread::sleep(POLL_INTERVAL);
-    };
-    let stderr = reader
-        .join()
-        .map_err(|_| io::Error::other("the stderr reader panicked"))?;
-    Ok((status.success(), stderr))
 }
 
 /// Generates a simple test harness for a lowered expression.
@@ -341,34 +290,4 @@ fn positive_control_list_compiles() -> TestResult {
         param: "nums",
         ty_str: "Vec<i32>",
     })
-}
-
-#[test]
-fn a_child_that_outlives_its_deadline_is_killed_and_reported() {
-    let mut command = Command::new("sleep");
-    command.arg("30");
-
-    let started = Instant::now();
-    let outcome = run_within_deadline(command, Duration::from_millis(200));
-
-    assert!(
-        matches!(&outcome, Err(error) if error.kind() == io::ErrorKind::TimedOut),
-        "a child past its deadline must fail with TimedOut, got {outcome:?}",
-    );
-    assert!(
-        started.elapsed() < Duration::from_secs(20),
-        "the child must be killed, not waited for",
-    );
-}
-
-#[test]
-fn a_child_inside_its_deadline_reports_its_status_and_stderr() {
-    let mut command = Command::new("sh");
-    command.args(["-c", "echo diagnostic >&2; exit 3"]);
-
-    let (success, stderr) = run_within_deadline(command, Duration::from_secs(20))
-        .expect("a quick child finishes inside its deadline");
-
-    assert!(!success, "exit status 3 is a failure");
-    assert_eq!(stderr.trim(), "diagnostic");
 }

@@ -46,6 +46,23 @@ fn two_fixtures_never_share_a_suffix() {
 }
 
 #[test]
+fn a_thousand_suffixes_in_one_process_are_all_distinct() {
+    let suffixes: std::collections::HashSet<String> = (0..1000).map(|_| unique_suffix()).collect();
+
+    assert_eq!(suffixes.len(), 1000);
+}
+
+#[test]
+fn the_suffix_carries_the_process_id_so_concurrent_runs_cannot_collide() {
+    let suffix = unique_suffix();
+
+    assert!(
+        suffix.starts_with(&format!("{:x}_", std::process::id())),
+        "{suffix} must begin with this process's id"
+    );
+}
+
+#[test]
 fn a_fixture_name_stays_short_enough_for_the_files_tools_derive_from_it() {
     let (_, name) = with_unique_package_name("[package]\nname = \"x\"\n", &unique_suffix())
         .expect("the manifest names its package");

@@ -25,16 +25,18 @@ static FIXTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// Returns a short suffix no other fixture, in this or an earlier run, has used.
 ///
-/// The clock's low 32 bits tell runs apart (they repeat only every four
-/// seconds, and the sequence number separates fixtures within a run), and the
-/// sequence number tells fixtures in one process apart.
+/// Three parts keep it unique where each alone would not be. The process id
+/// separates processes that run at once (two live processes never share one),
+/// the sequence number separates fixtures within a process, and the clock's low
+/// 16 bits separate runs that reuse a process id over the life of a persistent
+/// target directory.
 pub(super) fn unique_suffix() -> String {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_nanos());
-    let clock = u32::try_from(nanos & u128::from(u32::MAX)).unwrap_or(0);
+    let clock = u32::try_from(nanos & 0xffff).unwrap_or(0);
     let sequence = FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    format!("{clock:08x}{sequence:x}")
+    format!("{:x}_{sequence:x}_{clock:04x}", std::process::id())
 }
 
 /// Reads the value of a `name = "..."` line.

@@ -118,3 +118,42 @@ fn a_single_theorem_file_is_included_automatically() {}
     name = "Multiple theorem files compile in deterministic suite order"
 )]
 fn multiple_theorem_files_compile_in_deterministic_suite_order() {}
+
+/// Fixtures that declare the same package name still keep their artefacts
+/// apart in the shared target directory: each reads only its own suite.
+#[test]
+fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(), String> {
+    let first = FixtureCrate::new(
+        &build_support_fixture_manifest("build_suite_fixture"),
+        FIXTURE_LIB_RS,
+    )?;
+    first.write(
+        Utf8Path::new("theorems/only_first.theorem"),
+        TRIVIAL_THEOREM,
+    )?;
+    let second = FixtureCrate::new(
+        &build_support_fixture_manifest("build_suite_fixture"),
+        FIXTURE_LIB_RS,
+    )?;
+    second.write(
+        Utf8Path::new("theorems/only_second.theorem"),
+        TRIVIAL_THEOREM,
+    )?;
+
+    first.cargo_build()?;
+    second.cargo_build()?;
+    let first_suite = generated_suite_contents(&first)?;
+    let second_suite = generated_suite_contents(&second)?;
+
+    if !first_suite.contains("only_first") || first_suite.contains("only_second") {
+        return Err(format!(
+            "the first suite read another fixture's:\n{first_suite}"
+        ));
+    }
+    if !second_suite.contains("only_second") || second_suite.contains("only_first") {
+        return Err(format!(
+            "the second suite read another fixture's:\n{second_suite}"
+        ));
+    }
+    Ok(())
+}
