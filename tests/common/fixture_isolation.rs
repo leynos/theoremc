@@ -23,13 +23,14 @@ pub(super) const WORKSPACE_LOCK: &str = include_str!("../../Cargo.lock");
 /// Counts fixtures in this process, so package names stay unique within it.
 static FIXTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
-/// Returns a short suffix no other fixture, in this or an earlier run, has used.
+/// Returns a short suffix that is unlikely to clash with any other fixture's.
 ///
-/// Three parts keep it unique where each alone would not be. The process id
-/// separates processes that run at once (two live processes never share one),
-/// the sequence number separates fixtures within a process, and the clock's low
-/// 16 bits separate runs that reuse a process id over the life of a persistent
-/// target directory.
+/// Three parts make a clash unlikely: the process id separates processes that
+/// run at once, the sequence number separates fixtures within a process, and
+/// the clock's low 16 bits separate runs that reuse a process id. They do not
+/// make it impossible, because the clock bits wrap; `first_unused_suffix`
+/// closes that gap by refusing a suffix the shared target already holds build
+/// directories for.
 pub(super) fn unique_suffix() -> String {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
