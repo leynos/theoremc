@@ -304,8 +304,8 @@ where available, and run the direct Cargo invocations for specialized checks:
 | Gate                 | Command                                                                                            | What it checks                                                               |
 | -------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Formatting           | `make check-fmt`                                                                                   | `cargo fmt --all -- --check`                                                 |
-| Linting              | `make lint`                                                                                        | Whitaker (`make lint-whitaker`), then Clippy with `-D warnings` plus rustdoc |
-| Type checking        | `make typecheck`                                                                                   | `cargo check --all-targets --all-features`                                   |
+| Linting              | `make lint`                                                                                        | rustdoc, Clippy, then Whitaker, each over the whole workspace                |
+| Type checking        | `make typecheck`                                                                                   | `cargo check --workspace --all-targets --all-features`                       |
 | Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                                     |
 | Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit                     |
 | Architecture linting | planned: `theoremc_arch_lint` (see the roadmap)                                                    | Will flag schema layer boundary and other architecture rule violations       |
@@ -318,17 +318,34 @@ where available, and run the direct Cargo invocations for specialized checks:
 When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 `make nixie` must also pass.
 
-`make lint` runs the Whitaker Dylint suite through the `whitaker` wrapper
-(`make lint-whitaker`) before rustdoc and Clippy. Install it with
-`whitaker-installer` so that `whitaker` is on `PATH`, and never call
-`cargo dylint` directly. The recipe sets `DYLINT_RUSTFLAGS="-D warnings"` so
-findings fail the gate, and assigns an empty `RUSTFLAGS`, because Whitaker runs
-under the toolchain its installer manages and takes none of the development
-standard (no `-Zthreads=8`, no `mold`, no Cranelift). CI installs Whitaker
-through the shared `install-whitaker` action, pinned to a revision concordat
-QG-002 approves; that pin fixes the installer, while the lint suite itself
-follows Whitaker's rolling release. Whitaker does not replace the custom
-`theoremc_arch_lint` architecture rules, which are still planned.
+`make lint` is the aggregate entry point, locally and in CI. It runs three
+stages in order — rustdoc, Clippy, then Whitaker — and recurses through
+`$(MAKE)` for each, so the stages stay sequential even under `make -j`, and a
+failing stage stops the aggregate with its own exit status. All three cover the
+whole workspace: `LINT_PACKAGES` defaults to `--workspace`, `CARGO_FLAGS` adds
+`--all-targets --all-features`, and the rustdoc stage adds
+`--all-features --no-deps`. The scope is named once because Cargo selects only
+the root package when no package flag is given, which is how the gates used to
+under-check. `tests/lint_contract.rs` and `tests/lint_gate_execution.rs` hold
+this shape: the first reads the recipes and the workflow as text, and the
+second runs them against stub executables to prove each stage runs in order and
+propagates its failure.
+
+`make lint-whitaker` runs the Whitaker Dylint suite through the `whitaker`
+wrapper. Install it with `whitaker-installer` so that `whitaker` is on `PATH`,
+and never call `cargo dylint` directly. The recipe sets
+`DYLINT_RUSTFLAGS="-D warnings"` so findings fail the gate, and assigns an empty
+`RUSTFLAGS`, because Whitaker runs under the toolchain its installer manages
+and takes none of the development standard (no `-Zthreads=8`, no `mold`, no
+Cranelift). CI installs Whitaker through the shared `install-whitaker` action,
+pinned to a revision concordat QG-002 approves; that pin fixes the installer,
+while the lint suite itself follows Whitaker's rolling release. The root
+`dylint.toml` carries no exclusions, because the suite is clean over every
+package, target, and feature set. If a finding ever proves irreducible, add the
+narrowest key that works — `excluded_paths` before `excluded_crates` — and
+record the reason beside it; `no_std_fs_operations` cannot be suppressed in
+source. Whitaker does not replace the custom `theoremc_arch_lint` architecture
+rules, which are still planned.
 
 `make test` is intentionally nextest-backed for test binaries, followed by a
 Cargo doctest pass for Rustdoc examples. It runs

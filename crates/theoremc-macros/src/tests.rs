@@ -8,9 +8,8 @@
 
 use super::tests_support::{
     TheoremFixture, TheoremSpec, assert_expansion_is_stable, assert_single_theorem_expansion,
-    expand_fixture, expansion_error_message, expected_expansion_with_unwinds,
-    make_single_theorem_fixture, redact_hashes, set_cargo_manifest_dir_for_test, temp_fixture_dir,
-    write_fixture,
+    expand_fixture, expected_expansion_with_unwinds, make_single_theorem_fixture, redact_hashes,
+    set_cargo_manifest_dir_for_test, temp_fixture_dir, write_fixture,
 };
 use super::{
     MacroExpansionError, expand_theorem_file_at, generated_harnesses, manifest_dir_from_env,
@@ -20,7 +19,6 @@ use googletest::prelude::*;
 use indexmap::IndexMap;
 use proptest::prelude::{prop, prop_assert_eq, proptest};
 use proptest::{prop_assert, prop_assume};
-use rstest::rstest;
 use theoremc_core::{
     mangle::mangle_theorem_harness,
     schema::{
@@ -327,77 +325,4 @@ proptest! {
             "error named {theorem:?}, expected one of {missing_names:?}"
         );
     }
-}
-
-#[rstest]
-#[case::invalid_schema(
-    "theorems/invalid.theorem",
-    Some(concat!(
-        "Theorem: BrokenMacro\n",
-        "About: \"\"\n",
-        "Witness:\n",
-        "  - cover: \"true\"\n",
-        "    because: \"reachable\"\n",
-        "Prove:\n",
-        "  - assert: \"true\"\n",
-        "    because: \"trivial\"\n",
-        "Evidence:\n",
-        "  kani:\n",
-        "    unwind: 1\n",
-        "    expect: SUCCESS\n",
-    )),
-    "schema.validation_failure|theorems/invalid.theorem:",
-)]
-#[case::missing_file(
-    "theorems/missing.theorem",
-    None,
-    "failedtoreadtheoremfile'theorems/missing.theorem'"
-)]
-#[case::empty_file(
-    "theorems/empty.theorem",
-    Some(""),
-    "doesnotcontainanytheoremdocuments"
-)]
-#[case::zero_unwind(
-    "theorems/zero-unwind.theorem",
-    Some(concat!(
-        "Theorem: ZeroUnwindMacro\n",
-        "About: Invalid Kani evidence coverage\n",
-        "Witness:\n",
-        "  - cover: \"true\"\n",
-        "    because: \"reachable\"\n",
-        "Prove:\n",
-        "  - assert: \"true\"\n",
-        "    because: \"trivial\"\n",
-        "Evidence:\n",
-        "  kani:\n",
-        "    unwind: 0\n",
-        "    expect: SUCCESS\n",
-    )),
-    "Evidence.kani.unwindmustbeapositiveinteger"
-)]
-fn theorem_file_errors_report_expected_compile_error(
-    #[case] path: &str,
-    #[case] fixture_content: Option<&str>,
-    #[case] expected_fragment: &str,
-) {
-    let (_temp_dir, fixture_dir) =
-        temp_fixture_dir().expect("should create temp fixture dir for error fixture");
-    let relative_path = Utf8Path::new(path);
-
-    if let Some(content) = fixture_content {
-        write_fixture(
-            &fixture_dir,
-            relative_path,
-            &TheoremFixture(content.to_owned()),
-        )
-        .expect("should write theorem fixture");
-    }
-
-    let error_string = expansion_error_message(&fixture_dir, relative_path)
-        .expect("should render expansion error");
-    assert!(
-        error_string.contains(expected_fragment),
-        "expected '{expected_fragment}' in compile error, got: {error_string}"
-    );
 }

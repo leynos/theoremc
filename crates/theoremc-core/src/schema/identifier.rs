@@ -102,6 +102,8 @@ pub(crate) fn is_rust_reserved_keyword(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for identifier syntax validation and Rust keyword rejection.
+
     use rstest::rstest;
 
     use super::*;
