@@ -326,13 +326,14 @@ whole workspace: `LINT_PACKAGES` defaults to `--workspace`, `CARGO_FLAGS` adds
 `--all-targets --all-features`, and the rustdoc stage adds
 `--all-features --no-deps`. The scope is named once because Cargo selects only
 the root package when no package flag is given, which is how the gates used to
-under-check. Three tests hold this shape. `tests/lint_contract.rs` reads the
-recipes and the workflow as text. `tests/lint_gate_execution.rs` runs them
-against stub executables to prove each stage runs in order and propagates its
-failure. `tests/lint_workspace_execution.rs` writes a two-package workspace and
-runs the real `cargo doc` and `cargo clippy` invocations, so a finding in the
-non-root member is shown to fail the stage rather than merely being passed the
-right arguments.
+under-check. Four tests hold this shape. `tests/lint_makefile_contract.rs`
+reads the recipes as text, and `tests/lint_ci_contract.rs` reads the workflow
+and `dylint.toml`. `tests/lint_gate_execution.rs` runs the recipes against stub
+executables to prove each stage runs in order and propagates its failure.
+`tests/lint_workspace_execution.rs` writes a two-package workspace and runs the
+real `cargo doc` and `cargo clippy` invocations, so a finding in the non-root
+member is shown to fail the stage rather than merely being passed the right
+arguments.
 
 `make lint-whitaker` runs the Whitaker Dylint suite through the `whitaker`
 wrapper. Install it with `whitaker-installer` so that `whitaker` is on `PATH`,

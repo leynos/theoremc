@@ -1,10 +1,10 @@
 //! Executable contract test for the aggregate `lint` Makefile target.
 //!
-//! `tests/lint_contract.rs` reads the recipes as text, but a text copy cannot
-//! show that `make lint` really runs each stage, in the documented order, or
-//! that a failing stage stops the aggregate. This test puts stub `cargo` and
-//! `whitaker` executables at the recipes' variables and records what each
-//! invocation received.
+//! `tests/lint_makefile_contract.rs` reads the recipes as text, but a text copy
+//! cannot show that `make lint` really runs each stage, in the documented
+//! order, or that a failing stage stops the aggregate. This test puts stub
+//! `cargo` and `whitaker` executables at the recipes' variables and records
+//! what each invocation received.
 
 #![cfg(unix)]
 
@@ -35,30 +35,60 @@ const STUB: &str = concat!(
     "exit 0\n",
 );
 
-/// The arguments the rustdoc stage must pass to Cargo.
-const DOC_ARGUMENTS: &[&str] = &["doc", "--workspace", "--all-features", "--no-deps"];
+/// One stage of the aggregate, as the stub records it.
+///
+/// Naming the stages as variants keeps a stage's recorded name and its expected
+/// arguments together, so a test cannot check one stage against another's
+/// arguments.
+#[derive(Clone, Copy, Debug)]
+enum Stage {
+    /// `cargo doc`.
+    Rustdoc,
+    /// `cargo clippy`.
+    Clippy,
+    /// `whitaker`.
+    Whitaker,
+}
 
-/// The arguments the Clippy stage must pass to Cargo.
-const CLIPPY_ARGUMENTS: &[&str] = &[
-    "clippy",
-    "--workspace",
-    "--all-targets",
-    "--all-features",
-    "--",
-    "-D",
-    "warnings",
-];
+impl Stage {
+    /// The stages in the order the aggregate must run them.
+    const ORDER: [Self; 3] = [Self::Rustdoc, Self::Clippy, Self::Whitaker];
 
-/// The arguments the Whitaker stage must pass to the wrapper.
-/// `--workspace` is Whitaker's own flag and is forwarded to `cargo check`, so
-/// it must appear once, before `--`.
-const WHITAKER_ARGUMENTS: &[&str] = &[
-    "--all",
-    "--workspace",
-    "--",
-    "--all-targets",
-    "--all-features",
-];
+    /// The name the stub records for this stage.
+    fn name(self) -> &'static str {
+        match self {
+            Self::Rustdoc => "doc",
+            Self::Clippy => "clippy",
+            Self::Whitaker => "whitaker",
+        }
+    }
+
+    /// The arguments this stage must pass.
+    ///
+    /// `--workspace` is Whitaker's own flag and is forwarded to the `cargo
+    /// check` it runs, so it must appear once, before `--`.
+    fn arguments(self) -> &'static [&'static str] {
+        match self {
+            Self::Rustdoc => &["doc", "--workspace", "--all-features", "--no-deps"],
+            Self::Clippy => &[
+                "clippy",
+                "--workspace",
+                "--all-targets",
+                "--all-features",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            Self::Whitaker => &[
+                "--all",
+                "--workspace",
+                "--",
+                "--all-targets",
+                "--all-features",
+            ],
+        }
+    }
+}
 
 /// One recorded stub invocation.
 #[derive(Default)]
@@ -71,7 +101,8 @@ struct Invocation {
 }
 
 impl Invocation {
-    /// Fails unless this invocation passed exactly `expected` arguments.
+    /// Fails unless this invocation passed exactly the arguments `expected`
+    /// requires.
     ///
     /// The stage name comes from the invocation itself, so a caller cannot
     /// check one stage's arguments against another's name.
@@ -79,12 +110,13 @@ impl Invocation {
     /// # Errors
     ///
     /// Returns the mismatch, naming the stage and both argument lists.
-    fn expect_arguments(&self, expected: &[&str]) -> Result<(), String> {
+    fn expect_arguments(&self, expected: Stage) -> Result<(), String> {
         let received: Vec<&str> = self.arguments.iter().map(String::as_str).collect();
-        if received != expected {
+        if received != expected.arguments() {
             return Err(format!(
-                "the {} stage passed {received:?}, expected {expected:?}",
-                self.stage
+                "the {} stage passed {received:?}, expected {:?}",
+                self.stage,
+                expected.arguments()
             ));
         }
         Ok(())
@@ -152,14 +184,14 @@ const INHERITED_VARIABLES: &[&str] = &[
 
 /// Runs the aggregate target against the stubs in `root`.
 ///
-/// `fail_on` names the stage that must exit non-zero; an empty value lets every
-/// stage succeed. `RUSTFLAGS` is deliberately set, so the test can prove the
-/// Whitaker stage clears it.
+/// `fail_on` names the stage that must exit non-zero; `None` lets every stage
+/// succeed. `RUSTFLAGS` is deliberately set, so the test can prove the Whitaker
+/// stage clears it.
 ///
 /// # Errors
 ///
 /// Returns the reason when the stubs cannot be written or `make` cannot start.
-fn run_lint_target(root: &Path, fail_on: &str) -> Result<Output, String> {
+fn run_lint_target(root: &Path, fail_on: Option<Stage>) -> Result<Output, String> {
     let directory = Dir::open_ambient_dir(root, ambient_authority())
         .map_err(|error| format!("opening the temporary directory: {error}"))?;
     write_stubs(&directory)?;
@@ -174,7 +206,7 @@ fn run_lint_target(root: &Path, fail_on: &str) -> Result<Output, String> {
         .arg(format!("WHITAKER={}", root.join("whitaker").display()))
         .current_dir(manifest_dir)
         .env("STUB_LOG", root.join("stub.log"))
-        .env("STUB_FAIL_ON", fail_on);
+        .env("STUB_FAIL_ON", fail_on.map(Stage::name).unwrap_or_default());
     for variable in INHERITED_VARIABLES {
         command.env_remove(variable);
     }
@@ -221,16 +253,16 @@ fn parse_block(block: &str) -> Invocation {
     invocation
 }
 
-/// Returns the recorded invocation for the named stage.
+/// Returns the recorded invocation for `wanted`.
 ///
 /// # Errors
 ///
 /// Returns the reason when the stage never ran.
-fn stage<'a>(invocations: &'a [Invocation], name: &str) -> Result<&'a Invocation, String> {
+fn stage<'a>(invocations: &'a [Invocation], wanted: Stage) -> Result<&'a Invocation, String> {
     invocations
         .iter()
-        .find(|invocation| invocation.stage == name)
-        .ok_or_else(|| format!("make lint never ran the {name} stage"))
+        .find(|invocation| invocation.stage == wanted.name())
+        .ok_or_else(|| format!("make lint never ran the {} stage", wanted.name()))
 }
 
 /// Returns the names of the stages that ran, in order.
@@ -241,13 +273,18 @@ fn stage_names(invocations: &[Invocation]) -> Vec<&str> {
         .collect()
 }
 
+/// Returns the names of `stages`, in order.
+fn names_of(stages: &[Stage]) -> Vec<&'static str> {
+    stages.iter().copied().map(Stage::name).collect()
+}
+
 /// Verifies that `make lint` runs the three stages in order, each once, with the
 /// arguments and warning denials it needs.
 #[test]
 fn aggregate_runs_rustdoc_then_clippy_then_whitaker() -> Result<(), String> {
     let directory =
         TempDir::new().map_err(|error| format!("creating a temporary directory: {error}"))?;
-    let output = run_lint_target(directory.path(), "")?;
+    let output = run_lint_target(directory.path(), None)?;
     if !output.status.success() {
         return Err(format!(
             "make lint must succeed: {}",
@@ -256,14 +293,15 @@ fn aggregate_runs_rustdoc_then_clippy_then_whitaker() -> Result<(), String> {
     }
     let invocations = read_invocations(directory.path())?;
     let ran = stage_names(&invocations);
-    if ran != ["doc", "clippy", "whitaker"] {
+    let expected = names_of(&Stage::ORDER);
+    if ran != expected {
         return Err(format!(
             "make lint must run rustdoc, then Clippy, then Whitaker; ran {ran:?}"
         ));
     }
 
-    let doc = stage(&invocations, "doc")?;
-    doc.expect_arguments(DOC_ARGUMENTS)?;
+    let doc = stage(&invocations, Stage::Rustdoc)?;
+    doc.expect_arguments(Stage::Rustdoc)?;
     EnvironmentValue {
         name: "RUSTDOCFLAGS",
         expected: "-D warnings",
@@ -271,11 +309,11 @@ fn aggregate_runs_rustdoc_then_clippy_then_whitaker() -> Result<(), String> {
     }
     .expect(&doc.rustdocflags)?;
 
-    let clippy = stage(&invocations, "clippy")?;
-    clippy.expect_arguments(CLIPPY_ARGUMENTS)?;
+    let clippy = stage(&invocations, Stage::Clippy)?;
+    clippy.expect_arguments(Stage::Clippy)?;
 
-    let whitaker = stage(&invocations, "whitaker")?;
-    whitaker.expect_arguments(WHITAKER_ARGUMENTS)?;
+    let whitaker = stage(&invocations, Stage::Whitaker)?;
+    whitaker.expect_arguments(Stage::Whitaker)?;
     EnvironmentValue {
         name: "DYLINT_RUSTFLAGS",
         expected: "-D warnings",
@@ -293,26 +331,29 @@ fn aggregate_runs_rustdoc_then_clippy_then_whitaker() -> Result<(), String> {
 
 /// Verifies that a failing stage stops the aggregate before the next one runs.
 #[rstest]
-#[case::rustdoc("doc", &["doc"])]
-#[case::clippy("clippy", &["doc", "clippy"])]
-#[case::whitaker("whitaker", &["doc", "clippy", "whitaker"])]
+#[case::rustdoc(Stage::Rustdoc, &[Stage::Rustdoc])]
+#[case::clippy(Stage::Clippy, &[Stage::Rustdoc, Stage::Clippy])]
+#[case::whitaker(Stage::Whitaker, &[Stage::Rustdoc, Stage::Clippy, Stage::Whitaker])]
 fn a_failing_stage_stops_the_aggregate(
-    #[case] failing: &str,
-    #[case] expected: &[&str],
+    #[case] failing: Stage,
+    #[case] expected: &[Stage],
 ) -> Result<(), String> {
     let directory =
         TempDir::new().map_err(|error| format!("creating a temporary directory: {error}"))?;
-    let output = run_lint_target(directory.path(), failing)?;
+    let output = run_lint_target(directory.path(), Some(failing))?;
     if output.status.success() {
         return Err(format!(
-            "make lint must fail when the {failing} stage fails"
+            "make lint must fail when the {} stage fails",
+            failing.name()
         ));
     }
     let invocations = read_invocations(directory.path())?;
     let ran = stage_names(&invocations);
-    if ran.as_slice() != expected {
+    let expected = names_of(expected);
+    if ran != expected {
         return Err(format!(
-            "a failing {failing} stage must stop the aggregate after {expected:?}; ran {ran:?}"
+            "a failing {} stage must stop the aggregate after {expected:?}; ran {ran:?}",
+            failing.name()
         ));
     }
     Ok(())

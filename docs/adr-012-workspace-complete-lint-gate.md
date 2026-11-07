@@ -86,10 +86,11 @@ the stub-executable contract test possible.
    feature set. A future exemption must use the narrowest key that works,
    `excluded_paths` before `excluded_crates`, with the reason recorded beside
    it.
-5. Three tests hold the wiring, at three levels. `tests/lint_contract.rs` reads
-   the Makefile, the workflow, and `dylint.toml` as text and fails if a gate
-   loses workspace coverage, a stage disappears, a failure can be masked, CI
-   stops installing a pinned Whitaker, or the configuration gains a whole-crate
+5. Four tests hold the wiring, at three levels.
+   `tests/lint_makefile_contract.rs` and `tests/lint_ci_contract.rs` read the
+   Makefile, the workflow, and `dylint.toml` as text and fail if a gate loses
+   workspace coverage, a stage disappears, a failure can be masked, CI stops
+   installing a pinned Whitaker, or the configuration gains a whole-crate
    exemption. `tests/lint_gate_execution.rs` runs the recipes against stub
    executables to prove the stage order, the arguments each stage receives, and
    that a failing stage stops the aggregate.
