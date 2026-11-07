@@ -68,6 +68,9 @@ jobs:
         run: make msrv
       - name: Check agent-native command policy
         run: make check-agent-native
+      - name: Fetch dependencies
+        # Tests start their own cargo offline; fetch once so none resolves cold.
+        run: cargo fetch --locked
       - name: Test and Measure Coverage
         env:
           # One of the two exclusions from the build standard: a coverage build is a
