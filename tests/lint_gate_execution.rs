@@ -258,7 +258,7 @@ fn parse_block(block: &str) -> Invocation {
 /// # Errors
 ///
 /// Returns the reason when the stage never ran.
-fn stage<'a>(invocations: &'a [Invocation], wanted: Stage) -> Result<&'a Invocation, String> {
+fn stage(invocations: &[Invocation], wanted: Stage) -> Result<&Invocation, String> {
     invocations
         .iter()
         .find(|invocation| invocation.stage == wanted.name())
@@ -349,10 +349,10 @@ fn a_failing_stage_stops_the_aggregate(
     }
     let invocations = read_invocations(directory.path())?;
     let ran = stage_names(&invocations);
-    let expected = names_of(expected);
-    if ran != expected {
+    let expected_names = names_of(expected);
+    if ran != expected_names {
         return Err(format!(
-            "a failing {} stage must stop the aggregate after {expected:?}; ran {ran:?}",
+            "a failing {} stage must stop the aggregate after {expected_names:?}; ran {ran:?}",
             failing.name()
         ));
     }
