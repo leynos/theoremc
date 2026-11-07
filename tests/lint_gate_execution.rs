@@ -70,6 +70,54 @@ struct Invocation {
     arguments: Vec<String>,
 }
 
+impl Invocation {
+    /// Fails unless this invocation passed exactly `expected` arguments.
+    ///
+    /// The stage name comes from the invocation itself, so a caller cannot
+    /// check one stage's arguments against another's name.
+    ///
+    /// # Errors
+    ///
+    /// Returns the mismatch, naming the stage and both argument lists.
+    fn expect_arguments(&self, expected: &[&str]) -> Result<(), String> {
+        let received: Vec<&str> = self.arguments.iter().map(String::as_str).collect();
+        if received != expected {
+            return Err(format!(
+                "the {} stage passed {received:?}, expected {expected:?}",
+                self.stage
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// An environment value a stage must pass, and the policy it enforces.
+struct EnvironmentValue<'a> {
+    /// The variable name.
+    name: &'a str,
+    /// The value the stub must have recorded.
+    expected: &'a str,
+    /// Why the stage must pass that value.
+    reason: &'a str,
+}
+
+impl EnvironmentValue<'_> {
+    /// Fails unless `actual` matches this expectation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the mismatch, naming the variable and the value the stub saw.
+    fn expect(&self, actual: &str) -> Result<(), String> {
+        if actual != self.expected {
+            return Err(format!(
+                "{} must be `{}`, because {}; the stub saw `{actual}`",
+                self.name, self.expected, self.reason
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Writes the stub under both executable names and makes them executable.
 ///
 /// # Errors
@@ -193,36 +241,6 @@ fn stage_names(invocations: &[Invocation]) -> Vec<&str> {
         .collect()
 }
 
-/// Fails unless the stage passed exactly the arguments it must receive.
-///
-/// # Errors
-///
-/// Returns the mismatch, naming the stage and both argument lists.
-fn expect_arguments(stage: &str, actual: &[String], expected: &[&str]) -> Result<(), String> {
-    let received: Vec<&str> = actual.iter().map(String::as_str).collect();
-    if received != expected {
-        return Err(format!(
-            "the {stage} stage passed {received:?}, expected {expected:?}"
-        ));
-    }
-    Ok(())
-}
-
-/// Fails unless an environment value matches what the stage must receive.
-///
-/// `description` completes the sentence "the stub saw" is appended to, so each
-/// caller states the policy rather than only the value.
-///
-/// # Errors
-///
-/// Returns the mismatch with the value the stub recorded.
-fn expect_value(description: &str, actual: &str, expected: &str) -> Result<(), String> {
-    if actual != expected {
-        return Err(format!("{description}; the stub saw `{actual}`"));
-    }
-    Ok(())
-}
-
 /// Verifies that `make lint` runs the three stages in order, each once, with the
 /// arguments and warning denials it needs.
 #[test]
@@ -245,28 +263,31 @@ fn aggregate_runs_rustdoc_then_clippy_then_whitaker() -> Result<(), String> {
     }
 
     let doc = stage(&invocations, "doc")?;
-    expect_arguments("rustdoc", &doc.arguments, DOC_ARGUMENTS)?;
-    expect_value(
-        "the rustdoc stage must deny warnings",
-        &doc.rustdocflags,
-        "-D warnings",
-    )?;
+    doc.expect_arguments(DOC_ARGUMENTS)?;
+    EnvironmentValue {
+        name: "RUSTDOCFLAGS",
+        expected: "-D warnings",
+        reason: "the rustdoc stage must deny warnings",
+    }
+    .expect(&doc.rustdocflags)?;
 
     let clippy = stage(&invocations, "clippy")?;
-    expect_arguments("Clippy", &clippy.arguments, CLIPPY_ARGUMENTS)?;
+    clippy.expect_arguments(CLIPPY_ARGUMENTS)?;
 
     let whitaker = stage(&invocations, "whitaker")?;
-    expect_arguments("Whitaker", &whitaker.arguments, WHITAKER_ARGUMENTS)?;
-    expect_value(
-        "the Whitaker stage must deny lint warnings",
-        &whitaker.dylint_rustflags,
-        "-D warnings",
-    )?;
-    expect_value(
-        "the Whitaker stage must clear RUSTFLAGS",
-        &whitaker.rustflags,
-        "",
-    )?;
+    whitaker.expect_arguments(WHITAKER_ARGUMENTS)?;
+    EnvironmentValue {
+        name: "DYLINT_RUSTFLAGS",
+        expected: "-D warnings",
+        reason: "the Whitaker stage must deny lint warnings",
+    }
+    .expect(&whitaker.dylint_rustflags)?;
+    EnvironmentValue {
+        name: "RUSTFLAGS",
+        expected: "",
+        reason: "the Whitaker stage must clear it",
+    }
+    .expect(&whitaker.rustflags)?;
     Ok(())
 }
 
