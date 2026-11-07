@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import adr_rfc_names
 import pytest
 
 from adr_rfc_names import (
@@ -332,9 +333,11 @@ class _StubReader:
         self,
         records: dict[Path, str],
         resolved_links: dict[str, Path] | None = None,
+        resolved_root: Path | None = None,
     ) -> None:
         self._records = records
         self._resolved_links = resolved_links or {}
+        self._resolved_root = resolved_root
 
     def record_files(self, directory: Path) -> list[Path]:
         return sorted(path for path in self._records if path.parent == directory)
@@ -344,6 +347,9 @@ class _StubReader:
 
     def read_text(self, path: Path) -> str:
         return self._records[path]
+
+    def resolve_root(self, repository_root: Path) -> Path:
+        return self._resolved_root or repository_root
 
     def resolve_link(
         self, repository_root: Path, source: Path, link_path: str
@@ -382,3 +388,44 @@ def test_stub_reader_resolves_local_record_links_without_filesystem() -> None:
     )
 
     assert validate_local_record_links(reader, repository_root, [source]) == ([], 1)
+
+
+def test_uses_reader_resolved_root_for_link_containment() -> None:
+    supplied_root = Path("/supplied")
+    resolved_root = Path("/resolved")
+    source = resolved_root / "docs" / "contents.md"
+    record = resolved_root / "docs" / "adrs" / "adr-0001-example.md"
+    reader = _StubReader(
+        {
+            source: "[record](adrs/adr-0001-example.md)\n",
+            record: "# Architectural decision record (ADR) 0001: Example\n",
+        },
+        {"adrs/adr-0001-example.md": record},
+        resolved_root,
+    )
+
+    assert validate_local_record_links(reader, supplied_root, [source]) == ([], 1)
+
+
+FILESYSTEM_METHODS = (
+    "resolve",
+    "read_text",
+    "iterdir",
+    "glob",
+    "exists",
+    "is_dir",
+    "is_file",
+    "is_symlink",
+)
+
+
+def test_rules_module_has_no_direct_filesystem_calls() -> None:
+    source = Path(adr_rfc_names.__file__).read_text(encoding="utf-8")
+    delegated_calls_removed = source.replace("reader.", "")
+    direct_calls = [
+        method
+        for method in FILESYSTEM_METHODS
+        if f".{method}(" in delegated_calls_removed
+    ]
+
+    assert direct_calls == []

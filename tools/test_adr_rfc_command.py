@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -99,20 +100,47 @@ def test_command_reports_malformed_destination_without_traceback(
     assert "Traceback" not in result.stderr
 
 
-def test_make_target_runs_both_checks_with_pinned_interpreter() -> None:
+def test_command_reports_filesystem_failure_without_traceback(
+    tmp_path: Path,
+) -> None:
+    checker = _create_repository(tmp_path)
+    (tmp_path / "docs" / "broken.md").symlink_to(tmp_path / "missing.md")
+
+    result = _run_checker(checker)
+
+    assert result.returncode == 1
+    assert "could not read repository files" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_make_target_executes_both_checks_with_pinned_interpreter(
+    tmp_path: Path,
+) -> None:
     repository_root = Path(__file__).resolve().parents[1]
+    log = tmp_path / "uv-calls.log"
+    stub = tmp_path / "uv"
+    stub.write_text(
+        '#!/bin/sh\nprintf \'%s\\n\' "$*" >> "$UV_LOG"\n',
+        encoding="utf-8",
+    )
+    stub.chmod(0o755)
+    environment = {**os.environ, "UV_LOG": str(log)}
 
     result = subprocess.run(
-        ["make", "-n", "check-adr-rfc-names"],
+        ["make", f"UV={stub}", "check-adr-rfc-names"],
         cwd=repository_root,
         capture_output=True,
         text=True,
         check=False,
+        env=environment,
     )
 
     assert result.returncode == 0, result.stderr
-    commands = [line for line in result.stdout.splitlines() if "python" in line]
+    commands = log.read_text(encoding="utf-8").splitlines()
     assert len(commands) == 2
     assert all("--python 3.13" in command for command in commands)
-    assert any("tools/test_check_adr_rfc_names.py" in command for command in commands)
-    assert any("tools/check_adr_rfc_names.py" in command for command in commands)
+    assert any(
+        "-m pytest tools/test_check_adr_rfc_names.py" in command
+        for command in commands
+    )
+    assert any(command.endswith("tools/check_adr_rfc_names.py") for command in commands)
