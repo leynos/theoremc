@@ -24,13 +24,15 @@ const INHERITED_BUILD_LOCATIONS: [&str; 2] = ["CARGO_BUILD_TARGET_DIR", "CARGO_B
 #[must_use]
 pub fn hermetic_cargo(manifest_dir: &Utf8Path, target_dir: &Utf8Path) -> Command {
     let mut command = Command::new("cargo");
+    for variable in INHERITED_BUILD_LOCATIONS {
+        command.env_remove(variable);
+    }
+    // Offline is set after the removals so it is the last operation on the
+    // command's environment.
     command
         .current_dir(manifest_dir)
         .env("CARGO_TARGET_DIR", target_dir.as_str())
         .env("CARGO_NET_OFFLINE", "true");
-    for variable in INHERITED_BUILD_LOCATIONS {
-        command.env_remove(variable);
-    }
     command
 }
 
