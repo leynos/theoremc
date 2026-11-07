@@ -23,7 +23,7 @@ published as a draft pull request.
   add them to `theoremc-core`, `theoremc-macros`, or the `theoremc` facade.
 - Declare Rust 1.89 for every workspace package. `cargo-theorem` requires it
   for OrthoConfig, and the reusable libraries require it for `serde-saphyr`
-  2.0.0 (ADR-010).
+  2.0.0 (ADR-0010).
 - Keep OrthoConfig default features enabled. Do not use unreleased APIs.
 - Follow roadmap Phase 3.1; do not implement backend, proof-run, project-edit,
   or other later command handlers in this change.
@@ -37,7 +37,7 @@ published as a draft pull request.
   its governing docs, workspace manifests, CI, and tests, stop and reassess.
 - Interface: if a reusable library API or its MSRV must change, stop and record
   the conflict before editing it. The user-approved MSRV increase to Rust 1.89
-  is recorded in ADR-010.
+  is recorded in ADR-0010.
 - Dependencies: only `ortho_config` 0.10.0 and dependencies directly needed by
   the application foundation are in scope; keep default features enabled.
 - Compatibility: do not add aliases or fallbacks for configuration names not
@@ -137,7 +137,7 @@ published as a draft pull request.
   and defer nested-workspace resolution and its root/member fixture to 3.1.2.
 - [x] (2026-10-31) Adopt `serde-saphyr` 2.0.0, raise every workspace package
   to Rust 1.89, simplify `make msrv` and CI to one workspace check, and record
-  ADR-010.
+  ADR-0010.
 - [x] (2026-10-31) Run the sequential gates for the assessment repair and
   serde-saphyr/MSRV candidate; the gate set passed on commit `5fc2a5f`.
 - [x] (2026-11-01) Remove the `clippy::struct_excessive_bools` expectations by
@@ -194,7 +194,7 @@ rerun rather than changed.
 Remaining work is the final approval request and the merge.
 
 **Historical (pre-rebase) state.** The paragraph below records the working-tree
-state before ADR-010 unified the MSRV checks and before the rebase onto
+state before ADR-0010 unified the MSRV checks and before the rebase onto
 `563e4d5`; it does not describe the current candidate.
 
 M2 implementation was then present in the working tree: the dedicated package,
@@ -458,8 +458,8 @@ latest formatting command passed; restart the complete gate sequence.
   2.0.0 is the current parser release and declares Rust 1.89; keeping 1.1.0
   pinned would preserve a split MSRV that the application package already
   exceeds, solely to hold back the parser. OrthoConfig remains
-  application-only. Recorded in ADR-010. Date/Author: 2026-10-31, user-directed
-  under issue #200.
+  application-only. Recorded in ADR-0010. Date/Author: 2026-10-31,
+  user-directed under issue #200.
 - Decision: use the accepted CLI policy: `THEOREMC_*`, `theoremc.toml` at the
   Cargo workspace root, explicit `--config` selection, TOML, defaults < files <
   named profile < environment < explicit CLI values for global settings, and
@@ -662,7 +662,7 @@ The imported guides are `docs/ortho-config/users-guide.md` and
   workspace MSRV, direct/Cargo invocation, and base output contracts. Step
   3.1.2 owns Cargo workspace/package discovery and its nested-workspace
   fixtures.
-- `docs/adr-002-library-first-internationalization-and-localization-with-fluent.md`:
+- `docs/adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md`:
   keep localization ownership at the application boundary.
 - Repository instructions in `AGENTS.md`: Rust, documentation, test, commit,
   and PR gates.
@@ -785,7 +785,7 @@ link in the terminal `## References` section. Do not merge.
 Run commands from the repository root. Use Makefile gates for repository-wide
 validation, and capture their output under `/tmp` as required by `AGENTS.md`.
 The workspace-wide MSRV check clears the repository's nightly-only `RUSTFLAGS`
-with an empty assignment; it does not bypass the Rust version check. ADR-010
+with an empty assignment; it does not bypass the Rust version check. ADR-0010
 supersedes the earlier split library and application checks with the single
 Rust 1.89 workspace check used by `make msrv` and CI.
 
@@ -914,7 +914,7 @@ that gate before proceeding. Never discard unrelated changes.
   validation. Package-only `cargo-theorem` coverage passed 46 tests and
   measured 678/716 lines (94.69%) and 61/70 functions (87.14%). CodeRabbit
   returned one documentation finding: `cargo-orthohelp` is a runtime bridge in
-  `agent_context.rs` and shares the Rust 1.89 floor. ADR-009, the CLI design,
+  `agent_context.rs` and shares the Rust 1.89 floor. ADR-0009, the CLI design,
   and developers' guide now record that boundary. Run the documentation gates
   and another CodeRabbit review before committing; hosted CI and the coverage
   ratchet remain pending the follow-up push.
@@ -922,7 +922,7 @@ that gate before proceeding. Never discard unrelated changes.
   intent detection, repeated Cargo subprocess setup, and two overlapping ADR
   structure findings. The pre-command scan now stops at `--`, with a regression
   test proving later operands do not select JSON diagnostics. The two parity
-  tests share an `rstest` fixture. ADR-009 now uses separate Status and Date
+  tests share an `rstest` fixture. ADR-0009 now uses separate Status and Date
   sections, an accepted-decision summary, and the repository's required Context
   and problem statement section. Rerun the full candidate gates, then review
   this final diff before committing and pushing.
@@ -1092,8 +1092,8 @@ that gate before proceeding. Never discard unrelated changes.
 - 2026-10-31: User-directed dependency decision: adopt `serde-saphyr` 2.0.0
   instead of holding 1.1.0 to keep the Rust 1.88 library floor. All workspace
   packages now declare Rust 1.89; `make msrv` and CI run one
-  `cargo +1.89 check --workspace`. ADR-010 records the decision and supersedes
-  ADR-009's mixed-MSRV clauses. The full sequential gate set passed on
+  `cargo +1.89 check --workspace`. ADR-0010 records the decision and supersedes
+  ADR-0009's mixed-MSRV clauses. The full sequential gate set passed on
   committed tree `5fc2a5f`: formatting, Markdown, Mermaid, lint, typecheck,
   workflow contracts, agent-native policy, MSRV, 884 tests, build, release, and
   Makefile validation. The 1.85 negative control failed with `serde-saphyr`

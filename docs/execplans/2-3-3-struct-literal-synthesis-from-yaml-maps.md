@@ -53,7 +53,7 @@ inference out of scope.
 
 ## Constraints
 
-- Keep Architecture Decision Record 003 (ADR-003) boundaries intact. `schema`
+- Keep Architecture Decision Record 0003 (ADR-0003) boundaries intact. `schema`
   remains responsible for YAML/domain decoding. The new struct/list lowering
   must live outside the schema loading pipeline so `schema::types` and
   `schema::arg_value` do not import emitter or resolution logic.
@@ -352,7 +352,7 @@ stable.
 ### Milestone 1: add the internal lowering surface
 
 Introduce a new internal module dedicated to argument-expression lowering. Keep
-it outside `schema` so ADR-003 boundaries stay intact. A likely layout is:
+it outside `schema` so ADR-0003 boundaries stay intact. A likely layout is:
 
 - `src/arg_lowering.rs`
 - `src/arg_lowering_tests.rs`

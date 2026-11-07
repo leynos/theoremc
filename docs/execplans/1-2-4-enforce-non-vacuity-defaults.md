@@ -24,7 +24,7 @@ all acceptance criteria and quality gates pass.
 
 ## Constraints
 
-- Keep behaviour aligned with signposts `TFS-6`, `ADR-4`, and `DES-8`.
+- Keep behaviour aligned with signposts `TFS-6`, `ADR-0001-4`, and `DES-8`.
 - Preserve deterministic error wording shape through
   `SchemaError::ValidationFailed` messages.
 - Do not change the public loader API signature
@@ -79,7 +79,7 @@ all acceptance criteria and quality gates pass.
   implementation and identified acceptance/test/documentation gaps.
 - [x] (2026-02-20 17:27Z) Milestone 1: no validator logic changes required.
   Existing `validate_kani_vacuity` and `validate_kani_witnesses` semantics
-  already matched `TFS-6` and `ADR-4`.
+  already matched `TFS-6` and `ADR-0001-4`.
 - [x] (2026-02-20 17:34Z) Milestone 2: added unit coverage for explicit
   `allow_vacuous: false` missing-witness failure in `src/schema/loader.rs`.
 - [x] (2026-02-20 17:43Z) Milestone 3: added `rstest-bdd` v0.5.0 behavioural
@@ -159,8 +159,8 @@ This task is Roadmap Phase 1, Step 1.2.4 in `docs/roadmap.md:137`. The target
 behaviour is defined by:
 
 - `docs/theorem-file-specification.md:453` (`TFS-6` §6.2),
-- `docs/adr-001-theorem-symbol-stability-and-non-vacuity-policy.md:78`
-  (`ADR-4` decision 4),
+- `docs/adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md:78`
+  (`ADR-0001-4` decision 4),
 - `docs/theoremc-design.md:926` (`DES-8` §8.4).
 
 Current implementation state after completion:

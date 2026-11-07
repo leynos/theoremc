@@ -29,8 +29,8 @@ in place:
 The CLI is its own package, `cargo-theorem`, and it requires Rust 1.89 because
 `ortho_config` 0.10.0 requires it. The theoremc library packages also require
 Rust 1.89, because `serde-saphyr` 2.0.0 declares that floor;
-[ADR-010](adr-010-reusable-library-msrv-rust-1-89.md) records the decision.
-Continuous integration (CI) tests the single workspace contract:
+[ADR-0010](adrs/adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md) records
+the decision. Continuous integration (CI) tests the single workspace contract:
 
 ```console
 RUSTFLAGS="" cargo +1.89 check --workspace --all-targets --all-features --locked

@@ -2,56 +2,60 @@
 
 - [Documentation contents](contents.md) - Index of all documentation files
   in this directory.
-- [Architecture Decision Record (ADR) 001: theorem symbol stability and
+- [Architectural decision record (ADR) 0001: theorem symbol stability and
   non-vacuity
-  policy](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+  policy](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   - Decision record for injective symbol mangling, explicit reference
     semantics, non-vacuity requirements, and theorem ID migration.
-- [Architecture Decision Record (ADR) 002: library-first internationalization
+- [Architectural decision record (ADR) 0002: library-first internationalization
   and localization with
-  Fluent](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+  Fluent](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
   - Decision record for Fluent-based, library-safe localization via injected
     localizers, structured diagnostic codes, and deterministic fallback policy.
-- [Architecture Decision Record (ADR) 003: architectural boundary
-  enforcement for schema layers](adr-003-architectural-boundary-enforcement.md)
+- [Architectural decision record (ADR) 0003: architectural boundary
+  enforcement for schema
+  layers](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
   - Decision record for schema layering constraints, module boundary policy,
     and an incremental architecture-enforcement stack.
-- [Architecture Decision Record (ADR) 004: theorem-side action
-  signatures](adr-004-action-signature-specification.md)
+- [Architectural decision record (ADR) 0004: theorem-side action
+  signatures](adrs/adr-0004-theorem-side-action-signatures.md)
   - Decision record for explicit theorem-side action signatures used by typed
     action probes and future argument shaping.
-- [Architecture Decision Record (ADR) 005: vertical-slice-first roadmap
-  sequencing](adr-005-vertical-slice-first-roadmap-sequencing.md)
-  - Decision record for making a real Kani proof and counterexample the next
-    release gate, before semantic laws or rich reporting.
-- [Architecture Decision Record (ADR) 006: backend-neutral harness planning
-  boundary](adr-006-backend-neutral-harness-planning-boundary.md)
+- [Architectural decision record (ADR) 0005: Rust build standard](adrs/adr-0005-adopt-the-rust-build-standard-for-development-builds.md)
+  - Decision record for the repository-wide Rust build commands and warning
+    policy used during development.
+- [Architectural decision record (ADR) 0006: backend-neutral harness planning
+  boundary](adrs/adr-0006-backend-neutral-harness-planning-boundary.md)
   - Decision record for the shared harness plan that supports the Kani
     vertical slice and later RFC 0001 law lowering without direct
     schema-to-Kani coupling.
-- [Architecture Decision Record (ADR) 007: Verus backend preservation
-  invariants](adr-007-verus-backend-preservation-invariants.md)
+- [Architectural decision record (ADR) 0007: Verus backend preservation
+  invariants](adrs/adr-0007-verus-backend-preservation-invariants.md)
   - Decision record for keeping law meaning, primary identity, backend
     bindings, evidence, and Verus mode distinctions separate.
-- [Architecture Decision Record (ADR) 008: workspace build-support
-  boundary](adr-008-workspace-build-support-boundary.md)
+- [Architectural decision record (ADR) 0008: workspace build-support
+  boundary](adrs/adr-0008-workspace-build-support-boundary.md)
   - Decision record for the narrow crate boundary around theorem discovery
     and generated-suite writing.
-- [Architecture Decision Record (ADR) 009: OrthoConfig CLI
-  configuration](adr-009-ortho-config-cli-configuration.md)
+- [Architectural decision record (ADR) 0009: OrthoConfig CLI
+  configuration](adrs/adr-0009-orthoconfig-cli-configuration.md)
   - Decision record for the application-only configuration boundary, source
     precedence, and profile support; its mixed-MSRV boundary is superseded by
-    ADR-010.
-- [Architecture Decision Record (ADR) 010: reusable-library MSRV for
-  serde-saphyr 2.0](adr-010-reusable-library-msrv-rust-1-89.md)
+    ADR-0010.
+- [Architectural decision record (ADR) 0010: reusable-library MSRV for
+  serde-saphyr 2.0](adrs/adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md)
   - Decision record for adopting serde-saphyr 2.0.0 and raising every
     workspace package to Rust 1.89.
-- [Architecture Decision Record (ADR) 011: a shared warm target for fixture
-  crates](adr-011-shared-warm-target-for-fixture-crates.md)
+- [Architectural decision record (ADR) 0011: vertical-slice-first roadmap
+  sequencing](adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md)
+  - Decision record for making a real Kani proof and counterexample the next
+    release gate, before semantic laws or rich reporting.
+- [Architectural decision record (ADR) 0012: shared warm target for fixture
+  crates](adrs/adr-0012-shared-warm-target-for-fixture-crates.md)
   - Decision record for sharing one warm target between fixture crates, their
     unique package names, the seeded lock and offline builds.
 - [Request for Comments (RFC) 0001: semantic law templates over composable
-  primaries](rfcs/0001-semantic-law-templates.md)
+  primaries](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
   - Accepted proposal for schema version 2 structured laws, composable
     primaries, semantic Law IR, and staged Kani lowering.
 - [`cargo theorem` CLI design](cargo-theorem-cli-design.md) - Cargo-native,

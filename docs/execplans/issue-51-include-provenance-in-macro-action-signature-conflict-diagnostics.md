@@ -117,7 +117,7 @@ Observable success:
 
 - [x] (2026-10-11T02:07Z) Reconnaissance: read the macro expansion pipeline,
       the action-signature index, the trybuild fixtures, the snapshot pattern,
-      `clippy.toml`, the `Makefile` gates, and ADR-004.
+      `clippy.toml`, the `Makefile` gates, and ADR-0004.
 - [x] (2026-10-11T02:07Z) Probed `thiserror` attribute forms and rustc
       `compile_error!` rendering of long single-line messages.
 - [x] (2026-10-11T02:12Z) Wrote this ExecPlan; branch renamed and Lody session
@@ -147,7 +147,7 @@ Observable success:
       `crates/theoremc-macros/src/action_probe_tests/conflicting_signatures.rs`
       to restore the 400-line file cap. Commit `bcaf572`.
 - [x] (2026-10-11T02:28Z) EP-M3: macro rustdoc table row, users' guide
-      paragraph, and ADR-004 rule update.
+      paragraph, and ADR-0004 rule update.
 - [x] (2026-10-11T02:34Z) EP-M3: `make fmt`, then `make check-fmt`,
       `make markdownlint`, `make nixie` all passed on the documentation commit
       `2fd8213`.
@@ -332,7 +332,7 @@ Observable success:
   `fn(<name>: <type>, ...) -> <return>`, reusing the declared parameter names.
   Rationale: those names are exactly the keys the author wrote under
   `Actions.params`, so the summary maps onto the YAML the user edits, and
-  ADR-004's documented probe shape shows parameter names. Parameter order is
+  ADR-0004's documented probe shape shows parameter names. Parameter order is
   the YAML order, which is already significant for the generated probe.
   Date/Author: 2026-10-11, implementation agent.
 - Decision: keep `ConflictingActionSignature` as a struct variant with five
@@ -460,7 +460,7 @@ Deliberately out of scope, and recorded rather than silently dropped:
 - No shared cross-file signature manifest or import mechanism. A conflict is
   defined within one `theorem_file!` expansion; two different `.theorem` files
   may still disagree, and ordinary Rust type checking rejects whichever file no
-  longer matches the export. ADR-004 records this.
+  longer matches the export. ADR-0004 records this.
 - No `insta` snapshot, per the `Decision Log` entry above.
 
 Lessons for similar work:
@@ -555,10 +555,10 @@ Upstream artefacts:
   error"; its "Validation expectations" are unit tests for the typed conflict
   data, trybuild coverage for the public compile error, and snapshot tests only
   if the format becomes substantial.
-- `docs/adr-004-action-signature-specification.md` (ADR-004), which rules that
-  a signature declared more than once within one `theorem_file!` expansion must
-  be semantically equivalent, and that probes are emitted as anonymous
-  `const _` items.
+- `docs/adrs/adr-0004-theorem-side-action-signatures.md` (ADR-0004), which
+  rules that a signature declared more than once within one `theorem_file!`
+  expansion must be semantically equivalent, and that probes are emitted as
+  anonymous `const _` items.
 - `docs/reviews/rfc-0001-selective-adoption-and-vertical-slice-preservation.md`
   and `docs/rfcs/` for repository governance style.
 - `AGENTS.md` (code style, doc maintenance, committing, Rust guidance) and
@@ -575,13 +575,13 @@ Trace links:
 ISSUE-51-PROPOSED-RESOLUTION -> EP-M1 (typed provenance in the index and error)
 ISSUE-51-VALIDATION-UNIT    -> EP-M2 (rstest cases and index field assertions)
 ISSUE-51-VALIDATION-TRYBUILD-> EP-M2 (regenerated golden .stderr)
-ADR-004-RULE-IDENTICAL      -> EP-M1 (equivalence path unchanged)
+ADR-0004-RULE-IDENTICAL      -> EP-M1 (equivalence path unchanged)
 AGENTS-DOC-MAINTENANCE      -> EP-M3 (macro rustdoc table row, users' guide)
 EP-C5-position-independence -> V5  (reference_selection::conflict_diagnostic_is_independent_of_reference_depth,
                                      reference_selection::equivalent_signature_reference_expands_at_any_depth)
 EP-C7-reference-selection  -> V6  (reference_selection::first_declaration_supplies_the_reference_signature_spelling)
 EP-C8-declaration-order    -> V6  (reference_selection::conflict_summary_preserves_declaration_parameter_order)
-ADR-004-RULE-ORDER          -> V6  (parameter order is the generated probe order)
+ADR-0004-RULE-ORDER          -> V6  (parameter order is the generated probe order)
 ```
 
 ## Verification plan
@@ -828,14 +828,14 @@ Milestone EP-M1: the index and error type carry provenance.
   provenance in place and the red tests turning green; no user-visible change
   yet.
 - Requirements and gaps: discharges `ISSUE-51-PROPOSED-RESOLUTION` and
-  `ADR-004-RULE-IDENTICAL`.
+  `ADR-0004-RULE-IDENTICAL`.
 - Acceptance evidence: `cargo nextest run -p theoremc-macros` passes, including
   the new provenance case and the unchanged whitespace-equivalence control.
 - Conformance check:
   - Requirements satisfied: provenance is carried and rendered.
   - Design still followed: the index remains a single-pass build over
     document order, and probes are still anonymous `const _` items.
-  - Upstream assumptions still valid: ADR-004's semantic-equivalence rule is
+  - Upstream assumptions still valid: ADR-0004's semantic-equivalence rule is
     unchanged, and equivalence still uses `is_semantically_equivalent`.
   - No unapproved public interface or dependency change: the variant is
     private to `theoremc-macros`; no dependency is added.
@@ -927,7 +927,7 @@ Milestone EP-M5: review follow-up closes the C5 and ordering coverage gaps.
     a third test module beside the two existing ones. The seeded fault touched
     `crates/theoremc-core/src/collision.rs` and was reverted byte-identically,
     so the deliverable diff remains code-unchanged from `3b45546`.
-  - Upstream assumptions still valid: ADR-004's rule that `params` order is the
+  - Upstream assumptions still valid: ADR-0004's rule that `params` order is the
     generated probe order is now asserted end to end through the diagnostic,
     and its rule that renames or reorderings conflict is what C8's two cases
     rest on.

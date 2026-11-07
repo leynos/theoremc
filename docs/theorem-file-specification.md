@@ -1,14 +1,15 @@
 # Theorem file format
 
 Decision context for symbol stability and vacuity policy is recorded in
-[Architecture Decision Record (ADR) 0001](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md).
+[Architecture Decision Record (ADR) 0001](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md).
 
-[RFC 0001](rfcs/0001-semantic-law-templates.md) is accepted and defines schema
-version 2. This specification records that target contract as well as the
-version 1 compatibility profile. Version 2 implementation is pending roadmap
-step 4.4, after the working version 1 Kani vertical slice. The current public
-model and raw adapter still use assertion-only proof lists; accepted syntax
-below must not be read as a claim of current parser or backend support.
+[RFC 0001](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
+is accepted and defines schema version 2. This specification records that
+target contract as well as the version 1 compatibility profile. Version 2
+implementation is pending roadmap step 4.4, after the working version 1 Kani
+vertical slice. The current public model and raw adapter still use
+assertion-only proof lists; accepted syntax below must not be read as a claim
+of current parser or backend support.
 
 ## 1. YAML schema reference (versions 1 and 2)
 
@@ -276,7 +277,7 @@ Each `Step` is exactly one of:
 Each entry declares the expected Rust function signature for an action named by
 `Let` or `Do`. The theorem document, not the current Rust implementation, is
 the source of this expected contract. This follows
-[ADR 004](adr-004-action-signature-specification.md).
+[ADR-0004](adrs/adr-0004-theorem-side-action-signatures.md).
 
 Example:
 
@@ -417,7 +418,7 @@ Prove:
 The fragment requires the usual theorem metadata, a `config` binding, evidence,
 and explicit witnesses to form a complete document. Full examples for every law
 are in
-[RFC 0001's catalogue](rfcs/0001-semantic-law-templates.md#initial-law-catalogue).
+[RFC 0001's catalogue](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md#initial-law-catalogue).
 
 ### 3.10.3 Validation, lowering, and evidence (version 2)
 
@@ -431,7 +432,7 @@ aliases, associated types, coercions, and generic normalization beyond
 theoremc's structural validation.
 
 Validated laws lower into semantic Law IR, then the shared `HarnessPlan` from
-[ADR 006](adr-006-backend-neutral-harness-planning-boundary.md). Opaque
+[ADR-0006](adrs/adr-0006-backend-neutral-harness-planning-boundary.md). Opaque
 obligations join at the same plan. Neither representation contains Kani syntax
 or token streams. Laws reuse the existing renderer and runner; backends
 **MUST** check the complete plan's capabilities before emitting partial output.
@@ -453,7 +454,7 @@ Future Verus support **MUST** preserve version 2 law meaning and add explicit
 bindings for executable, specification, and proof symbols and mathematical
 views. Ordinary action signatures do not imply those bindings. Opaque Rust
 expressions remain backend-constrained. These requirements follow
-[ADR 007](adr-007-verus-backend-preservation-invariants.md).
+[ADR-0007](adrs/adr-0007-verus-backend-preservation-invariants.md).
 
 ### 3.11 `Evidence` (required)
 

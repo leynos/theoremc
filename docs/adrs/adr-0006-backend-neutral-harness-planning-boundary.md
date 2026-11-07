@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 006: backend-neutral harness planning boundary
+# Architectural decision record (ADR) 0006: Backend-neutral harness planning boundary
 
 ## Status
 
@@ -384,12 +384,12 @@ Capabilities and rendering functions remain explicit until Verus work begins.
 
 ## Related documents
 
-- [ADR 005: vertical-slice-first roadmap
-  sequencing](adr-005-vertical-slice-first-roadmap-sequencing.md)
-- [ADR 007: Verus backend preservation
-  invariants](adr-007-verus-backend-preservation-invariants.md)
-- [RFC 0001: semantic law templates](rfcs/0001-semantic-law-templates.md)
-- [ADR 004: theorem-side action
-  signatures](adr-004-action-signature-specification.md)
-- [Theoremc design specification](theoremc-design.md)
-- [Development roadmap](roadmap.md)
+- [ADR-0011: vertical-slice-first roadmap
+  sequencing](adr-0011-vertical-slice-first-roadmap-sequencing.md)
+- [ADR-0007: Verus backend preservation
+  invariants](adr-0007-verus-backend-preservation-invariants.md)
+- [RFC 0001: semantic law templates](../rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
+- [ADR-0004: theorem-side action
+  signatures](adr-0004-theorem-side-action-signatures.md)
+- [Theoremc design specification](../theoremc-design.md)
+- [Development roadmap](../roadmap.md)

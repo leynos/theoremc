@@ -1,4 +1,4 @@
-# Request for Comments (RFC) 0001: semantic law templates over composable primaries
+# RFC 0001: Semantic law templates over composable primaries
 
 ## Preamble
 
@@ -9,8 +9,8 @@
 - Initial backend: Kani
 - Future backend considered: Verus
 - Related decisions:
-  [ADR 005](../adr-005-vertical-slice-first-roadmap-sequencing.md), [ADR 006](../adr-006-backend-neutral-harness-planning-boundary.md),
-  and [ADR 007](../adr-007-verus-backend-preservation-invariants.md)
+  [ADR-0011](../adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md), [ADR-0006](../adrs/adr-0006-backend-neutral-harness-planning-boundary.md),
+  and [ADR-0007](../adrs/adr-0007-verus-backend-preservation-invariants.md)
 - Originating proposal:
   [GitHub issue 80](https://github.com/leynos/theoremc/issues/80)
 
@@ -46,9 +46,9 @@ Prove:
 ```
 
 Law instances lower into a typed semantic law intermediate representation (IR),
-then into the backend-neutral harness plan defined by ADR 006. The first
+then into the backend-neutral harness plan defined by ADR-0006. The first
 implementation targets Kani. A later Verus backend may consume the same law
-semantics through explicit Verus bindings, subject to ADR 007.
+semantics through explicit Verus bindings, subject to ADR-0007.
 
 The proposal reuses the existing `Actions` mapping. An action used as a leaf of
 a structured law is a **composable primary**. Good primaries are small,
@@ -123,7 +123,7 @@ semantic vocabulary between human intent and backend mechanics.
 - Introduce named theorem imports, lemma dependency graphs, or a package
   registry of user-defined laws.
 - Make every useful algebraic law a built-in template.
-- Delay the first working Kani vertical slice. ADR 005 places this RFC after
+- Delay the first working Kani vertical slice. ADR-0011 places this RFC after
   that slice.
 
 ## Terminology
@@ -195,7 +195,7 @@ permits both opaque assertions and structured laws. A structured law inside an
 unversioned or `Schema: 1` document produces a targeted diagnostic rather than
 silently upgrading the document.
 
-A future Verus binding schema must be additive. ADR 007 permits a later schema
+A future Verus binding schema must be additive. ADR-0007 permits a later schema
 version, such as version 3, or an external binding registry, but it forbids
 changing the meaning of a valid schema version 2 law declaration.
 
@@ -247,7 +247,7 @@ Actions:
 ```
 
 The action declaration remains the theorem-owned executable contract. The Rust
-function remains its executable implementation. ADR 007 makes clear that this
+function remains its executable implementation. ADR-0007 makes clear that this
 contract does not, by itself, identify a Verus specification or proof.
 
 A law reference extends the set of actions considered referenced for:
@@ -585,7 +585,7 @@ opaque schema 1/2 obligation    semantic Law IR
 
 _Figure 1: Schema and law lowering converge at the shared harness plan._
 
-ADR 006 owns the harness-plan boundary. The plan contains semantic operations,
+ADR-0006 owns the harness-plan boundary. The plan contains semantic operations,
 resolved invocations, stable obligation identities, source provenance, and
 explicit opaque-expression nodes. It contains no Kani token streams or Kani
 syntax.
@@ -621,7 +621,7 @@ result.
 
 Verus separates executable, specification, and proof code. An ordinary theorem
 action export and function-pointer probe cannot identify the `spec fn` or proof
-lemma required by Verus. ADR 007 therefore requires explicit backend bindings
+lemma required by Verus. ADR-0007 therefore requires explicit backend bindings
 and forbids inference from executable action signatures.
 
 ## Non-vacuity policy
@@ -764,7 +764,7 @@ reinterpret the existing law syntax.
 
 ## Implementation sequence
 
-ADR 005 places the work after the first working Kani vertical slice.
+ADR-0011 places the work after the first working Kani vertical slice.
 
 ### Stage 1: versioned proof-obligation schema
 
@@ -813,7 +813,7 @@ Before implementing a Verus renderer:
 - define backend capability diagnostics;
 - test at least one unchanged schema version 2 law through Kani and Verus.
 
-ADR 007 supplies the invariants that this follow-up design must preserve.
+ADR-0007 supplies the invariants that this follow-up design must preserve.
 
 ## Alternatives considered
 
@@ -859,7 +859,7 @@ generated code repair a poorly composable interface.
 
 ### Complete RFC 0001 before the Kani vertical slice
 
-Rejected by ADR 005. The existing assertion language must first prove that the
+Rejected by ADR-0011. The existing assertion language must first prove that the
 shared execution pipeline works end to end. RFC 0001 then adds a second
 frontend into a proven harness-planning and rendering seam.
 
@@ -886,14 +886,14 @@ Costs and trade-offs:
 
 ## Related documents
 
-- [ADR 005: vertical-slice-first roadmap
-  sequencing](../adr-005-vertical-slice-first-roadmap-sequencing.md)
-- [ADR 006: backend-neutral harness planning
-  boundary](../adr-006-backend-neutral-harness-planning-boundary.md)
-- [ADR 007: Verus backend preservation
-  invariants](../adr-007-verus-backend-preservation-invariants.md)
+- [ADR-0011: vertical-slice-first roadmap
+  sequencing](../adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md)
+- [ADR-0006: backend-neutral harness planning
+  boundary](../adrs/adr-0006-backend-neutral-harness-planning-boundary.md)
+- [ADR-0007: Verus backend preservation
+  invariants](../adrs/adr-0007-verus-backend-preservation-invariants.md)
 - [Theorem file specification](../theorem-file-specification.md)
 - [Theoremc design specification](../theoremc-design.md)
 - [Development roadmap](../roadmap.md)
-- [ADR 004: theorem-side action
-  signatures](../adr-004-action-signature-specification.md)
+- [ADR-0004: theorem-side action
+  signatures](../adrs/adr-0004-theorem-side-action-signatures.md)

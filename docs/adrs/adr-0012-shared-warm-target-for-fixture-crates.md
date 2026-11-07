@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 011: A shared warm target for fixture crates
+# Architectural decision record (ADR) 0012: Shared warm target for fixture crates
 
 ## Status
 
