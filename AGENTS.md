@@ -130,23 +130,37 @@ project:
   - `make check-fmt` executes:
 
     ```sh
-    cargo fmt --workspace -- --check
+    cargo fmt --all -- --check
     ```
 
     validating formatting across the entire workspace without modifying files.
-  - `make lint` executes:
+  - `make lint` runs three stages, in order, over the whole workspace:
 
     ```sh
-    DYLINT_RUSTFLAGS="-D warnings" \
-      whitaker --all -- --all-targets --all-features
-    cargo clippy --workspace --all-targets --all-features -- -D warnings
+    make lint-rustdoc
+    make lint-clippy
+    make lint-whitaker
     ```
 
-    running the Whitaker Dylint suite through its `whitaker` wrapper first (it
-    is a prerequisite of `lint`), then linting every target with all features
-    enabled and denying all Clippy warnings. Install it with
+    which expand to:
+
+    ```sh
+    RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
+    RUSTFLAGS= DYLINT_RUSTFLAGS="-D warnings" \
+      whitaker --all --workspace -- --all-targets --all-features
+    ```
+
+    running rustdoc, then Clippy, then the Whitaker Dylint suite through its
+    `whitaker` wrapper. Each stage recurses through `$(MAKE)`, so the stages stay
+    sequential even under `make -j` and a failing stage stops the aggregate.
+    `LINT_PACKAGES ?= --workspace` and `LINT_TARGET_FLAGS ?= --all-targets
+    --all-features` name the scope once, because a bare Cargo invocation selects
+    only the root package. Whitaker's own `--workspace` is forwarded to the
+    `cargo check` it runs, so it must not be repeated after `--`. Install
+    Whitaker with
     `whitaker-installer`; never call `cargo dylint` directly. CI installs it
-    through the shared `install-whitaker` action.
+    through the shared `install-whitaker` action and runs `make lint`.
   - `make test` executes:
 
     ```sh

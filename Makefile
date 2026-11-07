@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv
+.PHONY: help all clean test build release lint lint-rustdoc lint-clippy lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv
 
 TARGET ?= cargo-theorem
 
@@ -9,10 +9,18 @@ WHITAKER ?= whitaker
 BUILD_JOBS ?=
 RUST_FLAGS ?= -D warnings
 RUSTDOC_FLAGS ?= -D warnings
-CARGO_FLAGS ?= --all-targets --all-features
-CLIPPY_FLAGS ?= --workspace $(CARGO_FLAGS) -- $(RUST_FLAGS)
-NEXTEST_FLAGS ?= --workspace $(CARGO_FLAGS)
-DOCTEST_FLAGS ?= --workspace --all-features --doc
+# Every gate covers the whole workspace: the root `theoremc` package plus each
+# member crate, including the root package's integration-test targets. The
+# scope is named once so a gate cannot silently fall back to the root package,
+# which is what Cargo selects when no package flag is given.
+LINT_PACKAGES ?= --workspace
+LINT_TARGET_FLAGS ?= --all-targets --all-features
+CARGO_FLAGS ?= $(LINT_PACKAGES) $(LINT_TARGET_FLAGS)
+CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
+# `cargo doc` rejects `--all-targets`, so documentation carries its own flags.
+RUSTDOC_TARGET_FLAGS ?= $(LINT_PACKAGES) --all-features --no-deps
+NEXTEST_FLAGS ?= $(CARGO_FLAGS)
+DOCTEST_FLAGS ?= $(LINT_PACKAGES) --all-features --doc
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
 # `make fmt` and `make check-fmt` call mdtablefix directly. `--git` selects the
@@ -68,12 +76,28 @@ test: ## Run tests with warnings treated as errors
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(if $(findstring release,$(@)),RUSTFLAGS="$${RUSTFLAGS-}",RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)") $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) -p cargo-theorem --bin $(TARGET)
 
-lint: lint-whitaker ## Run rustdoc, Clippy and the Whitaker suite with warnings denied
-	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) doc --no-deps
+# A prerequisite list is not a sequencing guarantee: under `make -j lint` the
+# three stages would start at once and queue against one another for compiler
+# slots. Recursing through `$(MAKE)` gives each stage its own recipe line, so
+# they run in the listed order even under `-j`, and a failing stage stops the
+# aggregate with that stage's exit status.
+lint: ## Run rustdoc, Clippy and the Whitaker suite over the workspace, in order
+	$(MAKE) lint-rustdoc
+	$(MAKE) lint-clippy
+	$(MAKE) lint-whitaker
+
+lint-rustdoc: ## Build rustdoc for every workspace package with warnings denied
+	RUSTDOCFLAGS="$(RUSTDOC_FLAGS)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) doc $(RUSTDOC_TARGET_FLAGS)
+
+lint-clippy: ## Lint every workspace package, target and feature with warnings denied
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) clippy $(CLIPPY_FLAGS)
 
-lint-whitaker: ## Run the Whitaker Dylint suite through its wrapper with warnings denied
-	RUSTFLAGS= DYLINT_RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all -- $(CARGO_FLAGS)
+# `--workspace` is Whitaker's own flag, and Whitaker forwards it to the
+# `cargo check` it runs. Passing it after `--` as well makes Cargo reject the
+# run as a duplicate, so the forwarded arguments carry only the target and
+# feature flags.
+lint-whitaker: ## Run the Whitaker Dylint suite over the workspace with warnings denied
+	RUSTFLAGS= DYLINT_RUSTFLAGS="$(RUST_FLAGS)" $(WHITAKER) --all $(LINT_PACKAGES) -- $(LINT_TARGET_FLAGS)
 
 typecheck: ## Run type checking for all targets and features
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)" $(CARGO) check $(CARGO_FLAGS)
