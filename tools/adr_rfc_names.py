@@ -68,6 +68,13 @@ class RecordReader(Protocol):
         """Return a file's UTF-8 text."""
         ...
 
+    def resolve_root(self, repository_root: Path) -> Path:
+        """Return the canonical root that record links must stay inside.
+
+        Example: a root reached through a symlink resolves to its real path.
+        """
+        ...
+
     def resolve_link(
         self,
         repository_root: Path,
@@ -350,16 +357,28 @@ def _local_record_link(
     return RecordLink(repository_root, source, target, destination)
 
 
+def _relative_source(link: RecordLink) -> Path:
+    """Return the source path relative to the root, or the source itself.
+
+    Example: a source outside the root is reported by its own path rather than
+    raising from `Path.relative_to`.
+    """
+    try:
+        return link.source.relative_to(link.repository_root)
+    except ValueError:
+        return link.source
+
+
 def _local_record_link_error(reader: RecordReader, link: RecordLink) -> str | None:
     """Describe a local record link that escapes the repository or is missing.
 
     Example: a link to an absent ADR returns a path-specific error.
     """
-    relative_source = link.source.relative_to(link.repository_root)
+    relative_source = _relative_source(link)
     if link.target is None:
         return f"{relative_source}: malformed local record link: {link.destination}"
     try:
-        link.target.relative_to(link.repository_root.resolve())
+        link.target.relative_to(link.repository_root)
     except ValueError:
         return f"{relative_source}: record link escapes the repository: {link.destination}"
     if reader.is_file(link.target):
@@ -381,10 +400,11 @@ def validate_local_record_links(
     """
     errors: list[str] = []
     checked_links = 0
+    resolved_root = reader.resolve_root(repository_root)
     for source in markdown_paths:
         markdown = reader.read_text(source)
         for destination in extract_markdown_destinations(markdown):
-            link = _local_record_link(reader, repository_root, source, destination)
+            link = _local_record_link(reader, resolved_root, source, destination)
             if link is None:
                 continue
             checked_links += 1

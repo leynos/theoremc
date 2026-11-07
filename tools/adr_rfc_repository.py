@@ -76,6 +76,19 @@ class PathRecordReader(RecordReader):
         """
         return path.read_text(encoding="utf-8")
 
+    def resolve_root(self, repository_root: Path) -> Path:
+        """Return the canonical root that record links must stay inside.
+
+        Example: a repository reached through a symlink resolves to its real
+        path, so containment checks compare like with like.
+        """
+        try:
+            return repository_root.resolve()
+        except (OSError, RuntimeError):
+            # A symlink loop leaves the root unusable; the rules still report
+            # containment against the path the caller supplied.
+            return repository_root
+
     def resolve_link(
         self,
         repository_root: Path,

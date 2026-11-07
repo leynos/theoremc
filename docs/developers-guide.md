@@ -407,10 +407,11 @@ The checker is split along a port-and-adapter boundary:
 
 - `tools/adr_rfc_names.py` holds the pure rules: filename and heading patterns,
   slug generation, Markdown destination extraction, and the `RecordReader` port
-  that supplies record names, Markdown paths, file text, and resolved link
-  targets. It never touches the filesystem directly.
+  that supplies record names, Markdown paths, file text, the canonical
+  repository root, and resolved link targets. It never touches the filesystem
+  directly.
 - `tools/adr_rfc_repository.py` implements that port as `PathRecordReader` and
-  owns Markdown discovery, file reads, and path resolution, including symlink
+  owns Markdown discovery, file reads, root and link resolution, and symlink
   and encoded-path handling.
 - `tools/check_adr_rfc_names.py` is the composition root. It wires the adapter
   into the rules and returns a `DocumentationCheck` value whose `read_error`
@@ -419,8 +420,8 @@ The checker is split along a port-and-adapter boundary:
 The rules report canonical filenames, unique serials, heading serials, title
 slugs, and local ADR/RFC links that escape the repository or are missing. A
 malformed local destination becomes an error diagnostic rather than a
-traceback. Link resolution failures are reported through the port, so a test
-double can supply resolved targets without a filesystem.
+traceback. Root and link resolution are supplied through the port, so a test
+double can provide both without a filesystem.
 
 `make lint` is the aggregate entry point, locally and in CI. It runs three
 stages in order — rustdoc, Clippy, then Whitaker — and recurses through

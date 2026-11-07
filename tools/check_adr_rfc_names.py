@@ -41,8 +41,11 @@ def check_documentation(repository_root: Path) -> DocumentationCheck:
     `read_error` describes the failure instead of raising.
     """
     reader = PathRecordReader()
-    docs_root = repository_root / "docs"
     try:
+        # Resolve once so discovery, reads, and link containment all use the
+        # same root even when the repository is reached through a symlink.
+        repository_root = reader.resolve_root(repository_root)
+        docs_root = repository_root / "docs"
         errors = validate_record_files(reader, docs_root)
         paths = reader.markdown_paths(repository_root)
         link_errors, checked_links = validate_local_record_links(
