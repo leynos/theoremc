@@ -86,12 +86,18 @@ the stub-executable contract test possible.
    feature set. A future exemption must use the narrowest key that works,
    `excluded_paths` before `excluded_crates`, with the reason recorded beside
    it.
-5. `tests/lint_contract.rs` reads the Makefile, the workflow, and `dylint.toml`
-   as text and fails if a gate loses workspace coverage, a stage disappears, a
-   failure can be masked, CI stops installing a pinned Whitaker, or the
-   configuration gains a whole-crate exemption. `tests/lint_gate_execution.rs`
-   runs the recipes against stub executables to prove the stage order, the
-   arguments each stage receives, and that a failing stage stops the aggregate.
+5. Three tests hold the wiring, at three levels. `tests/lint_contract.rs` reads
+   the Makefile, the workflow, and `dylint.toml` as text and fails if a gate
+   loses workspace coverage, a stage disappears, a failure can be masked, CI
+   stops installing a pinned Whitaker, or the configuration gains a whole-crate
+   exemption. `tests/lint_gate_execution.rs` runs the recipes against stub
+   executables to prove the stage order, the arguments each stage receives, and
+   that a failing stage stops the aggregate.
+   `tests/lint_workspace_execution.rs` goes one level further: it writes a
+   two-package workspace that mirrors the hybrid manifest, runs the real
+   `cargo doc` and `cargo clippy` invocations the recipes use, and shows that a
+   clean workspace passes while a finding in the non-root member fails the
+   stage. The stubs prove the wiring; this proves Cargo acts on it.
 6. CI installs Whitaker through the shared `install-whitaker` action pinned to a
    full commit SHA and then runs `make lint`, the same target contributors run
    locally.
@@ -106,6 +112,10 @@ the stub-executable contract test possible.
 - Two source findings surfaced when the suite first ran workspace-wide: a test
   module without an inner doc comment, and a test module three lines over the
   400-line budget. Both were fixed at source rather than exempted.
+- The end-to-end test adds compiler work to `make test`. It joins the
+  `nested-cargo-builds` group in `.config/nextest.toml`, which runs one such
+  test at a time so the shared package-cache lock and compiler admission do not
+  turn a cold build into an apparent hang.
 - `dylint.toml` exists, so the exclusion policy has a home. It declares no
   exclusions today, which the contract test holds.
 - The Netsuke lint-table alignment tracked by issue #98 remains separate work.
@@ -115,6 +125,7 @@ the stub-executable contract test possible.
 ## Related documents
 
 - [ADR-005: Rust build standard](adr-005-rust-build-standard.md)
-- [ADR-010: reusable-library MSRV for Rust 1.89](adr-010-reusable-library-msrv-rust-1-89.md)
+- [ADR-010: reusable-library MSRV for Rust
+  1.89](adr-010-reusable-library-msrv-rust-1-89.md)
 - [Developer's guide](developers-guide.md)
 - [Theoremc design](theoremc-design.md)

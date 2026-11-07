@@ -79,6 +79,7 @@ fn contains_all(haystack: &str, needles: &[&str]) -> bool {
     needles.iter().all(|needle| haystack.contains(needle))
 }
 
+/// Verifies that every lint variable composes the workspace-wide scope.
 #[test]
 fn every_lint_variable_scopes_the_whole_workspace() {
     assert_eq!(
@@ -90,6 +91,11 @@ fn every_lint_variable_scopes_the_whole_workspace() {
         variable_default(MAKEFILE, "RUSTDOC_FLAGS"),
         Some("-D warnings"),
         "RUSTDOC_FLAGS must deny warnings by default"
+    );
+    assert_eq!(
+        variable_default(MAKEFILE, "RUST_FLAGS"),
+        Some("-D warnings"),
+        "RUST_FLAGS must deny warnings by default, because Clippy and Whitaker inherit it"
     );
 
     let target_flags = variable_default(MAKEFILE, "LINT_TARGET_FLAGS").unwrap_or_default();
@@ -120,6 +126,7 @@ fn every_lint_variable_scopes_the_whole_workspace() {
     );
 }
 
+/// Verifies that `make lint` recurses into each stage exactly once, in order.
 #[test]
 fn the_aggregate_runs_each_stage_once_in_order() {
     assert_eq!(
@@ -133,6 +140,7 @@ fn the_aggregate_runs_each_stage_once_in_order() {
     );
 }
 
+/// Verifies that the rustdoc stage covers the workspace with warnings denied.
 #[test]
 fn rustdoc_stage_denies_warnings_over_the_workspace() {
     let line = single_recipe_line(MAKEFILE, "lint-rustdoc");
@@ -148,6 +156,7 @@ fn rustdoc_stage_denies_warnings_over_the_workspace() {
     );
 }
 
+/// Verifies that the Clippy stage covers the workspace with warnings denied.
 #[test]
 fn clippy_stage_denies_warnings_over_the_workspace() {
     let line = single_recipe_line(MAKEFILE, "lint-clippy");
@@ -157,6 +166,7 @@ fn clippy_stage_denies_warnings_over_the_workspace() {
     );
 }
 
+/// Verifies that the Whitaker stage covers the workspace and clears `RUSTFLAGS`.
 #[test]
 fn whitaker_stage_denies_warnings_over_the_workspace() {
     let line = single_recipe_line(MAKEFILE, "lint-whitaker");
@@ -176,6 +186,7 @@ fn whitaker_stage_denies_warnings_over_the_workspace() {
     );
 }
 
+/// Verifies that no lint recipe can swallow a failing command.
 #[test]
 fn no_lint_stage_can_mask_a_failure() {
     for target in ["lint", "lint-rustdoc", "lint-clippy", "lint-whitaker"] {
@@ -196,17 +207,76 @@ fn no_lint_stage_can_mask_a_failure() {
     }
 }
 
+/// Reports whether a line opens a CI job.
+///
+/// A job is a key indented by exactly two spaces under `jobs:`. Steps are
+/// indented further, so they never match.
+fn is_job_header(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    line.starts_with("  ")
+        && !line.starts_with("   ")
+        && !trimmed.starts_with('#')
+        && trimmed.ends_with(':')
+}
+
+/// Reports whether a line is a `uses:` step, as opposed to a comment that
+/// merely names an action.
+fn is_uses_step(line: &str) -> bool {
+    line.trim_start().starts_with("uses:")
+}
+
+/// Returns the lines of the CI job that runs `make lint`.
+///
+/// Comparing the first occurrence of each string across the whole file would
+/// keep passing if a second job ran `make lint` without installing Whitaker.
+/// Scoping both searches to the one job keeps the ordering assertion honest.
+fn lint_job_lines(ci: &str) -> Vec<&str> {
+    let lines: Vec<&str> = ci.lines().collect();
+    let Some(lint_index) = lint_step_index(&lines) else {
+        return Vec::new();
+    };
+    let start = lines
+        .iter()
+        .take(lint_index)
+        .rposition(|line| is_job_header(line))
+        .unwrap_or(0);
+    let end = lines
+        .iter()
+        .skip(lint_index)
+        .position(|line| is_job_header(line))
+        .map_or(lines.len(), |offset| lint_index + offset);
+    lines
+        .iter()
+        .skip(start)
+        .take(end - start)
+        .copied()
+        .collect()
+}
+
+/// Returns the index of the `run: make lint` line in `ci`.
+fn lint_step_index(ci: &[&str]) -> Option<usize> {
+    ci.iter().position(|line| line.trim() == "run: make lint")
+}
+
+/// Verifies that the job which runs `make lint` installs a pinned Whitaker.
 #[test]
 fn ci_installs_a_pinned_whitaker_before_running_the_aggregate() {
-    let install_line = CI
-        .lines()
-        .find(|line| line.contains(WHITAKER_INSTALLER))
-        .unwrap_or_default();
+    let job = lint_job_lines(CI);
     assert!(
-        !install_line.is_empty(),
-        "CI must install Whitaker through the shared action"
+        !job.is_empty(),
+        "CI must run `make lint`, the same aggregate target used locally"
     );
 
+    let install_index = job
+        .iter()
+        .position(|line| is_uses_step(line) && line.contains(WHITAKER_INSTALLER))
+        .unwrap_or(usize::MAX);
+    assert!(
+        install_index != usize::MAX,
+        "the job that runs `make lint` must install Whitaker through the shared action"
+    );
+
+    let install_line = job.get(install_index).copied().unwrap_or_default();
     let reference = install_line
         .split(WHITAKER_INSTALLER)
         .nth(1)
@@ -222,24 +292,14 @@ fn ci_installs_a_pinned_whitaker_before_running_the_aggregate() {
         "the Whitaker action pin must be hexadecimal; found `{sha}`"
     );
 
-    let install_step = CI
-        .lines()
-        .position(|line| line.contains(WHITAKER_INSTALLER))
-        .unwrap_or(usize::MAX);
-    let lint_step = CI
-        .lines()
-        .position(|line| line.trim() == "run: make lint")
-        .unwrap_or(usize::MAX);
+    let lint_index = lint_step_index(&job).unwrap_or(usize::MAX);
     assert!(
-        lint_step != usize::MAX,
-        "CI must run `make lint`, the same aggregate target used locally"
-    );
-    assert!(
-        install_step < lint_step,
-        "CI must install Whitaker before the lint step"
+        install_index < lint_index,
+        "CI must install Whitaker before the lint step in the same job"
     );
 }
 
+/// Verifies that `dylint.toml` declares no whole-crate exclusion.
 #[test]
 fn the_dylint_configuration_exempts_no_whole_crate() {
     assert!(

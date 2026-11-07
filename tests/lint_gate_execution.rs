@@ -10,6 +10,7 @@
 
 use cap_std::ambient_authority;
 use cap_std::fs::{Dir, Permissions, PermissionsExt};
+use rstest::rstest;
 use std::path::Path;
 use std::process::{Command, Output};
 use tempfile::TempDir;
@@ -86,6 +87,21 @@ fn write_stubs(directory: &Dir) -> Result<(), String> {
     Ok(())
 }
 
+/// Variables a parent `make` or shell may export that would override the
+/// Makefile defaults under test.
+const INHERITED_VARIABLES: &[&str] = &[
+    "MAKEFLAGS",
+    "MAKELEVEL",
+    "MFLAGS",
+    "RUST_FLAGS",
+    "RUSTDOC_FLAGS",
+    "LINT_PACKAGES",
+    "LINT_TARGET_FLAGS",
+    "CARGO_FLAGS",
+    "CLIPPY_FLAGS",
+    "RUSTDOC_TARGET_FLAGS",
+];
+
 /// Runs the aggregate target against the stubs in `root`.
 ///
 /// `fail_on` names the stage that must exit non-zero; an empty value lets every
@@ -100,7 +116,8 @@ fn run_lint_target(root: &Path, fail_on: &str) -> Result<Output, String> {
         .map_err(|error| format!("opening the temporary directory: {error}"))?;
     write_stubs(&directory)?;
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    Command::new("make")
+    let mut command = Command::new("make");
+    command
         .arg("--no-print-directory")
         .arg("-f")
         .arg(manifest_dir.join("Makefile"))
@@ -109,7 +126,11 @@ fn run_lint_target(root: &Path, fail_on: &str) -> Result<Output, String> {
         .arg(format!("WHITAKER={}", root.join("whitaker").display()))
         .current_dir(manifest_dir)
         .env("STUB_LOG", root.join("stub.log"))
-        .env("STUB_FAIL_ON", fail_on)
+        .env("STUB_FAIL_ON", fail_on);
+    for variable in INHERITED_VARIABLES {
+        command.env_remove(variable);
+    }
+    command
         .env("RUSTFLAGS", "-Csentinel")
         .output()
         .map_err(|error| format!("running make lint: {error}"))
@@ -172,6 +193,38 @@ fn stage_names(invocations: &[Invocation]) -> Vec<&str> {
         .collect()
 }
 
+/// Fails unless the stage passed exactly the arguments it must receive.
+///
+/// # Errors
+///
+/// Returns the mismatch, naming the stage and both argument lists.
+fn expect_arguments(stage: &str, actual: &[String], expected: &[&str]) -> Result<(), String> {
+    let received: Vec<&str> = actual.iter().map(String::as_str).collect();
+    if received != expected {
+        return Err(format!(
+            "the {stage} stage passed {received:?}, expected {expected:?}"
+        ));
+    }
+    Ok(())
+}
+
+/// Fails unless an environment value matches what the stage must receive.
+///
+/// `description` completes the sentence "the stub saw" is appended to, so each
+/// caller states the policy rather than only the value.
+///
+/// # Errors
+///
+/// Returns the mismatch with the value the stub recorded.
+fn expect_value(description: &str, actual: &str, expected: &str) -> Result<(), String> {
+    if actual != expected {
+        return Err(format!("{description}; the stub saw `{actual}`"));
+    }
+    Ok(())
+}
+
+/// Verifies that `make lint` runs the three stages in order, each once, with the
+/// arguments and warning denials it needs.
 #[test]
 fn aggregate_runs_rustdoc_then_clippy_then_whitaker() -> Result<(), String> {
     let directory =
@@ -184,92 +237,62 @@ fn aggregate_runs_rustdoc_then_clippy_then_whitaker() -> Result<(), String> {
         ));
     }
     let invocations = read_invocations(directory.path())?;
-    if stage_names(&invocations) != ["doc", "clippy", "whitaker"] {
+    let ran = stage_names(&invocations);
+    if ran != ["doc", "clippy", "whitaker"] {
         return Err(format!(
-            "make lint must run rustdoc, then Clippy, then Whitaker, costing one stage per failure; ran {:?}",
-            stage_names(&invocations)
+            "make lint must run rustdoc, then Clippy, then Whitaker; ran {ran:?}"
         ));
     }
 
     let doc = stage(&invocations, "doc")?;
-    if doc.arguments.iter().map(String::as_str).collect::<Vec<_>>() != DOC_ARGUMENTS {
-        return Err(format!(
-            "the rustdoc stage passed {:?}, expected {DOC_ARGUMENTS:?}",
-            doc.arguments
-        ));
-    }
-    if doc.rustdocflags != "-D warnings" {
-        return Err(format!(
-            "the rustdoc stage must deny warnings; the stub saw `{}`",
-            doc.rustdocflags
-        ));
-    }
+    expect_arguments("rustdoc", &doc.arguments, DOC_ARGUMENTS)?;
+    expect_value(
+        "the rustdoc stage must deny warnings",
+        &doc.rustdocflags,
+        "-D warnings",
+    )?;
 
     let clippy = stage(&invocations, "clippy")?;
-    if clippy
-        .arguments
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        != CLIPPY_ARGUMENTS
-    {
-        return Err(format!(
-            "the Clippy stage passed {:?}, expected {CLIPPY_ARGUMENTS:?}",
-            clippy.arguments
-        ));
-    }
+    expect_arguments("Clippy", &clippy.arguments, CLIPPY_ARGUMENTS)?;
 
     let whitaker = stage(&invocations, "whitaker")?;
-    if whitaker
-        .arguments
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>()
-        != WHITAKER_ARGUMENTS
-    {
-        return Err(format!(
-            "the Whitaker stage passed {:?}, expected {WHITAKER_ARGUMENTS:?}",
-            whitaker.arguments
-        ));
-    }
-    if whitaker.dylint_rustflags != "-D warnings" {
-        return Err(format!(
-            "the Whitaker stage must deny lint warnings; the stub saw `{}`",
-            whitaker.dylint_rustflags
-        ));
-    }
-    if !whitaker.rustflags.is_empty() {
-        return Err(format!(
-            "the Whitaker stage must clear RUSTFLAGS; the stub saw `{}`",
-            whitaker.rustflags
-        ));
-    }
+    expect_arguments("Whitaker", &whitaker.arguments, WHITAKER_ARGUMENTS)?;
+    expect_value(
+        "the Whitaker stage must deny lint warnings",
+        &whitaker.dylint_rustflags,
+        "-D warnings",
+    )?;
+    expect_value(
+        "the Whitaker stage must clear RUSTFLAGS",
+        &whitaker.rustflags,
+        "",
+    )?;
     Ok(())
 }
 
-#[test]
-fn a_failing_stage_stops_the_aggregate() -> Result<(), String> {
-    for (failing, expected) in [
-        ("doc", vec!["doc"]),
-        ("clippy", vec!["doc", "clippy"]),
-        ("whitaker", vec!["doc", "clippy", "whitaker"]),
-    ] {
-        let directory =
-            TempDir::new().map_err(|error| format!("creating a temporary directory: {error}"))?;
-        let output = run_lint_target(directory.path(), failing)?;
-        if output.status.success() {
-            return Err(format!(
-                "make lint must fail when the {failing} stage fails"
-            ));
-        }
-        let invocations = read_invocations(directory.path())?;
-        if stage_names(&invocations) != expected {
-            return Err(format!(
-                "a failing {failing} stage must stop the aggregate after {:?}; ran {:?}",
-                expected,
-                stage_names(&invocations)
-            ));
-        }
+/// Verifies that a failing stage stops the aggregate before the next one runs.
+#[rstest]
+#[case::rustdoc("doc", &["doc"])]
+#[case::clippy("clippy", &["doc", "clippy"])]
+#[case::whitaker("whitaker", &["doc", "clippy", "whitaker"])]
+fn a_failing_stage_stops_the_aggregate(
+    #[case] failing: &str,
+    #[case] expected: &[&str],
+) -> Result<(), String> {
+    let directory =
+        TempDir::new().map_err(|error| format!("creating a temporary directory: {error}"))?;
+    let output = run_lint_target(directory.path(), failing)?;
+    if output.status.success() {
+        return Err(format!(
+            "make lint must fail when the {failing} stage fails"
+        ));
+    }
+    let invocations = read_invocations(directory.path())?;
+    let ran = stage_names(&invocations);
+    if ran.as_slice() != expected {
+        return Err(format!(
+            "a failing {failing} stage must stop the aggregate after {expected:?}; ran {ran:?}"
+        ));
     }
     Ok(())
 }
