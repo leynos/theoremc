@@ -120,6 +120,7 @@ fn workspace_rust_versions() -> Result<Vec<(String, String)>, String> {
     let output = Command::new("cargo")
         .args(["metadata", "--no-deps", "--format-version", "1"])
         .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env("CARGO_NET_OFFLINE", "true")
         .output()
         .map_err(|error| format!("running cargo metadata: {error}"))?;
     if !output.status.success() {
