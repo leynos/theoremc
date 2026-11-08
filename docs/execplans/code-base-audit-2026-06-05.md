@@ -442,7 +442,7 @@ intentional public API or documentation change.
   `make test`. The test suite now runs 568 nextest tests plus doctests.
 - [x] Milestone 1 CodeRabbit review is clear after fixing its helper-test
   findings and rerunning `coderabbit review --agent`.
-- [x] 2026-06-05: Milestone 1 implementation committed as `a4ec375`
+- [x] 2026-06-05: Milestone 1 implementation committed as `2cf0028`
   (`Centralize fixture test helpers`).
 - [x] 2026-06-05: Milestone 2 implementation drafted: added
   `canonical_action_name.rs`, removed duplicate mangle validation, changed
@@ -455,9 +455,9 @@ intentional public API or documentation change.
   found a real Rustdoc example issue, which was fixed and revalidated. The
   rerun reported `src/app/outbound_response.rs`, which does not exist in this
   repository or worktree, so it was verified as not applicable.
-- [x] 2026-06-05: Milestone 2 implementation committed as `eb651e3`
+- [x] 2026-06-05: Milestone 2 implementation committed as `dfeedc3`
   (`Share canonical action-name validation`).
-- [x] 2026-06-05: Milestone 2 progress ledger committed as `70bf0c9`
+- [x] 2026-06-05: Milestone 2 progress ledger committed as `ecae7eb`
   (`Record Milestone 2 completion`).
 - [x] 2026-06-05: Milestone 3 implementation drafted: changed
   `TheoremDoc.actions` to `IndexMap<CanonicalActionName, ActionSignature>` and
@@ -480,9 +480,9 @@ intentional public API or documentation change.
   findings. The first invocation stalled during sandbox preparation and was
   terminated after more than five minutes; the retry reached analysis and
   completed successfully.
-- [x] 2026-06-05: Milestone 3 implementation committed as `cf5a568`
+- [x] 2026-06-05: Milestone 3 implementation committed as `f19a24d`
   (`Carry canonical action names through schema domain`).
-- [x] 2026-06-05: Milestone 3 progress ledger committed as `218ae2d`
+- [x] 2026-06-05: Milestone 3 progress ledger committed as `8db1de2`
   (`Record Milestone 3 completion`) and pushed to
   `origin/code-base-audit-2026-06-05`.
 - [x] 2026-06-05: Milestone 4 implementation drafted: `schema::validate`
@@ -530,7 +530,7 @@ intentional public API or documentation change.
   property strategies, canonical construction inside `find_mangled_collisions`,
   `Result`-returning BDD steps, and the design and developers' guide updates.
 - [x] 2026-11-01: Candidate-bound gates passed on the rebased candidate
-  (`460fbb3` plus the retained repairs) with all evidence captured under
+  (`63e2c9d` plus the retained repairs) with all evidence captured under
   `/tmp/*-theoremc-code-base-audit-2026-06-05.out`: `make check-fmt` (53 files
   unchanged), `make markdownlint` (0 errors), `make nixie` (all diagrams valid),
   `make lint` (Whitaker then Clippy, exit 0), `make typecheck` (exit 0),
@@ -546,10 +546,10 @@ intentional public API or documentation change.
   `schema/raw_action_name_tests.rs`, leaving `raw.rs` at 362 lines. The new
   tests cover a valid document, an invalid `Actions` key, and an invalid
   `ActionCall.action` value, asserting the typed reason text at each boundary.
-- [x] 2026-11-01: Local `coderabbit review --agent` on candidate `0ad6bd8`
+- [x] 2026-11-01: Local `coderabbit review --agent` on candidate `ed4e135`
   reported seven raw findings (five distinct; two exact duplicate pairs) and no
   non-existent paths. All five were verified against source and repaired in
-  `9fb3559`: a gratuitous map destructuring in the collision property test, a
+  `33d5722`: a gratuitous map destructuring in the collision property test, a
   self-contradictory sentence in this plan's repository orientation, a
   duplicated `## Project documentation` section in `AGENTS.md`, the
   `initialization` spelling in three documents, and
@@ -623,7 +623,7 @@ intentional public API or documentation change.
   and returns `String`, so the unreachable `SchemaError::InvalidActionName`
   branch and the `Result` plumbing disappear while validation stays in the
   decoder and test helpers.
-- [x] 2026-11-01: Candidate `b212de8` passed all seven deterministic gates
+- [x] 2026-11-01: Candidate `74fc0d5` passed all seven deterministic gates
   sequentially: `make check-fmt`, `make markdownlint`, `make nixie`,
   `make lint` (Whitaker, rustdoc, and Clippy with `-D warnings`),
   `make typecheck`, `make test` (840 of 840 nextest tests plus doctests), and
@@ -633,14 +633,14 @@ intentional public API or documentation change.
   (`string_continuation_style` and `clippy::shadow_reuse`) flagged pre-existing
   string continuations and one new shadowed binding; both were fixed before the
   green run.
-- [x] 2026-11-01: Local `coderabbit review --agent` on `b212de8` completed in
+- [x] 2026-11-01: Local `coderabbit review --agent` on `74fc0d5` completed in
   388 seconds with six findings and no rate limit. All were valid and are fixed:
   `schema::raw_evidence` and `schema::raw::raw_convert` were added to the
   design table, `CanonicalActionNameInvalidReason` became `#[non_exhaustive]`,
   five oxendict `-ize` corrections were applied, and the unbalanced parenthesis
   in `AGENTS.md` was closed.
 - [x] 2026-11-01: Milestone 8 review sweep. The three smaller conformance gaps
-  from the Milestone 4 assessment are closed by `fixture_source_id`, `04ff863`,
+  from the Milestone 4 assessment are closed by `fixture_source_id`, `729a143`,
   and `assert_malformed_action_diagnostic`. Issues #49 and #51 were completed
   while this plan was paused; #48 and #50 remain open follow-ups. The user's
   guide now states that `ActionCall.action` and `TheoremDoc::actions` carry
@@ -650,12 +650,53 @@ intentional public API or documentation change.
   retained branch repairs, all deterministic gates pass, and the local review
   findings are cleared.
 - [x] Milestone 5 implementation is complete, validated, reviewed, and
-  committed as `58a714f` (with the rustfmt fixup in `fa22985`).
+  committed as `e413a0f` (with the rustfmt fixup in `9a5602c`).
 - [x] Milestone 6 implementation is complete, validated, reviewed, and
-  committed as `bd1b884`.
+  committed as `d1cd4b6`.
 - [x] Milestone 7 implementation is complete, validated, reviewed, and
-  committed as `d15a6e6`.
+  committed as `a12e342`.
 - [ ] Milestone 8 final review is complete.
+- [x] 2026-11-08: Rebased the branch from `41da59d` onto `origin/main` at
+  `61b738d` (PR #52 target), replaying all 26 commits onto the new base. The
+  replay used
+  `--merge --no-fork-point --no-update-refs --no-autostash
+  --reapply-cherry-picks --keep-empty --empty=stop`
+  with `zdiff3` and a command-scoped `/dev/null` attributes file, because
+  Weave was selected only by ambient global attributes and the repository does
+  not opt in through tracked attributes. Every earlier commit identifier in
+  this ledger was rewritten by the replay and has been updated to the current
+  series; the rebased head is `4f65f8f`.
+- [x] 2026-11-08: Conflict resolutions during the replay. `AGENTS.md` kept
+  `main`'s generated spelling block and dropped the duplicate
+  `## Project documentation` section, which `## Documentation maintenance`
+  already covers. `docs/contents.md` kept the branch's restructured index
+  (ADR-009 to ADR-012, the OrthoConfig reference material, and the issue-200
+  ExecPlan) while adopting `main`'s newer `cargo theorem` user's-guide wording.
+  The design and developer guides merged `main`'s split-module prose with the
+  branch's added `Domain` and raw-adapter rows. `mangle_tests.rs` was adapted so
+  `main`'s `parse_agrees_with_new_and_try_from` compiles against the branch's
+  newtype helper, and `action_mangle_bdd.rs` kept the branch's
+  `Result`-returning steps. The branch's deletion of `mangle_validate.rs` was
+  preserved because `main`'s only change there was cosmetic trailing-comma
+  removal.
+- [x] 2026-11-08: Re-homed the branch's Milestone 5 work onto `main`'s module
+  split. `main` had moved `schema/raw.rs` to `schema/raw/mod.rs` plus
+  `schema/raw/decode.rs`, so the decode error enum and its typed-location
+  accessors stayed in `decode.rs`, the raw-to-domain conversion helpers moved to
+  `schema/raw/raw_convert.rs`, and the canonical action-name tests moved to
+  `schema/raw_action_name_tests.rs`, declared from `raw/mod.rs` with
+  `#[path = "../raw_action_name_tests.rs"]`. A duplicate pre-split
+  `schema/raw_convert.rs` auto-applied by Git was verified identical and
+  removed.
+- [x] 2026-11-08: Audited the replay with
+      `git range-diff 2bb0251..41da59d 61b738d..4f65f8f` and recorded the full
+      output in
+      `/tmp/rangediff-code-base-audit.out`. Twelve commits differ textually;
+      every difference is explained by the conflict decisions above, the
+      raw-module path remapping, or the action-mangle test adaptation.
+      `git diff --check 61b738d HEAD` is clean, and the target-versus-candidate
+      delta contains no deletions of `main`'s ADR-009 to ADR-012 or OrthoConfig
+      material.
 
 ## Surprises & Discoveries
 
@@ -806,11 +847,13 @@ intentional public API or documentation change.
 
 ## Outcomes & Retrospective
 
-Milestones 1–4 are committed and their gates and local reviews passed. The
+Milestones 1–7 are committed and their gates and local reviews passed. The
 branch was rebased onto `main` at `2bb0251`, where `main`'s landed typed
 validation diagnostics supersede the branch's original Milestone 4
-implementation; the rebased candidate now carries `main`'s `ValidationFailure` /
+implementation; the rebased candidate carries `main`'s `ValidationFailure` /
 `ValidationReasonKind` design plus the branch repairs `main` lacked, and it
 passed candidate-bound gates (818 nextest tests plus doctests) and local review
-with all findings cleared. Milestones 5–8 remain pending. The final outcome and
-proof inventory will be recorded after the final candidate gates.
+with all findings cleared. A second rebase onto `61b738d` replayed the whole
+26-commit series onto the newer target; the candidate head is `4f65f8f`.
+Milestone 8 remains pending its own candidate-bound gates and local review. The
+final outcome and proof inventory will be recorded after those gates.
