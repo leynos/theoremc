@@ -128,8 +128,13 @@ mod tests {
         },
     ];
     const LINK: LinkArg = LinkArg("-C link-arg=-fuse-ld=lld");
-    const OK: &str = "CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang \
-        RUSTFLAGS=\"-D warnings -C link-arg=-fuse-ld=lld\" CFLAGS=\"-fuse-ld=lld\" LDFLAGS=\"-fuse-ld=lld\" cargo llvm-cov --lcov";
+    const OK: &str = concat!(
+        "CARGO_PROFILE_DEV_CODEGEN_BACKEND=llvm ",
+        "CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang ",
+        "RUSTFLAGS=\"-D warnings -C link-arg=-fuse-ld=lld\" ",
+        "CFLAGS=\"-fuse-ld=lld\" LDFLAGS=\"-fuse-ld=lld\" ",
+        "cargo llvm-cov --lcov"
+    );
 
     fn command(text: &str) -> Command {
         Command {
