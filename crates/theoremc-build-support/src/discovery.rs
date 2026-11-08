@@ -12,12 +12,15 @@ use cap_std::{
 };
 use thiserror::Error;
 
+/// Directory relative to the crate root that holds theorem files.
 const THEOREMS_DIR: &str = "theorems";
 
 /// Ordered theorem inputs plus the directories Cargo should watch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildDiscovery {
+    /// Theorem files discovered in deterministic order.
     theorem_files: Vec<Utf8PathBuf>,
+    /// Directories Cargo should watch for changes.
     watched_directories: Vec<Utf8PathBuf>,
 }
 
