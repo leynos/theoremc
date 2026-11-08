@@ -344,20 +344,25 @@ full rustdoc set (`broken_intra_doc_links`, `private_intra_doc_links`,
 `cfg(kani)` and `cfg(dylint_lib)`, so Kani harnesses and Dylint libraries are
 declared once instead of carrying per-site expectations.
 
-Adoption is deliberately partial, and three baseline rules are deferred rather
-than adopted silently. `clippy::disallowed_methods` waits on replacing the
-`test-helpers` environment guard and its direct `std::env` calls with injected
-readers. `unsafe_code = "forbid"` waits on removing the two `unsafe` blocks
-that same guard owns in `crates/test-helpers`, because a `forbid`-level lint
-cannot be relaxed locally. `clippy::missing_docs_in_private_items` waits on
-documenting the 224 private items it reports, concentrated in
-`crates/theoremc-macros/src/lib.rs` and `crates/theoremc-core`. None of the
-three is enforced yet, so do not treat a clean `make lint` as proof that they
-hold.
+Adoption is deliberately partial, and one baseline rule is still deferred
+rather than adopted silently: `clippy::missing_docs_in_private_items` waits on
+documenting every private item it reports, concentrated in
+`crates/theoremc-macros/src/lib.rs` and `crates/theoremc-core`. That rule is
+not enforced yet, so do not treat a clean `make lint` as proof that it holds.
 
 Where a rule is adopted but tuned differently, record the reason beside the
 setting: `clippy.toml` keeps `cognitive-complexity-threshold = 9` to match
 CodeScene's ceiling, where Netsuke raises it to 32.
+
+Environment access follows the same policy, and this layer is where the last
+two deferred rules land. Production code reads the environment through an
+injected reader rather than mutating or querying the process directly, so a
+test passes a stub value or error instead of changing global state. The only
+sanctioned reads are the boundary seams in the macro, build script, and test
+harnesses that must inherit Cargo's or the host's values; each carries
+`#[expect(clippy::disallowed_methods, reason = "...")]`, and `allow` is never
+used. `unsafe_code = "forbid"` is set workspace-wide, so no expectation can
+re-open it.
 
 `make lint-whitaker` runs the Whitaker Dylint suite through the `whitaker`
 wrapper. Install it with `whitaker-installer` so that `whitaker` is on `PATH`,

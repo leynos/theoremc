@@ -9,10 +9,10 @@
 use super::tests_support::{
     TheoremFixture, TheoremSpec, assert_expansion_is_stable, assert_single_theorem_expansion,
     expand_fixture, expected_expansion_with_unwinds, make_single_theorem_fixture, redact_hashes,
-    set_cargo_manifest_dir_for_test, temp_fixture_dir, write_fixture,
+    temp_fixture_dir, write_fixture,
 };
 use super::{
-    MacroExpansionError, expand_theorem_file_at, generated_harnesses, manifest_dir_from_env,
+    MacroExpansionError, expand_theorem_file_at, generated_harnesses, manifest_dir_from_reader,
 };
 use camino::Utf8Path;
 use googletest::prelude::*;
@@ -97,10 +97,8 @@ fn expansion_is_stable_for_repeat_calls() -> Result<(), Box<dyn std::error::Erro
 
 #[test]
 fn manifest_dir_from_env_reports_missing_manifest_dir() {
-    let _env = set_cargo_manifest_dir_for_test(None);
-
-    let error =
-        manifest_dir_from_env().expect_err("missing CARGO_MANIFEST_DIR should return an error");
+    let error = manifest_dir_from_reader(|_| Err(std::env::VarError::NotPresent))
+        .expect_err("missing CARGO_MANIFEST_DIR should return an error");
 
     assert!(matches!(error, MacroExpansionError::MissingManifestDir));
 }
@@ -115,9 +113,8 @@ fn manifest_dir_from_env_supports_expansion_from_valid_manifest_dir()
     });
     let (_temp_dir, fixture_dir) = temp_fixture_dir()?;
     write_fixture(&fixture_dir, path, &fixture)?;
-    let _env = set_cargo_manifest_dir_for_test(Some(fixture_dir.as_str()));
 
-    let manifest_dir = manifest_dir_from_env()?;
+    let manifest_dir = manifest_dir_from_reader(|_| Ok(fixture_dir.as_str().to_owned()))?;
     let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
 
     expand_theorem_file_at(&manifest_dir, &path_literal)?;
