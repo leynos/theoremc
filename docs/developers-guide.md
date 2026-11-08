@@ -335,6 +335,30 @@ real `cargo doc` and `cargo clippy` invocations, so a finding in the non-root
 member is shown to fail the stage rather than merely being passed the right
 arguments.
 
+The `[workspace.lints]` tables adopt the `leynos/netsuke` baseline as a
+minimum, in layers, and keep any stricter TheoremC rule. This layer adds
+`missing_assert_message`, `unknown_lints`, `renamed_and_removed_lints`, the
+full rustdoc set (`broken_intra_doc_links`, `private_intra_doc_links`,
+`bare_urls`, `invalid_html_tags`, `invalid_codeblock_attributes`,
+`unescaped_backticks`), and `unexpected_cfgs` with `check-cfg` declarations for
+`cfg(kani)` and `cfg(dylint_lib)`, so Kani harnesses and Dylint libraries are
+declared once instead of carrying per-site expectations.
+
+Adoption is deliberately partial, and three baseline rules are deferred rather
+than adopted silently. `clippy::disallowed_methods` waits on replacing the
+`test-helpers` environment guard and its direct `std::env` calls with injected
+readers. `unsafe_code = "forbid"` waits on removing the two `unsafe` blocks
+that same guard owns in `crates/test-helpers`, because a `forbid`-level lint
+cannot be relaxed locally. `clippy::missing_docs_in_private_items` waits on
+documenting the 224 private items it reports, concentrated in
+`crates/theoremc-macros/src/lib.rs` and `crates/theoremc-core`. None of the
+three is enforced yet, so do not treat a clean `make lint` as proof that they
+hold.
+
+Where a rule is adopted but tuned differently, record the reason beside the
+setting: `clippy.toml` keeps `cognitive-complexity-threshold = 9` to match
+CodeScene's ceiling, where Netsuke raises it to 32.
+
 `make lint-whitaker` runs the Whitaker Dylint suite through the `whitaker`
 wrapper. Install it with `whitaker-installer` so that `whitaker` is on `PATH`,
 and never call `cargo dylint` directly. The recipe sets
