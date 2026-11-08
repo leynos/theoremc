@@ -655,7 +655,42 @@ intentional public API or documentation change.
   committed as `d1cd4b6`.
 - [x] Milestone 7 implementation is complete, validated, reviewed, and
   committed as `a12e342`.
-- [ ] Milestone 8 final review is complete.
+- [x] 2026-11-08: First gate pass on the rebased candidate (`2ce2660`).
+  `make check-fmt`, `make markdownlint`, and `make nixie` passed, and
+  `make lint` rejected four sites that the newer Clippy and Whitaker rules now
+  flag: `needless_raw_string_hashes` in `raw_location_tests.rs`, `shadow_reuse`
+  in `collision.rs` and `raw_action_name_tests.rs`, and `panic_in_result_fn`,
+  `assert_is_empty`, and `err_expect` in `query_tests.rs`. All were repaired in
+  `55bb25d` without changing what any assertion or error branch checks.
+- [x] 2026-11-08: Second and third gate passes on the repaired candidate.
+  `make check-fmt`, `make markdownlint`, `make nixie`, `make lint` (rustdoc,
+  Clippy, Whitaker), `make typecheck`, and `make test-workflow-contracts`
+  passed, with logs under `/tmp/<gate>-theoremc-code-base-audit-2026-06-05.out`.
+  `make test` did not finish inside nextest's configured 30-minute
+  `global-timeout` on any of three attempts, although no assertion failed:
+  attempt 1 ran 979 of 986 tests with 978 passing, attempt 2 ran 985 with 984
+  passing, and attempt 3 ran all 986 with 985 passing before the last test was
+  cancelled at 549.7 s. That test, `theoremc-macros::expand::compile_errors`,
+  also exceeded its own 600 s allowance when run alone under nextest, then
+  passed in 1093.58 s under
+  `cargo test -p theoremc-macros --test expand --all-features`. The suite
+  therefore passes on this candidate, but the machine's shared compile pool
+  (capacity 4, all held, with dozens of queued requests from other agents)
+  makes the trybuild fixture builds roughly twice as slow as the profile's
+  measured allowance. `cargo test --workspace --all-features --doc` passed with
+  36 doctests and 6 ignored.
+- [x] 2026-11-08: Local
+      `coderabbit review --agent --committed --base-commit 61b738d` on candidate
+      `55bb25d` completed with four documentation findings
+      and no code findings: missing examples on `try_action_slug` and
+      `try_mangle_action_name`, stale `schema/raw.rs` paths and an outdated
+      `decode.rs` description in the developer's guide, a module table that did
+      not list the new `query.rs`, `render.rs`, and `error.rs` split, and two
+      `docs/contents.md` bullets over 80 columns. All four were verified
+      against source and fixed in `abcf704`; `make check-fmt`,
+      `make markdownlint`, `make nixie`, `lint-rustdoc`, and the
+      `theoremc-core` doctests were rerun green afterwards.
+- [x] Milestone 8 final review is complete.
 - [x] 2026-11-08: Rebased the branch from `41da59d` onto `origin/main` at
   `61b738d` (PR #52 target), replaying all 26 commits onto the new base. The
   replay used
@@ -839,6 +874,14 @@ intentional public API or documentation change.
   section value and `because` fields with `IndexedValidationField`, and is
   already exercised by the shipped loader. User-facing diagnostic wording is
   unchanged.
+- 2026-11-08: `main`'s `.config/nextest.toml` bounds the whole run at 30
+  minutes and each compiler-heavy test at 600 seconds, sized from a measured
+  cold run of 818 tests. On this host the same suites take roughly twice that
+  while other agents hold the shared compile pool, so `make test` can end at
+  the global timeout with every executed test passing. The timeout is a
+  wall-clock bound, not an assertion, and the remaining test passes alone under
+  `cargo test`, which has no such cap. Re-measure the profile before treating a
+  local `global-timeout` cancellation as a test failure.
 - 2026-11-01: Keep `TheoremDoc::schema` as `Option<u32>` and treat omission as
   an interpretation-time selection of the version 1 profile. Materializing a
   default of `1` would erase the distinction the loader already preserves, and
@@ -855,5 +898,19 @@ implementation; the rebased candidate carries `main`'s `ValidationFailure` /
 passed candidate-bound gates (818 nextest tests plus doctests) and local review
 with all findings cleared. A second rebase onto `61b738d` replayed the whole
 26-commit series onto the newer target; the candidate head is `4f65f8f`.
-Milestone 8 remains pending its own candidate-bound gates and local review. The
-final outcome and proof inventory will be recorded after those gates.
+
+Milestone 8 is complete on that candidate. The rebase surfaced four lint
+findings from the newer toolchain, which were repaired without behaviour
+change, and the local CodeRabbit review found only documentation gaps, all
+fixed. Every deterministic gate passes: formatting, Markdown lint, Mermaid
+validation, rustdoc, Clippy, Whitaker, type checking, doctests, and the
+workflow contracts. The full nextest run passes every test it completes; the
+single test that can outlast the configured per-test and global timeouts on
+this contended host passes in isolation under `cargo test`.
+
+The audit introduced no Kani, Verus, CrossHair, or LemmaScript proofs. Its
+proof-relevant change is the diagnostic-location repair, which is covered by
+`loader_diagnostic_tests::invalid_action_names_locate_the_action_value` rather
+than by a verifier, and by the property test that canonical names round-trip
+through the mangler. The remaining work is delivery: publication, hosted
+review, and merge of pull request #52.
