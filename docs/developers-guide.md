@@ -132,15 +132,15 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 
 **Table:** Module layers and responsibilities
 
-| Layer         | Crate                    | Modules                                                | Responsibility                                                                 |
-| ------------- | ------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| Domain        | `theoremc-core`          | `canonical_action_name.rs`                             | Shared canonical action-name grammar and newtype                               |
-| Schema        | `theoremc-core`          | `schema/loader/`, `schema/raw/`, `schema/validate*.rs` | YAML loading, span-aware conversion, duplicate-key diagnostics, and validation |
-| Mangle        | `theoremc-core`          | `mangle*.rs`                                           | Deterministic identifier generation                                            |
-| Cross-cutting | `theoremc-core`          | `collision.rs`                                         | Collision detection across schema and mangle                                   |
-| Proc-macro    | `theoremc-macros`        | `lib.rs`                                               | Proc-macro entry points, theorem-file loading delegation, and code generation  |
-| Lowering      | `theoremc`               | `arg_lowering.rs`                                      | Test-gated prototype for converting semantic values to Rust token trees        |
-| Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs`            | Theorem file discovery, suite generation, and Cargo change tracking            |
+| Layer         | Crate                    | Modules                                                | Responsibility                                                                       |
+| ------------- | ------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Domain        | `theoremc-core`          | `canonical_action_name.rs`                             | Shared canonical action-name grammar and newtype                                     |
+| Schema        | `theoremc-core`          | `schema/loader/`, `schema/raw/`, `schema/validate*.rs` | YAML loading, span-aware conversion, duplicate-key diagnostics, and validation       |
+| Mangle        | `theoremc-core`          | `mangle*.rs`                                           | Deterministic identifier generation                                                  |
+| Cross-cutting | `theoremc-core`          | `collision.rs`                                         | Collision detection across schema and mangle                                         |
+| Proc-macro    | `theoremc-macros`        | `lib.rs`, `query.rs`, `render.rs`, `error.rs`          | Macro entry points, semantic query phase, token rendering, and expansion diagnostics |
+| Lowering      | `theoremc`               | `arg_lowering.rs`                                      | Test-gated prototype for converting semantic values to Rust token trees              |
+| Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs`            | Theorem file discovery, suite generation, and Cargo change tracking                  |
 
 The schema loader entry point is `schema/loader/mod.rs`. It coordinates YAML
 deserialization, duplicate-key checking, raw-to-domain conversion, semantic
@@ -153,9 +153,12 @@ files with `#[path = "../loader_tests.rs"]`,
 `#[path = "../loader_duplicate_tests.rs"]`.
 
 The raw span adapter is defined in `schema/raw/mod.rs`, which privately declares
-`schema/raw/decode.rs` and re-exports `RawDocDecodeError` as `pub(crate)`. The
-decode helpers are `pub(super)` and perform raw-to-domain conversion for `Let`
-bindings and `Do` steps. Raw span-location tests stay in the sibling
+`schema/raw/decode.rs` and re-exports `RawDocDecodeError` as `pub(crate)`.
+`decode.rs` holds only that error enum and its location, parameter, and binding
+accessors. The `pub(super)` conversion helpers perform raw-to-domain conversion
+for `Actions`, `Let` bindings, and `Do` steps from `schema/raw/raw_convert.rs`,
+consuming the raw mirror types in `schema/raw_action.rs` and
+`schema/raw_evidence.rs`. Raw span-location tests stay in the sibling
 `schema/raw_location_tests.rs` file.
 
 Rust-type lifetime unit tests live in `schema/rust_type_tests.rs`. Property
@@ -181,8 +184,8 @@ identifiers, or user-facing text.
 
 Public schema domain types under `schema/types.rs` carry no serde derives.
 Spelling, aliases, defaults, and unknown-key policy belong to the raw adapter in
-`schema/raw.rs`, `schema/raw_action.rs`, and `schema/raw_evidence.rs`, which
-mirrors each domain type and converts into it explicitly. When adding a
+`schema/raw/mod.rs`, `schema/raw_action.rs`, and `schema/raw_evidence.rs`,
+which mirrors each domain type and converts into it explicitly. When adding a
 YAML-visible field, extend the raw mirror and the conversion helper rather than
 deriving serde traits on the public type; that keeps the domain API independent
 of the YAML implementation as ADR-003 requires. The identifier newtypes remain
@@ -275,9 +278,9 @@ then `Actions.returns`, with canonical-token-stream deduplication.
 owns Rust type parsing and comparison so schema validation, action signature
 equivalence, and macro probe generation do not drift apart.
 `parse_with_free_named_lifetime` parses once and performs the schema-validation
-lifetime analysis for free named lifetime parameters. The macro renderer still
-uses `syn::parse_str` directly for probe emission rather than routing through
-the shared parser.
+lifetime analysis for free named lifetime parameters. The macro query phase in
+`query.rs` still uses `syn::parse_str` directly for probe emission rather than
+routing through the shared parser; `render.rs` performs no parsing of its own.
 
 Macro tests should keep the layers distinct:
 

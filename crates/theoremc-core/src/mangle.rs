@@ -258,6 +258,11 @@ pub fn action_slug(canonical_name: &CanonicalActionName) -> String {
 
 /// Validates and builds the escaped slug from a canonical action-name string.
 ///
+///     use theoremc_core::mangle::try_action_slug;
+///     let slug = try_action_slug("account.deposit").expect("valid canonical name");
+///     assert_eq!(slug, "account__deposit");
+///     assert!(try_action_slug("deposit").is_err());
+///
 /// # Errors
 ///
 /// Returns [`InvalidCanonicalActionName`] when the input does not satisfy the
@@ -303,6 +308,11 @@ pub fn mangle_action_name(canonical_name: &CanonicalActionName) -> MangledAction
 
 /// Validates and mangles a canonical action-name string into a
 /// [`MangledAction`].
+///
+///     use theoremc_core::mangle::try_mangle_action_name;
+///     let m = try_mangle_action_name("account.deposit").expect("valid canonical name");
+///     assert_eq!(m.identifier(), "account__deposit__h05158894bfb4");
+///     assert!(try_mangle_action_name("deposit").is_err());
 ///
 /// # Errors
 ///
