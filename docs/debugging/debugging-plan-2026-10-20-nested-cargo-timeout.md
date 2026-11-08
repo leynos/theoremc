@@ -80,24 +80,37 @@ These precedents support persistent fixture build artefacts and a Nextest
 scheduling group. Raising timeouts alone does not address either avoidable
 recompilation or admission failures.
 
-The repair keeps temporary source isolation, selects generated output for the
-exact fixture, and leaves compiler admission and the shared Cargo cache intact.
-Fixture sources now live under `target/fixture-sources`; fixture dependencies
-reuse the workspace Cargo target, normally `target`. The `nested-cargo` Nextest
-group serializes Cargo-spawning test binaries for build discovery, suite
-generation, common support and theorem-file macros, plus the compile-error
-suite, across separate test processes. Cargo JSON output is filtered to JSON
-object lines before parsing because verbose build-script output can be
-interleaved on stdout. Tests cover source isolation, exact manifest/output
-selection, mixed Cargo output, malformed JSON, and the shared target contract.
+The repair's conclusion stands: fixtures need persistent, reusable dependency
+artefacts plus cross-process serialization of Cargo-spawning tests. The target
+branch had independently landed that repair in #228 and #231 before this branch
+was rebased, so the rebase adopted the target's implementation and dropped the
+branch's parallel one.
 
-The branch was rebased onto fetched `origin/main` at `2bb0251`, using `af76081`
-as the verified old-base boundary. All six branch commits were replayed. The
-target's `hermetic_cargo` helper is retained and now receives the workspace
-fixture target, so its removal of the caller's build-directory variables still
-applies while dependencies remain shared. The target's reference-provenance
-guidance and the installed-Kani harness check remain intact.
+What remains from this investigation:
 
-No test skip or timeout increase is part of the repair. The rebased candidate
-`03e01f3` passed `make check-fmt`, `make typecheck`, `make lint`, `make test`
-(834 of 834 tests, including doctests), `make markdownlint`, and `make nixie`.
+- Fixtures build into a warm target shared by every fixture,
+  `theoremc-fixture-builds` under `$CARGO_TARGET_DIR` or the repository
+  `target`. Each fixture copies the workspace `Cargo.lock` and gets a unique
+  package name, and `generated_suite_contents` reads only the directories named
+  after its own package.
+- `tests/fixture_cache_contract.rs` pins that contract behaviourally: two
+  fixtures share one target, keep distinct source directories, and each
+  generated suite lists only its own theorem.
+- The `nested-cargo-builds` Nextest group serializes Cargo-spawning test
+  binaries across separate test processes, and its filter includes the new
+  contract test.
+- Cargo-spawning tests keep the process-local `FIXTURE_CARGO_LOCK` mutex for
+  the libtest threads inside one process.
+
+The branch's own implementation — fixture sources under
+`target/fixture-sources`, selection of the generated suite from Cargo's JSON
+messages, and the separate `fixture_cache`, `fixture_output` and
+`fixture_manifest` helper modules — duplicated the target's design. The rebase
+resolved those conflicts in the target's favour, so none of it is part of the
+result.
+
+The branch was rebased onto `origin/main` at `61b738d`, using `2bb0251` as the
+verified old-base boundary. Eleven of the twelve commits were replayed. The
+remaining commit only relaxed a `Result`-returning test that the resolution
+removed, so it replayed empty and was dropped. No test skip or timeout increase
+is part of the repair.
