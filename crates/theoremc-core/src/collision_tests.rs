@@ -186,7 +186,8 @@ fn crafted_collision_returns_mangled_identifier_collision_error(boilerplate: Doc
             .expect("test theorem name should be valid"),
     ];
 
-    let always_collide = |_: &str| Ok("colliding__identifier__h000000000000".to_owned());
+    let always_collide =
+        |_: &CanonicalActionName| "colliding__identifier__h000000000000".to_owned();
     let result = check_action_collisions_with(&docs, always_collide);
 
     let error = result.expect_err("should return MangledIdentifierCollision");
