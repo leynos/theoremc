@@ -74,6 +74,7 @@ allow_attributes                    = "deny"
 allow_attributes_without_reason     = "deny"
 blanket_clippy_restriction_lints    = "deny"
 cognitive_complexity                = "deny"
+disallowed_methods                  = "deny"
 needless_pass_by_value              = "deny"
 implicit_hasher                     = "deny"
 missing_assert_message              = "deny"
@@ -133,6 +134,7 @@ result_large_err                    = "deny"
 unknown_lints                       = "deny"
 renamed_and_removed_lints           = "deny"
 missing_docs                        = "deny"
+unsafe_code                         = "forbid"
 unexpected_cfgs                     = { level = "warn", check-cfg = [
   "cfg(kani)",
   "cfg(dylint_lib, values(any()))",

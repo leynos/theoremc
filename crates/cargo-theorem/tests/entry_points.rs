@@ -358,6 +358,10 @@ fn isolated_command(binary: impl AsRef<OsStr>, cwd: &Path, path: &OsString) -> C
 }
 
 /// Keep the Cargo proxy pointed at the installed toolchains after isolating HOME.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the child process inherits the host environment, so the test must read the ambient values it copies into the cleared child"
+)]
 fn rustup_home() -> Option<OsString> {
     env::var_os("RUSTUP_HOME").or_else(|| {
         env::var_os("HOME")
@@ -367,6 +371,10 @@ fn rustup_home() -> Option<OsString> {
 }
 
 /// Put the temporary command directory ahead of the host's executable path.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the child process inherits the host environment, so the test must read the ambient values it copies into the cleared child"
+)]
 fn isolated_path(bin_dir: &Path) -> Result<OsString> {
     let mut paths = vec![bin_dir.to_path_buf()];
     if let Some(current) = env::var_os("PATH") {
@@ -376,6 +384,10 @@ fn isolated_path(bin_dir: &Path) -> Result<OsString> {
 }
 
 /// Find the absolute Cargo client before the test child clears its environment.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the child process inherits the host environment, so the test must read the ambient values it copies into the cleared child"
+)]
 fn cargo_binary() -> Result<PathBuf> {
     let current = env::var_os("PATH").ok_or_else(|| anyhow::anyhow!("PATH is unavailable"))?;
     for directory in env::split_paths(&current) {
