@@ -121,13 +121,15 @@ The following audit findings are related but outside the direct scope of this
 implementation plan:
 
 - [#48](https://github.com/leynos/theoremc/issues/48): define or remove the
-  placeholder `theoremc` binary contract.
+  placeholder `theoremc` binary contract. Still open.
 - [#49](https://github.com/leynos/theoremc/issues/49): replace build-script
-  `#[path]` sharing with a stable build support boundary.
+  `#[path]` sharing with a stable build support boundary. Completed on
+  2026-10-18 while this plan was paused.
 - [#50](https://github.com/leynos/theoremc/issues/50): split oversized schema
-  modules to preserve the 400-line file limit.
+  modules to preserve the 400-line file limit. Still open; this plan's module
+  splits reduced some pressure but did not close the issue.
 - [#51](https://github.com/leynos/theoremc/issues/51): include provenance in
-  macro action-signature conflict diagnostics.
+  macro action-signature conflict diagnostics. Completed on 2026-10-16.
 
 ## Repository orientation
 
@@ -621,16 +623,38 @@ intentional public API or documentation change.
   and returns `String`, so the unreachable `SchemaError::InvalidActionName`
   branch and the `Result` plumbing disappear while validation stays in the
   decoder and test helpers.
+- [x] 2026-11-01: Candidate `b212de8` passed all seven deterministic gates
+  sequentially: `make check-fmt`, `make markdownlint`, `make nixie`,
+  `make lint` (Whitaker, rustdoc, and Clippy with `-D warnings`),
+  `make typecheck`, `make test` (840 of 840 nextest tests plus doctests), and
+  `make test-workflow-contracts`. Logs are under
+  `/tmp/<gate>-theoremc-code-base-audit-2026-06-05.out`. The first attempt
+  stopped at `make lint` because newly installed Whitaker rules
+  (`string_continuation_style` and `clippy::shadow_reuse`) flagged pre-existing
+  string continuations and one new shadowed binding; both were fixed before the
+  green run.
+- [x] 2026-11-01: Local `coderabbit review --agent` on `b212de8` completed in
+  388 seconds with six findings and no rate limit. All were valid and are fixed:
+  `schema::raw_evidence` and `schema::raw::raw_convert` were added to the
+  design table, `CanonicalActionNameInvalidReason` became `#[non_exhaustive]`,
+  five oxendict `-ize` corrections were applied, and the unbalanced parenthesis
+  in `AGENTS.md` was closed.
+- [x] 2026-11-01: Milestone 8 review sweep. The three smaller conformance gaps
+  from the Milestone 4 assessment are closed by `fixture_source_id`, `04ff863`,
+  and `assert_malformed_action_diagnostic`. Issues #49 and #51 were completed
+  while this plan was paused; #48 and #50 remain open follow-ups. The user's
+  guide now states that `ActionCall.action` and `TheoremDoc::actions` carry
+  `CanonicalActionName` values.
 - [x] Milestone 4 implementation is complete, validated, reviewed, and
   committed. The rebased candidate carries `main`'s typed diagnostics plus the
   retained branch repairs, all deterministic gates pass, and the local review
   findings are cleared.
-- [ ] Milestone 5 implementation is complete, validated, reviewed, and
-  committed.
-- [ ] Milestone 6 implementation is complete, validated, reviewed, and
-  committed.
-- [ ] Milestone 7 implementation is complete, validated, reviewed, and
-  committed.
+- [x] Milestone 5 implementation is complete, validated, reviewed, and
+  committed as `58a714f` (with the rustfmt fixup in `fa22985`).
+- [x] Milestone 6 implementation is complete, validated, reviewed, and
+  committed as `bd1b884`.
+- [x] Milestone 7 implementation is complete, validated, reviewed, and
+  committed as `d15a6e6`.
 - [ ] Milestone 8 final review is complete.
 
 ## Surprises & Discoveries
@@ -704,6 +728,12 @@ intentional public API or documentation change.
   encode guesses. The final cases pin the coordinates the implementation
   actually produces, discovered by asserting impossible bounds first and then
   replacing the probe with the real numbers.
+- 2026-11-01: `make lint` is not stable across Whitaker installations. The
+  installed suite gained `string_continuation_style` and `clippy::shadow_reuse`
+  between runs, so code that passed the Milestone 4 gates failed here without
+  being changed. Treat a lint failure in untouched code as a toolchain change
+  first: inspect the rule, and fix the code rather than pinning an older lint
+  set.
 
 ## Decision Log
 

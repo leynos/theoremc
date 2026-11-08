@@ -331,6 +331,11 @@ Do:
 - `action` (required): dot-separated action name (e.g., `account.deposit`).
 - `action` must use canonical grammar (`Segment ("." Segment)+`), where each
   segment is an ASCII identifier and not a Rust reserved keyword.
+- In the Rust model this field is a `CanonicalActionName`, not a `String`, and
+  `TheoremDoc::actions` is keyed by `CanonicalActionName` too. The loader
+  validates once during decoding, so consumers compare or read `as_str()`
+  instead of re-parsing. Construct a value with `CanonicalActionName::new`,
+  which returns `InvalidCanonicalActionName` on malformed input.
 - `args` (required): mapping of parameter name to value.
 - `as` (optional): binding name for the return value.
 
