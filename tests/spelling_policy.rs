@@ -1,9 +1,11 @@
 //! Non-vacuous policy test for the repository spelling overlay.
 //!
-//! The test runs the real pinned builder against two temporary, tracked
-//! fixtures. The first exercises every pattern in `typos.local.toml`, so a
-//! pattern that stops matching makes the fixture fail. The second adds one
-//! ordinary misspelling to prove the masked prose is still checked.
+//! The tests run the real pinned builder against temporary, tracked fixtures.
+//! The first exercises every pattern in `typos.local.toml`, so a pattern that
+//! stops matching makes the fixture fail. The second adds one ordinary
+//! misspelling to prove the masked prose is still checked. The third commits a
+//! `typos.toml` that the builder would regenerate differently, proving the
+//! gate's freshness check rejects a stale committed file.
 //!
 //! The fixture prose lives under `tests/fixtures/spelling/` and is excluded
 //! from the repository gate, because it must contain the spellings the gate
@@ -74,8 +76,7 @@ fn stage_fixture(prose: &str) -> Result<tempfile::TempDir, String> {
         .write("prose.md", prose)
         .map_err(|error| format!("write prose: {error}"))?;
     run_git(directory.path(), &["init"])?;
-    run_git(directory.path(), &["add", "-A"])?;
-    run_git(directory.path(), &["commit", "-m", "fixture"])?;
+    commit_fixture(directory.path(), "fixture")?;
     Ok(directory)
 }
 
@@ -93,6 +94,27 @@ fn run_gate(fixture: &Path) -> Result<Output, String> {
         .env("TYPOS_CONFIG_BUILDER_OFFLINE", "true")
         .output()
         .map_err(|error| format!("run make: {error}"))
+}
+
+/// Appends `line` to a fixture file, keeping the existing content.
+///
+/// The freshness case needs a committed `typos.toml` that differs from what
+/// the builder writes, and a hand-appended line is the smallest such edit.
+fn append_line(directory: &Path, name: &str, line: &str) -> Result<(), String> {
+    let fixture = Dir::open_ambient_dir(directory, ambient_authority())
+        .map_err(|error| format!("open fixture: {error}"))?;
+    let existing = fixture
+        .read_to_string(name)
+        .map_err(|error| format!("read {name}: {error}"))?;
+    fixture
+        .write(name, format!("{existing}{line}"))
+        .map_err(|error| format!("write {name}: {error}"))
+}
+
+/// Commits every change in a fixture repository.
+fn commit_fixture(directory: &Path, message: &str) -> Result<(), String> {
+    run_git(directory, &["add", "-A"])?;
+    run_git(directory, &["commit", "-m", message])
 }
 
 /// Renders a gate failure with both streams for the test assertion.
@@ -127,6 +149,34 @@ fn overlay_patterns_pass_and_an_introduced_typo_fails() -> Result<(), String> {
     if !rendered.contains("should be") {
         return Err(format!(
             "the gate rejected the fixture without a correction hint:\n{rendered}"
+        ));
+    }
+    Ok(())
+}
+
+#[test]
+fn stale_committed_typos_toml_fails_the_gate() -> Result<(), String> {
+    let fixture = stage_fixture(FIXTURE_PROSE)?;
+    let generated = run_gate(fixture.path())?;
+    if !generated.status.success() {
+        return Err(gate_failure(&generated));
+    }
+    commit_fixture(fixture.path(), "generated")?;
+    let committed = run_gate(fixture.path())?;
+    if !committed.status.success() {
+        return Err(gate_failure(&committed));
+    }
+
+    append_line(fixture.path(), "typos.toml", "# stale hand edit\n")?;
+    commit_fixture(fixture.path(), "stale")?;
+    let stale = run_gate(fixture.path())?;
+    if stale.status.success() {
+        return Err("the gate accepted a typos.toml its builder would not".to_owned());
+    }
+    let rendered = gate_output(&stale);
+    if !rendered.contains("commit the regenerated file") {
+        return Err(format!(
+            "the gate rejected the stale file without the freshness hint:\n{rendered}"
         ));
     }
     Ok(())
