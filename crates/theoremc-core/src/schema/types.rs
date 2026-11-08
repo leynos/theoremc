@@ -289,6 +289,7 @@ fn rust_types_equivalent(left: &str, right: &str) -> bool {
     }
 }
 
+/// Returns the canonical spelling of the unit return type.
 fn unit_return_type() -> String {
     "()".to_owned()
 }

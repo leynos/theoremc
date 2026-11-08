@@ -29,6 +29,7 @@ pub(crate) enum IndexedValidationSection {
 }
 
 impl IndexedValidationSection {
+    /// Human-readable section name used in validation messages.
     pub(crate) const fn label(self) -> &'static str {
         match self {
             Self::Prove => "Prove assertion",
@@ -37,6 +38,7 @@ impl IndexedValidationSection {
         }
     }
 
+    /// Builds the typed reason for a failed field in this section.
     pub(crate) const fn reason_kind(
         self,
         index: usize,
@@ -89,12 +91,16 @@ pub(crate) enum ValidationReasonKind {
 /// Internal validation failure before conversion to the public error type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ValidationFailure {
+    /// Name of the theorem that failed validation.
     theorem: String,
+    /// Rendered explanation of the failure.
     reason: String,
+    /// Typed classification when it is specific enough to locate a field.
     reason_kind: Option<ValidationReasonKind>,
 }
 
 impl ValidationFailure {
+    /// Captures a failure against `doc` with its rendered reason.
     pub(crate) fn new(
         doc: &TheoremDoc,
         reason: String,
@@ -107,14 +113,17 @@ impl ValidationFailure {
         }
     }
 
+    /// Returns the rendered explanation of the failure.
     pub(crate) fn reason(&self) -> &str {
         &self.reason
     }
 
+    /// Returns the typed reason kind, when one was recorded.
     pub(crate) const fn reason_kind(&self) -> Option<ValidationReasonKind> {
         self.reason_kind
     }
 
+    /// Consumes the failure, attaching an optional rendered diagnostic.
     pub(crate) fn into_schema_error(self, diagnostic: Option<SchemaDiagnostic>) -> SchemaError {
         SchemaError::ValidationFailed {
             theorem: self.theorem,

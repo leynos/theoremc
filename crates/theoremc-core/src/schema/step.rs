@@ -37,6 +37,7 @@ pub(crate) fn validate_action_call(action_call: &ActionCall) -> Result<(), Strin
     Ok(())
 }
 
+/// Extracts the reason text from an invalid-action-name error.
 fn action_name_error_reason(error: SchemaError) -> String {
     match error {
         SchemaError::InvalidActionName { reason, .. } => reason,

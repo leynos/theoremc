@@ -64,6 +64,7 @@ impl SchemaDiagnostic {
     }
 }
 
+/// Converts a parser location into a source-qualified location.
 fn location_for_source(source: &SourceId, location: serde_saphyr::Location) -> SourceLocation {
     let line = usize::try_from(location.line()).ok().unwrap_or(usize::MAX);
     let column = usize::try_from(location.column())
@@ -76,6 +77,7 @@ fn location_for_source(source: &SourceId, location: serde_saphyr::Location) -> S
     }
 }
 
+/// Builds a diagnostic with the given code, message, and location.
 pub(crate) fn create_diagnostic(
     code: SchemaDiagnosticCode,
     source: &SourceId,
@@ -89,6 +91,7 @@ pub(crate) fn create_diagnostic(
     }
 }
 
+/// Returns the first line of a parser message.
 pub(crate) fn first_line(message: &str) -> String {
     message.lines().next().unwrap_or(message).to_owned()
 }
