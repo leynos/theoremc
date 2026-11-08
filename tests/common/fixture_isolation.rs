@@ -148,6 +148,10 @@ fn repository_root() -> Utf8PathBuf {
 /// It sits inside the caller's `CARGO_TARGET_DIR` when one is exported, else
 /// inside the repository's `target`, so it is warm on a second run and `cargo
 /// clean` removes it.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "fixture crates must share the target directory the host Cargo invocation is using, so the helper reads the ambient CARGO_TARGET_DIR"
+)]
 pub(super) fn shared_target_dir() -> Result<Utf8PathBuf, String> {
     let base = std::env::var("CARGO_TARGET_DIR")
         .map_or_else(|_| repository_root().join("target"), Utf8PathBuf::from);

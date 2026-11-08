@@ -1,5 +1,15 @@
 //! `OrthoConfig` settings, validation, and selected-command resolution.
 
+// The `OrthoConfig` derive expands to a process-environment read, and Clippy
+// reports that read at the derive on `GlobalOptions`. An expectation on the
+// struct does not reach the derive expansion, so it is declared here as the
+// narrowest scope that does. Callers that need isolation inject sources
+// through `load_with_sources` instead of relying on this read.
+#![expect(
+    clippy::disallowed_methods,
+    reason = "the OrthoConfig derive expands to a process-environment read; callers that need isolation inject sources through load_with_sources"
+)]
+
 use std::{collections::BTreeMap, ffi::OsString, path::Path, sync::Arc};
 
 use clap::{ArgAction, Args};

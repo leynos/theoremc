@@ -57,10 +57,22 @@ pub(super) struct GeneratedActionProbe {
 }
 
 /// Reads `CARGO_MANIFEST_DIR` for the crate invoking the macro.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "a proc-macro can only learn its crate root from Cargo's environment, so this single read is the seam whose result is injected into the pure reader"
+)]
 pub(super) fn manifest_dir_from_env() -> Result<Utf8PathBuf, MacroExpansionError> {
-    let manifest_dir =
-        env::var("CARGO_MANIFEST_DIR").map_err(|_| MacroExpansionError::MissingManifestDir)?;
-    Ok(Utf8PathBuf::from(manifest_dir))
+    manifest_dir_from_reader(env::var)
+}
+
+/// Resolves the manifest directory through an injected variable reader, so the
+/// private tests supply a value or an error without touching process state.
+pub(super) fn manifest_dir_from_reader(
+    read_variable: impl FnOnce(&'static str) -> Result<String, env::VarError>,
+) -> Result<Utf8PathBuf, MacroExpansionError> {
+    read_variable("CARGO_MANIFEST_DIR")
+        .map(Utf8PathBuf::from)
+        .map_err(|_| MacroExpansionError::MissingManifestDir)
 }
 
 /// Loads the theorem file named by `path_literal` beneath `manifest_dir`.
