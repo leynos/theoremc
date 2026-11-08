@@ -107,7 +107,7 @@ fn multiple_theorem_files_compile_in_deterministic_suite_order() {}
 fn fixture_with_theorem(name: &str) -> Result<FixtureCrate, String> {
     let fixture = FixtureCrate::new(
         &build_support_fixture_manifest("build_suite_fixture"),
-        FIXTURE_LIB_RS,
+        SUITE_FIXTURE_LIB_RS,
     )?;
     fixture.write(
         Utf8Path::new(&format!("theorems/{name}.theorem")),
