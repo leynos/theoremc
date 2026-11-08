@@ -6,14 +6,14 @@
 //! this module concentrates on internal expansion shape, ordering, and
 //! harness metadata before those tokens reach rustc.
 
+use super::error::MacroExpansionError;
+use super::expand_theorem_file_at;
+use super::query::{generated_harnesses, manifest_dir_from_env};
 use super::tests_support::{
     TheoremFixture, TheoremSpec, assert_expansion_is_stable, assert_single_theorem_expansion,
     expand_fixture, expected_expansion_with_unwinds, make_single_theorem_fixture, redact_hashes,
     set_cargo_manifest_dir_for_test, temp_fixture_dir, write_fixture,
 };
-use super::error::MacroExpansionError;
-use super::expand_theorem_file_at;
-use super::query::{generated_harnesses, manifest_dir_from_env};
 use camino::Utf8Path;
 use googletest::prelude::*;
 use indexmap::IndexMap;

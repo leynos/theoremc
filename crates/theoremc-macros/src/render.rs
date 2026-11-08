@@ -16,8 +16,11 @@ pub(super) fn render_expansion(plan: &ExpansionPlan) -> TokenStream2 {
     let path_literal = &plan.path_literal;
     let action_probe_tokens = render_action_probes(&plan.action_probes);
     let type_probe_tokens = render_referenced_type_probes(&plan.referenced_types);
-    let harness_idents: Vec<&proc_macro2::Ident> =
-        plan.harnesses.iter().map(|harness| &harness.ident).collect();
+    let harness_idents: Vec<&proc_macro2::Ident> = plan
+        .harnesses
+        .iter()
+        .map(|harness| &harness.ident)
+        .collect();
     let unwind_literals: Vec<&syn::LitInt> = plan
         .harnesses
         .iter()

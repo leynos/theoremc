@@ -10,8 +10,8 @@ use crate::tests_support::{
 };
 
 #[rstest]
-fn plan_expansion_derives_module_and_harness_from_the_path() -> Result<(), Box<dyn std::error::Error>>
-{
+fn plan_expansion_derives_module_and_harness_from_the_path()
+-> Result<(), Box<dyn std::error::Error>> {
     let (_temp_dir, fixture_dir) = temp_fixture_dir()?;
     let path = Utf8Path::new("theorems/planned.theorem");
     let fixture = make_single_theorem_fixture(&TheoremSpec {
