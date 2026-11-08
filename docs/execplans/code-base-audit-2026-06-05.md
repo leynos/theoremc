@@ -560,6 +560,67 @@ intentional public API or documentation change.
       `make lint`,
       `make typecheck`, and `make test` (`818 tests run: 818 passed, 0 skipped`
       plus passing doctests).
+- [x] 2026-11-01: Milestone 5 implementation drafted. `schema/types.rs` no
+  longer derives or names any serde trait: `Assumption`, `Assertion`,
+  `WitnessCheck`, `ActionSignature`, `Evidence`, `KaniEvidence`, and
+  `KaniExpectation` are plain data, and the module doc states the ADR-003
+  reason. The YAML-visible half moved to the new `schema/raw_evidence.rs`
+  (`RawEvidence`, `RawKaniEvidence`, `RawKaniExpectation`, and
+  `RawActionSignature`) with explicit `to_evidence`, `to_kani_evidence`,
+  `to_expectation`, and `to_action_signature` conversions, which also keeps
+  `raw.rs` clear of evidence concerns. Both identifier newtypes now share
+  `impl_identifier_deserialize!` instead of duplicated `Deserialize` impls, and
+  `newtypes_tests.rs` pins the accepted and rejected forms.
+- [x] 2026-11-01: Milestone 5 Rustdoc examples added for `TheoremName::new` and
+  `ForallVar::new` (valid construction plus a rejected input) and for
+  `SourceId::new` (infallible construction and `as_str`). Focused validation on
+  the working candidate:
+  `cargo check -p theoremc-core --all-targets --all-features` exited 0 with no
+  diagnostics, the 209 filtered `schema` unit tests passed, and all 27 doctests
+  passed with one ignored.
+- [x] 2026-11-01: Documented the raw-mirror convention in
+  `docs/developers-guide.md` so future YAML-visible fields extend the raw
+  adapter instead of re-deriving serde on public domain types, with the
+  identifier newtypes named as the deliberate exception.
+- [x] 2026-11-01: Repaired the Milestone 4 review's diagnostic-location defect.
+  `RawLetBinding` and `RawStep` used `#[serde(untagged)]`, which routes the
+  mapping through `serde`'s `ContentDeserializer` and discards `Spanned`
+  coordinates, so an invalid action name located at the theorem header instead
+  of the value. Both types now dispatch their single `call`, `must`, or `maybe`
+  key with a hand-written `Deserialize`/`MapAccess` visitor, and the loader
+  consults `RawDocDecodeError::typed_location` before any textual fallback.
+  `loader_diagnostic_tests::invalid_action_names_locate_the_action_value` pins
+  the exact line and column for TitleCase, lowercase-alias, nested `maybe.do`,
+  and flow-mapping forms (5:15, 6:15, 8:21, and 4:20 respectively).
+- [x] 2026-11-01: Repaired the Milestone 4 review's broken public API example.
+  `docs/users-guide.md` now imports `CanonicalActionName` and
+  `mangle_action_name` from the public `theoremc::mangle` facade rather than an
+  internal module path, and adds a `try_mangle_action_name` example plus the
+  public building blocks (`action_slug`, `try_action_slug`, `hash12`).
+- [x] 2026-11-01: Milestone 6 implementation complete. Omitted `Schema` stays
+  `None` in `TheoremDoc` and is not materialised as version `1`; section 3.1 of
+  `docs/theorem-file-specification.md` and the user's guide field notes now say
+  that omission selects the version 1 compatibility profile when interpreted, so
+  `None` and `Some(1)` agree semantically while remaining distinguishable.
+  `schema_deser::schema_field_preserves_omitted_and_explicit_values` keeps both
+  accepted forms, and
+  `omitted_schema_only_differs_from_explicit_version_one_in_the_stored_value`
+  compares the whole documents with `pretty_assertions` after clearing the
+  explicit value.
+- [x] 2026-11-01: Milestone 7 implementation complete. `lib.rs` is 155 lines and
+  keeps only the `theorem_file!` entry point, `query.rs` returns a typed
+  `ExpansionPlan` from loading and semantic checks, `render.rs` renders tokens
+  with no I/O, and `error.rs` owns `MacroExpansionError` and its
+  `compile_error!` rendering. Token output is unchanged: the `insta` expansion
+  snapshot still matches. New seam tests cover `plan_expansion`,
+  referenced-type and action-type parse failures, missing Kani evidence, empty
+  probe lists, path anchoring, and absent referenced types. Focused validation:
+  `cargo test -p theoremc-macros --lib` ran 48 tests with 0 failures.
+- [x] 2026-11-01: Post-change review removed redundant canonical-name
+  revalidation from `collision`: the mangler now takes `&CanonicalActionName`
+  and returns `String`, so the unreachable `SchemaError::InvalidActionName`
+  branch and the `Result` plumbing disappear while validation stays in the
+  decoder and test helpers.
 - [x] Milestone 4 implementation is complete, validated, reviewed, and
   committed. The rebased candidate carries `main`'s typed diagnostics plus the
   retained branch repairs, all deterministic gates pass, and the local review
@@ -632,6 +693,17 @@ intentional public API or documentation change.
   source inspection confirms the variant has only `theorem`, `reason`, and
   `diagnostic`, so no API change is warranted. Duplicate loader-size rows share
   one repair.
+- 2026-11-01: `serde_saphyr::Spanned` loses its coordinates whenever `serde`
+  buffers the value first. `#[serde(untagged)]`, `#[serde(flatten)]`, and
+  `#[serde(tag = "...")]` all deserialize through `ContentDeserializer`, so a
+  span that the raw type declares still arrives as `Location::UNKNOWN`. A
+  single-key enum therefore has to dispatch `MapAccess` by hand: that keeps the
+  span attached and lets diagnostics point at the value instead of the map key.
+- 2026-11-01: The typed-location regression tests first reported 999/998 as
+  expected values, which only proved that assertions without observed values
+  encode guesses. The final cases pin the coordinates the implementation
+  actually produces, discovered by asserting impossible bounds first and then
+  replacing the probe with the real numbers.
 
 ## Decision Log
 
@@ -696,6 +768,11 @@ intentional public API or documentation change.
   section value and `because` fields with `IndexedValidationField`, and is
   already exercised by the shipped loader. User-facing diagnostic wording is
   unchanged.
+- 2026-11-01: Keep `TheoremDoc::schema` as `Option<u32>` and treat omission as
+  an interpretation-time selection of the version 1 profile. Materialising a
+  default of `1` would erase the distinction the loader already preserves, and
+  no product requirement asks for it; the specification and user's guide were
+  aligned with the implementation instead.
 
 ## Outcomes & Retrospective
 
