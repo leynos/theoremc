@@ -36,6 +36,51 @@ const FIXTURE_PROSE: &str = include_str!("fixtures/spelling/prose.txt");
 /// One ordinary misspelling added to the passing fixture.
 const INTRODUCED_TYPO: &str = include_str!("fixtures/spelling/introduced-typo.txt");
 
+/// The generated configuration the freshness case commits and then stales.
+const TYPOS_FILE: &str = "typos.toml";
+
+/// A hand edit the builder will not reproduce, which makes the file stale.
+const STALE_EDIT: &str = "# stale hand edit\n";
+
+/// The commits a fixture repository records while a case runs.
+///
+/// Naming them keeps the commit helper free of free text, so a caller cannot
+/// pass a message that describes a state the case did not reach.
+#[derive(Clone, Copy)]
+enum FixtureCommit {
+    Initial,
+    Generated,
+    Stale,
+}
+
+impl FixtureCommit {
+    /// Returns the message this step records.
+    const fn message(self) -> &'static str {
+        match self {
+            Self::Initial => "fixture",
+            Self::Generated => "generated",
+            Self::Stale => "stale",
+        }
+    }
+}
+
+/// How the stale configuration reached the repository when the gate ran.
+#[derive(Clone, Copy)]
+enum StaleState {
+    Committed,
+    Staged,
+}
+
+impl StaleState {
+    /// Describes the state in the failure message of the assertion helper.
+    const fn describe(self) -> &'static str {
+        match self {
+            Self::Committed => "the stale file is committed",
+            Self::Staged => "the stale file is committed and the fix is only staged",
+        }
+    }
+}
+
 /// Returns the package root, which holds the Makefile and the pinned builder.
 fn repository_root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -78,7 +123,7 @@ fn stage_fixture(prose: &str) -> Result<tempfile::TempDir, String> {
         .write("prose.md", prose)
         .map_err(|error| format!("write prose: {error}"))?;
     run_git(directory.path(), &["init"])?;
-    commit_fixture(directory.path(), "fixture")?;
+    commit_fixture(directory.path(), FixtureCommit::Initial)?;
     Ok(directory)
 }
 
@@ -98,25 +143,25 @@ fn run_gate(fixture: &Path) -> Result<Output, String> {
         .map_err(|error| format!("run make: {error}"))
 }
 
-/// Appends `line` to a fixture file, keeping the existing content.
+/// Appends the stale hand edit to the fixture's tracked configuration.
 ///
 /// The freshness case needs a committed `typos.toml` that differs from what
 /// the builder writes, and a hand-appended line is the smallest such edit.
-fn append_line(directory: &Path, name: &str, line: &str) -> Result<(), String> {
+fn append_stale_edit(directory: &Path) -> Result<(), String> {
     let fixture = Dir::open_ambient_dir(directory, ambient_authority())
         .map_err(|error| format!("open fixture: {error}"))?;
     let existing = fixture
-        .read_to_string(name)
-        .map_err(|error| format!("read {name}: {error}"))?;
+        .read_to_string(TYPOS_FILE)
+        .map_err(|error| format!("read {TYPOS_FILE}: {error}"))?;
     fixture
-        .write(name, format!("{existing}{line}"))
-        .map_err(|error| format!("write {name}: {error}"))
+        .write(TYPOS_FILE, format!("{existing}{STALE_EDIT}"))
+        .map_err(|error| format!("write {TYPOS_FILE}: {error}"))
 }
 
 /// Commits every change in a fixture repository.
-fn commit_fixture(directory: &Path, message: &str) -> Result<(), String> {
+fn commit_fixture(directory: &Path, commit: FixtureCommit) -> Result<(), String> {
     stage_fixture_changes(directory)?;
-    run_git(directory, &["commit", "-m", message])
+    run_git(directory, &["commit", "-m", commit.message()])
 }
 
 /// Stages every change in a fixture repository without committing it.
@@ -162,7 +207,8 @@ fn overlay_patterns_pass_and_an_introduced_typo_fails() -> Result<(), String> {
 }
 
 /// Asserts that the gate rejected a stale `typos.toml` with its freshness hint.
-fn check_freshness_failure(output: &Output, scenario: &str) -> Result<(), String> {
+fn check_freshness_failure(output: &Output, state: StaleState) -> Result<(), String> {
+    let scenario = state.describe();
     if output.status.success() {
         return Err(format!(
             "the gate accepted a typos.toml its builder would not, when {scenario}"
@@ -185,16 +231,16 @@ fn stale_typos_toml_fails_the_gate_when_committed_or_staged() -> Result<(), Stri
     if !generated.status.success() {
         return Err(gate_failure(&generated));
     }
-    commit_fixture(fixture.path(), "generated")?;
+    commit_fixture(fixture.path(), FixtureCommit::Generated)?;
     let committed = run_gate(fixture.path())?;
     if !committed.status.success() {
         return Err(gate_failure(&committed));
     }
 
-    append_line(fixture.path(), "typos.toml", "# stale hand edit\n")?;
-    commit_fixture(fixture.path(), "stale")?;
+    append_stale_edit(fixture.path())?;
+    commit_fixture(fixture.path(), FixtureCommit::Stale)?;
     let stale = run_gate(fixture.path())?;
-    check_freshness_failure(&stale, "the stale file is committed")?;
+    check_freshness_failure(&stale, StaleState::Committed)?;
 
     // The failing gate regenerated the file, so staging that regeneration
     // leaves the index equal to the worktree while `HEAD` stays stale. A
@@ -202,8 +248,5 @@ fn stale_typos_toml_fails_the_gate_when_committed_or_staged() -> Result<(), Stri
     // `HEAD` to reject it.
     stage_fixture_changes(fixture.path())?;
     let staged = run_gate(fixture.path())?;
-    check_freshness_failure(
-        &staged,
-        "the stale file is committed and the fix is only staged",
-    )
+    check_freshness_failure(&staged, StaleState::Staged)
 }
