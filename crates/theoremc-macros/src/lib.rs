@@ -122,6 +122,8 @@ pub fn theorem_file(input: TokenStream) -> TokenStream {
     }
 }
 
+/// Resolves the crate root from the environment and expands the referenced
+/// theorem file.
 fn expand_theorem_file(path_literal: &LitStr) -> Result<TokenStream2, MacroExpansionError> {
     let manifest_dir = manifest_dir_from_env()?;
     expand_theorem_file_at(&manifest_dir, path_literal)
@@ -131,10 +133,12 @@ fn expand_theorem_file(path_literal: &LitStr) -> Result<TokenStream2, MacroExpan
     clippy::disallowed_methods,
     reason = "a proc-macro can only learn its crate root from Cargo's environment, so this single read is the seam whose result is injected into the pure reader"
 )]
+/// Reads `CARGO_MANIFEST_DIR` through the injectable reader seam.
 fn manifest_dir_from_env() -> Result<Utf8PathBuf, MacroExpansionError> {
     manifest_dir_from_reader(env::var)
 }
 
+/// Parses the manifest directory returned by `read_variable`.
 fn manifest_dir_from_reader(
     read_variable: impl FnOnce(&'static str) -> Result<String, env::VarError>,
 ) -> Result<Utf8PathBuf, MacroExpansionError> {
@@ -143,6 +147,8 @@ fn manifest_dir_from_reader(
         .map_err(|_| MacroExpansionError::MissingManifestDir)
 }
 
+/// Loads and validates the theorem file beneath `manifest_dir` and renders its
+/// expansion.
 fn expand_theorem_file_at(
     manifest_dir: &Utf8Path,
     path_literal: &LitStr,
@@ -157,6 +163,7 @@ fn expand_theorem_file_at(
     render_expansion(&canonical_path_literal, &canonical_path, &theorem_docs)
 }
 
+/// Builds the generated module from the loaded theorem documents.
 fn render_expansion(
     path_literal: &LitStr,
     theorem_path: &str,
@@ -202,6 +209,7 @@ fn render_expansion(
     })
 }
 
+/// Parses every referenced type into syntax types for the compile-time probes.
 fn generated_referenced_type_probes(
     theorem_docs: &[TheoremDoc],
 ) -> Result<Vec<syn::Type>, MacroExpansionError> {
@@ -211,12 +219,14 @@ fn generated_referenced_type_probes(
         .collect()
 }
 
+/// Parses one referenced type, reporting the offending spelling on failure.
 fn parse_referenced_type(ty: &str) -> Result<syn::Type, MacroExpansionError> {
     syn::parse_str(ty).map_err(|source| MacroExpansionError::InvalidReferencedType {
         ty: ty.to_owned(),
         message: source.to_string(),
     })
 }
+/// Creates one harness ident and unwind literal per theorem document.
 fn generated_harnesses(
     theorem_path: &str,
     theorem_docs: &[TheoremDoc],
@@ -239,6 +249,7 @@ fn generated_harnesses(
         .collect()
 }
 
+/// Creates a signature-checking probe for every referenced action.
 fn generated_action_probes(
     theorem_docs: &[TheoremDoc],
 ) -> Result<Vec<GeneratedActionProbe>, MacroExpansionError> {
@@ -253,6 +264,7 @@ fn generated_action_probes(
         .collect()
 }
 
+/// Builds the probe ident and parsed types for one action signature.
 fn action_probe(
     canonical: &str,
     signature: &ActionSignature,
@@ -271,6 +283,7 @@ fn action_probe(
     })
 }
 
+/// Parses one action parameter or return type, naming the action on failure.
 fn parse_action_type(canonical: &str, ty: &str) -> Result<syn::Type, MacroExpansionError> {
     syn::parse_str(ty).map_err(|source| MacroExpansionError::InvalidActionSignature {
         action: canonical.to_owned(),
@@ -278,6 +291,7 @@ fn parse_action_type(canonical: &str, ty: &str) -> Result<syn::Type, MacroExpans
     })
 }
 
+/// Renders the anonymous const items that anchor each action signature.
 fn render_action_probes(action_probes: &[GeneratedActionProbe]) -> TokenStream2 {
     if action_probes.is_empty() {
         return TokenStream2::new();
@@ -299,6 +313,7 @@ fn render_action_probes(action_probes: &[GeneratedActionProbe]) -> TokenStream2 
     }
 }
 
+/// Renders the anonymous const item that anchors each referenced type.
 fn render_referenced_type_probes(type_probes: &[syn::Type]) -> TokenStream2 {
     if type_probes.is_empty() {
         return TokenStream2::new();
@@ -313,52 +328,91 @@ fn render_referenced_type_probes(type_probes: &[syn::Type]) -> TokenStream2 {
         };
     }
 }
+/// Creates a call-site identifier from a mangled name.
 fn identifier(name: &str) -> Ident {
     Ident::new(name, Span::call_site())
 }
 
+/// Ident and unwind bound for one generated Kani harness.
 struct GeneratedHarness {
+    /// Call-site identifier of the generated harness function.
     ident: Ident,
+    /// Unwind bound taken from the theorem's `Evidence.kani` block.
     unwind_literal: syn::LitInt,
 }
 
+/// Ident and parsed types for one compile-time action signature probe.
 struct GeneratedActionProbe {
+    /// Call-site identifier used as the action's `theorem_actions` symbol.
     ident: Ident,
+    /// Parsed parameter types used to rebuild the expected `fn` type.
     param_types: Vec<syn::Type>,
+    /// Parsed return type used to rebuild the expected `fn` type.
     return_type: syn::Type,
 }
 
+/// Failure modes reported as `compile_error!` at the macro call site.
 #[derive(Debug, thiserror::Error)]
 enum MacroExpansionError {
+    /// The macro could not learn its crate root from Cargo.
     #[error("`CARGO_MANIFEST_DIR` is not set during theorem macro expansion")]
     MissingManifestDir,
+    /// A theorem document omits the Kani evidence the macro requires.
     #[error("theorem `{theorem}` does not declare required `Evidence.kani` configuration")]
-    MissingKaniEvidence { theorem: String },
+    MissingKaniEvidence {
+        /// Theorem that omitted its Kani evidence.
+        theorem: String,
+    },
+    /// A referenced action has no declared signature.
     #[error("referenced action `{action}` is missing an Actions signature entry")]
-    MissingActionSignature { action: String },
+    MissingActionSignature {
+        /// Canonical action name that was referenced.
+        action: String,
+    },
+    /// Two theorem documents declare the same action differently.
     #[error(
         "referenced action `{action}` has conflicting Actions signatures: theorem `{first_theorem}` declares `{first_signature}`, but theorem `{conflicting_theorem}` declares `{conflicting_signature}`"
     )]
     ConflictingActionSignature {
+        /// Canonical action name under conflict.
         action: String,
+        /// Theorem whose declaration is treated as the reference.
         first_theorem: String,
+        /// Theorem that disagrees with the reference declaration.
         conflicting_theorem: String,
+        /// Signature summary declared by `first_theorem`.
         first_signature: String,
+        /// Signature summary declared by `conflicting_theorem`.
         conflicting_signature: String,
     },
+    /// A declared action signature is not valid Rust syntax.
     #[error("referenced action `{action}` has an invalid Actions signature: {message}")]
-    InvalidActionSignature { action: String, message: String },
+    InvalidActionSignature {
+        /// Canonical action name whose signature failed to parse.
+        action: String,
+        /// Parser diagnostic for the offending signature.
+        message: String,
+    },
+    /// A referenced type is not valid Rust syntax.
     #[error("referenced type `{ty}` is invalid: {message}")]
-    InvalidReferencedType { ty: String, message: String },
+    InvalidReferencedType {
+        /// Type spelling that failed to parse.
+        ty: String,
+        /// Parser diagnostic for the offending type.
+        message: String,
+    },
+    /// Loading or validating the theorem file failed.
     #[error("{0}")]
     LoadTheoremFile(String),
 }
 
 impl MacroExpansionError {
+    /// Converts the error into a `compile_error!` invocation at `span`.
     fn to_compile_error(&self, span: Span) -> TokenStream2 {
         syn::Error::new(span, self.to_string()).to_compile_error()
     }
 
+    /// Maps a theorem file load failure to a rendered diagnostic message.
     fn from_load(error: &TheoremFileLoadError) -> Self {
         let message = match &error {
             TheoremFileLoadError::InvalidTheoremFile { source, .. } => source

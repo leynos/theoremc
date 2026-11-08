@@ -344,11 +344,11 @@ full rustdoc set (`broken_intra_doc_links`, `private_intra_doc_links`,
 `cfg(kani)` and `cfg(dylint_lib)`, so Kani harnesses and Dylint libraries are
 declared once instead of carrying per-site expectations.
 
-Adoption is deliberately partial, and one baseline rule is still deferred
-rather than adopted silently: `clippy::missing_docs_in_private_items` waits on
-documenting every private item it reports, concentrated in
-`crates/theoremc-macros/src/lib.rs` and `crates/theoremc-core`. That rule is
-not enforced yet, so do not treat a clean `make lint` as proof that it holds.
+`clippy::missing_docs_in_private_items` was the last baseline rule to arrive:
+it waited on documenting every private item it reports, concentrated in
+`crates/theoremc-macros/src/lib.rs` and `crates/theoremc-core`. That
+documentation is in place and the rule is denied, so a new private item without
+a doc comment now fails `make lint` rather than passing unnoticed.
 
 Where a rule is adopted but tuned differently, record the reason beside the
 setting: `clippy.toml` keeps `cognitive-complexity-threshold = 9` to match
