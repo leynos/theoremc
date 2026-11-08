@@ -4,8 +4,7 @@ use super::RawTheoremDoc;
 use crate::schema::validation_reason::{IndexedValidationField, ValidationReasonKind};
 use rstest::rstest;
 
-const LOCATION_FIXTURE: &str = "\
-Theorem: T
+const LOCATION_FIXTURE: &str = r#"Theorem: T
 About: ''
 Assume:
   - expr: ''
@@ -22,7 +21,7 @@ Evidence:
     expect: SUCCESS
     allow_vacuous: true
     vacuity_because: ''
-";
+"#;
 
 fn raw_doc() -> RawTheoremDoc {
     let docs: Vec<RawTheoremDoc> =

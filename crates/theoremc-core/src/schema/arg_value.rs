@@ -46,8 +46,7 @@ pub enum ArgDecodeError {
 
     /// The `{ ref: <name> }` target is not a valid ASCII identifier.
     #[error(
-        "argument '{param}': ref value '{name}' is not a valid \
-         identifier (must match ^[A-Za-z_][A-Za-z0-9_]*$)"
+        "argument '{param}': ref value '{name}' is not a valid identifier (must match ^[A-Za-z_][A-Za-z0-9_]*$)"
     )]
     InvalidIdentifier {
         /// Argument parameter name.
@@ -66,10 +65,7 @@ pub enum ArgDecodeError {
     },
 
     /// The `ref` value is not a string (e.g. an integer or boolean).
-    #[error(
-        "argument '{param}': ref value must be a string identifier, \
-         not {kind}"
-    )]
+    #[error("argument '{param}': ref value must be a string identifier, not {kind}")]
     NonStringRefTarget {
         /// Argument parameter name.
         param: String,
@@ -78,10 +74,7 @@ pub enum ArgDecodeError {
     },
 
     /// The `literal` value is not a string (e.g. an integer or boolean).
-    #[error(
-        "argument '{param}': literal value must be a string, \
-         not {kind}"
-    )]
+    #[error("argument '{param}': literal value must be a string, not {kind}")]
     NonStringLiteralValue {
         /// Argument parameter name.
         param: String,

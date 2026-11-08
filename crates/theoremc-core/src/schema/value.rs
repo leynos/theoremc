@@ -48,10 +48,10 @@ impl<'de> Visitor<'de> for TheoremValueVisitor {
     type Value = TheoremValue;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(
-            "a non-null YAML value (bool, integer, float, string, \
-             sequence, or mapping)",
-        )
+        formatter.write_str(concat!(
+            "a non-null YAML value (bool, integer, float, string, ",
+            "sequence, or mapping)",
+        ))
     }
 
     fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
