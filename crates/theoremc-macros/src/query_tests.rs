@@ -1,6 +1,7 @@
 //! Unit tests for the macro expansion query phase.
 
 use camino::Utf8Path;
+use googletest::{assert_that, matchers::eq};
 use rstest::rstest;
 use theoremc_core::mangle::mangle_module_path;
 
@@ -23,23 +24,23 @@ fn plan_expansion_derives_module_and_harness_from_the_path()
 
     let plan = plan_expansion(&fixture_dir, &path_literal)?;
 
-    assert_eq!(
+    assert_that!(
         plan.module_ident.to_string(),
-        mangle_module_path(path.as_str()).module_name()
+        eq(mangle_module_path(path.as_str()).module_name())
     );
-    assert_eq!(plan.path_literal.value(), path.as_str());
-    assert_eq!(plan.harnesses.len(), 1);
+    assert_that!(plan.path_literal.value(), eq(path.as_str()));
+    assert_that!(plan.harnesses.len(), eq(1_usize));
     // No `Actions` or `Forall` entries means no probes of either kind.
-    assert!(plan.action_probes.is_empty());
-    assert!(plan.referenced_types.is_empty());
+    assert_that!(plan.action_probes.len(), eq(0_usize));
+    assert_that!(plan.referenced_types.len(), eq(0_usize));
     Ok(())
 }
 
 #[test]
 fn parse_referenced_type_reports_invalid_types() {
-    let error = parse_referenced_type("Vec<")
-        .err()
-        .expect("unclosed generic must fail");
+    let Err(error) = parse_referenced_type("Vec<") else {
+        panic!("unclosed generic must fail");
+    };
 
     assert!(matches!(
         error,
@@ -49,9 +50,9 @@ fn parse_referenced_type_reports_invalid_types() {
 
 #[test]
 fn parse_action_type_reports_the_offending_action() {
-    let error = parse_action_type("account.deposit", "Vec<")
-        .err()
-        .expect("unclosed generic must fail");
+    let Err(error) = parse_action_type("account.deposit", "Vec<") else {
+        panic!("unclosed generic must fail");
+    };
 
     let MacroExpansionError::InvalidActionSignature { action, .. } = error else {
         panic!("expected InvalidActionSignature, got a different variant");
@@ -79,9 +80,9 @@ fn generated_harnesses_reject_theorems_without_kani_evidence() {
     let docs = theoremc_core::schema::load_theorem_docs(&fixture.0)
         .expect("fixture should parse as a theorem document");
 
-    let error = generated_harnesses("theorems/no-kani.theorem", &docs)
-        .err()
-        .expect("missing Kani evidence must fail expansion");
+    let Err(error) = generated_harnesses("theorems/no-kani.theorem", &docs) else {
+        panic!("missing Kani evidence must fail expansion");
+    };
 
     assert!(matches!(
         error,

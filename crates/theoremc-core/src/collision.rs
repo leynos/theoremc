@@ -236,7 +236,7 @@ fn unique_canonical_names<'a>(
 fn find_mangled_collisions(
     canonical_names: &BTreeSet<&str>,
 ) -> Result<BTreeMap<String, BTreeSet<String>>, SchemaError> {
-    let canonical_names = canonical_names
+    let validated = canonical_names
         .iter()
         .map(|name| {
             CanonicalActionName::new(name).map_err(|error| SchemaError::InvalidActionName {
@@ -245,7 +245,7 @@ fn find_mangled_collisions(
             })
         })
         .collect::<Result<BTreeSet<_>, _>>()?;
-    let canonical_name_refs = canonical_names.iter().collect();
+    let canonical_name_refs = validated.iter().collect();
     Ok(find_mangled_collisions_with(
         &canonical_name_refs,
         mangle_to_identifier,

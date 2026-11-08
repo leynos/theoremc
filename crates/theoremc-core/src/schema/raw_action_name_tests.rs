@@ -46,7 +46,7 @@ fn raw_conversion_carries_canonical_action_names_into_domain() {
         .do_steps
         .first()
         .and_then(|step| match step {
-            super::super::types::Step::Call(step) => Some(step.call.action.as_str()),
+            super::super::types::Step::Call(call) => Some(call.call.action.as_str()),
             _ => None,
         })
         .expect("first step should be a call action");
