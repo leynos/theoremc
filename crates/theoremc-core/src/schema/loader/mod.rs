@@ -111,6 +111,7 @@ pub fn load_theorem_docs_with_source(
     Ok(docs)
 }
 
+/// Builds a located diagnostic for a raw document decode failure.
 fn attach_decode_failure_diagnostic(
     error: RawDocDecodeError,
     source: &SourceId,
@@ -137,6 +138,7 @@ fn attach_decode_failure_diagnostic(
     }
 }
 
+/// Builds a diagnostic located from the failure's typed reason kind.
 fn attach_validation_failure_diagnostic(
     failure: ValidationFailure,
     source: &SourceId,
@@ -155,6 +157,7 @@ fn attach_validation_failure_diagnostic(
     failure.into_schema_error(Some(diagnostic))
 }
 
+/// Builds the parse diagnostic, re-anchoring unknown fields where possible.
 fn build_parse_diagnostic(
     source: &SourceId,
     input: &str,
@@ -181,10 +184,12 @@ fn build_parse_diagnostic(
     Some(diagnostic)
 }
 
+/// Reports whether a diagnostic points at the document-start fallback.
 const fn should_reanchor_unknown_field(diagnostic: &SchemaDiagnostic) -> bool {
     diagnostic.location.line == 1 && diagnostic.location.column == 1
 }
 
+/// Finds the line and column of the key named in an unknown-field message.
 fn locate_unknown_field(input: &str, message: ErrorMessage<'_>) -> Option<(usize, usize)> {
     let field = unknown_field_name(message)?;
 
@@ -197,12 +202,14 @@ fn locate_unknown_field(input: &str, message: ErrorMessage<'_>) -> Option<(usize
     None
 }
 
+/// Extracts the field name from an unknown-field message.
 fn unknown_field_name(message: ErrorMessage<'_>) -> Option<FieldName<'_>> {
     let (_, tail) = message.as_str().split_once("unknown field `")?;
     let (field, _) = tail.split_once('`')?;
     Some(FieldName::new(field))
 }
 
+/// Returns the column of `field` when it opens a mapping entry on `line`.
 fn mapping_key_column(line: &str, field: FieldName<'_>) -> Option<usize> {
     let trimmed = line.trim_start();
     if trimmed.is_empty() || trimmed.starts_with('#') {
@@ -217,23 +224,27 @@ fn mapping_key_column(line: &str, field: FieldName<'_>) -> Option<usize> {
     None
 }
 
+/// Reports whether `line` starts with an unquoted `field:` key.
 fn is_plain_mapping_key(line: &str, field: FieldName<'_>) -> bool {
     line.strip_prefix(field.as_str())
         .is_some_and(|tail| tail.starts_with(':'))
 }
 
+/// Reports whether `line` starts with a single-quoted `field:` key.
 fn is_single_quoted_mapping_key(line: &str, field: FieldName<'_>) -> bool {
     line.strip_prefix('\'')
         .and_then(|tail| tail.strip_prefix(field.as_str()))
         .is_some_and(|tail| tail.starts_with("':"))
 }
 
+/// Reports whether `line` starts with a double-quoted `field:` key.
 fn is_double_quoted_mapping_key(line: &str, field: FieldName<'_>) -> bool {
     line.strip_prefix('"')
         .and_then(|tail| tail.strip_prefix(field.as_str()))
         .is_some_and(|tail| tail.starts_with("\":"))
 }
 
+/// Reports whether `line` opens a mapping entry for `field` in any quoting style.
 fn is_mapping_key_for_field(line: &str, field: FieldName<'_>) -> bool {
     is_plain_mapping_key(line, field)
         || is_single_quoted_mapping_key(line, field)

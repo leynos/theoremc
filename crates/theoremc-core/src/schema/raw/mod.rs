@@ -23,30 +23,43 @@ pub(crate) use decode::RawDocDecodeError;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawTheoremDoc {
+    /// Declared schema version, when the document supplies one.
     #[serde(rename = "Schema", alias = "schema", default)]
     pub(crate) schema: Option<u32>,
+    /// Theorem name with its source location.
     #[serde(rename = "Theorem", alias = "theorem")]
     pub(crate) theorem: Spanned<TheoremName>,
+    /// One-line description with its source location.
     #[serde(rename = "About", alias = "about")]
     pub(crate) about: Spanned<String>,
+    /// Free-form discovery tags.
     #[serde(rename = "Tags", alias = "tags", default)]
     pub(crate) tags: Vec<String>,
+    /// Narrative givens recorded verbatim.
     #[serde(rename = "Given", alias = "given", default)]
     pub(crate) given: Vec<String>,
+    /// Typed universally quantified variables keyed by name.
     #[serde(rename = "Forall", alias = "forall", default)]
     pub(crate) forall: IndexMap<ForallVar, String>,
+    /// Declared action signatures keyed by canonical name.
     #[serde(rename = "Actions", alias = "actions", default)]
     pub(crate) actions: IndexMap<String, RawActionSignature>,
+    /// Assumptions that guard the proof.
     #[serde(rename = "Assume", alias = "assume", default)]
     pub(crate) assume: Vec<RawAssumption>,
+    /// Witness checks that must be satisfied.
     #[serde(rename = "Witness", alias = "witness", default)]
     pub(crate) witness: Vec<RawWitnessCheck>,
+    /// Named bindings available to later steps.
     #[serde(rename = "Let", alias = "let", default)]
     pub(crate) let_bindings: IndexMap<String, RawLetBinding>,
+    /// Imperative steps executed before the assertions.
     #[serde(rename = "Do", alias = "do", default)]
     pub(crate) do_steps: Vec<RawStep>,
+    /// Assertions the theorem must establish.
     #[serde(rename = "Prove", alias = "prove")]
     pub(crate) prove: Vec<RawAssertion>,
+    /// Verification evidence blocks.
     #[serde(rename = "Evidence", alias = "evidence")]
     pub(crate) evidence: RawEvidence,
 }
@@ -55,8 +68,10 @@ pub(crate) struct RawTheoremDoc {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawAssumption {
+    /// Assumed expression with its source location.
     #[serde(rename = "assume", alias = "expr")]
     pub(crate) expr: Spanned<String>,
+    /// Justification with its source location.
     pub(crate) because: Spanned<String>,
 }
 
@@ -64,8 +79,10 @@ pub(crate) struct RawAssumption {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawAssertion {
+    /// Asserted expression with its source location.
     #[serde(rename = "assert")]
     pub(crate) assert_expr: Spanned<String>,
+    /// Justification with its source location.
     pub(crate) because: Spanned<String>,
 }
 
@@ -73,7 +90,9 @@ pub(crate) struct RawAssertion {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawWitnessCheck {
+    /// Witness expression with its source location.
     pub(crate) cover: Spanned<String>,
+    /// Justification with its source location.
     pub(crate) because: Spanned<String>,
 }
 
@@ -141,6 +160,7 @@ impl RawTheoremDoc {
             .unwrap_or_else(|| self.theorem_location())
     }
 
+    /// Finds the most specific source location for a validation reason.
     fn location_for_reason(&self, reason: ValidationReasonKind) -> Option<Location> {
         match reason {
             ValidationReasonKind::AboutEmpty => Some(self.about.referenced),
@@ -198,6 +218,7 @@ impl RawTheoremDoc {
     }
 }
 
+/// Selects the value or justification location for an indexed check.
 const fn location_for_indexed_field(
     field: IndexedValidationField,
     value: Location,

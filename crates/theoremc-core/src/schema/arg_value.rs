@@ -141,6 +141,7 @@ impl ArgDecodeError {
     }
 }
 
+/// Prefixes a parameter name for error messages.
 fn prefixed_param(prefix: &str, param: &str) -> String {
     format!("{prefix}: {param}")
 }

@@ -29,6 +29,7 @@ fn require_non_blank_fields(
     Ok(())
 }
 
+/// Validates each entry in a repeated section via `extract_fields`.
 fn validate_collection_fields<T>(
     doc: &TheoremDoc,
     section: IndexedValidationSection,

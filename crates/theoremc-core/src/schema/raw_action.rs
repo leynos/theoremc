@@ -92,6 +92,7 @@ impl<'de> SingleKeyDecoder<'de> for LetBindingDecoder {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawLetCall {
+    /// Action invocation bound to the `Let` name.
     pub(crate) call: RawActionCall,
 }
 
@@ -99,6 +100,7 @@ pub(crate) struct RawLetCall {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawLetMust {
+    /// Action invocation whose success value is bound to the `Let` name.
     pub(crate) must: RawActionCall,
 }
 
@@ -159,6 +161,7 @@ impl<'de> SingleKeyDecoder<'de> for StepDecoder {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawStepCall {
+    /// Action invocation performed by the step.
     pub(crate) call: RawActionCall,
 }
 
@@ -166,6 +169,7 @@ pub(crate) struct RawStepCall {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawStepMust {
+    /// Action invocation the step requires to succeed.
     pub(crate) must: RawActionCall,
 }
 
@@ -173,6 +177,7 @@ pub(crate) struct RawStepMust {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawStepMaybe {
+    /// Symbolic branching block for this step.
     pub(crate) maybe: RawMaybeBlock,
 }
 
