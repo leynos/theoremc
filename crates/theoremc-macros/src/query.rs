@@ -33,7 +33,7 @@ use super::error::MacroExpansionError;
 pub(super) struct ExpansionPlan {
     /// Stable private module name derived from the theorem file path.
     pub(super) module_ident: Ident,
-    /// Canonicalised theorem path literal, preserving the call-site span.
+    /// Canonicalized theorem path literal, preserving the call-site span.
     pub(super) path_literal: LitStr,
     /// One generated Kani harness per theorem document, in document order.
     pub(super) harnesses: Vec<GeneratedHarness>,

@@ -550,7 +550,7 @@ intentional public API or documentation change.
   `9fb3559`: a gratuitous map destructuring in the collision property test, a
   self-contradictory sentence in this plan's repository orientation, a
   duplicated `## Project documentation` section in `AGENTS.md`, the
-  `initialisation` spelling in three documents, and
+  `initialization` spelling in three documents, and
   `RawActionCallDecodeError::param()` returning an empty breadcrumb so an
   invalid action name fell back to the theorem header. The action-name fix
   carries the new `invalid_action_names_locate_the_action_key` regression test,
@@ -598,7 +598,7 @@ intentional public API or documentation change.
   internal module path, and adds a `try_mangle_action_name` example plus the
   public building blocks (`action_slug`, `try_action_slug`, `hash12`).
 - [x] 2026-11-01: Milestone 6 implementation complete. Omitted `Schema` stays
-  `None` in `TheoremDoc` and is not materialised as version `1`; section 3.1 of
+  `None` in `TheoremDoc` and is not materialized as version `1`; section 3.1 of
   `docs/theorem-file-specification.md` and the user's guide field notes now say
   that omission selects the version 1 compatibility profile when interpreted, so
   `None` and `Some(1)` agree semantically while remaining distinguishable.
@@ -769,7 +769,7 @@ intentional public API or documentation change.
   already exercised by the shipped loader. User-facing diagnostic wording is
   unchanged.
 - 2026-11-01: Keep `TheoremDoc::schema` as `Option<u32>` and treat omission as
-  an interpretation-time selection of the version 1 profile. Materialising a
+  an interpretation-time selection of the version 1 profile. Materializing a
   default of `1` would erase the distinction the loader already preserves, and
   no product requirement asks for it; the specification and user's guide were
   aligned with the implementation instead.

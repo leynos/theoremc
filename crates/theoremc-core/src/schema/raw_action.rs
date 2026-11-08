@@ -163,7 +163,7 @@ impl<'de> Deserialize<'de> for RawStep {
 
 /// Deserialize a mapping that holds exactly one supported variant key.
 ///
-/// `dispatch` returns `Ok(None)` for an unrecognised key so the caller can
+/// `dispatch` returns `Ok(None)` for an unrecognized key so the caller can
 /// report the accepted variant names with serde's standard wording. Any
 /// second key is rejected: the raw step and binding shapes never permit one,
 /// and silently ignoring it would hide a malformed document.

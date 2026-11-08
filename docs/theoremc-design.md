@@ -237,7 +237,7 @@ Table 1: Current schema layer to module mapping (informative).
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::arg_value`, `schema::identifier`                          |
 | Raw span adapter            | `schema::raw`                                                                                                            |
-| Raw-to-domain conversion    | `schema::raw::decode`, `schema::raw::raw_convert`, `schema::raw_action`                                                  |
+| Raw-to-domain conversion    | `schema::raw::decode`, `schema::raw::raw_convert`, `schema::raw_action`, `schema::raw_evidence`                          |
 | Validator (domain rules)    | `schema::validate` (with private `validate_*` rule modules), `schema::validation_reason`, `schema::expr`, `schema::step` |
 | Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::loader_message`, `schema::str_newtype`                      |
 | Duplicate-key diagnostics   | `schema::loader::duplicate`                                                                                              |
