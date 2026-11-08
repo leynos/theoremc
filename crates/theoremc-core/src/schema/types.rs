@@ -2,14 +2,14 @@
 //!
 //! These types mirror the YAML schema defined in
 //! `docs/theorem-file-specification.md` section 8. YAML is first
-//! deserialized into raw serde types (see `raw` and `raw_action`
-//! modules), then converted into these public domain types.
-//! Leaf types that are still directly deserialized use
-//! `serde(deny_unknown_fields)` and support both `TitleCase`
-//! (canonical) and lowercase key aliases.
+//! deserialized into raw serde types (see `raw`, `raw_action`, and
+//! `raw_evidence`), then converted into these public domain types.
+//!
+//! The domain types deliberately carry no serde derives: spelling, aliases,
+//! and defaults belong to the raw adapter, which keeps the public schema
+//! surface independent of the YAML implementation (ADR-003).
 
 use indexmap::IndexMap;
-use serde::Deserialize;
 
 use crate::canonical_action_name::CanonicalActionName;
 
@@ -98,8 +98,7 @@ pub struct TheoremDoc {
 ///
 /// Each assumption provides a Rust expression and a human-readable
 /// explanation of why the constraint is necessary.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Assumption {
     /// A Rust expression that must hold (parsed as `syn::Expr` in
     /// later validation stages).
@@ -114,11 +113,9 @@ pub struct Assumption {
 ///
 /// The `assert` field contains a Rust boolean expression; `because`
 /// provides a human-readable explanation.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Assertion {
     /// A Rust boolean expression to assert.
-    #[serde(rename = "assert")]
     pub assert_expr: String,
     /// Human-readable justification for this assertion.
     pub because: String,
@@ -128,8 +125,7 @@ pub struct Assertion {
 
 /// A non-vacuity witness that ensures the theorem exercises at least
 /// one meaningful execution path.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WitnessCheck {
     /// A Rust expression used as a coverage marker.
     pub cover: String,
@@ -244,14 +240,11 @@ pub struct ActionCall {
 ///
 /// `params` preserves YAML insertion order because generated probes use this
 /// order for the bare function pointer parameter list.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ActionSignature {
     /// Ordered parameter names and Rust type strings.
-    #[serde(default)]
     pub params: IndexMap<String, String>,
-    /// Rust return type. Omitted declarations default to unit.
-    #[serde(default = "unit_return_type")]
+    /// Rust return type. Raw YAML declares unit when the key is omitted.
     pub returns: String,
 }
 
@@ -291,27 +284,19 @@ fn rust_types_equivalent(left: &str, right: &str) -> bool {
     }
 }
 
-fn unit_return_type() -> String {
-    "()".to_owned()
-}
-
 // ── Evidence ────────────────────────────────────────────────────────
 
 /// Backend evidence configuration for a theorem.
 ///
 /// At least one backend must be specified. For v1, Kani is the primary
 /// backend; `verus` and `stateright` are placeholders for future use.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Evidence {
     /// Kani model-checking backend configuration.
-    #[serde(default)]
     pub kani: Option<KaniEvidence>,
     /// Verus proof backend configuration (placeholder).
-    #[serde(default)]
     pub verus: Option<TheoremValue>,
     /// Stateright model-checking backend configuration (placeholder).
-    #[serde(default)]
     pub stateright: Option<TheoremValue>,
 }
 
@@ -326,35 +311,28 @@ impl Evidence {
 // ── Kani evidence ───────────────────────────────────────────────────
 
 /// Configuration for the Kani model-checking backend.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct KaniEvidence {
     /// Loop unwinding bound (`#[kani::unwind(n)]`).
     pub unwind: u32,
     /// Expected verification outcome.
     pub expect: KaniExpectation,
-    /// Whether vacuous success is permitted (default: `false`).
-    #[serde(default)]
+    /// Whether vacuous success is permitted (raw YAML defaults to `false`).
     pub allow_vacuous: bool,
     /// Justification required when `allow_vacuous` is `true`.
-    #[serde(default)]
     pub vacuity_because: Option<String>,
 }
 
 /// Expected outcome of a Kani verification run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KaniExpectation {
     /// The proof harness is expected to succeed.
-    #[serde(rename = "SUCCESS")]
     Success,
     /// The proof harness is expected to find a counterexample.
-    #[serde(rename = "FAILURE")]
     Failure,
     /// The proof harness is expected to be unreachable.
-    #[serde(rename = "UNREACHABLE")]
     Unreachable,
     /// The verification outcome is undetermined.
-    #[serde(rename = "UNDETERMINED")]
     Undetermined,
 }
 

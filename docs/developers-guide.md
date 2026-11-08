@@ -179,6 +179,17 @@ should treat `TheoremDoc.actions` and `ActionCall.action` as already canonical;
 use `CanonicalActionName::as_str()` only when rendering messages, generated
 identifiers, or user-facing text.
 
+Public schema domain types under `schema/types.rs` carry no serde derives.
+Spelling, aliases, defaults, and unknown-key policy belong to the raw adapter in
+`schema/raw.rs`, `schema/raw_action.rs`, and `schema/raw_evidence.rs`, which
+mirrors each domain type and converts into it explicitly. When adding a
+YAML-visible field, extend the raw mirror and the conversion helper rather than
+deriving serde traits on the public type; that keeps the domain API independent
+of the YAML implementation as ADR-003 requires. The identifier newtypes remain
+the one deliberate exception: `TheoremName` and `ForallVar` implement
+`Deserialize` through a shared `impl_identifier_deserialize!` macro so
+validation happens during decoding and cannot be bypassed.
+
 ### Accepted harness-planning boundary (pending implementation)
 
 [ADR 005](adr-005-vertical-slice-first-roadmap-sequencing.md) makes a real

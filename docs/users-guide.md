@@ -617,12 +617,15 @@ into the `crate::theorem_actions` module.
 
 ### Mangling a canonical action name
 
-Use `mangle_action_name` to transform a validated canonical action name:
+Use `mangle_action_name` to transform a value that has already been validated
+as a canonical action name:
 
 ```rust
-use theoremc::mangle::mangle_action_name;
+use theoremc::mangle::{CanonicalActionName, mangle_action_name};
 
-let mangled = mangle_action_name("account.deposit");
+let name = CanonicalActionName::new("account.deposit")
+    .expect("valid canonical action name");
+let mangled = mangle_action_name(&name);
 assert_eq!(mangled.slug(), "account__deposit");
 assert_eq!(mangled.hash(), "05158894bfb4");
 assert_eq!(mangled.identifier(), "account__deposit__h05158894bfb4");
@@ -632,8 +635,18 @@ assert_eq!(
 );
 ```
 
-The function assumes its input has already passed canonical action-name
-validation. It does not re-validate.
+`mangle_action_name` takes `&CanonicalActionName`, so the grammar is checked
+once when the value is constructed and is never re-validated during mangling.
+When the input is still an untrusted string, use `try_mangle_action_name`; it
+validates and returns `InvalidCanonicalActionName` on failure:
+
+```rust
+use theoremc::mangle::try_mangle_action_name;
+
+let mangled = try_mangle_action_name("account.deposit")
+    .expect("valid canonical action name");
+assert_eq!(mangled.identifier(), "account__deposit__h05158894bfb4");
+```
 
 ### Mangling algorithm
 
@@ -652,9 +665,12 @@ The algorithm follows `docs/name-mangling-rules.md`:
 
 The individual building blocks are also public for reuse:
 
-- `segment_escape(segment)` — escapes underscores in a single segment.
-- `action_slug(canonical_name)` — produces the escaped slug.
-- `hash12(value)` — computes the 12-character blake3 hash prefix.
+- `action_slug(&CanonicalActionName)` — produces the escaped slug.
+- `try_action_slug(&str)` — validates a string first, then produces the slug.
+- `hash12(&str)` — computes the 12-character blake3 hash prefix.
+
+Per-segment escaping stays private to the module; `action_slug` exposes the
+same behaviour over a whole canonical name.
 
 ### Injectivity guarantee
 

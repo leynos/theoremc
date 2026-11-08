@@ -10,12 +10,13 @@ use indexmap::IndexMap;
 use crate::canonical_action_name::CanonicalActionName;
 
 use super::super::raw_action::{self, RawLetBinding, RawStep};
+use super::super::raw_evidence::RawActionSignature;
 use super::super::types::{ActionSignature, LetBinding, Step};
 use super::RawDocDecodeError;
 
 /// Converts raw action signature keys into canonical action-name keys.
 pub(super) fn convert_actions(
-    raw: &IndexMap<String, ActionSignature>,
+    raw: &IndexMap<String, RawActionSignature>,
 ) -> Result<IndexMap<CanonicalActionName, ActionSignature>, RawDocDecodeError> {
     let mut out = IndexMap::with_capacity(raw.len());
     for (action, signature) in raw {
@@ -25,7 +26,7 @@ pub(super) fn convert_actions(
                 source,
             }
         })?;
-        out.insert(canonical, signature.clone());
+        out.insert(canonical, signature.to_action_signature());
     }
     Ok(out)
 }
