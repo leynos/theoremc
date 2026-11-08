@@ -1,8 +1,10 @@
 //! Behavioural tests for structured diagnostics using `rstest-bdd`.
 
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{FixtureName, StrNewtype, assert_diagnostic_failure, load_fixture_text};
-use theoremc::schema::{SchemaDiagnosticCode, SourceId, load_theorem_docs_with_source};
+use test_helpers::{
+    FixtureName, StrNewtype, assert_diagnostic_failure, fixture_source_id, load_fixture_text,
+};
+use theoremc::schema::{SchemaDiagnosticCode, load_theorem_docs_with_source};
 
 #[given("a parser-invalid theorem fixture")]
 fn given_parser_invalid_theorem_fixture() {}
@@ -35,9 +37,9 @@ fn given_valid_theorem_fixture_for_diagnostics() {}
 
 #[then("loading succeeds with explicit source")]
 fn then_loading_succeeds_with_explicit_source() -> Result<(), String> {
-    let source = "tests/fixtures/valid_aliases_and_must.theorem";
-    let yaml = load_fixture_text(FixtureName::new("valid_aliases_and_must.theorem"))?;
-    load_theorem_docs_with_source(&SourceId::new(source), &yaml)
+    let name = FixtureName::new("valid_aliases_and_must.theorem");
+    let yaml = load_fixture_text(name)?;
+    load_theorem_docs_with_source(&fixture_source_id(name), &yaml)
         .map_err(|error| error.to_string())?;
 
     Ok(())

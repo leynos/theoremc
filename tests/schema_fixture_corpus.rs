@@ -1,17 +1,13 @@
 //! Regression corpus tests for parser and validator fixtures.
 
 use rstest::rstest;
-use test_helpers::{FIXTURES_DIR, FixtureName, StrNewtype, load_fixture};
-use theoremc::schema::{SourceId, load_theorem_docs_with_source};
-
-fn fixture_source(fixture_name: &str) -> String {
-    format!("{FIXTURES_DIR}/{fixture_name}")
-}
+use test_helpers::{FixtureName, StrNewtype, fixture_source_id, load_fixture};
+use theoremc::schema::load_theorem_docs_with_source;
 
 fn load_from_fixture(fixture_name: &str) -> Result<(), String> {
-    let source = fixture_source(fixture_name);
-    let yaml = load_fixture(FixtureName::new(fixture_name)).map_err(|error| error.to_string())?;
-    load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
+    let name = FixtureName::new(fixture_name);
+    let yaml = load_fixture(name).map_err(|error| error.to_string())?;
+    load_theorem_docs_with_source(&fixture_source_id(name), &yaml)
         .map(|_| ())
         .map_err(|error| error.to_string())
 }
@@ -37,12 +33,13 @@ fn valid_fixture_corpus_parses(#[case] fixture_name: &str) {
 #[case::must_empty_action("invalid_must_empty_action.theorem")]
 #[case::missing_witness_default("invalid_missing_witness_default.theorem")]
 fn invalid_fixture_corpus_fails_with_diagnostic_source(#[case] fixture_name: &str) {
-    let source = fixture_source(fixture_name);
-    let yaml = load_fixture(FixtureName::new(fixture_name)).expect("failed to load fixture");
-    let result = load_theorem_docs_with_source(&SourceId::new(&source), &yaml);
+    let name = FixtureName::new(fixture_name);
+    let source = fixture_source_id(name);
+    let yaml = load_fixture(name).expect("failed to load fixture");
+    let result = load_theorem_docs_with_source(&source, &yaml);
     let error = result.expect_err("expected fixture to fail");
     let diagnostic = error.diagnostic().expect("diagnostic should be present");
-    assert_eq!(diagnostic.location.source, source);
+    assert_eq!(diagnostic.location.source, source.as_str());
     assert!(diagnostic.location.line > 0);
     assert!(diagnostic.location.column > 0);
 }

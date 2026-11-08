@@ -1,5 +1,7 @@
 //! Argument decoding and source-preserving raw document conversion errors.
 
+use serde_saphyr::Location;
+
 use crate::canonical_action_name::InvalidCanonicalActionName;
 
 use super::super::raw_action::RawActionCallDecodeError;
@@ -46,6 +48,20 @@ pub(crate) enum RawDocDecodeError {
 }
 
 impl RawDocDecodeError {
+    /// Returns the typed source location retained by the decode failure.
+    ///
+    /// `None` means the failure carries no usable span and the caller must
+    /// fall back to textual scanning.
+    #[must_use]
+    pub(crate) fn typed_location(&self) -> Option<Location> {
+        match self {
+            Self::LetBinding { source, .. } | Self::DoStep { source, .. } => {
+                source.typed_location()
+            }
+            Self::ActionSignature { .. } => None,
+        }
+    }
+
     /// Returns the argument breadcrumb associated with the decode failure.
     #[must_use]
     pub(crate) fn param(&self) -> &str {

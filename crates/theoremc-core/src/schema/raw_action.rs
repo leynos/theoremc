@@ -7,8 +7,13 @@
 //! [`TheoremValue`] into an [`ArgValue`] via
 //! [`decode_arg_value`](super::arg_value::decode_arg_value).
 
+use std::fmt;
+
 use indexmap::IndexMap;
-use serde::Deserialize;
+use serde::{
+    Deserialize, Deserializer,
+    de::{self, IgnoredAny, MapAccess, Visitor},
+};
 use serde_saphyr::{Location, Spanned};
 
 use crate::canonical_action_name::{CanonicalActionName, InvalidCanonicalActionName};
@@ -38,14 +43,54 @@ pub(crate) struct RawActionCall {
 // ── Raw Let bindings ────────────────────────────────────────────────
 
 /// Raw `LetBinding` as deserialized from YAML.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
+///
+/// Deserialization is hand-written instead of `#[serde(untagged)]` because
+/// serde buffers untagged variants through a `ContentDeserializer`, which
+/// discards every `serde_saphyr` span nested inside the variant. Dispatching
+/// on the map key directly keeps the `Spanned` action name in
+/// [`RawActionCall`] pointing at real source coordinates, so decode
+/// diagnostics do not depend on a line-oriented rescan of the YAML text.
+#[derive(Debug, Clone)]
 pub(crate) enum RawLetBinding {
     /// Invoke an action and bind the result.
     Call(RawLetCall),
     /// Invoke an action, prove it cannot fail, and bind the unwrapped
     /// success value.
     Must(RawLetMust),
+}
+
+impl<'de> Deserialize<'de> for RawLetBinding {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct LetBindingVisitor;
+
+        impl<'de> Visitor<'de> for LetBindingVisitor {
+            type Value = RawLetBinding;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a binding mapping with exactly one of `call` or `must`")
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                dispatch_single_key(map, &["call", "must"], |key, map| match key {
+                    "call" => map
+                        .next_value::<RawActionCall>()
+                        .map(|call| Some(RawLetBinding::Call(RawLetCall { call }))),
+                    "must" => map
+                        .next_value::<RawActionCall>()
+                        .map(|must| Some(RawLetBinding::Must(RawLetMust { must }))),
+                    _ => Ok(None),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(LetBindingVisitor)
+    }
 }
 
 /// Raw wrapper for a `call` variant in a `Let` binding.
@@ -65,8 +110,11 @@ pub(crate) struct RawLetMust {
 // ── Raw Steps ───────────────────────────────────────────────────────
 
 /// Raw `Step` as deserialized from YAML.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
+///
+/// Like [`RawLetBinding`], this uses a hand-written single-key dispatch so
+/// nested `Spanned` fields keep their source locations through `maybe.do`
+/// nesting instead of being flattened by an untagged buffer.
+#[derive(Debug, Clone)]
 pub(crate) enum RawStep {
     /// Invoke an action.
     Call(RawStepCall),
@@ -74,6 +122,70 @@ pub(crate) enum RawStep {
     Must(RawStepMust),
     /// Symbolic branching.
     Maybe(RawStepMaybe),
+}
+
+impl<'de> Deserialize<'de> for RawStep {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct StepVisitor;
+
+        impl<'de> Visitor<'de> for StepVisitor {
+            type Value = RawStep;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a step mapping with exactly one of `call`, `must`, or `maybe`")
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                dispatch_single_key(map, &["call", "must", "maybe"], |key, map| match key {
+                    "call" => map
+                        .next_value::<RawActionCall>()
+                        .map(|call| Some(RawStep::Call(RawStepCall { call }))),
+                    "must" => map
+                        .next_value::<RawActionCall>()
+                        .map(|must| Some(RawStep::Must(RawStepMust { must }))),
+                    "maybe" => map
+                        .next_value::<RawMaybeBlock>()
+                        .map(|maybe| Some(RawStep::Maybe(RawStepMaybe { maybe }))),
+                    _ => Ok(None),
+                })
+            }
+        }
+
+        deserializer.deserialize_map(StepVisitor)
+    }
+}
+
+/// Deserialize a mapping that holds exactly one supported variant key.
+///
+/// `dispatch` returns `Ok(None)` for an unrecognised key so the caller can
+/// report the accepted variant names with serde's standard wording. Any
+/// second key is rejected: the raw step and binding shapes never permit one,
+/// and silently ignoring it would hide a malformed document.
+fn dispatch_single_key<'de, A, T>(
+    mut map: A,
+    variants: &'static [&'static str],
+    dispatch: impl FnOnce(&str, &mut A) -> Result<Option<T>, A::Error>,
+) -> Result<T, A::Error>
+where
+    A: MapAccess<'de>,
+{
+    let key = map
+        .next_key::<String>()?
+        .ok_or_else(|| de::Error::custom("expected a mapping with exactly one key"))?;
+    let value =
+        dispatch(&key, &mut map)?.ok_or_else(|| de::Error::unknown_variant(&key, variants))?;
+    if map.next_key::<IgnoredAny>()?.is_some() {
+        return Err(de::Error::custom(
+            "mapping must contain exactly one of the supported keys",
+        ));
+    }
+    Ok(value)
 }
 
 /// Raw wrapper for a `call` variant in a `Do` step.
@@ -134,6 +246,21 @@ pub(crate) enum RawActionCallDecodeError {
 }
 
 impl RawActionCallDecodeError {
+    /// Returns the typed source location captured during deserialization.
+    ///
+    /// Only the rejected action-value span is retained; argument decoding
+    /// failures still rely on the `Let`/`Do` textual scan. The loader prefers
+    /// this span over that scan because it survives lowercase section
+    /// aliases, nested `maybe.do` steps, and flow-mapping syntax that the
+    /// line-oriented scanner cannot follow.
+    #[must_use]
+    pub(crate) const fn typed_location(&self) -> Option<Location> {
+        match self {
+            Self::InvalidActionName { location, .. } => Some(*location),
+            Self::Arg { .. } => None,
+        }
+    }
+
     /// Returns the argument breadcrumb associated with the decode failure.
     #[must_use]
     pub(crate) fn param(&self) -> &str {

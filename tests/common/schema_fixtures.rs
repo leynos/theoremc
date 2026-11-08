@@ -20,6 +20,16 @@ pub fn load_fixture(name: FixtureName<'_>) -> std::io::Result<String> {
     Dir::open_ambient_dir(FIXTURES_DIR, ambient_authority())?.read_to_string(name.as_str())
 }
 
+/// Builds the diagnostic source identifier for a fixture file.
+///
+/// Every diagnostic assertion, corpus iteration, and snapshot render must
+/// report the same `<fixtures dir>/<name>` path, so the convention lives here
+/// rather than being rebuilt with `format!` at each call site.
+#[must_use]
+pub fn fixture_source_id(name: FixtureName<'_>) -> SourceId {
+    SourceId::new(format!("{FIXTURES_DIR}/{}", name.as_str()))
+}
+
 /// Loads a fixture file and formats I/O failures as test-friendly strings.
 ///
 /// # Errors
@@ -102,9 +112,9 @@ pub fn assert_diagnostic_failure(
     fixture_name: FixtureName<'_>,
     expected_code: SchemaDiagnosticCode,
 ) -> Result<(), String> {
-    let source = format!("{FIXTURES_DIR}/{}", fixture_name.as_str());
+    let source = fixture_source_id(fixture_name);
     let yaml = load_fixture_text(fixture_name)?;
-    let error = load_theorem_docs_with_source(&SourceId::new(&source), &yaml)
+    let error = load_theorem_docs_with_source(&source, &yaml)
         .err()
         .ok_or_else(|| format!("fixture should fail: {}", fixture_name.as_str()))?;
     let diagnostic = error
@@ -118,9 +128,10 @@ pub fn assert_diagnostic_failure(
             diagnostic.code.as_str()
         ));
     }
-    if diagnostic.location.source != source {
+    if diagnostic.location.source != source.as_str() {
         return Err(format!(
-            "unexpected diagnostic source: expected {source}, got {}",
+            "unexpected diagnostic source: expected {}, got {}",
+            source.as_str(),
             diagnostic.location.source
         ));
     }
