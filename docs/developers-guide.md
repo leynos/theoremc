@@ -378,12 +378,15 @@ the tracked `typos.toml` from the live shared en-GB-oxendict dictionary on the
 Because the dictionary is live, `typos.toml` changes whenever shared policy
 changes; CI runs the gate rather than a drift check, and the regenerated file
 is committed. The target enforces that last step: after the gate succeeds it
-runs `git diff --quiet -- typos.toml` and fails, printing the changed stat, if
-the regeneration left the file different from `HEAD`. A stale committed
-`typos.toml` therefore cannot pass review just because the spellings it rejects
-are absent. The comparison uses `SPELLING_REPOSITORY`, so it inspects the
-repository the gate just wrote, and it is skipped when that path is not inside
-a Git work tree, where there is no committed version to compare against.
+runs `git diff --quiet HEAD -- typos.toml` and fails, printing the changed
+stat, if the regeneration left the file different from `HEAD`. Naming `HEAD` is
+what makes the check meaningful: a plain `git diff` compares the worktree with
+the index, so staging the regenerated file would satisfy it while the commit
+stayed stale. A stale `typos.toml` therefore cannot pass review just because
+the spellings it rejects are absent. The comparison uses `SPELLING_REPOSITORY`,
+so it inspects the repository the gate just wrote, and it is skipped when that
+path is not inside a Git work tree, where there is no committed version to
+compare against.
 
 `typos.local.toml` holds narrow repository-specific exceptions only: exact or
 full-line patterns for identifiers and terms the policy cannot correct, never

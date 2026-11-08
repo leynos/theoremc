@@ -112,9 +112,9 @@ fn spelling_target_runs_the_pinned_gate() {
     assert!(
         recipe
             .iter()
-            .any(|line| line.contains("diff --quiet -- typos.toml")),
-        "the spelling target must reject a regenerated typos.toml that differs from HEAD, got \
-         {recipe:?}"
+            .any(|line| line.contains("diff --quiet HEAD -- typos.toml")),
+        "the spelling target must compare the regenerated typos.toml with HEAD rather than the \
+         index, got {recipe:?}"
     );
 }
 

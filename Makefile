@@ -134,9 +134,9 @@ spelling: ## Check spelling and shared phrase corrections
 	$(SPELLING_COMMAND)
 	@if git -C "$(SPELLING_REPOSITORY)" rev-parse --is-inside-work-tree \
 			>/dev/null 2>&1 && \
-		! git -C "$(SPELLING_REPOSITORY)" diff --quiet -- typos.toml; then \
+		! git -C "$(SPELLING_REPOSITORY)" diff --quiet HEAD -- typos.toml; then \
 		echo "typos.toml differs from HEAD; commit the regenerated file." >&2; \
-		git -C "$(SPELLING_REPOSITORY)" diff --stat -- typos.toml >&2; \
+		git -C "$(SPELLING_REPOSITORY)" diff --stat HEAD -- typos.toml >&2; \
 		exit 1; \
 	fi
 
