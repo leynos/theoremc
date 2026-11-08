@@ -32,6 +32,7 @@ pub(super) fn validate_canonical(name: &str) -> Result<(), InvalidCanonicalActio
     Ok(())
 }
 
+/// Validates one dot-separated segment of an action name.
 fn validate_segment(name: &str, seg: &str, pos: usize) -> Result<(), InvalidCanonicalActionName> {
     if seg.is_empty() {
         return Err(InvalidCanonicalActionName {

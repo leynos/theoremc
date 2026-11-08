@@ -46,9 +46,13 @@ impl From<String> for PathStem {
 /// Rust module name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MangledModule {
+    /// Original path stem without the `.theorem` suffix.
     stem: PathStem,
+    /// Sanitized stem used inside the module name.
     mangled_stem: String,
+    /// Twelve-character hash of the full path.
     hash: String,
+    /// Generated module name.
     module_name: String,
 }
 
