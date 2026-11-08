@@ -153,6 +153,12 @@ Every theorem document is a YAML mapping with the following fields. Keys use
 | `Prove`    | list of `Assertion`                | **yes**                                    | —                   | Proof obligations.                                                                                                                                                  |
 | `Evidence` | `Evidence`                         | **yes**                                    | —                   | Backend configuration.                                                                                                                                              |
 
+`Schema` is optional. When it is omitted, `TheoremDoc::schema` is `None` and
+stays unspecified in the Rust model: the loader does not store a default of
+`1`. Omission selects the version 1 compatibility profile when the document is
+interpreted, so `None` and `Some(1)` mean the same thing semantically while
+remaining distinguishable in the parsed document.
+
 ### Accepted schema evolution (pending implementation)
 
 The table above describes the current assertion-only API. Accepted
