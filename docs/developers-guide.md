@@ -137,7 +137,7 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 | Schema        | `theoremc-core`          | `schema/loader/`, `schema/raw/`, `schema/validate*.rs` | YAML loading, span-aware conversion, duplicate-key diagnostics, and validation |
 | Mangle        | `theoremc-core`          | `mangle*.rs`                                           | Deterministic identifier generation                                            |
 | Cross-cutting | `theoremc-core`          | `collision.rs`                                         | Collision detection across schema and mangle                                   |
-| Proc-macro    | `theoremc-macros`        | `lib.rs`                                               | Proc-macro entry points, theorem-file loading delegation, and code generation  |
+| Proc-macro    | `theoremc-macros`        | `lib.rs`, `expansion.rs`                               | Proc-macro entry points, theorem-file loading delegation, and code generation  |
 | Lowering      | `theoremc`               | `arg_lowering.rs`                                      | Test-gated prototype for converting semantic values to Rust token trees        |
 | Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs`            | Theorem file discovery, suite generation, and Cargo change tracking            |
 

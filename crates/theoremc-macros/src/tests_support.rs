@@ -13,7 +13,7 @@ use rstest::rstest;
 use tempfile::TempDir;
 use theoremc_core::mangle::{mangle_module_path, mangle_theorem_harness};
 
-use super::expand_theorem_file_at;
+use crate::expansion::expand_theorem_file_at;
 
 pub(super) struct TheoremSpec<'a> {
     pub(super) name: &'a str,

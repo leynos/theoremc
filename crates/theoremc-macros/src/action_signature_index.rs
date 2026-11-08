@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use theoremc_core::schema::{ActionSignature, TheoremDoc, TheoremName};
 
-use super::MacroExpansionError;
+use crate::expansion::MacroExpansionError;
 
 /// One declared action signature together with the theorem that declared it.
 ///

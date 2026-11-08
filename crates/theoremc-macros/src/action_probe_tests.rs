@@ -1,7 +1,7 @@
 //! Unit tests for generated compile-time action binding probes.
 
-use super::MacroExpansionError;
 use super::tests_support::{TheoremFixture, expand_fixture};
+use crate::expansion::MacroExpansionError;
 use camino::Utf8Path;
 use googletest::prelude::*;
 use rstest::rstest;
