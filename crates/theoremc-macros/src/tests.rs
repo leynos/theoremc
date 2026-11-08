@@ -11,9 +11,9 @@ use super::tests_support::{
     expand_fixture, expected_expansion_with_unwinds, make_single_theorem_fixture, redact_hashes,
     set_cargo_manifest_dir_for_test, temp_fixture_dir, write_fixture,
 };
-use super::{
-    MacroExpansionError, expand_theorem_file_at, generated_harnesses, manifest_dir_from_env,
-};
+use super::error::MacroExpansionError;
+use super::expand_theorem_file_at;
+use super::query::{generated_harnesses, manifest_dir_from_env};
 use camino::Utf8Path;
 use googletest::prelude::*;
 use indexmap::IndexMap;

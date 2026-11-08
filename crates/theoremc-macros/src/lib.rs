@@ -1,26 +1,20 @@
 //! Proc-macro expansion for compile-time theorem integration.
 
-use std::env;
-
-use camino::{Utf8Path, Utf8PathBuf};
+use camino::Utf8Path;
 use proc_macro::TokenStream;
-use proc_macro2::{Ident, Span, TokenStream as TokenStream2};
-use quote::quote;
+use proc_macro2::TokenStream as TokenStream2;
 use syn::{LitStr, parse_macro_input};
-use theoremc_core::{
-    TheoremFileLoadError,
-    canonical_action_name::CanonicalActionName,
-    collision::{referenced_actions, referenced_types},
-    load_theorem_file_from_manifest_dir,
-    mangle::{mangle_action_name, mangle_module_path, mangle_theorem_harness},
-    path_format::normalize_path_separators,
-    schema::{ActionSignature, SchemaDiagnostic, TheoremDoc},
-};
 
-/// First-seen action signature index with conflict provenance.
-mod action_signature_index;
+/// Semantic query phase: loads theorem files and derives expansion inputs.
+mod query;
 
-use action_signature_index::ActionSignatureIndex;
+/// Token rendering phase: converts expansion inputs into Rust tokens.
+mod render;
+
+/// Expansion failures and their `compile_error!` diagnostics.
+mod error;
+
+use error::MacroExpansionError;
 
 /// Expands a crate-relative `.theorem` file into a stable private module.
 ///
@@ -123,243 +117,22 @@ pub fn theorem_file(input: TokenStream) -> TokenStream {
     }
 }
 
+/// Expands a theorem file relative to the invoking crate's manifest directory.
 fn expand_theorem_file(path_literal: &LitStr) -> Result<TokenStream2, MacroExpansionError> {
-    let manifest_dir = manifest_dir_from_env()?;
+    let manifest_dir = query::manifest_dir_from_env()?;
     expand_theorem_file_at(&manifest_dir, path_literal)
 }
 
-fn manifest_dir_from_env() -> Result<Utf8PathBuf, MacroExpansionError> {
-    let manifest_dir =
-        env::var("CARGO_MANIFEST_DIR").map_err(|_| MacroExpansionError::MissingManifestDir)?;
-    Ok(Utf8PathBuf::from(manifest_dir))
-}
-
+/// Expands a theorem file against an explicit manifest directory.
+///
+/// This is the single seam the private expansion tests drive directly, so the
+/// public proc-macro entry point stays a thin wrapper around it.
 fn expand_theorem_file_at(
     manifest_dir: &Utf8Path,
     path_literal: &LitStr,
 ) -> Result<TokenStream2, MacroExpansionError> {
-    let path_value = path_literal.value();
-    let canonical_path = normalize_path_separators(&path_value);
-    let canonical_path_literal = LitStr::new(&canonical_path, path_literal.span());
-    let theorem_path = Utf8PathBuf::from(&canonical_path);
-    let theorem_docs = load_theorem_file_from_manifest_dir(manifest_dir, &theorem_path)
-        .map_err(|error| MacroExpansionError::from_load(&error))?;
-
-    render_expansion(&canonical_path_literal, &canonical_path, &theorem_docs)
-}
-
-fn render_expansion(
-    path_literal: &LitStr,
-    theorem_path: &str,
-    theorem_docs: &[TheoremDoc],
-) -> Result<TokenStream2, MacroExpansionError> {
-    let module_ident = identifier(mangle_module_path(theorem_path).module_name());
-    let harnesses = generated_harnesses(theorem_path, theorem_docs)?;
-    let action_probes = generated_action_probes(theorem_docs)?;
-    let action_probe_tokens = render_action_probes(&action_probes);
-    let type_probes = generated_referenced_type_probes(theorem_docs)?;
-    let type_probe_tokens = render_referenced_type_probes(&type_probes);
-    let harness_idents: Vec<&Ident> = harnesses.iter().map(|harness| &harness.ident).collect();
-    let unwind_literals: Vec<&syn::LitInt> = harnesses
-        .iter()
-        .map(|harness| &harness.unwind_literal)
-        .collect();
-    let harness_count = syn::LitInt::new(&harness_idents.len().to_string(), Span::call_site());
-
-    Ok(quote! {
-        #[expect(
-            unexpected_cfgs,
-            reason = "Kani sets cfg(kani) when compiling proof harnesses"
-        )]
-        mod #module_ident {
-            const _: &str =
-                include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", #path_literal));
-
-            #action_probe_tokens
-            #type_probe_tokens
-
-            #[cfg(kani)]
-            pub(super) mod kani {
-                #(
-                    #[kani::proof]
-                    #[kani::unwind(#unwind_literals)]
-                    pub(crate) fn #harness_idents() {}
-                )*
-            }
-
-            #[cfg(kani)]
-            const _: [fn(); #harness_count] = [#(kani::#harness_idents),*];
-        }
-    })
-}
-
-fn generated_referenced_type_probes(
-    theorem_docs: &[TheoremDoc],
-) -> Result<Vec<syn::Type>, MacroExpansionError> {
-    referenced_types(theorem_docs)
-        .into_iter()
-        .map(parse_referenced_type)
-        .collect()
-}
-
-fn parse_referenced_type(ty: &str) -> Result<syn::Type, MacroExpansionError> {
-    syn::parse_str(ty).map_err(|source| MacroExpansionError::InvalidReferencedType {
-        ty: ty.to_owned(),
-        message: source.to_string(),
-    })
-}
-fn generated_harnesses(
-    theorem_path: &str,
-    theorem_docs: &[TheoremDoc],
-) -> Result<Vec<GeneratedHarness>, MacroExpansionError> {
-    theorem_docs
-        .iter()
-        .map(|doc| {
-            let kani = doc.evidence.kani.as_ref().ok_or_else(|| {
-                MacroExpansionError::MissingKaniEvidence {
-                    theorem: doc.theorem.as_str().to_owned(),
-                }
-            })?;
-            Ok(GeneratedHarness {
-                ident: identifier(
-                    mangle_theorem_harness(theorem_path, doc.theorem.as_str()).identifier(),
-                ),
-                unwind_literal: syn::LitInt::new(&kani.unwind.to_string(), Span::call_site()),
-            })
-        })
-        .collect()
-}
-
-fn generated_action_probes(
-    theorem_docs: &[TheoremDoc],
-) -> Result<Vec<GeneratedActionProbe>, MacroExpansionError> {
-    let referenced = referenced_actions(theorem_docs);
-    let canonical_names: Vec<&str> = referenced.iter().map(|name| name.as_str()).collect();
-    let signature_index = ActionSignatureIndex::for_actions(theorem_docs, &canonical_names)?;
-    referenced
-        .iter()
-        .map(|canonical| {
-            let signature = signature_index.signature_for(canonical.as_str())?;
-            action_probe(canonical, signature)
-        })
-        .collect()
-}
-
-fn action_probe(
-    canonical: &CanonicalActionName,
-    signature: &ActionSignature,
-) -> Result<GeneratedActionProbe, MacroExpansionError> {
-    let param_types = signature
-        .params
-        .values()
-        .map(|param| parse_action_type(canonical.as_str(), param))
-        .collect::<Result<Vec<_>, _>>()?;
-    let return_type = parse_action_type(canonical.as_str(), &signature.returns)?;
-
-    Ok(GeneratedActionProbe {
-        ident: identifier(mangle_action_name(canonical).identifier()),
-        param_types,
-        return_type,
-    })
-}
-
-fn parse_action_type(canonical: &str, ty: &str) -> Result<syn::Type, MacroExpansionError> {
-    syn::parse_str(ty).map_err(|source| MacroExpansionError::InvalidActionSignature {
-        action: canonical.to_owned(),
-        message: source.to_string(),
-    })
-}
-
-fn render_action_probes(action_probes: &[GeneratedActionProbe]) -> TokenStream2 {
-    if action_probes.is_empty() {
-        return TokenStream2::new();
-    }
-
-    let probe_idents = action_probes.iter().map(|probe| &probe.ident);
-    let probe_param_types = action_probes.iter().map(|probe| &probe.param_types);
-    let probe_return_types = action_probes.iter().map(|probe| &probe.return_type);
-
-    // Each `const _: fn(...) -> ... = crate::theorem_actions::...;` anchors the
-    // referenced symbol at compile time. Anonymous `_` items bypass dead-code
-    // checks without an `#[allow]`, so a signature mismatch surfaces as a
-    // normal type error rather than a silenced lint.
-    quote! {
-        #(
-            const _: fn(#(#probe_param_types),*) -> #probe_return_types =
-                crate::theorem_actions::#probe_idents;
-        )*
-    }
-}
-
-fn render_referenced_type_probes(type_probes: &[syn::Type]) -> TokenStream2 {
-    if type_probes.is_empty() {
-        return TokenStream2::new();
-    }
-
-    quote! {
-        const _: () = {
-            fn __theoremc_assert_referenced<T: ?Sized>() {}
-            #(
-                let _ = __theoremc_assert_referenced::<#type_probes>;
-            )*
-        };
-    }
-}
-fn identifier(name: &str) -> Ident {
-    Ident::new(name, Span::call_site())
-}
-
-struct GeneratedHarness {
-    ident: Ident,
-    unwind_literal: syn::LitInt,
-}
-
-struct GeneratedActionProbe {
-    ident: Ident,
-    param_types: Vec<syn::Type>,
-    return_type: syn::Type,
-}
-
-#[derive(Debug, thiserror::Error)]
-enum MacroExpansionError {
-    #[error("`CARGO_MANIFEST_DIR` is not set during theorem macro expansion")]
-    MissingManifestDir,
-    #[error("theorem `{theorem}` does not declare required `Evidence.kani` configuration")]
-    MissingKaniEvidence { theorem: String },
-    #[error("referenced action `{action}` is missing an Actions signature entry")]
-    MissingActionSignature { action: String },
-    #[error(
-        "referenced action `{action}` has conflicting Actions signatures: theorem `{first_theorem}` declares `{first_signature}`, but theorem `{conflicting_theorem}` declares `{conflicting_signature}`"
-    )]
-    ConflictingActionSignature {
-        action: String,
-        first_theorem: String,
-        conflicting_theorem: String,
-        first_signature: String,
-        conflicting_signature: String,
-    },
-    #[error("referenced action `{action}` has an invalid Actions signature: {message}")]
-    InvalidActionSignature { action: String, message: String },
-    #[error("referenced type `{ty}` is invalid: {message}")]
-    InvalidReferencedType { ty: String, message: String },
-    #[error("{0}")]
-    LoadTheoremFile(String),
-}
-
-impl MacroExpansionError {
-    fn to_compile_error(&self, span: Span) -> TokenStream2 {
-        syn::Error::new(span, self.to_string()).to_compile_error()
-    }
-
-    fn from_load(error: &TheoremFileLoadError) -> Self {
-        let message = match &error {
-            TheoremFileLoadError::InvalidTheoremFile { source, .. } => source
-                .diagnostic()
-                .map_or_else(|| error.to_string(), SchemaDiagnostic::render),
-            _ => error.to_string(),
-        };
-        Self::LoadTheoremFile(message)
-    }
+    let plan = query::plan_expansion(manifest_dir, path_literal)?;
+    Ok(render::render_expansion(&plan))
 }
 
 /// Fixture and assertion helpers consumed by the private macro expansion tests.
