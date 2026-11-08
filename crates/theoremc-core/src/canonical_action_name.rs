@@ -30,7 +30,12 @@ impl InvalidCanonicalActionName {
 }
 
 /// Typed reason data for canonical action-name validation failures.
+///
+/// Marked `#[non_exhaustive]` so a future grammar rule can add a reason
+/// without breaking downstream matches, matching the other public error
+/// enums in this crate.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CanonicalActionNameInvalidReason {
     /// The name does not contain the required namespace separator.
     MissingSeparator,
