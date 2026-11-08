@@ -139,7 +139,9 @@ where
 
 /// Configuration sources passed through the application boundary as one unit.
 struct ConfigurationSources {
+    /// Source used to discover configuration files.
     discovery: ortho_config::SharedEnvSource,
+    /// Source used to merge environment overrides.
     merge: ortho_config::SharedScanEnvSource,
 }
 
