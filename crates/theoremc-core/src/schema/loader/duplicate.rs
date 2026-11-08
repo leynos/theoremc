@@ -4,16 +4,23 @@ use std::collections::BTreeMap;
 
 use super::{RawTheoremDoc, SchemaDiagnosticCode, SchemaError, SourceId, create_diagnostic};
 
+/// Source location of one theorem declaration in a duplicate-key report.
 #[derive(Debug, Clone, Copy)]
 struct DuplicateTheoremLocation {
+    /// Location type used by the YAML parser.
     location: serde_saphyr::Location,
+    /// One-based source line.
     line: usize,
+    /// One-based source column.
     column: usize,
 }
 
+/// All declarations that share one colliding theorem key.
 #[derive(Debug, Clone)]
 struct DuplicateTheoremCollision {
+    /// First declaration seen for the key.
     first: DuplicateTheoremLocation,
+    /// Later declarations that repeat the key.
     duplicates: Vec<DuplicateTheoremLocation>,
 }
 

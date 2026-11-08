@@ -11,10 +11,15 @@ const HARNESS_PREFIX: &str = "theorem__";
 /// The result of mangling a theorem identifier into a Kani harness name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MangledHarness {
+    /// Original theorem identifier as written.
     theorem: String,
+    /// Deterministic snake-case theorem slug.
     slug: String,
+    /// Exact theorem key `{P}#{T}`.
     theorem_key: String,
+    /// Twelve-character lowercase hex hash of the theorem key.
     hash: String,
+    /// Generated harness identifier.
     identifier: String,
 }
 
@@ -50,6 +55,7 @@ impl MangledHarness {
     }
 }
 
+/// Reports whether a name is already a safe snake-case identifier.
 fn is_preserved_snake_identifier(value: &str) -> bool {
     let mut chars = value.chars();
     let Some(first) = chars.next() else {
@@ -63,16 +69,23 @@ fn is_preserved_snake_identifier(value: &str) -> bool {
     chars.all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '_')
 }
 
+/// Classification used to decide acronym and digit boundaries.
 #[derive(Copy, Clone, PartialEq, Eq)]
 enum CharKind {
+    /// An ASCII uppercase letter.
     Upper,
+    /// An ASCII lowercase letter.
     Lower,
+    /// An ASCII digit.
     Digit,
+    /// An underscore.
     Underscore,
+    /// Any other character.
     Other,
 }
 
 impl CharKind {
+    /// Classifies one character.
     const fn of(ch: char) -> Self {
         match ch {
             '_' => Self::Underscore,
@@ -84,6 +97,7 @@ impl CharKind {
     }
 }
 
+/// Decides whether a separator belongs between two characters.
 fn should_insert_slug_separator(previous: char, current: char, next: Option<char>) -> bool {
     use CharKind::{Digit, Lower, Underscore, Upper};
 
@@ -101,6 +115,7 @@ fn should_insert_slug_separator(previous: char, current: char, next: Option<char
     }
 }
 
+/// Reports whether position `index` needs a separating underscore.
 fn needs_slug_separator(chars: &[char], index: usize, slug: &str) -> bool {
     let Some(current) = chars.get(index).copied() else {
         return false;
@@ -113,6 +128,7 @@ fn needs_slug_separator(chars: &[char], index: usize, slug: &str) -> bool {
         && !slug.ends_with('_')
 }
 
+/// Normalizes a raw slug into a safe identifier fragment.
 fn sanitize_slug_fragment(raw_slug: &str) -> String {
     let mut sanitized = String::with_capacity(raw_slug.len());
 

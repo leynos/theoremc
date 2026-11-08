@@ -125,6 +125,7 @@ pub fn referenced_types(docs: &[TheoremDoc]) -> Vec<&str> {
     distinct
 }
 
+/// Collects every type spelling referenced by the documents.
 fn collect_referenced_type_occurrences(docs: &[TheoremDoc]) -> Vec<&str> {
     let mut out = Vec::new();
     for doc in docs {

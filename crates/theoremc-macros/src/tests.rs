@@ -1,6 +1,7 @@
 //! Unit tests for deterministic theorem-file macro expansion.
 //!
-//! These tests exercise the private expansion pipeline in `lib.rs` directly,
+//! These tests exercise the private expansion pipeline in `expansion.rs`
+//! directly,
 //! using `tests_support.rs` for temporary theorem fixtures and golden token
 //! rendering. The separate trybuild suite covers public compiler diagnostics;
 //! this module concentrates on internal expansion shape, ordering, and
@@ -11,7 +12,7 @@ use super::tests_support::{
     expand_fixture, expected_expansion_with_unwinds, make_single_theorem_fixture, redact_hashes,
     temp_fixture_dir, write_fixture,
 };
-use super::{
+use crate::expansion::{
     MacroExpansionError, expand_theorem_file_at, generated_harnesses, manifest_dir_from_reader,
 };
 use camino::Utf8Path;

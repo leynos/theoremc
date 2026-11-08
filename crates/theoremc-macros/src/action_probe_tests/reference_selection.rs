@@ -18,8 +18,8 @@
 //! that traversal fault leaves the conflict cases green and fails the nested
 //! equivalent cases, which is the evidence that the latter are not vacuous.
 
-use super::super::MacroExpansionError;
 use super::super::tests_support::{TheoremFixture, expand_fixture};
+use crate::expansion::MacroExpansionError;
 use camino::Utf8Path;
 use googletest::prelude::*;
 use rstest::rstest;

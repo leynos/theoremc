@@ -31,6 +31,7 @@ use fields::{
 use steps::{validate_do_steps, validate_let_bindings};
 use types::validate_forall_types;
 
+/// Result type for one validation pass.
 type ValidationResult = Result<(), ValidationFailure>;
 
 /// Returns `true` if the string is empty or contains only whitespace.

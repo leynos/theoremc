@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use theoremc_core::schema::{ActionSignature, TheoremDoc, TheoremName};
 
-use super::MacroExpansionError;
+use crate::expansion::MacroExpansionError;
 
 /// One declared action signature together with the theorem that declared it.
 ///
@@ -19,13 +19,16 @@ use super::MacroExpansionError;
 /// error can name the action but not the two documents that disagree.
 #[derive(Debug, Clone, Copy)]
 struct DeclaredSignature<'a> {
+    /// Theorem that made this declaration.
     theorem: &'a TheoremName,
+    /// Signature as declared by that theorem.
     signature: &'a ActionSignature,
 }
 
 /// First-seen signatures for the actions one expansion referenced.
 #[derive(Debug)]
 pub(super) struct ActionSignatureIndex<'a> {
+    /// First-seen declaration for each selected action.
     signatures: BTreeMap<&'a str, DeclaredSignature<'a>>,
 }
 
@@ -62,6 +65,7 @@ impl<'a> ActionSignatureIndex<'a> {
         Ok(Self { signatures })
     }
 
+    /// Records a declaration, rejecting a second signature that disagrees.
     fn insert_signature(
         signatures: &mut BTreeMap<&'a str, DeclaredSignature<'a>>,
         canonical: &'a str,

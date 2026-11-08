@@ -57,7 +57,9 @@
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("invalid canonical action name '{name}': {reason}")]
 pub struct InvalidCanonicalActionName {
+    /// Offending action name.
     pub(crate) name: String,
+    /// Explanation of why the name is invalid.
     pub(crate) reason: String,
 }
 
@@ -217,9 +219,13 @@ pub const RESOLUTION_TARGET: &str = "crate::theorem_actions";
 /// The result of mangling a canonical action name.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MangledAction {
+    /// Escaped slug portion with segments joined by `__`.
     slug: String,
+    /// Twelve-character hash of the action name.
     hash: String,
+    /// Generated action identifier.
     identifier: String,
+    /// Fully qualified resolution path.
     path: String,
 }
 

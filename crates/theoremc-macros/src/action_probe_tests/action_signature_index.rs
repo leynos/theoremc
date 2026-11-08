@@ -1,6 +1,7 @@
 //! Focused unit tests for the action-signature index.
 
-use super::super::{MacroExpansionError, action_signature_index::ActionSignatureIndex};
+use crate::action_signature_index::ActionSignatureIndex;
+use crate::expansion::MacroExpansionError;
 use googletest::prelude::*;
 use pretty_assertions::assert_eq as pretty_assert_eq;
 use rstest::rstest;

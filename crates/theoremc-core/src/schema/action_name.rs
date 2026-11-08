@@ -7,6 +7,7 @@
 use super::error::SchemaError;
 use super::identifier::{is_rust_reserved_keyword, is_valid_ascii_identifier_pattern};
 
+/// Hint used when a name lacks the required dot separator.
 const CANONICAL_ACTION_HINT: &str =
     "action must be a dot-separated canonical name with at least two segments";
 
@@ -33,6 +34,7 @@ pub(crate) fn validate_canonical_action_name(name: &str) -> Result<(), SchemaErr
     Ok(())
 }
 
+/// Validates one dot-separated segment of an action name.
 fn validate_segment(name: &str, segment: &str, position: usize) -> Result<(), SchemaError> {
     if segment.is_empty() {
         return Err(invalid_action_name_error(
@@ -65,6 +67,7 @@ fn validate_segment(name: &str, segment: &str, position: usize) -> Result<(), Sc
     Ok(())
 }
 
+/// Builds the typed error for an invalid action name.
 fn invalid_action_name_error(name: &str, reason: String) -> SchemaError {
     SchemaError::InvalidActionName {
         action: name.to_owned(),

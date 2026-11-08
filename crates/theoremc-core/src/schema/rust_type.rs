@@ -8,12 +8,15 @@ use syn::{
     TypeTraitObject, TypeTuple,
 };
 
+/// Lifetime names bound by an enclosing `for<..>` binder.
 #[derive(Clone, Copy)]
 struct LifetimeScope<'a>(&'a [String]);
 
 impl LifetimeScope<'_> {
+    /// Scope with no bound lifetimes.
     const EMPTY: LifetimeScope<'static> = LifetimeScope(&[]);
 
+    /// Reports whether `name` is bound in this scope.
     fn contains(&self, name: &str) -> bool {
         self.0.iter().any(|bound| bound == name)
     }
@@ -73,6 +76,7 @@ fn free_named_lifetime_in_type(ty: &Type, scope: LifetimeScope<'_>) -> Option<St
     }
 }
 
+/// Scans an array element type.
 fn free_named_lifetime_in_array(ty: &TypeArray, scope: LifetimeScope<'_>) -> Option<String> {
     free_named_lifetime_in_type(&ty.elem, scope)
 }
@@ -106,10 +110,12 @@ fn free_named_lifetime_in_fn_ptr_signature(
         .or_else(|| free_named_lifetime_in_return_type(&ty.output, scope))
 }
 
+/// Scans the inner type of a grouped type.
 fn free_named_lifetime_in_group(ty: &TypeGroup, scope: LifetimeScope<'_>) -> Option<String> {
     free_named_lifetime_in_type(&ty.elem, scope)
 }
 
+/// Scans the bounds of an `impl Trait` type.
 fn free_named_lifetime_in_impl_trait(
     ty: &TypeImplTrait,
     scope: LifetimeScope<'_>,
@@ -119,22 +125,27 @@ fn free_named_lifetime_in_impl_trait(
         .find_map(|bound| free_named_lifetime_in_type_param_bound(bound, scope))
 }
 
+/// Scans the path arguments of a macro invocation used as a type.
 fn free_named_lifetime_in_macro(ty: &TypeMacro, scope: LifetimeScope<'_>) -> Option<String> {
     free_named_lifetime_in_path_arguments(&ty.mac.path.segments, scope)
 }
 
+/// Scans the inner type of a parenthesized type.
 fn free_named_lifetime_in_paren(ty: &TypeParen, scope: LifetimeScope<'_>) -> Option<String> {
     free_named_lifetime_in_type(&ty.elem, scope)
 }
 
+/// Scans the path arguments of a named type.
 fn free_named_lifetime_in_path(ty: &TypePath, scope: LifetimeScope<'_>) -> Option<String> {
     free_named_lifetime_in_path_arguments(&ty.path.segments, scope)
 }
 
+/// Scans the pointee type of a raw pointer.
 fn free_named_lifetime_in_ptr(ty: &TypePtr, scope: LifetimeScope<'_>) -> Option<String> {
     free_named_lifetime_in_type(&ty.elem, scope)
 }
 
+/// Scans a reference's lifetime and then the referent type.
 fn free_named_lifetime_in_reference(
     ty: &TypeReference,
     scope: LifetimeScope<'_>,
@@ -145,10 +156,12 @@ fn free_named_lifetime_in_reference(
         .or_else(|| free_named_lifetime_in_type(&ty.elem, scope))
 }
 
+/// Scans the element type of a slice.
 fn free_named_lifetime_in_slice(ty: &TypeSlice, scope: LifetimeScope<'_>) -> Option<String> {
     free_named_lifetime_in_type(&ty.elem, scope)
 }
 
+/// Scans the bounds of a trait object.
 fn free_named_lifetime_in_trait_object(
     ty: &TypeTraitObject,
     scope: LifetimeScope<'_>,
@@ -158,12 +171,14 @@ fn free_named_lifetime_in_trait_object(
         .find_map(|bound| free_named_lifetime_in_type_param_bound(bound, scope))
 }
 
+/// Scans each element of a tuple type.
 fn free_named_lifetime_in_tuple(ty: &TypeTuple, scope: LifetimeScope<'_>) -> Option<String> {
     ty.elems
         .iter()
         .find_map(|elem| free_named_lifetime_in_type(elem, scope))
 }
 
+/// Scans a return type, treating the default form as having none.
 fn free_named_lifetime_in_return_type(
     output: &ReturnType,
     scope: LifetimeScope<'_>,
@@ -174,6 +189,7 @@ fn free_named_lifetime_in_return_type(
     }
 }
 
+/// Scans one trait or lifetime bound.
 fn free_named_lifetime_in_type_param_bound(
     bound: &syn::TypeParamBound,
     scope: LifetimeScope<'_>,
@@ -196,6 +212,7 @@ fn free_named_lifetime_in_type_param_bound(
     }
 }
 
+/// Scans each path segment's arguments.
 fn free_named_lifetime_in_path_arguments(
     segments: &syn::punctuated::Punctuated<syn::PathSegment, syn::token::PathSep>,
     scope: LifetimeScope<'_>,
@@ -205,6 +222,7 @@ fn free_named_lifetime_in_path_arguments(
         .find_map(|segment| free_named_lifetime_in_arguments(&segment.arguments, scope))
 }
 
+/// Scans angle-bracketed or parenthesized path arguments.
 fn free_named_lifetime_in_arguments(
     arguments: &PathArguments,
     scope: LifetimeScope<'_>,
@@ -220,6 +238,7 @@ fn free_named_lifetime_in_arguments(
     }
 }
 
+/// Scans each generic argument.
 fn free_named_lifetime_in_angle_bracketed_arguments(
     arguments: &AngleBracketedGenericArguments,
     scope: LifetimeScope<'_>,
@@ -254,6 +273,7 @@ fn free_named_lifetime_in_parenthesized_arguments(
         .or_else(|| free_named_lifetime_in_return_type(&arguments.output, scope))
 }
 
+/// Builds a scope extended by the names bound at `new_lifetimes`.
 fn scoped_lifetimes(
     scope: LifetimeScope<'_>,
     new_lifetimes: Option<&BoundLifetimes>,
@@ -268,6 +288,7 @@ fn scoped_lifetimes(
     scoped
 }
 
+/// Returns `name` when it is free, ignoring reserved and bound names.
 fn free_named_lifetime_name(name: &str, scope: LifetimeScope<'_>) -> Option<String> {
     if is_reserved_lifetime_name(name) || is_bound_lifetime(name, scope) {
         None
@@ -276,10 +297,12 @@ fn free_named_lifetime_name(name: &str, scope: LifetimeScope<'_>) -> Option<Stri
     }
 }
 
+/// Reports whether a lifetime name is reserved (`'static` or `'_`).
 fn is_reserved_lifetime_name(name: &str) -> bool {
     name == "static" || name == "_"
 }
 
+/// Reports whether an enclosing binder already binds `name`.
 fn is_bound_lifetime(name: &str, scope: LifetimeScope<'_>) -> bool {
     scope.contains(name)
 }

@@ -25,6 +25,7 @@ use crate::cli::Commands;
 // Keep namespaces for deferred top-level commands so documented future
 // settings remain usable, while rejecting misspellings before dispatch. This
 // name-only allowlist does not define parser arguments or command metadata.
+/// Command names accepted in configuration even when not yet implemented.
 const CONFIGURABLE_COMMAND_NAMES: &[&str] = &[
     "init",
     "list",
@@ -43,7 +44,9 @@ const CONFIGURABLE_COMMAND_NAMES: &[&str] = &[
     "context",
     "feedback",
 ];
+/// Accepted values for policy-style settings.
 const POLICY_VALUES: &[&str] = &["auto", "always", "never"];
+/// Accepted values for accessibility settings.
 const ACCESSIBILITY_POLICY_VALUES: &[&str] = &["auto", "on", "off"];
 
 /// Consume `OrthoConfig`'s internal config selector without treating it as a

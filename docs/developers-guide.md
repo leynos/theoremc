@@ -137,7 +137,7 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 | Schema        | `theoremc-core`          | `schema/loader/`, `schema/raw/`, `schema/validate*.rs` | YAML loading, span-aware conversion, duplicate-key diagnostics, and validation |
 | Mangle        | `theoremc-core`          | `mangle*.rs`                                           | Deterministic identifier generation                                            |
 | Cross-cutting | `theoremc-core`          | `collision.rs`                                         | Collision detection across schema and mangle                                   |
-| Proc-macro    | `theoremc-macros`        | `lib.rs`                                               | Proc-macro entry points, theorem-file loading delegation, and code generation  |
+| Proc-macro    | `theoremc-macros`        | `lib.rs`, `expansion.rs`                               | Proc-macro entry points, theorem-file loading delegation, and code generation  |
 | Lowering      | `theoremc`               | `arg_lowering.rs`                                      | Test-gated prototype for converting semantic values to Rust token trees        |
 | Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs`            | Theorem file discovery, suite generation, and Cargo change tracking            |
 
@@ -344,11 +344,11 @@ full rustdoc set (`broken_intra_doc_links`, `private_intra_doc_links`,
 `cfg(kani)` and `cfg(dylint_lib)`, so Kani harnesses and Dylint libraries are
 declared once instead of carrying per-site expectations.
 
-Adoption is deliberately partial, and one baseline rule is still deferred
-rather than adopted silently: `clippy::missing_docs_in_private_items` waits on
-documenting every private item it reports, concentrated in
-`crates/theoremc-macros/src/lib.rs` and `crates/theoremc-core`. That rule is
-not enforced yet, so do not treat a clean `make lint` as proof that it holds.
+`clippy::missing_docs_in_private_items` was the last baseline rule to arrive:
+it waited on documenting every private item it reports, concentrated in
+`crates/theoremc-macros/src/lib.rs` and `crates/theoremc-core`. That
+documentation is in place and the rule is denied, so a new private item without
+a doc comment now fails `make lint` rather than passing unnoticed.
 
 Where a rule is adopted but tuned differently, record the reason beside the
 setting: `clippy.toml` keeps `cognitive-complexity-threshold = 9` to match

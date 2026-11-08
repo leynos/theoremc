@@ -196,10 +196,14 @@ pub(crate) fn locate_decode_failure(
     None
 }
 
+/// Result of scanning one line while locating a `Let` argument.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BindingLineOutcome {
+    /// The argument was found at the given row and column.
     Found(usize, usize),
+    /// The scan has left the selected binding's scope.
     ExitScope,
+    /// The line is unrelated and scanning should continue.
     Continue,
 }
 
@@ -239,17 +243,25 @@ fn locate_let_binding_argument(
     None
 }
 
+/// Result of scanning one line while locating a `Do` argument.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DoStepLineOutcome {
+    /// The argument was found at the given row and column.
     Found(usize, usize),
+    /// The scan has left the selected step's scope.
     ExitScope,
+    /// The line is unrelated and scanning should continue.
     Continue,
 }
 
+/// State carried into a single `Do` line scan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DoStepLineContext<'a> {
+    /// Position of the current line relative to the selected step.
     scope: StepScope,
+    /// Indentation of the selected step's mapping.
     indent: usize,
+    /// Argument name being located.
     argument_name: YamlKey<'a>,
 }
 
@@ -296,11 +308,16 @@ fn locate_do_step_argument(
     None
 }
 
+/// Position of a `Do` line relative to the selected step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum StepScope {
+    /// The selected step has not started yet.
     OutsideSelected,
+    /// The line opens the selected step.
     SelectedStart,
+    /// The line belongs to the selected step's body.
     InsideSelected,
+    /// The selected step has ended.
     PastSelected,
 }
 

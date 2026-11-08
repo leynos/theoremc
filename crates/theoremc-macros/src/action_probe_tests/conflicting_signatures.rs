@@ -4,8 +4,8 @@
 //! disagree, expansion must fail with a diagnostic that names both declaring
 //! theorems and both signature summaries.
 
-use super::super::MacroExpansionError;
 use super::super::tests_support::{TheoremFixture, expand_fixture};
+use crate::expansion::MacroExpansionError;
 use camino::Utf8Path;
 use googletest::prelude::*;
 use rstest::{fixture, rstest};

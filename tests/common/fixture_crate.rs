@@ -55,10 +55,15 @@ pub const TRIVIAL_THEOREM: &str = concat!(
 
 /// Temporary Cargo crate used by integration tests that exercise build scripts.
 pub struct FixtureCrate {
+    /// Temporary directory kept alive for the fixture's lifetime.
     _temp_dir: tempfile::TempDir,
+    /// Absolute path to the fixture crate's manifest directory.
     manifest_dir: Utf8PathBuf,
+    /// Shared target directory used by all fixture builds.
     target_dir: Utf8PathBuf,
+    /// Package name used in generated manifests and lookups.
     package_name: String,
+    /// Capability-scoped handle to the fixture's manifest directory.
     dir: Dir,
 }
 
@@ -292,6 +297,7 @@ impl FixtureCrate {
         Err("generated theorem_suite.rs was not found".to_owned())
     }
 
+    /// Advances the modification time of `path`'s parent directory.
     fn advance_parent_mtime(&self, path: &Utf8Path) -> Result<(), String> {
         if let Some(parent) = path.parent()
             && !parent.as_str().is_empty()
@@ -301,6 +307,7 @@ impl FixtureCrate {
         Ok(())
     }
 
+    /// Advances `path`'s modification time to defeat Cargo caching.
     fn advance_mtime(&self, path: &Utf8Path) -> Result<(), String> {
         let absolute_path = self.manifest_dir.join(path);
         let advanced_mtime = SystemTime::now()
@@ -311,6 +318,7 @@ impl FixtureCrate {
     }
 }
 
+/// Builds a fixture manifest with lints disabled for build-script tests.
 fn fixture_build_support_cargo_toml(manifest: &str) -> Result<String, String> {
     let mut removed_lints = false;
     let mut inside_lints = false;

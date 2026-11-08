@@ -143,6 +143,7 @@ pub fn load_theorem_file_from_manifest_dir(
     Ok(theorem_docs)
 }
 
+/// Reports whether a path begins with a Windows drive prefix.
 fn has_windows_drive_prefix(path: &Utf8Path) -> bool {
     matches!(
         path.as_str().as_bytes(),
@@ -150,13 +151,18 @@ fn has_windows_drive_prefix(path: &Utf8Path) -> bool {
     )
 }
 
+/// Reason a theorem path is rejected.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TheoremPathViolation {
+    /// Path is absolute or root-anchored.
     RootAnchored,
+    /// Path begins with a Windows drive prefix.
     DrivePrefixed,
+    /// Path contains a `..` component.
     ParentTraversal,
 }
 
+/// Classifies a theorem path that escapes the crate root.
 fn theorem_path_violation(path: &Utf8Path) -> Option<TheoremPathViolation> {
     let normalized_path = crate::path_format::normalize_path_separators(path.as_str());
     let candidate_path = Utf8Path::new(&normalized_path);
@@ -183,10 +189,12 @@ fn theorem_path_violation(path: &Utf8Path) -> Option<TheoremPathViolation> {
     None
 }
 
+/// Reports whether a theorem path is rejected by validation.
 fn is_invalid_theorem_path(path: &Utf8Path) -> bool {
     theorem_path_violation(path).is_some()
 }
 
+/// Maps an IO error kind to its stable diagnostic code.
 const fn io_error_code(kind: std::io::ErrorKind) -> &'static str {
     match kind {
         std::io::ErrorKind::NotFound => "io:NotFound",
