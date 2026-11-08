@@ -369,6 +369,11 @@ mod tests_support;
 #[path = "tests.rs"]
 mod tests;
 
+/// Error-reporting tests for the private expansion pipeline.
+#[cfg(test)]
+#[path = "error_reporting_tests.rs"]
+mod error_reporting_tests;
+
 /// Private expansion tests for compile-time action probe generation.
 #[cfg(test)]
 #[path = "action_probe_tests.rs"]

@@ -50,6 +50,10 @@
   crates](adr-011-shared-warm-target-for-fixture-crates.md)
   - Decision record for sharing one warm target between fixture crates, their
     unique package names, the seeded lock and offline builds.
+- [Architecture Decision Record (ADR) 012: workspace-complete lint
+  gate](adr-012-workspace-complete-lint-gate.md)
+  - Decision record for workspace-scoped rustdoc, Clippy, and Whitaker stages,
+    the sequential `make lint` aggregate, and the exclusion-free `dylint.toml`.
 - [Request for Comments (RFC) 0001: semantic law templates over composable
   primaries](rfcs/0001-semantic-law-templates.md)
   - Accepted proposal for schema version 2 structured laws, composable

@@ -1,0 +1,14 @@
+# Whitaker (Dylint) configuration for the workspace.
+#
+# This file carries no exclusions. `make lint-whitaker` runs the whole suite
+# against every workspace package, target, and feature set with warnings
+# denied, and the suite is clean, so no crate or module needs an exemption.
+#
+# Should a finding ever be irreducible, add the narrowest key that works and
+# record the reason in a comment beside it:
+#
+# - prefer `excluded_paths`, whose entries are crate-identifier-anchored module
+#   paths such as `crate_name::legacy_io`, over `excluded_crates`, which
+#   abandons the policy for the whole crate; and
+# - note that `no_std_fs_operations` cannot be suppressed in source, so a
+#   `dylint.toml` key is its only escape hatch.
