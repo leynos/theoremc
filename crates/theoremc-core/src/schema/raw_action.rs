@@ -77,11 +77,11 @@ impl<'de> Deserialize<'de> for RawLetBinding {
             where
                 A: MapAccess<'de>,
             {
-                dispatch_single_key(map, &["call", "must"], |key, map| match key {
-                    "call" => map
+                dispatch_single_key(map, &["call", "must"], |key, access| match key {
+                    "call" => access
                         .next_value::<RawActionCall>()
                         .map(|call| Some(RawLetBinding::Call(RawLetCall { call }))),
-                    "must" => map
+                    "must" => access
                         .next_value::<RawActionCall>()
                         .map(|must| Some(RawLetBinding::Must(RawLetMust { must }))),
                     _ => Ok(None),
@@ -142,14 +142,14 @@ impl<'de> Deserialize<'de> for RawStep {
             where
                 A: MapAccess<'de>,
             {
-                dispatch_single_key(map, &["call", "must", "maybe"], |key, map| match key {
-                    "call" => map
+                dispatch_single_key(map, &["call", "must", "maybe"], |key, access| match key {
+                    "call" => access
                         .next_value::<RawActionCall>()
                         .map(|call| Some(RawStep::Call(RawStepCall { call }))),
-                    "must" => map
+                    "must" => access
                         .next_value::<RawActionCall>()
                         .map(|must| Some(RawStep::Must(RawStepMust { must }))),
-                    "maybe" => map
+                    "maybe" => access
                         .next_value::<RawMaybeBlock>()
                         .map(|maybe| Some(RawStep::Maybe(RawStepMaybe { maybe }))),
                     _ => Ok(None),
