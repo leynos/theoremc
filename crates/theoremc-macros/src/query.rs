@@ -63,24 +63,39 @@ pub(super) fn manifest_dir_from_env() -> Result<Utf8PathBuf, MacroExpansionError
     Ok(Utf8PathBuf::from(manifest_dir))
 }
 
-/// Loads `path_literal` relative to `manifest_dir` and derives the plan.
-pub(super) fn plan_expansion(
+/// Loads the theorem file named by `path_literal` beneath `manifest_dir`.
+///
+/// This is the query phase's only filesystem step. The expansion boundary
+/// calls it once and hands the parsed documents to [`plan_expansion`], so the
+/// plan itself can be derived and tested from explicit documents.
+pub(super) fn load_theorem_docs(
     manifest_dir: &Utf8Path,
     path_literal: &LitStr,
-) -> Result<ExpansionPlan, MacroExpansionError> {
-    let path_value = path_literal.value();
-    let canonical_path = normalize_path_separators(&path_value);
-    let canonical_path_literal = LitStr::new(&canonical_path, path_literal.span());
+) -> Result<Vec<TheoremDoc>, MacroExpansionError> {
+    let canonical_path = normalize_path_separators(&path_literal.value());
     let theorem_path = Utf8PathBuf::from(&canonical_path);
-    let theorem_docs = load_theorem_file_from_manifest_dir(manifest_dir, &theorem_path)
-        .map_err(|error| MacroExpansionError::from_load(&error))?;
+    load_theorem_file_from_manifest_dir(manifest_dir, &theorem_path)
+        .map_err(|error| MacroExpansionError::from_load(&error))
+}
+
+/// Derives the expansion plan from already-loaded theorem documents.
+///
+/// The theorem path still supplies the module name and the emitted path
+/// literal, but no filesystem access happens here: a caller that already holds
+/// parsed documents can build and inspect a plan directly.
+pub(super) fn plan_expansion(
+    path_literal: &LitStr,
+    theorem_docs: &[TheoremDoc],
+) -> Result<ExpansionPlan, MacroExpansionError> {
+    let canonical_path = normalize_path_separators(&path_literal.value());
+    let canonical_path_literal = LitStr::new(&canonical_path, path_literal.span());
 
     Ok(ExpansionPlan {
         module_ident: identifier(mangle_module_path(&canonical_path).module_name()),
         path_literal: canonical_path_literal,
-        harnesses: generated_harnesses(&canonical_path, &theorem_docs)?,
-        action_probes: generated_action_probes(&theorem_docs)?,
-        referenced_types: generated_referenced_type_probes(&theorem_docs)?,
+        harnesses: generated_harnesses(&canonical_path, theorem_docs)?,
+        action_probes: generated_action_probes(theorem_docs)?,
+        referenced_types: generated_referenced_type_probes(theorem_docs)?,
     })
 }
 

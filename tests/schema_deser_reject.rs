@@ -6,7 +6,7 @@
 
 use rstest::rstest;
 use test_helpers::{FixtureName, StrNewtype, fixture_error_message};
-use theoremc::schema::{KaniExpectation, load_theorem_docs};
+use theoremc::schema::{KaniExpectation, LetBinding, Step, load_theorem_docs};
 
 fn require_message_contains(message: &str, expected: &str) -> Result<(), String> {
     if message.contains(expected) {
@@ -178,6 +178,126 @@ Witness:
     assert!(result.is_err());
     let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
     assert!(msg.contains("Rust reserved keyword"));
+}
+
+// ── Single-key mappings in `Let` and `Do` ───────────────────────────
+
+const DISPATCH_HEADER: &str = concat!(
+    "Theorem: Dispatch\n",
+    "About: Single-key mapping dispatch\n",
+    "Actions:\n",
+    "  account.deposit:\n",
+    "    params: {}\n",
+);
+
+const DISPATCH_FOOTER: &str = concat!(
+    "Prove:\n",
+    "  - assert: 'true'\n",
+    "    because: trivially true\n",
+    "Evidence:\n",
+    "  kani:\n",
+    "    unwind: 1\n",
+    "    expect: SUCCESS\n",
+    "Witness:\n",
+    "  - cover: 'true'\n",
+    "    because: always reachable\n",
+);
+
+/// Renders a document with the supplied `Let` and `Do` sections.
+fn document_with(let_section: &str, do_section: &str) -> String {
+    format!("{DISPATCH_HEADER}{let_section}{do_section}{DISPATCH_FOOTER}")
+}
+
+/// The `let_section` for a single `value` binding whose body is `body`.
+fn let_section(body: &str) -> String {
+    format!("Let:\n  value:\n{body}")
+}
+
+/// The `do_section` holding one step whose body is `body`.
+fn do_section(body: &str) -> String {
+    format!("Do:\n  - {body}")
+}
+
+#[rstest]
+#[case::two_supported_keys(concat!(
+    "    call:\n      action: account.deposit\n      args: {}\n",
+    "    must:\n      action: account.deposit\n      args: {}\n",
+))]
+#[case::extra_key(concat!(
+    "    call:\n      action: account.deposit\n      args: {}\n",
+    "    spurious: true\n",
+))]
+#[case::unknown_key("    invoke:\n      action: account.deposit\n      args: {}\n")]
+#[case::empty_mapping("    {}\n")]
+fn rejects_malformed_let_binding_mapping(#[case] body: &str) {
+    let yaml = document_with(&let_section(body), "");
+
+    let error = load_theorem_docs(&yaml).expect_err("malformed Let mapping should be rejected");
+    let message = error.to_string();
+    assert!(
+        message.contains("exactly one") || message.contains("unknown variant"),
+        "error should explain the single-key requirement, got: {message}"
+    );
+}
+
+#[rstest]
+#[case::two_supported_keys(concat!(
+    "call:\n      action: account.deposit\n      args: {}\n",
+    "    must:\n      action: account.deposit\n      args: {}\n",
+))]
+#[case::extra_key(concat!(
+    "call:\n      action: account.deposit\n      args: {}\n",
+    "    spurious: true\n",
+))]
+#[case::unknown_key("perform:\n      action: account.deposit\n      args: {}\n")]
+#[case::empty_mapping("{}\n")]
+fn rejects_malformed_do_step_mapping(#[case] body: &str) {
+    let yaml = document_with("", &do_section(body));
+
+    let error = load_theorem_docs(&yaml).expect_err("malformed Do step should be rejected");
+    let message = error.to_string();
+    assert!(
+        message.contains("exactly one") || message.contains("unknown variant"),
+        "error should explain the single-key requirement, got: {message}"
+    );
+}
+
+#[rstest]
+#[case::call("    call:\n      action: account.deposit\n      args: {}\n")]
+#[case::must("    must:\n      action: account.deposit\n      args: {}\n")]
+fn accepts_single_key_let_binding(#[case] body: &str) {
+    let yaml = document_with(&let_section(body), "");
+
+    let docs = load_theorem_docs(&yaml).expect("single-key Let mapping should decode");
+    let binding = docs
+        .first()
+        .and_then(|doc| doc.let_bindings.get("value"))
+        .expect("the value binding should decode");
+
+    if body.trim_start().starts_with("call:") {
+        assert!(matches!(binding, LetBinding::Call(_)));
+    } else {
+        assert!(matches!(binding, LetBinding::Must(_)));
+    }
+}
+
+#[rstest]
+#[case::call("call:\n      action: account.deposit\n      args: {}\n")]
+#[case::must("must:\n      action: account.deposit\n      args: {}\n")]
+fn accepts_single_key_do_step(#[case] body: &str) {
+    let yaml = document_with("", &do_section(body));
+
+    let docs = load_theorem_docs(&yaml).expect("single-key Do mapping should decode");
+    let step = docs
+        .first()
+        .and_then(|doc| doc.do_steps.first())
+        .expect("the step should decode");
+
+    if body.starts_with("call:") {
+        assert!(matches!(step, Step::Call(_)));
+    } else {
+        assert!(matches!(step, Step::Must(_)));
+    }
 }
 
 // ── Guard: identifiers from the doc that should work ────────────────

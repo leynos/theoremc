@@ -237,6 +237,10 @@ impl Segment<'_> {
 #[path = "canonical_action_name_test_support.rs"]
 pub(crate) mod test_support;
 
+#[cfg(test)]
+#[path = "canonical_action_name_property_tests.rs"]
+mod property_tests;
+
 /// Returns `true` if the string matches `^[A-Za-z_][A-Za-z0-9_]*$`.
 #[must_use]
 pub(crate) fn is_valid_ascii_identifier_pattern(s: &str) -> bool {

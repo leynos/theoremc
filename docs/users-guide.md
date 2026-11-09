@@ -131,6 +131,18 @@ let yaml = std::fs::read_to_string(source)?;
 let docs = load_theorem_docs_with_source(&SourceId::new(source), &yaml)?;
 ```
 
+#### Deserialization boundary
+
+The public schema domain types in `theoremc::schema` do not implement
+`Deserialize`. The two loader functions above are the deserialization boundary:
+they decode YAML into crate-private raw shapes, validate action names, and
+convert into the public domain types. Code that holds or passes domain values
+obtains them from the loader rather than deserializing into them directly.
+Construct an action name with `CanonicalActionName::new`, as described under
+[subordinate types](#subordinate-types); `TheoremName` and `ForallVar` are the
+deliberate exceptions and still implement `Deserialize`, so identifier
+validation cannot be bypassed.
+
 ### Top-level fields
 
 Every theorem document is a YAML mapping with the following fields. Keys use

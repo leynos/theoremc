@@ -12,8 +12,7 @@ use crate::tests_support::{
 };
 
 #[rstest]
-fn plan_expansion_derives_module_and_harness_from_the_path()
--> Result<(), Box<dyn std::error::Error>> {
+fn load_theorem_docs_reads_a_manifest_relative_file() -> Result<(), Box<dyn std::error::Error>> {
     let (_temp_dir, fixture_dir) = temp_fixture_dir()?;
     let path = Utf8Path::new("theorems/planned.theorem");
     let fixture = make_single_theorem_fixture(&TheoremSpec {
@@ -23,7 +22,24 @@ fn plan_expansion_derives_module_and_harness_from_the_path()
     write_fixture(&fixture_dir, path, &fixture)?;
     let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
 
-    let plan = plan_expansion(&fixture_dir, &path_literal)?;
+    let theorem_docs = load_theorem_docs(&fixture_dir, &path_literal)?;
+
+    assert_that!(theorem_docs.len(), eq(1_usize));
+    Ok(())
+}
+
+#[rstest]
+fn plan_expansion_derives_from_parsed_documents_without_filesystem_access()
+-> Result<(), Box<dyn std::error::Error>> {
+    let path = Utf8Path::new("theorems/planned.theorem");
+    let fixture = make_single_theorem_fixture(&TheoremSpec {
+        name: "Planned",
+        about: "query phase plan",
+    });
+    let theorem_docs = theoremc_core::schema::load_theorem_docs(fixture.0.as_str())?;
+    let path_literal = syn::LitStr::new(path.as_str(), proc_macro2::Span::call_site());
+
+    let plan = plan_expansion(&path_literal, &theorem_docs)?;
 
     assert_that!(
         plan.module_ident.to_string(),

@@ -1,9 +1,11 @@
-//! Post-deserialization structural validation for `Step`, `LetBinding`,
-//! `MaybeBlock`, and `ActionCall` shapes.
+//! Post-deserialization structural validation for step lists, `Step`,
+//! `LetBinding`, `MaybeBlock`, and `ActionCall` shapes.
 //!
 //! These checks enforce constraints that `serde` attributes cannot express,
-//! such as "maybe.do must contain at least one step". Canonical action-name
-//! validation happens during raw-to-domain conversion before
+//! such as "maybe.do must contain at least one step". `validate_step_list`
+//! walks a top-level `Do` list or a nested `maybe.do` list in order, so a
+//! failure names the list and the position that produced it. Canonical
+//! action-name validation happens during raw-to-domain conversion, before
 //! [`ActionCall`](super::types::ActionCall) values are constructed. The
 //! functions return `Result<(), String>` so the caller in [`super::validate`]
 //! can attach theorem-level context when constructing
@@ -59,10 +61,12 @@ fn validate_steps_at(steps: &[Step], path: &StepPath) -> Result<(), String> {
 
 /// Validates a single step's structural constraints.
 ///
-/// For `call` and `must` steps, validates the inner `ActionCall`. For
-/// `maybe` steps, validates that `because` is non-empty after trimming,
-/// `do` contains at least one step, and recursively validates each
-/// nested step.
+/// `call` and `must` steps carry no structural constraint of their own: the
+/// action name they reference was already validated during raw-to-domain
+/// conversion, and their argument values were decoded at the same boundary.
+/// A `maybe` step validates that `because` is non-empty after trimming, that
+/// `do` contains at least one step, and recursively validates each nested
+/// step.
 ///
 /// `pos` is the 1-based position within the current step list.
 fn validate_step(step: &Step, path: &StepPath, pos: usize) -> Result<(), String> {

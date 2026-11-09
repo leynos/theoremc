@@ -68,3 +68,41 @@ by-value receiver on a trait method; `Copy` wrappers are unaffected. And the
 methods are not `const`, so a wrapper that needs `const` construction or access
 must keep an inherent `const fn` pair alongside the derive — a blanket trait
 method cannot be `const`.
+
+## Typed action names
+
+0.2.0 makes canonical action names a domain type instead of a plain string:
+
+- `TheoremDoc.actions` is keyed by `CanonicalActionName`, and every call site
+  (`ActionCall.action`, `LetCall`, and `StepCall`) carries the newtype.
+- `CanonicalActionName::new` validates the grammar
+  `Segment ("." Segment)+`: ASCII-identifier segments that are not Rust
+  reserved keywords. It returns `InvalidCanonicalActionName`, whose `reason()`
+  exposes typed data such as `EmptySegment { position }` or
+  `ReservedKeyword { position, segment }`.
+- `TryFrom<&str>` and `TryFrom<String>` are the two conversion forms, and
+  `as_str()` returns the validated spelling.
+
+The mangle entry points take the newtype, so a caller holding an untrusted
+string uses the checked alternatives:
+
+| Checked entry point            | Use when                                                      |
+| ------------------------------ | ------------------------------------------------------------- |
+| `try_mangle_action_name(&str)` | you hold an untrusted string and need validation and mangling |
+| `try_action_slug(&str)`        | you need only the escaped slug from an untrusted string       |
+
+The unchecked `mangle_action_name` and `action_slug` cannot fail once they hold
+a `CanonicalActionName`. `hash12` and `segment_escape` are unchanged.
+
+## Schema deserialization boundary
+
+The public schema domain types no longer implement `Deserialize`. YAML
+spelling, aliases, defaults, and unknown-key policy live in crate-private raw
+adapters, and the loader converts those adapters into the public domain after
+validating action names.
+
+A caller that deserialized `TheoremDoc` or `ActionCall` directly should parse
+through `load_theorem_docs` or `load_theorem_docs_with_source` (or
+`load_theorem_file_from_manifest_dir` for a file). The raw adapters are not
+part of the public API. `TheoremName` and `ForallVar` remain `Deserialize` so
+identifier validation cannot be bypassed.

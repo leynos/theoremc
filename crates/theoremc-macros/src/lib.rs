@@ -131,7 +131,10 @@ fn expand_theorem_file_at(
     manifest_dir: &Utf8Path,
     path_literal: &LitStr,
 ) -> Result<TokenStream2, MacroExpansionError> {
-    let plan = query::plan_expansion(manifest_dir, path_literal)?;
+    // The filesystem load belongs to the expansion boundary; deriving the plan
+    // from explicit documents keeps that phase testable without I/O.
+    let theorem_docs = query::load_theorem_docs(manifest_dir, path_literal)?;
+    let plan = query::plan_expansion(path_literal, &theorem_docs)?;
     Ok(render::render_expansion(&plan))
 }
 
