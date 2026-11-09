@@ -1,12 +1,13 @@
-//! Post-deserialization structural validation for step lists, `Step`,
-//! `LetBinding`, `MaybeBlock`, and `ActionCall` shapes.
+//! Post-deserialization structural validation for step lists, `Step` values,
+//! and `MaybeBlock` constraints.
 //!
 //! These checks enforce constraints that `serde` attributes cannot express,
 //! such as "maybe.do must contain at least one step". `validate_step_list`
 //! walks a top-level `Do` list or a nested `maybe.do` list in order, so a
-//! failure names the list and the position that produced it. Canonical
-//! action-name validation happens during raw-to-domain conversion, before
-//! [`ActionCall`](super::types::ActionCall) values are constructed. The
+//! failure names the list and the position that produced it. `call` and
+//! `must` steps carry no structural constraint here: their canonical action
+//! names were validated during raw-to-domain conversion, before
+//! [`ActionCall`](super::types::ActionCall) values were constructed. The
 //! functions return `Result<(), String>` so the caller in [`super::validate`]
 //! can attach theorem-level context when constructing
 //! [`super::error::SchemaError`].

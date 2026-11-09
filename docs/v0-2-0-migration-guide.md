@@ -96,13 +96,15 @@ a `CanonicalActionName`. `hash12` and `segment_escape` are unchanged.
 
 ## Schema deserialization boundary
 
-The public schema domain types no longer implement `Deserialize`. YAML
-spelling, aliases, defaults, and unknown-key policy live in crate-private raw
-adapters, and the loader converts those adapters into the public domain after
-validating action names.
+The document and step domain types, including `TheoremDoc` and its subordinate
+structures, no longer implement `Deserialize`. YAML spelling, aliases,
+defaults, and unknown-key policy live in crate-private raw adapters, and the
+loader converts those adapters into the public domain after validating action
+names.
 
 A caller that deserialized `TheoremDoc` or `ActionCall` directly should parse
 through `load_theorem_docs` or `load_theorem_docs_with_source` (or
 `load_theorem_file_from_manifest_dir` for a file). The raw adapters are not
 part of the public API. `TheoremName` and `ForallVar` remain `Deserialize` so
-identifier validation cannot be bypassed.
+identifier validation cannot be bypassed, and `TheoremValue` remains
+`Deserialize` because its no-null rule is enforced by that implementation.
