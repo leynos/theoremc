@@ -980,3 +980,17 @@ for it. The hosted candidate supplies the complementary evidence:
 CodeScene and Gecko Security reviews pass on the same head. The remaining work
 is delivery: the two hosted assessments, readiness, and merge of the pull
 request.
+
+The 2026-11-09 CodeRabbit review raised eight pre-merge checks, all answered
+with changes in `9c9dff9`. Its follow-up assessment kept two documentation rows
+open and asked for the CodeScene failure to be cleared.
+`tests/schema_deser_reject.rs` was rewritten around a `DispatchCase` enum and a
+`Position` enum in `34ec8b3`, removing the string-carrying helpers and
+collapsing the duplicated accept tests; local `cs delta origin/main` reports
+the file at 10.00. `441262c` narrowed the `schema/step.rs` header to the
+constraints it actually enforces and scoped the user-facing deserialization
+boundary to the document and step types, listing `TheoremValue` beside
+`TheoremName` and `ForallVar` as the deliberate `Deserialize` exceptions. Every
+deterministic gate passes on that candidate, and hosted `CI / build-test`
+passed on attempt 6 after earlier attempts met GitHub release-download 504
+responses.
