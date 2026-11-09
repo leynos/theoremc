@@ -259,10 +259,24 @@ impl DispatchCase {
         )
     }
 
-    /// Whether this case dispatches through `call` rather than `must`.
-    fn is_call(self) -> bool {
-        matches!(self, Self::Call)
+    /// The variant this case should decode to, or `None` when it is malformed.
+    fn decoded(self) -> Option<Decoded> {
+        match self {
+            Self::Call => Some(Decoded::Call),
+            Self::Must => Some(Decoded::Must),
+            Self::TwoKeys | Self::ExtraKey | Self::UnknownKey | Self::EmptyMapping => None,
+        }
     }
+}
+
+/// The variant a decoded single-key mapping produced.
+///
+/// Keeping the variant explicit lets the accept test distinguish an absent
+/// entry and a `Step::Maybe` from the `must` control it is asserting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Decoded {
+    Call,
+    Must,
 }
 
 /// The position a decoded single-key mapping is read from.
@@ -281,11 +295,18 @@ impl Position {
         }
     }
 
-    /// Whether the first entry decoded from `doc` used the `call` key.
-    fn decoded_as_call(self, doc: &TheoremDoc) -> bool {
+    /// The variant the first entry decoded from `doc` produced.
+    fn decoded_variant(self, doc: &TheoremDoc) -> Option<Decoded> {
         match self {
-            Self::Let => matches!(doc.let_bindings.get("value"), Some(LetBinding::Call(_))),
-            Self::Do => matches!(doc.do_steps.first(), Some(Step::Call(_))),
+            Self::Let => doc.let_bindings.get("value").map(|binding| match binding {
+                LetBinding::Call(_) => Decoded::Call,
+                LetBinding::Must(_) => Decoded::Must,
+            }),
+            Self::Do => doc.do_steps.first().and_then(|step| match step {
+                Step::Call(_) => Some(Decoded::Call),
+                Step::Must(_) => Some(Decoded::Must),
+                Step::Maybe(_) => None,
+            }),
         }
     }
 }
@@ -333,8 +354,8 @@ fn accepts_single_key_mapping(
     let doc = docs.first().expect("the document should decode");
 
     assert_eq!(
-        position.decoded_as_call(doc),
-        case.is_call(),
+        position.decoded_variant(doc),
+        case.decoded(),
         "the decoded variant should follow the mapping key"
     );
 }
