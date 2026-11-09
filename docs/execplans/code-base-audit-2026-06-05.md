@@ -732,6 +732,36 @@ intentional public API or documentation change.
       `git diff --check 61b738d HEAD` is clean, and the target-versus-candidate
       delta contains no deletions of `main`'s ADR-009 to ADR-012 or OrthoConfig
       material.
+- [x] 2026-11-09: Hosted CodeScene review of `cdffc9f` failed two gates. "New
+      code is healthy" reported `String Heavy Function Arguments` in
+      `canonical_action_name.rs` and `query.rs`; "Enforce advisory code health
+      rules" reported `Code Duplication` in `raw_action.rs` (10.00 to 9.39). A
+      local `cs delta` also flagged `step.rs` for the same string-argument
+      rule. All four were repaired by refactoring in `88a1c9c`, never by
+      suppression: typed `Candidate` and `Segment` validation structs, a typed
+      `&CanonicalActionName` parameter for `parse_action_type`, a shared
+      `single_key_deserialize!` template in the new
+      `schema/raw_single_key.rs` module, and a `StepPath` breadcrumb type with
+      canonical-name test builders in `schema/step.rs`. Local `cs delta` now
+      reports `9.68 -> 10.00` for every one of the four files and lists no
+      remaining issue.
+- [x] 2026-11-09: Gate pass on `88a1c9c`. `make check-fmt`, `make markdownlint`
+      and `make nixie` passed, and `make lint` (rustdoc, Clippy, Whitaker)
+      passed in 10 minutes 25 seconds. `make test` again ended at nextest's
+      30-minute `global-timeout` with no assertion failure: 974 of 986 tests
+      ran, 973 passed, and the single "failure" was
+      `a_moved_actions_type_fails_ordinary_compilation` receiving `SIGTERM`
+      while still running. The 12 tests the run did not reach were identified
+      by diffing `cargo nextest list --workspace --all-targets --all-features`
+      against the gate log and then run under `cargo test`, which has no
+      global cap. All 12 passed: the 13 `theorem_file_macro_bdd` tests
+      (including the `SIGTERM`ed one in 190.01 s) and
+      `theoremc-macros::expand::compile_errors` in 998.15 s. Logs are under
+      `/tmp/missing-tests*-theoremc-code-base-audit-2026-06-05.out`.
+- [x] 2026-11-09: Disposition for the remaining local CodeScene figure.
+      `mangle_tests.rs` shows an unchanged 9.68 in a `cs delta` that includes
+      it; it is a pre-existing test-file string-argument ratio, the hosted
+      review does not report it, and `88a1c9c` does not touch it.
 
 ## Surprises & Discoveries
 
@@ -912,5 +942,15 @@ The audit introduced no Kani, Verus, CrossHair, or LemmaScript proofs. Its
 proof-relevant change is the diagnostic-location repair, which is covered by
 `loader_diagnostic_tests::invalid_action_names_locate_the_action_value` rather
 than by a verifier, and by the property test that canonical names round-trip
-through the mangler. The remaining work is delivery: publication, hosted
-review, and merge of pull request #52.
+through the mangler.
+
+Hosted delivery added one more round of work. The CodeScene review of the
+pushed candidate failed two gates on four modules; all four findings were
+repaired by refactoring rather than suppression in `88a1c9c`, and local
+`cs delta` now reports every changed file at 10.00. The repaired candidate
+passes every deterministic gate. The full suite also passes: nextest's global
+timeout, sized for a less contended host, cancels the run before the last few
+compiler-heavy tests finish, and each of those 12 tests passes when run under
+`cargo test`, which has no such cap. The remaining work is delivery: hosted
+re-review of the repaired candidate, the two hosted assessments, and merge of
+pull request #52.
