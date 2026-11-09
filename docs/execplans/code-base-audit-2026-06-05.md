@@ -994,3 +994,12 @@ boundary to the document and step types, listing `TheoremValue` beside
 deterministic gate passes on that candidate, and hosted `CI / build-test`
 passed on attempt 6 after earlier attempts met GitHub release-download 504
 responses.
+
+CodeRabbit's next assessment found one remaining test gap: the valid `must`
+controls asserted only that the decoded value was not a `call`, so they also
+passed when the binding or step was absent, and the `Do` case also passed for
+`Step::Maybe`. `d93024d` resolves both positions to one `Decoded` variant and
+asserts it positively, so an absent `Let` binding or `Do` step fails the test.
+Clippy passes on the affected target, the target's 33 tests pass, local
+`cs delta origin/main` reports the file at 10.00, and hosted `CI / build-test`
+passes on `d93024d`.
