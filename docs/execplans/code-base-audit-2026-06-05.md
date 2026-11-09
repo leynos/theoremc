@@ -761,7 +761,11 @@ intentional public API or documentation change.
       190.01 s in the second), as did
       `theoremc-macros::expand::compile_errors` in 998.15 s. The gate itself
       is recorded as incomplete, not as a pass. Logs are under
-      `/tmp/missing-tests*-theoremc-code-base-audit-2026-06-05.out`.
+      `/tmp/missing-tests*-theoremc-code-base-audit-2026-06-05.out`. The
+      candidate afterwards changed only text: `721451c` corrected spelling in
+      two doc comments and in this plan, and `0a2cbc4` corrected the plan's
+      test-gate wording. `make check-fmt`, `make markdownlint`, `make nixie`,
+      and `make spelling` were re-run on each later head.
 - [x] 2026-11-09: Disposition for the remaining local CodeScene figure.
       `mangle_tests.rs` shows an unchanged 9.68 in a `cs delta` that includes
       it; it is a pre-existing test-file string-argument ratio, the hosted
@@ -942,12 +946,12 @@ with all findings cleared. A second rebase onto `61b738d` replayed the whole
 Milestone 8 is complete on that candidate. The rebase surfaced four lint
 findings from the newer toolchain, which were repaired without behaviour
 change, and the local CodeRabbit review found only documentation gaps, all
-fixed. Every deterministic gate passes: formatting, Markdown lint, Mermaid
-validation, rustdoc, Clippy, Whitaker, type checking, doctests, and the
-workflow contracts. The nextest run passes every test it completes, but on this
-contended host it does not complete before the profile's global timeout; the
-tests it does not reach pass under `cargo test`, which has no such cap. The
-gate is therefore recorded as incomplete rather than a pass.
+fixed. Every deterministic gate except `make test` passes: formatting, Markdown
+lint, Mermaid validation, rustdoc, Clippy, Whitaker, type checking, doctests,
+and the workflow contracts. The nextest run passes every test it completes, but
+on this contended host it does not complete before the profile's global
+timeout; the tests it does not reach pass under `cargo test`, which has no such
+cap. The gate is therefore recorded as incomplete rather than a pass.
 
 The audit introduced no Kani, Verus, CrossHair, or LemmaScript proofs. Its
 proof-relevant change is the diagnostic-location repair, which is covered by
