@@ -673,12 +673,13 @@ intentional public API or documentation change.
   cancelled at 549.7 s. That test, `theoremc-macros::expand::compile_errors`,
   also exceeded its own 600 s allowance when run alone under nextest, then
   passed in 1093.58 s under
-  `cargo test -p theoremc-macros --test expand --all-features`. The suite
-  therefore passes on this candidate, but the machine's shared compile pool
-  (capacity 4, all held, with dozens of queued requests from other agents)
-  makes the trybuild fixture builds roughly twice as slow as the profile's
-  measured allowance. `cargo test --workspace --all-features --doc` passed with
-  36 doctests and 6 ignored.
+  `cargo test -p theoremc-macros --test expand --all-features`. Every test in
+  the suite passed when run, but the gate itself did not complete on this host
+  and is recorded as incomplete rather than a pass. The machine's shared
+  compile pool (capacity 4, all held, with dozens of queued requests from other
+  agents) makes the trybuild fixture builds roughly twice as slow as the
+  profile's measured allowance. `cargo test --workspace --all-features --doc`
+  passed with 36 doctests and 6 ignored.
 - [x] 2026-11-08: Local
       `coderabbit review --agent --committed --base-commit 61b738d` on candidate
       `55bb25d` completed with four documentation findings
@@ -745,18 +746,21 @@ intentional public API or documentation change.
       canonical-name test builders in `schema/step.rs`. Local `cs delta` now
       reports `9.68 -> 10.00` for every one of the four files and lists no
       remaining issue.
-- [x] 2026-11-09: Gate pass on `88a1c9c`. `make check-fmt`, `make markdownlint`
+- [x] 2026-11-09: Gate run on `88a1c9c`. `make check-fmt`, `make markdownlint`
       and `make nixie` passed, and `make lint` (rustdoc, Clippy, Whitaker)
-      passed in 10 minutes 25 seconds. `make test` again ended at nextest's
-      30-minute `global-timeout` with no assertion failure: 974 of 986 tests
-      ran, 973 passed, and the single "failure" was
-      `a_moved_actions_type_fails_ordinary_compilation` receiving `SIGTERM`
-      while still running. The 12 tests the run did not reach were identified
-      by diffing `cargo nextest list --workspace --all-targets --all-features`
-      against the gate log and then run under `cargo test`, which has no
-      global cap. All 12 passed: the 13 `theorem_file_macro_bdd` tests
-      (including the `SIGTERM`ed one in 190.01 s) and
-      `theoremc-macros::expand::compile_errors` in 998.15 s. Logs are under
+      passed in 10 minutes 25 seconds. `make test` did not pass: it ended at
+      nextest's 30-minute `global-timeout` and exited with
+      `error: test run failed`. 974 of 986 tests ran, 973 passed, and
+      `theorem_file_macro_bdd::a_moved_actions_type_fails_ordinary_compilation`
+      received `SIGTERM` while still running; no assertion failed. The 12
+      tests the run did not reach were identified by diffing
+      `cargo nextest list --workspace --all-targets --all-features` against the
+      gate log and then run under `cargo test`, which has no global cap. All
+      13 `theorem_file_macro_bdd` tests passed (12 in the first rerun job, the
+      remaining `a_valid_theorem_file_exposes_a_kani_proof_harness` in
+      190.01 s in the second), as did
+      `theoremc-macros::expand::compile_errors` in 998.15 s. The gate itself
+      is recorded as incomplete, not as a pass. Logs are under
       `/tmp/missing-tests*-theoremc-code-base-audit-2026-06-05.out`.
 - [x] 2026-11-09: Disposition for the remaining local CodeScene figure.
       `mangle_tests.rs` shows an unchanged 9.68 in a `cs delta` that includes
@@ -912,6 +916,12 @@ intentional public API or documentation change.
   wall-clock bound, not an assertion, and the remaining test passes alone under
   `cargo test`, which has no such cap. Re-measure the profile before treating a
   local `global-timeout` cancellation as a test failure.
+- 2026-11-09: Record the local `make test` `global-timeout` as an incomplete
+  gate and request an explicit exception, rather than describing it as a pass.
+  The target exits non-zero (`error: test run failed`) once the profile's
+  `global-timeout` fires, even though no assertion fails, so calling it a pass
+  overstates the evidence. The supporting per-test reruns show what the
+  unfinished run would have covered; they do not turn the gate into a pass.
 - 2026-11-01: Keep `TheoremDoc::schema` as `Option<u32>` and treat omission as
   an interpretation-time selection of the version 1 profile. Materializing a
   default of `1` would erase the distinction the loader already preserves, and
@@ -934,9 +944,10 @@ findings from the newer toolchain, which were repaired without behaviour
 change, and the local CodeRabbit review found only documentation gaps, all
 fixed. Every deterministic gate passes: formatting, Markdown lint, Mermaid
 validation, rustdoc, Clippy, Whitaker, type checking, doctests, and the
-workflow contracts. The full nextest run passes every test it completes; the
-single test that can outlast the configured per-test and global timeouts on
-this contended host passes in isolation under `cargo test`.
+workflow contracts. The nextest run passes every test it completes, but on this
+contended host it does not complete before the profile's global timeout; the
+tests it does not reach pass under `cargo test`, which has no such cap. The
+gate is therefore recorded as incomplete rather than a pass.
 
 The audit introduced no Kani, Verus, CrossHair, or LemmaScript proofs. Its
 proof-relevant change is the diagnostic-location repair, which is covered by
@@ -948,9 +959,13 @@ Hosted delivery added one more round of work. The CodeScene review of the
 pushed candidate failed two gates on four modules; all four findings were
 repaired by refactoring rather than suppression in `88a1c9c`, and local
 `cs delta` now reports every changed file at 10.00. The repaired candidate
-passes every deterministic gate. The full suite also passes: nextest's global
-timeout, sized for a less contended host, cancels the run before the last few
-compiler-heavy tests finish, and each of those 12 tests passes when run under
-`cargo test`, which has no such cap. The remaining work is delivery: hosted
-re-review of the repaired candidate, the two hosted assessments, and merge of
-pull request #52.
+passes every deterministic gate except `make test`, which does not pass on this
+host: nextest's 30-minute `global-timeout`, sized for a less contended host,
+stops the run and the target exits non-zero with `error: test run failed`. 974
+of 986 tests ran, 973 passed, and one was cancelled by `SIGTERM`; no assertion
+failed. The 12 tests the run did not reach, together with the cancelled test,
+all pass under `cargo test`, which has no global cap. That evidence shows what
+the unfinished run would have covered, but it does not make the gate a pass, so
+`make test` is recorded as incomplete and an explicit exception is requested
+for it. The remaining work is delivery: hosted re-review of the repaired
+candidate, the two hosted assessments, and merge of pull request #52.
