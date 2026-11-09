@@ -589,7 +589,7 @@ intentional public API or documentation change.
   mapping through `serde`'s `ContentDeserializer` and discards `Spanned`
   coordinates, so an invalid action name located at the theorem header instead
   of the value. Both types now dispatch their single `call`, `must`, or `maybe`
-  key with a hand-written `Deserialize`/`MapAccess` visitor, and the loader
+  key with a handwritten `Deserialize`/`MapAccess` visitor, and the loader
   consults `RawDocDecodeError::typed_location` before any textual fallback.
   `loader_diagnostic_tests::invalid_action_names_locate_the_action_value` pins
   the exact line and column for TitleCase, lowercase-alias, nested `maybe.do`,

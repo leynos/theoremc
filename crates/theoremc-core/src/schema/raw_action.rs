@@ -40,7 +40,7 @@ pub(crate) struct RawActionCall {
 
 /// Raw `LetBinding` as deserialized from YAML.
 ///
-/// Deserialization is hand-written instead of `#[serde(untagged)]` because
+/// Deserialization is handwritten instead of `#[serde(untagged)]` because
 /// serde buffers untagged variants through a `ContentDeserializer`, which
 /// discards every `serde_saphyr` span nested inside the variant. Dispatching
 /// on the map key directly keeps the `Spanned` action name in
@@ -102,7 +102,7 @@ pub(crate) struct RawLetMust {
 
 /// Raw `Step` as deserialized from YAML.
 ///
-/// Like [`RawLetBinding`], this uses a hand-written single-key dispatch so
+/// Like [`RawLetBinding`], this uses a handwritten single-key dispatch so
 /// nested `Spanned` fields keep their source locations through `maybe.do`
 /// nesting instead of being flattened by an untagged buffer.
 #[derive(Debug, Clone)]
