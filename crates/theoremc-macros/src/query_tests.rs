@@ -3,6 +3,7 @@
 use camino::Utf8Path;
 use googletest::{assert_that, matchers::eq};
 use rstest::rstest;
+use theoremc_core::canonical_action_name::CanonicalActionName;
 use theoremc_core::mangle::mangle_module_path;
 
 use super::*;
@@ -50,7 +51,8 @@ fn parse_referenced_type_reports_invalid_types() {
 
 #[test]
 fn parse_action_type_reports_the_offending_action() {
-    let Err(error) = parse_action_type("account.deposit", "Vec<") else {
+    let canonical = CanonicalActionName::new("account.deposit").expect("valid canonical name");
+    let Err(error) = parse_action_type(&canonical, "Vec<") else {
         panic!("unclosed generic must fail");
     };
 

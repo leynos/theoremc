@@ -7,18 +7,14 @@
 //! [`TheoremValue`] into an [`ArgValue`] via
 //! [`decode_arg_value`](super::arg_value::decode_arg_value).
 
-use std::fmt;
-
 use indexmap::IndexMap;
-use serde::{
-    Deserialize, Deserializer,
-    de::{self, IgnoredAny, MapAccess, Visitor},
-};
+use serde::{Deserialize, Deserializer, de::MapAccess};
 use serde_saphyr::{Location, Spanned};
 
 use crate::canonical_action_name::{CanonicalActionName, InvalidCanonicalActionName};
 
 use super::arg_value::{ArgDecodeError, ParamName, decode_arg_value};
+use super::raw_single_key::{SingleKeyDecoder, deserialize_single_key, single_key_deserialize};
 use super::types::{
     ActionCall, LetBinding, LetCall, LetMust, MaybeBlock, Step, StepCall, StepMaybe, StepMust,
 };
@@ -59,37 +55,32 @@ pub(crate) enum RawLetBinding {
     Must(RawLetMust),
 }
 
-impl<'de> Deserialize<'de> for RawLetBinding {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+single_key_deserialize!(
+    RawLetBinding,
+    "a binding mapping with exactly one of `call` or `must`",
+    ["call", "must"],
+    LetBindingDecoder
+);
+
+/// Builds [`RawLetBinding`] variants from a single-key mapping.
+struct LetBindingDecoder;
+
+impl<'de> SingleKeyDecoder<'de> for LetBindingDecoder {
+    type Output = RawLetBinding;
+
+    fn decode<A>(self, key: &str, map: &mut A) -> Result<Option<Self::Output>, A::Error>
     where
-        D: Deserializer<'de>,
+        A: MapAccess<'de>,
     {
-        struct LetBindingVisitor;
-
-        impl<'de> Visitor<'de> for LetBindingVisitor {
-            type Value = RawLetBinding;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a binding mapping with exactly one of `call` or `must`")
-            }
-
-            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                dispatch_single_key(map, &["call", "must"], |key, access| match key {
-                    "call" => access
-                        .next_value::<RawActionCall>()
-                        .map(|call| Some(RawLetBinding::Call(RawLetCall { call }))),
-                    "must" => access
-                        .next_value::<RawActionCall>()
-                        .map(|must| Some(RawLetBinding::Must(RawLetMust { must }))),
-                    _ => Ok(None),
-                })
-            }
+        match key {
+            "call" => map
+                .next_value::<RawActionCall>()
+                .map(|call| Some(RawLetBinding::Call(RawLetCall { call }))),
+            "must" => map
+                .next_value::<RawActionCall>()
+                .map(|must| Some(RawLetBinding::Must(RawLetMust { must }))),
+            _ => Ok(None),
         }
-
-        deserializer.deserialize_map(LetBindingVisitor)
     }
 }
 
@@ -124,68 +115,36 @@ pub(crate) enum RawStep {
     Maybe(RawStepMaybe),
 }
 
-impl<'de> Deserialize<'de> for RawStep {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+single_key_deserialize!(
+    RawStep,
+    "a step mapping with exactly one of `call`, `must`, or `maybe`",
+    ["call", "must", "maybe"],
+    StepDecoder
+);
+
+/// Builds [`RawStep`] variants from a single-key mapping.
+struct StepDecoder;
+
+impl<'de> SingleKeyDecoder<'de> for StepDecoder {
+    type Output = RawStep;
+
+    fn decode<A>(self, key: &str, map: &mut A) -> Result<Option<Self::Output>, A::Error>
     where
-        D: Deserializer<'de>,
+        A: MapAccess<'de>,
     {
-        struct StepVisitor;
-
-        impl<'de> Visitor<'de> for StepVisitor {
-            type Value = RawStep;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a step mapping with exactly one of `call`, `must`, or `maybe`")
-            }
-
-            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-            where
-                A: MapAccess<'de>,
-            {
-                dispatch_single_key(map, &["call", "must", "maybe"], |key, access| match key {
-                    "call" => access
-                        .next_value::<RawActionCall>()
-                        .map(|call| Some(RawStep::Call(RawStepCall { call }))),
-                    "must" => access
-                        .next_value::<RawActionCall>()
-                        .map(|must| Some(RawStep::Must(RawStepMust { must }))),
-                    "maybe" => access
-                        .next_value::<RawMaybeBlock>()
-                        .map(|maybe| Some(RawStep::Maybe(RawStepMaybe { maybe }))),
-                    _ => Ok(None),
-                })
-            }
+        match key {
+            "call" => map
+                .next_value::<RawActionCall>()
+                .map(|call| Some(RawStep::Call(RawStepCall { call }))),
+            "must" => map
+                .next_value::<RawActionCall>()
+                .map(|must| Some(RawStep::Must(RawStepMust { must }))),
+            "maybe" => map
+                .next_value::<RawMaybeBlock>()
+                .map(|maybe| Some(RawStep::Maybe(RawStepMaybe { maybe }))),
+            _ => Ok(None),
         }
-
-        deserializer.deserialize_map(StepVisitor)
     }
-}
-
-/// Deserialize a mapping that holds exactly one supported variant key.
-///
-/// `dispatch` returns `Ok(None)` for an unrecognized key so the caller can
-/// report the accepted variant names with serde's standard wording. Any
-/// second key is rejected: the raw step and binding shapes never permit one,
-/// and silently ignoring it would hide a malformed document.
-fn dispatch_single_key<'de, A, T>(
-    mut map: A,
-    variants: &'static [&'static str],
-    dispatch: impl FnOnce(&str, &mut A) -> Result<Option<T>, A::Error>,
-) -> Result<T, A::Error>
-where
-    A: MapAccess<'de>,
-{
-    let key = map
-        .next_key::<String>()?
-        .ok_or_else(|| de::Error::custom("expected a mapping with exactly one key"))?;
-    let value =
-        dispatch(&key, &mut map)?.ok_or_else(|| de::Error::unknown_variant(&key, variants))?;
-    if map.next_key::<IgnoredAny>()?.is_some() {
-        return Err(de::Error::custom(
-            "mapping must contain exactly one of the supported keys",
-        ));
-    }
-    Ok(value)
 }
 
 /// Raw wrapper for a `call` variant in a `Do` step.

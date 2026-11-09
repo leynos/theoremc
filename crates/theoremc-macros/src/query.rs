@@ -144,9 +144,9 @@ fn action_probe(
     let param_types = signature
         .params
         .values()
-        .map(|param| parse_action_type(canonical.as_str(), param))
+        .map(|param| parse_action_type(canonical, param))
         .collect::<Result<Vec<_>, _>>()?;
-    let return_type = parse_action_type(canonical.as_str(), &signature.returns)?;
+    let return_type = parse_action_type(canonical, &signature.returns)?;
 
     Ok(GeneratedActionProbe {
         ident: identifier(mangle_action_name(canonical).identifier()),
@@ -155,9 +155,12 @@ fn action_probe(
     })
 }
 
-fn parse_action_type(canonical: &str, ty: &str) -> Result<syn::Type, MacroExpansionError> {
+fn parse_action_type(
+    canonical: &CanonicalActionName,
+    ty: &str,
+) -> Result<syn::Type, MacroExpansionError> {
     syn::parse_str(ty).map_err(|source| MacroExpansionError::InvalidActionSignature {
-        action: canonical.to_owned(),
+        action: canonical.as_str().to_owned(),
         message: source.to_string(),
     })
 }

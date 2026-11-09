@@ -161,6 +161,16 @@ consuming the raw mirror types in `schema/raw_action.rs` and
 `schema/raw_evidence.rs`. Raw span-location tests stay in the sibling
 `schema/raw_location_tests.rs` file.
 
+The raw step and binding enums in `schema/raw_action.rs` are mappings with
+exactly one variant key. They dispatch on that key through
+`schema/raw_single_key.rs` rather than deriving `#[serde(untagged)]`, because
+serde buffers untagged variants through a `ContentDeserializer`, which discards
+every `serde_saphyr` span nested inside the variant. Keeping the dispatch means
+the `Spanned` action names survive into the conversion diagnostics. The
+`raw_single_key` machinery is crate-private and scoped to the raw adapters: a
+new raw shape that is a single-key mapping should reuse it, but nothing outside
+the raw adapters should depend on it.
+
 Rust-type lifetime unit tests live in `schema/rust_type_tests.rs`. Property
 tests remain in `schema/rust_type_property_tests.rs`, which
 `schema/rust_type.rs` registers through its `property_tests` module.

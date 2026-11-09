@@ -17,6 +17,7 @@ mod newtypes;
 mod raw;
 mod raw_action;
 mod raw_evidence;
+mod raw_single_key;
 pub(crate) mod rust_type;
 mod source_id;
 mod step;

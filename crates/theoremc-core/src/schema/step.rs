@@ -9,14 +9,48 @@
 //! can attach theorem-level context when constructing
 //! [`super::error::SchemaError`].
 
+use std::fmt;
+
 use super::types::Step;
+
+/// Diagnostic breadcrumb identifying the step list being validated.
+///
+/// The root names the list (for example `Do step`); each nested `maybe.do`
+/// list extends its parent with the position that led into it, so an error
+/// reads as `Do step 2: maybe.do step 1`. Rendering is deferred until an
+/// error is actually raised.
+#[derive(Clone)]
+struct StepPath(String);
+
+impl StepPath {
+    /// Root breadcrumb for a named step list.
+    fn root(label: &str) -> Self {
+        Self(label.to_owned())
+    }
+
+    /// Breadcrumb for the `maybe.do` list of the step at `position`.
+    fn nested(&self, position: usize) -> Self {
+        Self(format!("{self} {position}: maybe.do step"))
+    }
+}
+
+impl fmt::Display for StepPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
 
 /// Validates a list of steps, used for both top-level `Do` and nested
 /// `maybe.do` sequences.
 ///
-/// Each step is validated in order using [`validate_step`]. The `path`
-/// parameter provides context for error messages (e.g., `"Do step"`).
-pub(crate) fn validate_step_list(steps: &[Step], path: &str) -> Result<(), String> {
+/// `label` names the list in diagnostics (for example `Do step`). Each step is
+/// validated in order using [`validate_step`].
+pub(crate) fn validate_step_list(steps: &[Step], label: &str) -> Result<(), String> {
+    validate_steps_at(steps, &StepPath::root(label))
+}
+
+/// Validates a step list under an existing diagnostic breadcrumb.
+fn validate_steps_at(steps: &[Step], path: &StepPath) -> Result<(), String> {
     for (i, step) in steps.iter().enumerate() {
         validate_step(step, path, i + 1)?;
     }
@@ -30,10 +64,8 @@ pub(crate) fn validate_step_list(steps: &[Step], path: &str) -> Result<(), Strin
 /// `do` contains at least one step, and recursively validates each
 /// nested step.
 ///
-/// The `path` parameter provides context for error messages (e.g.,
-/// `"Do step"`). The `pos` parameter is the 1-based position within
-/// the current step list.
-fn validate_step(step: &Step, path: &str, pos: usize) -> Result<(), String> {
+/// `pos` is the 1-based position within the current step list.
+fn validate_step(step: &Step, path: &StepPath, pos: usize) -> Result<(), String> {
     match step {
         Step::Call(_) | Step::Must(_) => {}
         Step::Maybe(m) => validate_maybe_block(&m.maybe, path, pos)?,
@@ -45,7 +77,7 @@ fn validate_step(step: &Step, path: &str, pos: usize) -> Result<(), String> {
 /// `because`, non-empty `do`, and recursive step validation.
 fn validate_maybe_block(
     maybe: &super::types::MaybeBlock,
-    path: &str,
+    path: &StepPath,
     pos: usize,
 ) -> Result<(), String> {
     if maybe.because.trim().is_empty() {
@@ -65,8 +97,7 @@ fn validate_maybe_block(
             pos = pos
         ));
     }
-    let nested_path = format!("{path} {pos}: maybe.do step");
-    validate_step_list(&maybe.do_steps, &nested_path)
+    validate_steps_at(&maybe.do_steps, &path.nested(pos))
 }
 
 #[cfg(test)]
@@ -81,7 +112,12 @@ mod tests {
     /// Fixture: a valid `ActionCall` with a non-empty dotted action name.
     #[fixture]
     fn valid_action() -> ActionCall {
-        action("a.b")
+        action(&canonical("a.b"))
+    }
+
+    /// Parses a test action name, failing loudly when it is not canonical.
+    fn canonical(name: &str) -> CanonicalActionName {
+        CanonicalActionName::new(name).expect("test action name must be canonical")
     }
 
     /// Fixture: a valid `Step::Call` wrapping the default valid action.
@@ -97,16 +133,16 @@ mod tests {
     }
 
     /// Builder: an `ActionCall` with a custom action name.
-    fn action(name: &str) -> ActionCall {
+    fn action(name: &CanonicalActionName) -> ActionCall {
         ActionCall {
-            action: CanonicalActionName::new(name).expect("test action name must be canonical"),
+            action: name.clone(),
             args: IndexMap::new(),
             as_binding: None,
         }
     }
 
     /// Builder: a `Step::Call` with a custom action name.
-    fn call_step(name: &str) -> Step {
+    fn call_step(name: &CanonicalActionName) -> Step {
         Step::Call(StepCall { call: action(name) })
     }
 
@@ -139,7 +175,7 @@ mod tests {
     #[case("")]
     #[case("   ")]
     fn maybe_step_with_invalid_because_fails(#[case] because: &str) {
-        let steps = vec![maybe_step(because, vec![call_step("a.b")])];
+        let steps = vec![maybe_step(because, vec![call_step(&canonical("a.b"))])];
         let err = validate_step_list(&steps, "Do step").expect_err("should fail");
         assert!(
             err.contains("maybe.because must be non-empty"),
@@ -158,7 +194,7 @@ mod tests {
     }
 
     #[rstest]
-    #[case::blank_because("", vec![call_step("a.b")], "maybe.do step 1: maybe.because must be non-empty")]
+    #[case::blank_because("", vec![call_step(&canonical("a.b"))], "maybe.do step 1: maybe.because must be non-empty")]
     #[case::empty_do("inner reason", vec![], "maybe.do step 1: maybe.do must contain at least one step")]
     fn nested_maybe_validation_errors(
         #[case] inner_because: &str,
@@ -174,7 +210,10 @@ mod tests {
 
     #[rstest]
     fn second_step_error_reports_correct_position(valid_call: Step) {
-        let steps = vec![valid_call, maybe_step("", vec![call_step("a.b")])];
+        let steps = vec![
+            valid_call,
+            maybe_step("", vec![call_step(&canonical("a.b"))]),
+        ];
         let err = validate_step_list(&steps, "Do step").expect_err("should fail");
         assert!(
             err.contains("Do step 2: maybe.because must be non-empty"),

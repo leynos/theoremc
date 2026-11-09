@@ -160,58 +160,82 @@ impl TryFrom<String> for CanonicalActionName {
 /// Returns [`InvalidCanonicalActionName`] with typed reason data when the
 /// supplied string is not canonical.
 pub fn validate_canonical_action_name(name: &str) -> Result<(), InvalidCanonicalActionName> {
-    if !name.contains('.') {
-        return Err(invalid_name(
-            name,
-            CanonicalActionNameInvalidReason::MissingSeparator,
-        ));
-    }
-
-    for (index, segment) in name.split('.').enumerate() {
-        validate_segment(segment, index + 1).map_err(|reason| invalid_name(name, reason))?;
-    }
-
-    Ok(())
+    Candidate { name }.validate()
 }
 
-fn validate_segment(
-    segment: &str,
+/// A candidate canonical action name whose grammar is being validated.
+///
+/// Holding the whole name here keeps the per-segment checks independent of
+/// error wrapping, so each helper has one responsibility. Construct it with a
+/// struct literal; there is deliberately no constructor to maintain.
+struct Candidate<'a> {
+    name: &'a str,
+}
+
+impl Candidate<'_> {
+    /// Validates the grammar `Segment ("." Segment)+`.
+    fn validate(&self) -> Result<(), InvalidCanonicalActionName> {
+        if !self.name.contains('.') {
+            return Err(self.reject(CanonicalActionNameInvalidReason::MissingSeparator));
+        }
+
+        for (index, text) in self.name.split('.').enumerate() {
+            let segment = Segment {
+                text,
+                position: index + 1,
+            };
+            segment.validate().map_err(|reason| self.reject(reason))?;
+        }
+
+        Ok(())
+    }
+
+    /// Builds the rejected-name error for `reason`.
+    fn reject(&self, reason: CanonicalActionNameInvalidReason) -> InvalidCanonicalActionName {
+        InvalidCanonicalActionName {
+            name: self.name.to_owned(),
+            reason,
+        }
+    }
+}
+
+/// One dot-separated segment of a candidate name with its one-based position.
+struct Segment<'a> {
+    text: &'a str,
     position: usize,
-) -> Result<(), CanonicalActionNameInvalidReason> {
-    if segment.is_empty() {
-        return Err(CanonicalActionNameInvalidReason::EmptySegment { position });
-    }
+}
 
-    if !is_valid_ascii_identifier_pattern(segment) {
-        return Err(CanonicalActionNameInvalidReason::InvalidIdentifierPattern {
-            position,
-            segment: segment.to_owned(),
-        });
-    }
+impl Segment<'_> {
+    /// Checks that the segment is non-empty, identifier-shaped, and not a
+    /// Rust reserved keyword.
+    fn validate(&self) -> Result<(), CanonicalActionNameInvalidReason> {
+        if self.text.is_empty() {
+            return Err(CanonicalActionNameInvalidReason::EmptySegment {
+                position: self.position,
+            });
+        }
 
-    if is_rust_reserved_keyword(segment) {
-        return Err(CanonicalActionNameInvalidReason::ReservedKeyword {
-            position,
-            segment: segment.to_owned(),
-        });
-    }
+        if !is_valid_ascii_identifier_pattern(self.text) {
+            return Err(CanonicalActionNameInvalidReason::InvalidIdentifierPattern {
+                position: self.position,
+                segment: self.text.to_owned(),
+            });
+        }
 
-    Ok(())
+        if is_rust_reserved_keyword(self.text) {
+            return Err(CanonicalActionNameInvalidReason::ReservedKeyword {
+                position: self.position,
+                segment: self.text.to_owned(),
+            });
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 #[path = "canonical_action_name_test_support.rs"]
 pub(crate) mod test_support;
-
-fn invalid_name(
-    name: &str,
-    reason: CanonicalActionNameInvalidReason,
-) -> InvalidCanonicalActionName {
-    InvalidCanonicalActionName {
-        name: name.to_owned(),
-        reason,
-    }
-}
 
 /// Returns `true` if the string matches `^[A-Za-z_][A-Za-z0-9_]*$`.
 #[must_use]
