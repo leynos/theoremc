@@ -5,6 +5,7 @@ use the_newtype::Newtype;
 mod build_log;
 mod build_support_fixture;
 mod fixture_crate;
+mod fixture_inspection;
 mod fixture_isolation;
 mod hermetic_cargo;
 mod schema_fixtures;
