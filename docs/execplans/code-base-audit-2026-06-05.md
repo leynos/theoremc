@@ -765,7 +765,10 @@ intentional public API or documentation change.
       candidate afterwards changed only text: `721451c` corrected spelling in
       two doc comments and in this plan, and `0a2cbc4` corrected the plan's
       test-gate wording. `make check-fmt`, `make markdownlint`, `make nixie`,
-      and `make spelling` were re-run on each later head.
+      and `make spelling` were re-run on each later head. `make lint` was
+      re-run on `905dea4` and passed in 21 minutes 55 seconds, and hosted
+      `CI / build-test` run 42558639415 passed every step on that head,
+      including `Test`, `Lint`, and `Typecheck`.
 - [x] 2026-11-09: Disposition for the remaining local CodeScene figure.
       `mangle_tests.rs` shows an unchanged 9.68 in a `cs delta` that includes
       it; it is a pre-existing test-file string-argument ratio, the hosted
@@ -971,5 +974,9 @@ failed. The 12 tests the run did not reach, together with the cancelled test,
 all pass under `cargo test`, which has no global cap. That evidence shows what
 the unfinished run would have covered, but it does not make the gate a pass, so
 `make test` is recorded as incomplete and an explicit exception is requested
-for it. The remaining work is delivery: hosted re-review of the repaired
-candidate, the two hosted assessments, and merge of pull request #52.
+for it. The hosted candidate supplies the complementary evidence:
+`CI / build-test` run 42558639415 passed every step on `905dea4`, including
+`Test`, `Lint`, `Typecheck`, `Format`, `Markdown lint`, and `Spelling`, and the
+CodeScene and Gecko Security reviews pass on the same head. The remaining work
+is delivery: the two hosted assessments, readiness, and merge of the pull
+request.
