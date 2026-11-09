@@ -1,4 +1,13 @@
-//! Shared Cargo manifest builders for build-support fixture crates.
+//! Shared crate inputs for build-support fixture crates.
+//!
+//! A build-support fixture needs two things that every such fixture would
+//! otherwise repeat: the manifest that pulls in `theoremc-build-support` as a
+//! build dependency ([`build_support_fixture_manifest`]), and, for fixtures
+//! that must compile the suite its build script generates, the library source
+//! that includes `OUT_DIR/theorem_suite.rs` ([`SUITE_FIXTURE_LIB_RS`]).
+//! Including the generated file is what type-checks its macro invocations;
+//! a fixture that only reads the suite back may pass a minimal library
+//! instead.
 
 /// Fixture library source that compiles the generated theorem suite.
 ///

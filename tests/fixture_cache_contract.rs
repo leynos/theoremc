@@ -74,16 +74,15 @@ fn assert_path_relationships(first: &FixtureCrate, second: &FixtureCrate) -> Res
 
 /// Checks that a source written into one fixture is absent from the other.
 ///
-/// The suite read must fail before either fixture is built, so a cached suite
-/// from a sibling fixture cannot satisfy it.
+/// Both checks read absence through helpers that report an inspection failure
+/// separately from an absent path, so an unreadable fixture cannot pass as an
+/// unbuilt one. The suite must also be absent before either fixture is built,
+/// so a cached suite from a sibling fixture cannot satisfy it.
 fn assert_second_fixture_is_unbuilt(second: &FixtureCrate) -> Result<(), String> {
-    if second
-        .modified_time(Utf8Path::new(FIRST_FIXTURE.theorem))
-        .is_ok()
-    {
+    if second.path_exists(Utf8Path::new(FIRST_FIXTURE.theorem))? {
         return Err("writing one fixture must not change another fixture's sources".to_owned());
     }
-    if second.generated_suite_contents().is_ok() {
+    if second.find_generated_suite()?.is_some() {
         return Err("an unbuilt fixture must not read a stale shared suite".to_owned());
     }
     Ok(())

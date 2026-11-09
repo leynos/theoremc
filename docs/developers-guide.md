@@ -457,6 +457,15 @@ suite.
   `CARGO_BUILD_BUILD_DIR` removed so a caller's environment cannot move the
   artefacts or share a lock. A fixture that needs a private target must say so
   here and in its helper.
+- Fixtures that must compile the generated suite pass `SUITE_FIXTURE_LIB_RS`
+  (re-exported by `test-helpers`) as their library source. It includes
+  `OUT_DIR/theorem_suite.rs`, so the suite's macro invocations are type-checked
+  rather than only read back as text. A fixture that only reads the generated
+  file keeps a minimal library instead.
+- The Kani harness-listing test probes `cargo kani --version` and skips when
+  Kani is not installed. Once that probe succeeds, a listing failure is an
+  error: an installed but unusable Kani toolchain must fail the test rather
+  than silently skip it.
 - Tests that start a child `cargo` or `rustc` (the fixture suites, the macros
   crate's trybuild suite and the `rustc` compile-fail unit test) run in the
   `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,
