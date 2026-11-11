@@ -94,6 +94,18 @@ string uses the checked alternatives:
 The unchecked `mangle_action_name` and `action_slug` cannot fail once they hold
 a `CanonicalActionName`. `hash12` and `segment_escape` are unchanged.
 
+### Collision APIs
+
+The `theoremc::collision` APIs expose canonical names rather than strings:
+
+- `referenced_actions` returns `Vec<&CanonicalActionName>`; it previously
+  returned `Vec<&str>`.
+- `ActionOccurrence::canonical` is a `&CanonicalActionName`; it previously was
+  a `&str`.
+
+Call `as_str()` on either value where a `&str` is still needed, for example
+when comparing against untrusted text or looking up a string-keyed map.
+
 ## Schema deserialization boundary
 
 The document and step domain types, including `TheoremDoc` and its subordinate
@@ -108,3 +120,11 @@ through `load_theorem_docs` or `load_theorem_docs_with_source` (or
 part of the public API. `TheoremName` and `ForallVar` remain `Deserialize` so
 identifier validation cannot be bypassed, and `TheoremValue` remains
 `Deserialize` because its no-null rule is enforced by that implementation.
+
+`Evidence` and `ActionSignature` are subordinate types and do not implement
+`Deserialize` either. The loaders accept whole theorem documents, not
+standalone YAML fragments, so a caller that previously deserialized one of
+these values on its own wraps the fragment in a minimal valid document and
+reads the result from the loaded document: `doc.evidence` for `Evidence` and
+`doc.actions` for an `ActionSignature`. There is no supported standalone path
+for either type.

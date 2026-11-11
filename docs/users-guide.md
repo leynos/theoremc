@@ -741,6 +741,18 @@ let docs = load_theorem_docs(yaml)?;
 check_action_collisions(&docs)?;
 ```
 
+### Typed action names in collision APIs
+
+The collision APIs expose canonical action names as domain values:
+
+- `referenced_actions(&[TheoremDoc])` returns
+  `Vec<&CanonicalActionName>` in first-seen order.
+- `ActionOccurrence::canonical` is a `&CanonicalActionName`.
+
+Call `as_str()` on either value where a string slice is needed, for example for
+display, for comparison against untrusted text, or as a key in a string-keyed
+map.
+
 ## Per-file module naming
 
 The `theoremc::mangle` module provides per-file module naming for `.theorem`
