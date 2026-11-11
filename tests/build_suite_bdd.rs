@@ -5,25 +5,9 @@
 
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{FixtureCrate, TRIVIAL_THEOREM, build_support_fixture_manifest};
-
-/// Fixture lib.rs that includes the generated suite wiring.
-const FIXTURE_LIB_RS: &str = concat!(
-    "//! Fixture crate for build suite behavioural tests.\n",
-    "\n",
-    "#[doc(hidden)]\n",
-    "mod __theoremc_generated_suite {\n",
-    "    #[allow(unused_macros)]\n",
-    "    macro_rules! theorem_file {\n",
-    "        ($path:literal) => {\n",
-    "            const _: &str =\n",
-    "                include_str!(concat!(env!(\"CARGO_MANIFEST_DIR\"), \"/\", $path));\n",
-    "        };\n",
-    "    }\n",
-    "\n",
-    "    include!(concat!(env!(\"OUT_DIR\"), \"/theorem_suite.rs\"));\n",
-    "}\n",
-);
+use test_helpers::{
+    FixtureCrate, SUITE_FIXTURE_LIB_RS, TRIVIAL_THEOREM, build_support_fixture_manifest,
+};
 
 fn generated_suite_contents(fixture: &FixtureCrate) -> Result<String, String> {
     fixture.generated_suite_contents()
@@ -57,7 +41,7 @@ fn given_a_crate_without_a_theorems_directory() {}
 fn then_the_crate_compiles_successfully_with_the_generated_suite() -> Result<(), String> {
     let fixture = FixtureCrate::new(
         &build_support_fixture_manifest("build_suite_fixture"),
-        FIXTURE_LIB_RS,
+        SUITE_FIXTURE_LIB_RS,
     )?;
     // No theorems directory created - testing empty suite case
     fixture.cargo_build()?;
@@ -73,7 +57,7 @@ fn then_the_single_theorem_is_included_automatically_and_the_crate_compiles() ->
 {
     let fixture = FixtureCrate::new(
         &build_support_fixture_manifest("build_suite_fixture"),
-        FIXTURE_LIB_RS,
+        SUITE_FIXTURE_LIB_RS,
     )?;
     fixture.write(Utf8Path::new("theorems/single.theorem"), TRIVIAL_THEOREM)?;
 
@@ -89,7 +73,7 @@ fn given_a_crate_with_multiple_theorem_files_created_in_non_sorted_order() {}
 fn then_all_theorems_compile_in_deterministic_suite_order() -> Result<(), String> {
     let fixture = FixtureCrate::new(
         &build_support_fixture_manifest("build_suite_fixture"),
-        FIXTURE_LIB_RS,
+        SUITE_FIXTURE_LIB_RS,
     )?;
     // Create theorems in non-sorted order (z, a, m)
     fixture.write(Utf8Path::new("theorems/z.theorem"), TRIVIAL_THEOREM)?;
@@ -123,7 +107,7 @@ fn multiple_theorem_files_compile_in_deterministic_suite_order() {}
 fn fixture_with_theorem(name: &str) -> Result<FixtureCrate, String> {
     let fixture = FixtureCrate::new(
         &build_support_fixture_manifest("build_suite_fixture"),
-        FIXTURE_LIB_RS,
+        SUITE_FIXTURE_LIB_RS,
     )?;
     fixture.write(
         Utf8Path::new(&format!("theorems/{name}.theorem")),

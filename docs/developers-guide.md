@@ -166,6 +166,18 @@ module exists as a separate top-level module specifically to orchestrate both
 without violating this boundary. The `mangle_validate` module duplicates
 action-name validation rules to preserve independence from the schema layer.
 
+Schema internals follow the same ownership boundaries. `raw.rs` and
+`raw_action.rs` own YAML aliases, defaults applied while parsing raw input,
+source locations, and conversion from raw input. Private `types_*.rs` modules
+own public data shapes, model-local Serde defaults, and helpers, re-exported
+through `types.rs` and the `schema` facade. Private `validate_*.rs` modules
+hold validation concerns behind `validate_theorem_doc`, while that function
+owns validation order. `validation_reason.rs` models semantic failures;
+`loader.rs` and raw modules own diagnostics. `schema::rust_type` remains the
+shared Rust-type parser. This split is preventive modularization: put new
+responsibilities in focused private modules instead of growing `arg_value.rs`,
+`loader.rs`, or `raw.rs`.
+
 ### Accepted harness-planning boundary (pending implementation)
 
 [ADR 005](adr-005-vertical-slice-first-roadmap-sequencing.md) makes a real
@@ -445,6 +457,24 @@ suite.
   `CARGO_BUILD_BUILD_DIR` removed so a caller's environment cannot move the
   artefacts or share a lock. A fixture that needs a private target must say so
   here and in its helper.
+- Fixtures that must compile the generated suite pass `SUITE_FIXTURE_LIB_RS`
+  (re-exported by `test-helpers`) as their library source. It includes
+  `OUT_DIR/theorem_suite.rs`, which compiles the suite and resolves every
+  theorem path it names, so a suite pointing at a missing theorem fails the
+  fixture build. Its `theorem_file!` stub expands to `include_str!`, so the
+  real procedural macro never runs and theorem documents are not validated. A
+  fixture that only reads the generated file keeps a minimal library.
+- `FixtureCrate::path_exists` and `FixtureCrate::find_generated_suite` report
+  absence as `Ok(false)` or `Ok(None)` and return an error for every other
+  inspection failure, including `NotADirectory`. Use them instead of testing
+  `is_err()`: an unreadable fixture must not pass as an unbuilt one. The suite
+  lookup also fails when a matching `build/` entry is a file rather than a
+  directory, because that is a malformed build layout, not an absent suite.
+- The Kani harness-listing test probes `cargo kani --version` and skips when
+  Kani is not installed. Once that probe succeeds, a listing failure is an
+  error: an installed but unusable Kani toolchain must fail the test rather
+  than silently skip it. `cargo_runner::list_when_installed` holds that policy
+  and is unit tested with an injected probe result.
 - Tests that start a child `cargo` or `rustc` (the fixture suites, the macros
   crate's trybuild suite and the `rustc` compile-fail unit test) run in the
   `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,

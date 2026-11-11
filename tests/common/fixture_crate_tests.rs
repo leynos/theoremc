@@ -3,9 +3,8 @@
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 
-use super::{
-    BUILD_SUPPORT_CARGO_TOML, fixture_build_support_cargo_toml, package_directories, read_suite,
-};
+use super::super::suite_layout::{package_directories, read_suite};
+use super::{BUILD_SUPPORT_CARGO_TOML, fixture_build_support_cargo_toml};
 
 /// A shared `target/debug/build` holding two builds of `fx_ab`, one of the
 /// similarly named `fx_abc`, and a generated suite for the first `fx_ab` only.

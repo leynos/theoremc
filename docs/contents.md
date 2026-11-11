@@ -114,6 +114,10 @@
 
 ## Reference material
 
+- [Investigation: nested Cargo test
+  delays](debugging/debugging-plan-2026-10-20-nested-cargo-timeout.md)
+  - Falsification record for the shared-fixture-target and compile-admission
+    hypotheses behind the nested-Cargo test delays.
 - [Navigating code complexity: a guide for implementers and
   maintainers](complexity-antipatterns-and-refactoring-strategies.md)
   - Practical guide to complexity metrics, anti-patterns, and refactoring

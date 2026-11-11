@@ -5,13 +5,14 @@ use the_newtype::Newtype;
 mod build_log;
 mod build_support_fixture;
 mod fixture_crate;
+mod fixture_inspection;
 mod fixture_isolation;
 mod hermetic_cargo;
 mod schema_fixtures;
 mod suite_layout;
 
 pub use build_log::{BuildLog, toml_section};
-pub use build_support_fixture::build_support_fixture_manifest;
+pub use build_support_fixture::{SUITE_FIXTURE_LIB_RS, build_support_fixture_manifest};
 pub use fixture_crate::{
     BUILD_DISCOVERY_SOURCE, BUILD_SCRIPT_SOURCE, BUILD_SUITE_SOURCE, FixtureCrate, TRIVIAL_THEOREM,
 };

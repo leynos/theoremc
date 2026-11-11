@@ -217,9 +217,12 @@ fn lower_nested_mapping(
         ArgValue::RawMap(_) => Err(LoweringError::UnsupportedType {
             param: param_name.to_owned(),
             reason: format!(
-                "nested map with keys {:?} requires type information that is not \
-                 available without compile-time field type probes (Phase 3); \
-                 use explicit let-bindings for nested struct construction",
+                concat!(
+                    "nested map with keys {:?} requires type information that is ",
+                    "not available without compile-time field type probes ",
+                    "(Phase 3); use explicit let-bindings for nested struct ",
+                    "construction"
+                ),
                 fields.keys().collect::<Vec<_>>()
             ),
         }),
@@ -290,8 +293,10 @@ fn extract_type_path(param_name: &str, ty: &syn::Type) -> Result<syn::Path, Lowe
     // Reject qualified-self paths (e.g., `<T as Trait>::Assoc`).
     if type_path.qself.is_some() {
         return Err(unsupported(format!(
-            "qualified-self paths are not supported for struct \
-             literal synthesis, found: {}",
+            concat!(
+                "qualified-self paths are not supported for struct ",
+                "literal synthesis, found: {}"
+            ),
             quote! { #ty }
         )));
     }
@@ -304,8 +309,10 @@ fn extract_type_path(param_name: &str, ty: &syn::Type) -> Result<syn::Path, Lowe
         .any(|s| !s.arguments.is_none())
     {
         return Err(unsupported(format!(
-            "generic type paths are not supported for struct \
-             literal synthesis, found: {}",
+            concat!(
+                "generic type paths are not supported for struct ",
+                "literal synthesis, found: {}"
+            ),
             quote! { #ty }
         )));
     }
