@@ -122,7 +122,8 @@
   injection](reliable-testing-in-rust-via-dependency-injection.md)
   - Patterns for testable Rust design using dependency injection to avoid
     global-state coupling.
-- [Localizable Rust libraries with Fluent](localizable-rust-libraries-with-fluent.md)
+- [Localizable Rust libraries with
+  Fluent](localizable-rust-libraries-with-fluent.md)
   - Reference material for library-safe localization and Fluent integration.
 - [A systematic guide to effective, ergonomic, and "don't repeat yourself"
   (DRY) doctests in Rust](rust-doctest-dry-guide.md)
@@ -134,7 +135,8 @@
     practices with `rstest`.
 - [Scripting standards](scripting-standards.md) - Standards for project
   scripts, covering toolchain choices, structure, and operational expectations.
-- [OrthoConfig v0.10.0 documentation provenance](ortho-config-v0-10-0-provenance.md)
+- [OrthoConfig v0.10.0 documentation
+  provenance](ortho-config-v0-10-0-provenance.md)
   - Immutable source revision, imported-guide checksums, and local redirects
     for the guides' unimported relative-link targets.
 

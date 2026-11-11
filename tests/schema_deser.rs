@@ -97,14 +97,9 @@ fn valid_minimal_has_kani_evidence(
     Ok(())
 }
 
-#[rstest]
-#[case::omitted("", None)]
-#[case::explicit("Schema: 1\n", Some(1))]
-fn schema_field_preserves_omitted_and_explicit_values(
-    #[case] schema_line: &str,
-    #[case] expected: Option<u32>,
-) -> std::io::Result<()> {
-    let yaml = format!(
+/// Renders the schema example document with `schema_line` prepended.
+fn schema_example_yaml(schema_line: &str) -> String {
+    format!(
         "{schema_line}{}",
         concat!(
             "Theorem: SchemaExample\n",
@@ -120,12 +115,44 @@ fn schema_field_preserves_omitted_and_explicit_values(
             "  - cover: \"true\"\n",
             "    because: \"reachable path\"\n",
         )
-    );
+    )
+}
 
-    let docs = load_theorem_docs(&yaml).expect("schema example should parse");
+#[rstest]
+#[case::omitted("", None)]
+#[case::explicit("Schema: 1\n", Some(1))]
+fn schema_field_preserves_omitted_and_explicit_values(
+    #[case] schema_line: &str,
+    #[case] expected: Option<u32>,
+) -> std::io::Result<()> {
+    let docs =
+        load_theorem_docs(&schema_example_yaml(schema_line)).expect("schema example should parse");
 
     ensure_eq!(docs.first().map(|doc| doc.schema), Some(expected));
     Ok(())
+}
+
+#[test]
+fn omitted_schema_only_differs_from_explicit_version_one_in_the_stored_value() {
+    let omitted = load_theorem_docs(&schema_example_yaml("")).expect("omitted schema should parse");
+    let explicit = load_theorem_docs(&schema_example_yaml("Schema: 1\n"))
+        .expect("explicit schema should parse");
+
+    let omitted_doc = omitted
+        .first()
+        .expect("omitted schema should produce one document");
+    let mut explicit_doc = explicit
+        .first()
+        .expect("explicit schema should produce one document")
+        .clone();
+
+    assert!(omitted_doc.schema.is_none());
+    assert_eq!(explicit_doc.schema, Some(1));
+
+    // Omission must not disturb any other field or materialize a default:
+    // clearing the explicit value leaves the two documents identical.
+    explicit_doc.schema = None;
+    pretty_assertions::assert_eq!(omitted_doc, &explicit_doc);
 }
 
 #[rstest]

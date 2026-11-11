@@ -13,6 +13,27 @@ use serde::de;
 
 use super::identifier::validate_identifier;
 
+/// Implements `Deserialize` for a string-backed identifier newtype.
+///
+/// Every identifier newtype shares the same contract: read a YAML string,
+/// reject it through [`validate_identifier`], and only then wrap it. Keeping
+/// the rule in one macro prevents the newtypes from drifting apart.
+macro_rules! impl_identifier_deserialize {
+    ($newtype:ty) => {
+        impl<'de> Deserialize<'de> for $newtype {
+            /// Reads a YAML string and validates it as an identifier.
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: de::Deserializer<'de>,
+            {
+                let value = String::deserialize(deserializer)?;
+                validate_identifier(&value).map_err(de::Error::custom)?;
+                Ok(Self(value))
+            }
+        }
+    };
+}
+
 // ── TheoremName ────────────────────────────────────────────────────
 
 /// A validated theorem name.
@@ -36,6 +57,21 @@ impl TheoremName {
     ///
     /// Returns [`super::error::SchemaError::InvalidIdentifier`] if
     /// the string fails identifier validation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use theoremc_core::schema::TheoremName;
+    ///
+    /// let name = TheoremName::new("MyTheorem".to_owned())
+    ///     .expect("a Rust identifier is a valid theorem name");
+    /// assert_eq!(name.as_str(), "MyTheorem");
+    ///
+    /// assert!(
+    ///     TheoremName::new("1NotAnIdentifier".to_owned()).is_err(),
+    ///     "identifiers cannot start with a digit",
+    /// );
+    /// ```
     pub fn new(s: String) -> Result<Self, super::error::SchemaError> {
         validate_identifier(&s)?;
         Ok(Self(s))
@@ -66,16 +102,7 @@ impl fmt::Display for TheoremName {
     }
 }
 
-impl<'de> Deserialize<'de> for TheoremName {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        validate_identifier(&s).map_err(de::Error::custom)?;
-        Ok(Self(s))
-    }
-}
+impl_identifier_deserialize!(TheoremName);
 
 // ── ForallVar ──────────────────────────────────────────────────────
 
@@ -100,6 +127,21 @@ impl ForallVar {
     ///
     /// Returns [`super::error::SchemaError::InvalidIdentifier`] if
     /// the string fails identifier validation.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use theoremc_core::schema::ForallVar;
+    ///
+    /// let var = ForallVar::new("account".to_owned())
+    ///     .expect("a Rust identifier is a valid quantified variable");
+    /// assert_eq!(var.as_str(), "account");
+    ///
+    /// assert!(
+    ///     ForallVar::new("type".to_owned()).is_err(),
+    ///     "reserved keywords are rejected",
+    /// );
+    /// ```
     pub fn new(s: String) -> Result<Self, super::error::SchemaError> {
         validate_identifier(&s)?;
         Ok(Self(s))
@@ -136,13 +178,8 @@ impl fmt::Display for ForallVar {
     }
 }
 
-impl<'de> Deserialize<'de> for ForallVar {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        let s = String::deserialize(deserializer)?;
-        validate_identifier(&s).map_err(de::Error::custom)?;
-        Ok(Self(s))
-    }
-}
+impl_identifier_deserialize!(ForallVar);
+
+#[cfg(test)]
+#[path = "newtypes_tests.rs"]
+mod tests;

@@ -4,6 +4,7 @@ use super::test_helpers::{
     DocBoilerplate, boilerplate, doc_with_do_actions, doc_with_let_actions, theorem_doc,
 };
 use super::*;
+use crate::canonical_action_name::CanonicalActionName;
 use crate::schema::{ActionSignature, ForallVar, SchemaError};
 use indexmap::IndexMap;
 use rstest::rstest;
@@ -23,8 +24,13 @@ fn referenced_actions_deduplicate_in_first_seen_order(boilerplate: DocBoilerplat
     )
     .expect("test theorem name should be valid");
 
+    let docs = [first, second];
+    let referenced: Vec<&str> = referenced_actions(&docs)
+        .into_iter()
+        .map(CanonicalActionName::as_str)
+        .collect();
     assert_eq!(
-        referenced_actions(&[first, second]),
+        referenced,
         vec!["account.params", "account.deposit", "account.validate"]
     );
 }
@@ -44,7 +50,7 @@ fn referenced_types_collects_forall_params_and_returns_in_first_seen_order(
         "u64".to_owned(),
     );
     doc.actions.insert(
-        "account.deposit".to_owned(),
+        CanonicalActionName::new("account.deposit").expect("test action name should be valid"),
         ActionSignature {
             params: IndexMap::from([
                 ("command".to_owned(), "crate::DepositCommand".to_owned()),
@@ -75,7 +81,7 @@ fn referenced_types_deduplicate_by_canonical_type_tokens(boilerplate: DocBoilerp
         "Vec<u8>".to_owned(),
     );
     first.actions.insert(
-        "payload.write".to_owned(),
+        CanonicalActionName::new("payload.write").expect("test action name should be valid"),
         ActionSignature {
             params: IndexMap::from([("buffer".to_owned(), "Vec <u8>".to_owned())]),
             returns: "u64".to_owned(),
@@ -84,7 +90,7 @@ fn referenced_types_deduplicate_by_canonical_type_tokens(boilerplate: DocBoilerp
     let mut second = theorem_doc("Second", IndexMap::new(), Vec::new(), &boilerplate)
         .expect("test theorem name should be valid");
     second.actions.insert(
-        "payload.read".to_owned(),
+        CanonicalActionName::new("payload.read").expect("test action name should be valid"),
         ActionSignature {
             params: IndexMap::from([("buffer".to_owned(), "Vec<u8>".to_owned())]),
             returns: "u64".to_owned(),
@@ -116,6 +122,7 @@ mod referenced_types_proptests {
     use super::super::referenced_types;
     use super::super::test_helpers::{DocBoilerplate, boilerplate, theorem_doc};
     use super::forall_var;
+    use crate::canonical_action_name::CanonicalActionName;
     use crate::schema::rust_type::canonical_token_stream;
     use crate::schema::{ActionSignature, SchemaError, TheoremDoc};
     use indexmap::IndexMap;
@@ -127,6 +134,15 @@ mod referenced_types_proptests {
             .prop_map(|types| types.into_iter().collect())
     }
 
+    /// Builds a canonical action name, mapping the typed failure into the
+    /// schema error surface used by these builders.
+    fn canonical_action(name: &str) -> Result<CanonicalActionName, SchemaError> {
+        CanonicalActionName::new(name).map_err(|error| SchemaError::InvalidActionName {
+            action: error.name().to_owned(),
+            reason: error.reason().to_string(),
+        })
+    }
+
     fn build_doc_with_type(
         name: &str,
         position: usize,
@@ -134,7 +150,7 @@ mod referenced_types_proptests {
         boilerplate: &DocBoilerplate,
     ) -> Result<TheoremDoc, SchemaError> {
         let mut doc = theorem_doc(name, IndexMap::new(), Vec::new(), boilerplate)?;
-        let action_name = format!("action_{position}");
+        let action_name = canonical_action(&format!("action.n{position}"))?;
 
         match position.rem_euclid(3) {
             0 => {

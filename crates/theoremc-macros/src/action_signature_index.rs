@@ -25,7 +25,7 @@ struct DeclaredSignature<'a> {
 
 /// First-seen signatures for the actions one expansion referenced.
 #[derive(Debug)]
-pub(super) struct ActionSignatureIndex<'a> {
+pub(crate) struct ActionSignatureIndex<'a> {
     signatures: BTreeMap<&'a str, DeclaredSignature<'a>>,
 }
 
@@ -37,7 +37,7 @@ impl<'a> ActionSignatureIndex<'a> {
     /// Returns [`MacroExpansionError::ConflictingActionSignature`] when two
     /// documents declare the same action with signatures that are not
     /// semantically equivalent.
-    pub(super) fn for_actions(
+    pub(crate) fn for_actions(
         theorem_docs: &'a [TheoremDoc],
         canonical_actions: &[&str],
     ) -> Result<Self, MacroExpansionError> {
@@ -88,7 +88,7 @@ impl<'a> ActionSignatureIndex<'a> {
     ///
     /// Returns [`MacroExpansionError::MissingActionSignature`] when the action
     /// was referenced but never declared in any document.
-    pub(super) fn signature_for(
+    pub(crate) fn signature_for(
         &self,
         canonical: &str,
     ) -> Result<&'a ActionSignature, MacroExpansionError> {

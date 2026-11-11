@@ -6,6 +6,7 @@
 //! argument field instead of the theorem header.
 
 use derive_more::{From, Into};
+use serde_saphyr::Location;
 use the_newtype::Newtype;
 
 use super::raw::{RawDocDecodeError, RawTheoremDoc};
@@ -72,9 +73,18 @@ impl<'a> YamlLine<'a> {
     }
 
     /// True when the line is exactly the named section header.
+    ///
+    /// The comparison ignores ASCII case because every top-level section
+    /// accepts both its `TitleCase` spelling and its lowercase alias.
     #[must_use]
     fn is_section_line(self, section: YamlKey<'a>) -> bool {
-        self.trimmed() == format!("{}:", section.as_str())
+        let trimmed = self.trimmed();
+        let name = section.as_str();
+        trimmed.len() == name.len() + 1
+            && trimmed.ends_with(':')
+            && trimmed
+                .get(..name.len())
+                .is_some_and(|prefix| prefix.eq_ignore_ascii_case(name))
     }
 
     /// True when the line begins a mapping entry for `key`.
@@ -168,15 +178,31 @@ impl<'a> YamlLine<'a> {
     }
 }
 
+/// Convert a typed [`Location`] into one-based `(row, column)` coordinates.
+///
+/// `serde_saphyr` reports `Location::UNKNOWN` as line 0, column 0 whenever a
+/// span could not be captured, so those sentinels are rejected rather than
+/// rendered as a bogus position.
+fn location_coordinates(location: Location) -> Option<(usize, usize)> {
+    let line = usize::try_from(location.line()).ok()?;
+    let column = usize::try_from(location.column()).ok()?;
+    (line > 0 && column > 0).then_some((line, column))
+}
+
 /// Find the source position of the argument named by a decode failure.
 ///
-/// Returns the one-based `(row, column)` of the offending YAML key, or `None`
-/// when the failure carries no locatable `Let` binding or `Do` step context.
+/// Returns the one-based `(row, column)` of the offending YAML value, or
+/// `None` when the failure carries neither a usable typed span nor a
+/// locatable `Let` binding or `Do` step context.
 pub(crate) fn locate_decode_failure(
     input: &str,
     raw_doc: &RawTheoremDoc,
     error: &RawDocDecodeError,
 ) -> Option<(usize, usize)> {
+    if let Some(coordinates) = error.typed_location().and_then(location_coordinates) {
+        return Some(coordinates);
+    }
+
     let argument_name = terminal_argument_name(YamlKey::new(error.param()));
     let start_line = usize::try_from(raw_doc.theorem_location().line()).ok()?;
     let start_index = start_line.saturating_sub(1);

@@ -6,7 +6,9 @@
 
 use rstest::rstest;
 use test_helpers::{FixtureName, StrNewtype, fixture_error_message};
-use theoremc::schema::{KaniExpectation, load_theorem_docs};
+use theoremc::schema::{
+    KaniExpectation, LetBinding, SchemaError, Step, TheoremDoc, load_theorem_docs,
+};
 
 fn require_message_contains(message: &str, expected: &str) -> Result<(), String> {
     if message.contains(expected) {
@@ -178,6 +180,184 @@ Witness:
     assert!(result.is_err());
     let msg = result.err().map(|e| e.to_string()).unwrap_or_default();
     assert!(msg.contains("Rust reserved keyword"));
+}
+
+// ── Single-key mappings in `Let` and `Do` ───────────────────────────
+
+const DISPATCH_HEADER: &str = concat!(
+    "Theorem: Dispatch\n",
+    "About: Single-key mapping dispatch\n",
+    "Actions:\n",
+    "  account.deposit:\n",
+    "    params: {}\n",
+);
+
+const DISPATCH_FOOTER: &str = concat!(
+    "Prove:\n",
+    "  - assert: 'true'\n",
+    "    because: trivially true\n",
+    "Evidence:\n",
+    "  kani:\n",
+    "    unwind: 1\n",
+    "    expect: SUCCESS\n",
+    "Witness:\n",
+    "  - cover: 'true'\n",
+    "    because: always reachable\n",
+);
+
+/// One single-key dispatch shape under test, rendered as a full document.
+///
+/// A case carries the mapping shape rather than its YAML text so the tests
+/// keep one spelling of each fixture. The `Let` and `Do` positions exercise
+/// the same shapes, so both documents derive from one body.
+#[derive(Debug, Clone, Copy)]
+enum DispatchCase {
+    TwoKeys,
+    ExtraKey,
+    UnknownKey,
+    EmptyMapping,
+    Call,
+    Must,
+}
+
+impl DispatchCase {
+    /// The mapping body, indented to sit under a `Let` binding key.
+    fn body(self) -> &'static str {
+        match self {
+            Self::TwoKeys => concat!(
+                "    call:\n      action: account.deposit\n      args: {}\n",
+                "    must:\n      action: account.deposit\n      args: {}\n",
+            ),
+            Self::ExtraKey => concat!(
+                "    call:\n      action: account.deposit\n      args: {}\n",
+                "    spurious: true\n",
+            ),
+            Self::UnknownKey => "    invoke:\n      action: account.deposit\n      args: {}\n",
+            Self::EmptyMapping => "    {}\n",
+            Self::Call => "    call:\n      action: account.deposit\n      args: {}\n",
+            Self::Must => "    must:\n      action: account.deposit\n      args: {}\n",
+        }
+    }
+
+    /// The whole document holding this mapping as `Let.value`.
+    fn let_document(self) -> String {
+        format!(
+            "{DISPATCH_HEADER}Let:\n  value:\n{}{DISPATCH_FOOTER}",
+            self.body()
+        )
+    }
+
+    /// The whole document holding this mapping as the only `Do` entry.
+    ///
+    /// The body is written for the `Let` position, where the binding key
+    /// occupies column four. Removing that first-line indent lets the same
+    /// body follow the sequence dash at the same column.
+    fn do_document(self) -> String {
+        format!(
+            "{DISPATCH_HEADER}Do:\n  - {}{DISPATCH_FOOTER}",
+            self.body().trim_start()
+        )
+    }
+
+    /// The variant this case should decode to, or `None` when it is malformed.
+    fn decoded(self) -> Option<Decoded> {
+        match self {
+            Self::Call => Some(Decoded::Call),
+            Self::Must => Some(Decoded::Must),
+            Self::TwoKeys | Self::ExtraKey | Self::UnknownKey | Self::EmptyMapping => None,
+        }
+    }
+}
+
+/// The variant a decoded single-key mapping produced.
+///
+/// Keeping the variant explicit lets the accept test distinguish an absent
+/// entry and a `Step::Maybe` from the `must` control it is asserting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Decoded {
+    Call,
+    Must,
+}
+
+/// The position a decoded single-key mapping is read from.
+#[derive(Debug, Clone, Copy)]
+enum Position {
+    Let,
+    Do,
+}
+
+impl Position {
+    /// The document holding `case` at this position.
+    fn document(self, case: DispatchCase) -> String {
+        match self {
+            Self::Let => case.let_document(),
+            Self::Do => case.do_document(),
+        }
+    }
+
+    /// The variant the first entry decoded from `doc` produced.
+    fn decoded_variant(self, doc: &TheoremDoc) -> Option<Decoded> {
+        match self {
+            Self::Let => doc.let_bindings.get("value").map(|binding| match binding {
+                LetBinding::Call(_) => Decoded::Call,
+                LetBinding::Must(_) => Decoded::Must,
+            }),
+            Self::Do => doc.do_steps.first().and_then(|step| match step {
+                Step::Call(_) => Some(Decoded::Call),
+                Step::Must(_) => Some(Decoded::Must),
+                Step::Maybe(_) => None,
+            }),
+        }
+    }
+}
+
+/// Asserts that a rejection explains the single-key requirement.
+fn assert_single_key_error(error: &SchemaError) {
+    let message = error.to_string();
+    assert!(
+        message.contains("exactly one") || message.contains("unknown variant"),
+        "error should explain the single-key requirement, got: {message}"
+    );
+}
+
+#[rstest]
+#[case::two_supported_keys(DispatchCase::TwoKeys)]
+#[case::extra_key(DispatchCase::ExtraKey)]
+#[case::unknown_key(DispatchCase::UnknownKey)]
+#[case::empty_mapping(DispatchCase::EmptyMapping)]
+fn rejects_malformed_let_binding_mapping(#[case] case: DispatchCase) {
+    let error = load_theorem_docs(&case.let_document())
+        .expect_err("malformed Let mapping should be rejected");
+
+    assert_single_key_error(&error);
+}
+
+#[rstest]
+#[case::two_supported_keys(DispatchCase::TwoKeys)]
+#[case::extra_key(DispatchCase::ExtraKey)]
+#[case::unknown_key(DispatchCase::UnknownKey)]
+#[case::empty_mapping(DispatchCase::EmptyMapping)]
+fn rejects_malformed_do_step_mapping(#[case] case: DispatchCase) {
+    let error =
+        load_theorem_docs(&case.do_document()).expect_err("malformed Do step should be rejected");
+
+    assert_single_key_error(&error);
+}
+
+#[rstest]
+fn accepts_single_key_mapping(
+    #[values(DispatchCase::Call, DispatchCase::Must)] case: DispatchCase,
+    #[values(Position::Let, Position::Do)] position: Position,
+) {
+    let docs =
+        load_theorem_docs(&position.document(case)).expect("single-key mapping should decode");
+    let doc = docs.first().expect("the document should decode");
+
+    assert_eq!(
+        position.decoded_variant(doc),
+        case.decoded(),
+        "the decoded variant should follow the mapping key"
+    );
 }
 
 // ── Guard: identifiers from the doc that should work ────────────────

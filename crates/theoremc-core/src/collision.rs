@@ -17,11 +17,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::canonical_action_name::CanonicalActionName;
 use crate::mangle::mangle_action_name;
 use crate::schema::{LetBinding, SchemaError, Step, TheoremDoc, rust_type};
 
-/// Mangles a canonical action name string and returns the identifier.
-fn mangle_to_identifier(name: &str) -> String {
+/// Mangles a validated canonical action name and returns the identifier.
+///
+/// Canonical names reach this module already validated by the schema
+/// decoder, so the mangling step is infallible and must not re-check the
+/// grammar.
+fn mangle_to_identifier(name: &CanonicalActionName) -> String {
     mangle_action_name(name).identifier().to_owned()
 }
 
@@ -70,7 +75,7 @@ pub fn check_action_collisions(docs: &[TheoremDoc]) -> Result<(), SchemaError> {
 /// that force collisions.
 fn check_action_collisions_with(
     docs: &[TheoremDoc],
-    mangler: impl Fn(&str) -> String,
+    mangler: impl Fn(&CanonicalActionName) -> String,
 ) -> Result<(), SchemaError> {
     let occurrences = collect_all_occurrences(docs);
     let by_canonical = group_by_canonical(&occurrences);
@@ -91,7 +96,7 @@ fn check_action_collisions_with(
 /// A single occurrence of a canonical action name within a theorem.
 pub struct ActionOccurrence<'a> {
     /// The canonical dot-separated action name.
-    pub canonical: &'a str,
+    pub canonical: &'a CanonicalActionName,
     /// The theorem name where this action was referenced.
     pub theorem: &'a str,
 }
@@ -99,7 +104,7 @@ pub struct ActionOccurrence<'a> {
 /// Returns each distinct canonical action referenced by the loaded theorem
 /// documents in deterministic first-seen order.
 #[must_use]
-pub fn referenced_actions(docs: &[TheoremDoc]) -> Vec<&str> {
+pub fn referenced_actions(docs: &[TheoremDoc]) -> Vec<&CanonicalActionName> {
     let mut seen = BTreeSet::new();
     let mut distinct = Vec::new();
     for occurrence in collect_all_occurrences(docs) {
@@ -163,7 +168,7 @@ fn collect_doc_actions<'a>(doc: &'a TheoremDoc, out: &mut Vec<ActionOccurrence<'
 }
 
 /// Extracts the canonical action name from a `LetBinding`.
-fn let_binding_action(binding: &LetBinding) -> &str {
+const fn let_binding_action(binding: &LetBinding) -> &CanonicalActionName {
     match binding {
         LetBinding::Call(c) => &c.call.action,
         LetBinding::Must(m) => &m.must.action,
@@ -209,8 +214,8 @@ fn collect_step_actions<'a>(
 /// deterministic iteration order.
 fn group_by_canonical<'a>(
     occurrences: &[ActionOccurrence<'a>],
-) -> BTreeMap<&'a str, BTreeSet<&'a str>> {
-    let mut map: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+) -> BTreeMap<&'a CanonicalActionName, BTreeSet<&'a str>> {
+    let mut map: BTreeMap<&CanonicalActionName, BTreeSet<&str>> = BTreeMap::new();
     for occ in occurrences {
         map.entry(occ.canonical).or_default().insert(occ.theorem);
     }
@@ -219,8 +224,8 @@ fn group_by_canonical<'a>(
 
 /// Extracts the set of unique canonical names from the grouped map.
 fn unique_canonical_names<'a>(
-    by_canonical: &BTreeMap<&'a str, BTreeSet<&'a str>>,
-) -> BTreeSet<&'a str> {
+    by_canonical: &BTreeMap<&'a CanonicalActionName, BTreeSet<&'a str>>,
+) -> BTreeSet<&'a CanonicalActionName> {
     by_canonical.keys().copied().collect()
 }
 
@@ -228,22 +233,37 @@ fn unique_canonical_names<'a>(
 /// groups by mangled identifier. Returns only groups where two or more
 /// different canonical names produce the same mangled identifier.
 #[cfg(test)]
-fn find_mangled_collisions(canonical_names: &BTreeSet<&str>) -> BTreeMap<String, BTreeSet<String>> {
-    find_mangled_collisions_with(canonical_names, mangle_to_identifier)
+fn find_mangled_collisions(
+    canonical_names: &BTreeSet<&str>,
+) -> Result<BTreeMap<String, BTreeSet<String>>, SchemaError> {
+    let validated = canonical_names
+        .iter()
+        .map(|name| {
+            CanonicalActionName::new(name).map_err(|error| SchemaError::InvalidActionName {
+                action: error.name().to_owned(),
+                reason: error.reason().to_string(),
+            })
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    let canonical_name_refs = validated.iter().collect();
+    Ok(find_mangled_collisions_with(
+        &canonical_name_refs,
+        mangle_to_identifier,
+    ))
 }
 
 /// Groups canonical names by the identifier produced by `mangler`,
 /// returning only groups where two or more names collide.
 fn find_mangled_collisions_with(
-    canonical_names: &BTreeSet<&str>,
-    mangler: impl Fn(&str) -> String,
+    canonical_names: &BTreeSet<&CanonicalActionName>,
+    mangler: impl Fn(&CanonicalActionName) -> String,
 ) -> BTreeMap<String, BTreeSet<String>> {
     let mut by_identifier: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for &name in canonical_names {
         by_identifier
             .entry(mangler(name))
             .or_default()
-            .insert(name.to_owned());
+            .insert(name.as_str().to_owned());
     }
     by_identifier.retain(|_, names| names.len() > 1);
     by_identifier

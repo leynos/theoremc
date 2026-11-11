@@ -233,15 +233,21 @@ This section is intentionally informative and maps current module placement.
 
 Table 1: Current schema layer to module mapping (informative).
 
-| Layer                       | Current primary modules                                                    |
-| --------------------------- | -------------------------------------------------------------------------- |
-| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::identifier` |
-| Raw span adapter            | `schema::raw`                                                              |
-| Raw-to-domain conversion    | `schema::raw::decode`, `schema::raw_action`                                |
-| Validator (domain rules)    | `schema::validate`, `schema::expr`, `schema::step`                         |
-| Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::str_newtype`  |
-| Duplicate-key diagnostics   | `schema::loader::duplicate`                                                |
-| Diagnostic infrastructure   | `schema::diagnostic`, `schema::error`                                      |
+| Layer                       | Current primary modules                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Public API and domain model | `schema::types`, `schema::newtypes`, `schema::value`, `schema::arg_value`, `schema::identifier`                          |
+| Raw span adapter            | `schema::raw`                                                                                                            |
+| Raw-to-domain conversion    | `schema::raw::decode`, `schema::raw::raw_convert`, `schema::raw_action`, `schema::raw_evidence`                          |
+| Validator (domain rules)    | `schema::validate` (with private `validate_*` rule modules), `schema::validation_reason`, `schema::expr`, `schema::step` |
+| Loader orchestration        | `schema::loader`, `schema::loader_decode_location`, `schema::loader_message`, `schema::str_newtype`                      |
+| Duplicate-key diagnostics   | `schema::loader::duplicate`                                                                                              |
+| Diagnostic infrastructure   | `schema::diagnostic`, `schema::error`                                                                                    |
+
+Parser-error anchoring is owned by the private `schema::loader_message` module.
+It interprets `serde_saphyr` messages only at the loader boundary and is not a
+shared diagnostic API. Other schema validation paths use typed
+`ValidationReasonKind` values and raw source spans instead of parsing those
+messages.
 
 ______________________________________________________________________
 
@@ -1270,6 +1276,45 @@ boilerplate across the schema and test-support wrappers:
   predicates onto `YamlLine` methods replaces the free-function layer with one
   cohesive line vocabulary and keeps the module's string-argument ratio below
   the CodeScene advisory threshold it would otherwise cross.
+
+### 6.7.12 Implementation decisions (code-base audit 2026-06)
+
+The 2026-06 code-base audit revisited the schema and macro boundaries without
+invalidating the historical decisions above. This addendum records the current
+design; where it refines an earlier note, the earlier note remains as the
+rationale for how the design arrived here.
+
+- **Shared canonical-name boundary.** `canonical_action_name.rs` owns the
+  canonical grammar, the typed failure reasons, and the `CanonicalActionName`
+  newtype. Schema code validates action names once, during raw-to-domain
+  conversion, and wraps the typed result into schema diagnostics. Mangle code
+  accepts either `&CanonicalActionName` or a checked `try_*` string entry
+  point. Neither layer re-parses a name the other has validated, and public
+  domain objects (`TheoremDoc.actions`, `ActionCall.action`) carry the newtype
+  rather than a `String`.
+- **Single-key raw dispatch.** Section 6.6 records that
+  `deny_unknown_fields` cannot sit on an untagged enum, so the original raw
+  step and binding enums relied on `#[serde(untagged)]` variant matching. That
+  mechanism buffers each variant through a `ContentDeserializer` and discards
+  the nested `serde_saphyr` spans that structured diagnostics need. The current
+  raw enums are therefore mappings with exactly one variant key, dispatched
+  through `schema/raw_single_key.rs`. A missing key, an unknown key, and a
+  second key are each rejected explicitly, and the `Spanned` action name keeps
+  its source coordinates through `maybe.do` nesting.
+- **Deserialization boundary.** The public schema types under
+  `schema/types.rs` no longer implement `Deserialize`; raw mirrors own
+  spelling, aliases, defaults, and unknown-key policy. This realizes the
+  layering contract in section 3.2 rather than leaving serde attributes on the
+  public API. `TheoremName` and `ForallVar` keep their `Deserialize`
+  implementations so identifier validation cannot be bypassed.
+- **Macro query and load boundary.** The query phase is split from token
+  rendering (section 7.2.2). Within the query phase, filesystem loading is a
+  single call at the expansion boundary; `plan_expansion` derives everything
+  from explicit `TheoremDoc` values, so the plan can be built and tested
+  without filesystem access.
+
+The [developers' guide](developers-guide.md) states the same boundaries as
+contributor practice, including the reuse policy for `raw_single_key`.
 
 ### 6.8 Localized diagnostics contract (ADR 002)
 

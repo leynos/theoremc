@@ -131,6 +131,20 @@ let yaml = std::fs::read_to_string(source)?;
 let docs = load_theorem_docs_with_source(&SourceId::new(source), &yaml)?;
 ```
 
+#### Deserialization boundary
+
+The document and step domain types in `theoremc::schema` — `TheoremDoc` and its
+subordinate structures — do not implement `Deserialize`. The two loader
+functions above are the deserialization boundary: they decode YAML into
+crate-private raw shapes, validate action names, and convert into the public
+domain types. Code that holds or passes domain values obtains them from the
+loader rather than deserializing into them directly. Construct an action name
+with `CanonicalActionName::new`, as described under
+[subordinate types](#subordinate-types). `TheoremName`, `ForallVar`, and
+`TheoremValue` are the deliberate exceptions and still implement `Deserialize`:
+the first two so identifier validation cannot be bypassed, and `TheoremValue`
+because its no-null rule is enforced by that implementation.
+
 ### Top-level fields
 
 Every theorem document is a YAML mapping with the following fields. Keys use
@@ -152,6 +166,12 @@ Every theorem document is a YAML mapping with the following fields. Keys use
 | `Actions`  | map (canonical action → signature) | required when `Let`/`Do` reference actions | `{}`                | Maps canonical action names to Rust signatures used by `Let`/`Do` probes. See [Declaring action signatures](#declaring-action-signatures).                          |
 | `Prove`    | list of `Assertion`                | **yes**                                    | —                   | Proof obligations.                                                                                                                                                  |
 | `Evidence` | `Evidence`                         | **yes**                                    | —                   | Backend configuration.                                                                                                                                              |
+
+`Schema` is optional. When it is omitted, `TheoremDoc::schema` is `None` and
+stays unspecified in the Rust model: the loader does not store a default of
+`1`. Omission selects the version 1 compatibility profile when the document is
+interpreted, so `None` and `Some(1)` mean the same thing semantically while
+remaining distinguishable in the parsed document.
 
 ### Accepted schema evolution (pending implementation)
 
@@ -243,9 +263,10 @@ The loader validates the structural constraints of `Let` bindings and `Do`
 steps:
 
 - Every `ActionCall.action` field (in both `Let` bindings and `Do` steps) must
-  be non-empty after trimming. Blank action names are rejected.
-- Every non-blank `ActionCall.action` must follow canonical action-name
-  grammar: `Segment ("." Segment)+` (at least one `.` separator).
+  follow canonical action-name grammar: `Segment ("." Segment)+` (at least one
+  `.` separator). A blank action name fails this check and is reported as
+  `invalid canonical action name '': must contain at least two dot-separated
+  segments`.
 - Each canonical action-name segment must match
   `^[A-Za-z_][A-Za-z0-9_]*$` and must not be a Rust reserved keyword.
 - Every `MaybeBlock.because` field must be non-empty after trimming.
@@ -324,6 +345,11 @@ Do:
 - `action` (required): dot-separated action name (e.g., `account.deposit`).
 - `action` must use canonical grammar (`Segment ("." Segment)+`), where each
   segment is an ASCII identifier and not a Rust reserved keyword.
+- In the Rust model this field is a `CanonicalActionName`, not a `String`, and
+  `TheoremDoc::actions` is keyed by `CanonicalActionName` too. The loader
+  validates once during decoding, so consumers compare or read `as_str()`
+  instead of re-parsing. Construct a value with `CanonicalActionName::new`,
+  which returns `InvalidCanonicalActionName` on malformed input.
 - `args` (required): mapping of parameter name to value.
 - `as` (optional): binding name for the return value.
 
@@ -616,12 +642,15 @@ into the `crate::theorem_actions` module.
 
 ### Mangling a canonical action name
 
-Use `mangle_action_name` to transform a validated canonical action name:
+Use `mangle_action_name` to transform a value that has already been validated
+as a canonical action name:
 
 ```rust
-use theoremc::mangle::mangle_action_name;
+use theoremc::mangle::{CanonicalActionName, mangle_action_name};
 
-let mangled = mangle_action_name("account.deposit");
+let name = CanonicalActionName::new("account.deposit")
+    .expect("valid canonical action name");
+let mangled = mangle_action_name(&name);
 assert_eq!(mangled.slug(), "account__deposit");
 assert_eq!(mangled.hash(), "05158894bfb4");
 assert_eq!(mangled.identifier(), "account__deposit__h05158894bfb4");
@@ -631,8 +660,18 @@ assert_eq!(
 );
 ```
 
-The function assumes its input has already passed canonical action-name
-validation. It does not re-validate.
+`mangle_action_name` takes `&CanonicalActionName`, so the grammar is checked
+once when the value is constructed and is never re-validated during mangling.
+When the input is still an untrusted string, use `try_mangle_action_name`; it
+validates and returns `InvalidCanonicalActionName` on failure:
+
+```rust
+use theoremc::mangle::try_mangle_action_name;
+
+let mangled = try_mangle_action_name("account.deposit")
+    .expect("valid canonical action name");
+assert_eq!(mangled.identifier(), "account__deposit__h05158894bfb4");
+```
 
 ### Mangling algorithm
 
@@ -651,9 +690,12 @@ The algorithm follows `docs/name-mangling-rules.md`:
 
 The individual building blocks are also public for reuse:
 
-- `segment_escape(segment)` — escapes underscores in a single segment.
-- `action_slug(canonical_name)` — produces the escaped slug.
-- `hash12(value)` — computes the 12-character blake3 hash prefix.
+- `action_slug(&CanonicalActionName)` — produces the escaped slug.
+- `try_action_slug(&str)` — validates a string first, then produces the slug.
+- `hash12(&str)` — computes the 12-character blake3 hash prefix.
+
+Per-segment escaping stays private to the module; `action_slug` exposes the
+same behaviour over a whole canonical name.
 
 ### Injectivity guarantee
 
@@ -698,6 +740,18 @@ let docs = load_theorem_docs(yaml)?;
 // re-run after combining documents from multiple files:
 check_action_collisions(&docs)?;
 ```
+
+### Typed action names in collision APIs
+
+The collision APIs expose canonical action names as domain values:
+
+- `referenced_actions(&[TheoremDoc])` returns
+  `Vec<&CanonicalActionName>` in first-seen order.
+- `ActionOccurrence::canonical` is a `&CanonicalActionName`.
+
+Call `as_str()` on either value where a string slice is needed, for example for
+display, for comparison against untrusted text, or as a key in a string-keyed
+map.
 
 ## Per-file module naming
 

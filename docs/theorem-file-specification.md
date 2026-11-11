@@ -116,8 +116,10 @@ A theorem document is a YAML mapping with these fields.
 - Type: integer
 - Optional
 - Omitted: **MUST** select the version 1 compatibility profile permanently.
-  The domain model may preserve omission as `None`; this does not mean the
-  newest supported version.
+  Omission is not a request for the newest supported version, and it does not
+  materialize a default value in the Rust model. `TheoremDoc::schema` stays
+  `None` when the key is absent; selecting version 1 is an interpretation
+  applied when the document is used, not a stored default.
 - `Schema: 1`: **MUST** select version 1 (opaque assertions only).
 - `Schema: 2`: **MUST** select version 2 (opaque assertions and structured
   laws).

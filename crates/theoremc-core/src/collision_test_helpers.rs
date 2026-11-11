@@ -1,6 +1,7 @@
 //! Shared fixtures and builders for collision-detection unit tests.
 
 use super::{LetBinding, Step, TheoremDoc};
+use crate::canonical_action_name::CanonicalActionName;
 use crate::schema::{
     ActionCall, Assertion, Evidence, KaniEvidence, KaniExpectation, LetCall, SchemaError, StepCall,
     TheoremName, WitnessCheck,
@@ -43,10 +44,15 @@ pub(super) fn boilerplate() -> DocBoilerplate {
 /// Builds an `ActionCall` with the given action name and empty args.
 pub(super) fn action_call(name: &str) -> ActionCall {
     ActionCall {
-        action: name.to_owned(),
+        action: canonical_action(name),
         args: IndexMap::new(),
         as_binding: None,
     }
+}
+
+/// Parses a test action name, failing loudly when it is not canonical.
+fn canonical_action(name: &str) -> CanonicalActionName {
+    CanonicalActionName::new(name).expect("test action names must be canonical")
 }
 
 /// Builds a minimal valid `TheoremDoc` with custom bindings and steps.

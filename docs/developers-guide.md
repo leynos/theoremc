@@ -132,14 +132,15 @@ The crate follows the layer boundaries enforced by Architecture Decision Record
 
 **Table:** Module layers and responsibilities
 
-| Layer         | Crate                    | Modules                                                | Responsibility                                                                 |
-| ------------- | ------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| Schema        | `theoremc-core`          | `schema/loader/`, `schema/raw/`, `schema/validate*.rs` | YAML loading, span-aware conversion, duplicate-key diagnostics, and validation |
-| Mangle        | `theoremc-core`          | `mangle*.rs`                                           | Deterministic identifier generation                                            |
-| Cross-cutting | `theoremc-core`          | `collision.rs`                                         | Collision detection across schema and mangle                                   |
-| Proc-macro    | `theoremc-macros`        | `lib.rs`                                               | Proc-macro entry points, theorem-file loading delegation, and code generation  |
-| Lowering      | `theoremc`               | `arg_lowering.rs`                                      | Test-gated prototype for converting semantic values to Rust token trees        |
-| Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs`            | Theorem file discovery, suite generation, and Cargo change tracking            |
+| Layer         | Crate                    | Modules                                                | Responsibility                                                                       |
+| ------------- | ------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Domain        | `theoremc-core`          | `canonical_action_name.rs`                             | Shared canonical action-name grammar and newtype                                     |
+| Schema        | `theoremc-core`          | `schema/loader/`, `schema/raw/`, `schema/validate*.rs` | YAML loading, span-aware conversion, duplicate-key diagnostics, and validation       |
+| Mangle        | `theoremc-core`          | `mangle*.rs`                                           | Deterministic identifier generation                                                  |
+| Cross-cutting | `theoremc-core`          | `collision.rs`                                         | Collision detection across schema and mangle                                         |
+| Proc-macro    | `theoremc-macros`        | `lib.rs`, `query.rs`, `render.rs`, `error.rs`          | Macro entry points, semantic query phase, token rendering, and expansion diagnostics |
+| Lowering      | `theoremc`               | `arg_lowering.rs`                                      | Test-gated prototype for converting semantic values to Rust token trees              |
+| Build         | `theoremc-build-support` | `discovery.rs`, `suite.rs`; root `build.rs`            | Theorem file discovery, suite generation, and Cargo change tracking                  |
 
 The schema loader entry point is `schema/loader/mod.rs`. It coordinates YAML
 deserialization, duplicate-key checking, raw-to-domain conversion, semantic
@@ -152,19 +153,55 @@ files with `#[path = "../loader_tests.rs"]`,
 `#[path = "../loader_duplicate_tests.rs"]`.
 
 The raw span adapter is defined in `schema/raw/mod.rs`, which privately declares
-`schema/raw/decode.rs` and re-exports `RawDocDecodeError` as `pub(crate)`. The
-decode helpers are `pub(super)` and perform raw-to-domain conversion for `Let`
-bindings and `Do` steps. Raw span-location tests stay in the sibling
+`schema/raw/decode.rs` and re-exports `RawDocDecodeError` as `pub(crate)`.
+`decode.rs` holds only that error enum and its location, parameter, and binding
+accessors. The `pub(super)` conversion helpers perform raw-to-domain conversion
+for `Actions`, `Let` bindings, and `Do` steps from `schema/raw/raw_convert.rs`,
+consuming the raw mirror types in `schema/raw_action.rs` and
+`schema/raw_evidence.rs`. Raw span-location tests stay in the sibling
 `schema/raw_location_tests.rs` file.
+
+The raw step and binding enums in `schema/raw_action.rs` are mappings with
+exactly one variant key. They dispatch on that key through
+`schema/raw_single_key.rs` rather than deriving `#[serde(untagged)]`, because
+serde buffers untagged variants through a `ContentDeserializer`, which discards
+every `serde_saphyr` span nested inside the variant. Keeping the dispatch means
+the `Spanned` action names survive into the conversion diagnostics. The
+`raw_single_key` machinery is crate-private and scoped to the raw adapters: a
+new raw shape that is a single-key mapping should reuse it, but nothing outside
+the raw adapters should depend on it.
 
 Rust-type lifetime unit tests live in `schema/rust_type_tests.rs`. Property
 tests remain in `schema/rust_type_property_tests.rs`, which
 `schema/rust_type.rs` registers through its `property_tests` module.
 
-The schema layer must not import from `mangle`, and vice versa. The `collision`
-module exists as a separate top-level module specifically to orchestrate both
-without violating this boundary. The `mangle_validate` module duplicates
-action-name validation rules to preserve independence from the schema layer.
+The schema layer must not import from `mangle`, and vice versa. Shared domain
+concepts that both layers need belong in neutral top-level modules. For
+canonical action names, `canonical_action_name.rs` owns the grammar, typed
+failure reasons, and `CanonicalActionName` newtype. Schema code wraps that
+typed result into schema diagnostics, and mangle code accepts either
+`&CanonicalActionName` or checked `try_*` string APIs. Do not add another
+string parser in either layer.
+
+Public schema domain objects must carry canonical action names as
+`CanonicalActionName`, not `String`. Raw YAML adapters may deserialize action
+names as strings or `serde_saphyr::Spanned<String>` so diagnostics can retain
+source locations, but raw-to-domain conversion is the boundary where those
+strings are validated. Validation, collision detection, and macro query code
+should treat `TheoremDoc.actions` and `ActionCall.action` as already canonical;
+use `CanonicalActionName::as_str()` only when rendering messages, generated
+identifiers, or user-facing text.
+
+Public schema domain types under `schema/types.rs` carry no serde derives.
+Spelling, aliases, defaults, and unknown-key policy belong to the raw adapter in
+`schema/raw/mod.rs`, `schema/raw_action.rs`, and `schema/raw_evidence.rs`,
+which mirrors each domain type and converts into it explicitly. When adding a
+YAML-visible field, extend the raw mirror and the conversion helper rather than
+deriving serde traits on the public type; that keeps the domain API independent
+of the YAML implementation as ADR-003 requires. The identifier newtypes remain
+the one deliberate exception: `TheoremName` and `ForallVar` implement
+`Deserialize` through a shared `impl_identifier_deserialize!` macro so
+validation happens during decoding and cannot be bypassed.
 
 ### Accepted harness-planning boundary (pending implementation)
 
@@ -189,7 +226,35 @@ step; the public API break requires release and migration documentation. See
 [roadmap](roadmap.md#phase-4-working-kani-proof-path-safety-policy-and-semantic-laws)
 for implementation acceptance criteria.
 
-### 2.1 Action probe generation
+### 2.1 Schema validation diagnostics
+
+Semantic validators must return typed validation failures rather than rendered
+diagnostics. `schema::validate` owns the semantic rule check and returns a
+`ValidationFailure` whose optional `ValidationReasonKind` identifies the field
+or collection entry that failed; the human-readable reason is carried alongside
+it. `IndexedValidationField` distinguishes a repeated section's primary value
+field (`assert`, `expr`, or `cover`) from its `because` field. The loader
+renders the public diagnostic from that typed failure at its boundary.
+
+The raw schema adapter owns source-location mapping.
+`RawTheoremDoc::location_for_validation_reason` maps a `ValidationReasonKind`
+to the best available `serde_saphyr` span and falls back to the theorem-name
+span when a semantic rule has no precise field location. Do not locate
+diagnostics by parsing the public reason string; wording is for users and
+snapshots, while reason kinds are the stable machine contract between
+validation and loading.
+
+When adding a validation rule:
+
+1. add or reuse the smallest `ValidationReasonKind` variant that identifies the
+   field or aggregate responsible for the failure,
+2. describe the semantic rule in the failure's reason text,
+3. map the reason kind in
+   `RawTheoremDoc::location_for_validation_reason()`, and
+4. add `rstest` coverage for the mapping plus behavioural or snapshot coverage
+   when the rendered diagnostic is externally observable.
+
+### 2.2 Action probe generation
 
 Compile-time action probes are generated by `theoremc-macros` from validated
 `Actions` declarations in `TheoremDoc`. The macro must not infer signatures from
@@ -198,7 +263,9 @@ detect it. The implementation uses
 `theoremc_core::collision::referenced_actions` to walk action references in the
 same order as collision detection, then uses
 `theoremc_core::mangle::mangle_action_name` to resolve each canonical action to
-its Rust export.
+its Rust export. This path receives validated `CanonicalActionName` values from
+the schema domain model; string inputs must use checked `try_*` APIs before
+reaching identifier-sensitive code.
 
 Keep these conventions when extending probe generation:
 
@@ -221,9 +288,9 @@ then `Actions.returns`, with canonical-token-stream deduplication.
 owns Rust type parsing and comparison so schema validation, action signature
 equivalence, and macro probe generation do not drift apart.
 `parse_with_free_named_lifetime` parses once and performs the schema-validation
-lifetime analysis for free named lifetime parameters. The macro renderer still
-uses `syn::parse_str` directly for probe emission rather than routing through
-the shared parser.
+lifetime analysis for free named lifetime parameters. The macro query phase in
+`query.rs` still uses `syn::parse_str` directly for probe emission rather than
+routing through the shared parser; `render.rs` performs no parsing of its own.
 
 Macro tests should keep the layers distinct:
 
@@ -233,7 +300,7 @@ Macro tests should keep the layers distinct:
 - fixture-crate BDD tests in `tests/theorem_file_macro_bdd.rs` assert the
   theorem-author workflow using stable rustc fragments.
 
-### 2.2 Build system API
+### 2.3 Build system API
 
 The support crate exposes this API across a Cargo crate boundary to the root
 build script and fixture crates:
@@ -427,6 +494,23 @@ suite.
   `tests/features/`.
 - Add `insta` snapshot tests when requirements depend on output-format
   consistency across multiple variants.
+- Use `googletest` assertions when matcher-style checks make intent clearer,
+  especially for collection length, substring, and predicate assertions.
+- Use `pretty_assertions` for equality checks where a diff is more useful than
+  a boolean failure, such as full documents, generated output, and ordered
+  vectors.
+- Use `proptest` for invariants over a generated input space, such as path,
+  name, or mangling rules. Keep generated cases focused on the invariant and
+  retain example-based tests for named edge cases.
+- Keep shared property strategies under a `#[cfg(test)]` test-support module
+  owned by the domain module whose invariants they generate. Only unit tests
+  within that crate may reuse them; they are not production helpers or an
+  integration-test API.
+- Keep integration fixture helpers in `tests/common/mod.rs`. The common module
+  owns fixture loading, fixture source identifiers, successful fixture loading
+  assertions, and error-fragment assertions. BDD step functions should return
+  `Result` and delegate those reusable concerns to `tests/common` instead of
+  panicking locally.
 - Test files use `#[cfg(test)] #[path = "..._tests.rs"] mod tests;` to
   keep implementation files under 400 lines.
 - Cargo build-script rerun tests must use explicit fixture mtime helpers such

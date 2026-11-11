@@ -5,7 +5,6 @@
 //! are deserialized using `serde-saphyr` with strict unknown-key rejection
 //! and support for both TitleCase and lowercase key aliases.
 
-mod action_name;
 pub mod arg_value;
 mod diagnostic;
 mod error;
@@ -17,6 +16,8 @@ mod loader_message;
 mod newtypes;
 mod raw;
 mod raw_action;
+mod raw_evidence;
+mod raw_single_key;
 pub(crate) mod rust_type;
 mod source_id;
 mod step;

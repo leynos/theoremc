@@ -6,6 +6,18 @@ pub struct SourceId(String);
 
 impl SourceId {
     /// Creates a new source identifier from string-like input.
+    ///
+    /// Construction is infallible: a source identifier is a diagnostic label,
+    /// not a validated domain value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use theoremc_core::schema::SourceId;
+    ///
+    /// let source = SourceId::new("tests/fixtures/valid_full.theorem");
+    /// assert_eq!(source.as_str(), "tests/fixtures/valid_full.theorem");
+    /// ```
     #[must_use]
     pub fn new(source: impl Into<String>) -> Self {
         Self(source.into())
