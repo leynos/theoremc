@@ -132,6 +132,32 @@ mod tests {
     }
 
     #[test]
+    fn a_path_below_a_file_is_an_inspection_error() {
+        let (_temp, _root, dir) = scratch();
+        dir.write("blocker", "not a directory")
+            .expect("write a file where a directory would be");
+
+        let error = path_is_present(&dir, camino::Utf8Path::new("blocker/child"))
+            .expect_err("a path below a file must not read as absent");
+
+        assert!(error.contains("cannot inspect"), "{error}");
+    }
+
+    #[test]
+    fn a_package_entry_that_is_a_file_is_an_inspection_error() {
+        let (_temp, root, dir) = scratch();
+        dir.create_dir_all("debug/build")
+            .expect("create the build directory");
+        dir.write("debug/build/fx_ab-111", "not a directory")
+            .expect("write a file where a build directory would be");
+
+        let error = find_suite_in_build_root(&root.join("debug/build"), "fx_ab")
+            .expect_err("a package entry that is a file must not read as absent");
+
+        assert!(error.contains("fx_ab-111"), "{error}");
+    }
+
+    #[test]
     fn a_built_fixture_yields_its_suite() {
         let (_temp, root, dir) = scratch();
         dir.create_dir_all("debug/build/fx_ab-111/out")

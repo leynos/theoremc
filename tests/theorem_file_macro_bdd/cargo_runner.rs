@@ -117,6 +117,27 @@ pub(crate) fn kani_is_installed() -> bool {
         .is_ok_and(|o| o.status.success())
 }
 
+/// Runs the Kani harness listing only when the availability probe succeeded.
+///
+/// The probe and the listing have different meanings. A missing `cargo-kani`
+/// is a reason to skip the check, but a toolchain that is installed and still
+/// cannot list harnesses is a failure the caller must report. Taking the probe
+/// result as an argument keeps that policy testable without running Kani.
+///
+/// # Errors
+///
+/// Returns the listing error unchanged when the probe succeeded.
+pub(crate) fn list_when_installed<F>(is_installed: bool, list: F) -> Result<Option<String>, String>
+where
+    F: FnOnce() -> Result<String, String>,
+{
+    if is_installed {
+        list().map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
 fn command_result(
     subcommand: CargoSubcommand,
     output: &std::process::Output,
@@ -144,7 +165,23 @@ mod tests {
 
     use std::sync::Mutex;
 
-    use super::recover_mutex_guard;
+    use super::{list_when_installed, recover_mutex_guard};
+
+    #[test]
+    fn a_missing_kani_toolchain_skips_the_listing() {
+        let result = list_when_installed(false, || {
+            panic!("the listing must not run when the probe fails")
+        });
+
+        assert_eq!(result, Ok(None));
+    }
+
+    #[test]
+    fn a_listing_failure_after_a_successful_probe_is_an_error() {
+        let result = list_when_installed(true, || Err("kani list failed".to_owned()));
+
+        assert_eq!(result, Err("kani list failed".to_owned()));
+    }
 
     #[test]
     fn recover_mutex_guard_recovers_from_poisoned_local_mutex() {

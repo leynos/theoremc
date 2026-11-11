@@ -138,15 +138,17 @@ fn then_the_fixture_crate_builds_without_a_kani_dependency() -> Result<(), Strin
     reason = "BDD skip diagnostics should remain non-fallible"
 )]
 fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
-    if !cargo_runner::kani_is_installed() {
+    let Some(output) =
+        cargo_runner::list_when_installed(cargo_runner::kani_is_installed(), || {
+            build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
+                path: "theorems/single.theorem",
+                content: VALID_SINGLE_THEOREM,
+            })
+        })?
+    else {
         eprintln!("cargo-kani not installed; skipping Kani harness listing check");
         return Ok(());
-    }
-
-    let output = build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
-        path: "theorems/single.theorem",
-        content: VALID_SINGLE_THEOREM,
-    })?;
+    };
     let expected_mangled_harness = mangle_theorem_harness("theorems/single.theorem", "SmokeMacro");
     let expected_harness_identifier = expected_mangled_harness.identifier();
 

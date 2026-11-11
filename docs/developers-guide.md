@@ -459,13 +459,22 @@ suite.
   here and in its helper.
 - Fixtures that must compile the generated suite pass `SUITE_FIXTURE_LIB_RS`
   (re-exported by `test-helpers`) as their library source. It includes
-  `OUT_DIR/theorem_suite.rs`, so the suite's macro invocations are type-checked
-  rather than only read back as text. A fixture that only reads the generated
-  file keeps a minimal library instead.
+  `OUT_DIR/theorem_suite.rs`, which compiles the suite and resolves every
+  theorem path it names, so a suite pointing at a missing theorem fails the
+  fixture build. Its `theorem_file!` stub expands to `include_str!`, so the
+  real procedural macro never runs and theorem documents are not validated. A
+  fixture that only reads the generated file keeps a minimal library.
+- `FixtureCrate::path_exists` and `FixtureCrate::find_generated_suite` report
+  absence as `Ok(false)` or `Ok(None)` and return an error for every other
+  inspection failure, including `NotADirectory`. Use them instead of testing
+  `is_err()`: an unreadable fixture must not pass as an unbuilt one. The suite
+  lookup also fails when a matching `build/` entry is a file rather than a
+  directory, because that is a malformed build layout, not an absent suite.
 - The Kani harness-listing test probes `cargo kani --version` and skips when
   Kani is not installed. Once that probe succeeds, a listing failure is an
   error: an installed but unusable Kani toolchain must fail the test rather
-  than silently skip it.
+  than silently skip it. `cargo_runner::list_when_installed` holds that policy
+  and is unit tested with an injected probe result.
 - Tests that start a child `cargo` or `rustc` (the fixture suites, the macros
   crate's trybuild suite and the `rustc` compile-fail unit test) run in the
   `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,
