@@ -425,6 +425,8 @@ suite.
 - Replace duplicated tests with `#[rstest(...)]` parameterized cases.
 - Behavioural tests use `rstest-bdd` v0.5.0 with `.feature` files under
   `tests/features/`.
+- Add `insta` snapshot tests when requirements depend on output-format
+  consistency across multiple variants.
 - Test files use `#[cfg(test)] #[path = "..._tests.rs"] mod tests;` to
   keep implementation files under 400 lines.
 - Cargo build-script rerun tests must use explicit fixture mtime helpers such
