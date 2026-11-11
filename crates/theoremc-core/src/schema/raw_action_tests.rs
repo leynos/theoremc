@@ -81,31 +81,79 @@ fn raw_step_rejects_malformed_mappings(#[case] yaml: &str, #[case] expected: &st
     assert_that!(error.to_string(), contains_substring(expected));
 }
 
-#[rstest]
-#[case::let_call("call:\n  action: account.deposit\n  args: {}\n")]
-#[case::let_must("must:\n  action: account.deposit\n  args: {}\n")]
-fn raw_let_binding_accepts_a_single_supported_key(#[case] yaml: &str) {
-    let binding = serde_saphyr::from_str::<RawLetBinding>(yaml)
-        .expect("a single supported key should decode");
+/// The variant a single-key binding or step decoded to.
+///
+/// Keeping the variant explicit lets the accept tests reject an absent entry
+/// and, for steps, `RawStep::Maybe`, rather than accepting anything that is
+/// merely not the other supported key.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SingleKey {
+    Call,
+    Must,
+}
 
-    let action = match binding {
-        RawLetBinding::Call(call) => call.call.action.value,
-        RawLetBinding::Must(must) => must.must.action.value,
-    };
-    assert_that!(action.as_str(), eq("account.deposit"));
+impl From<&RawLetBinding> for SingleKey {
+    fn from(binding: &RawLetBinding) -> Self {
+        match binding {
+            RawLetBinding::Call(_) => Self::Call,
+            RawLetBinding::Must(_) => Self::Must,
+        }
+    }
+}
+
+/// The supported variant a raw step decoded to, or `None` for `maybe`.
+fn step_key(step: &RawStep) -> Option<SingleKey> {
+    match step {
+        RawStep::Call(_) => Some(SingleKey::Call),
+        RawStep::Must(_) => Some(SingleKey::Must),
+        RawStep::Maybe(_) => None,
+    }
+}
+
+/// The action name carried by a `call` or `must` step.
+fn step_action(step: &RawStep) -> Option<&Spanned<String>> {
+    match step {
+        RawStep::Call(call) => Some(&call.call.action),
+        RawStep::Must(must) => Some(&must.must.action),
+        RawStep::Maybe(_) => None,
+    }
 }
 
 #[rstest]
-#[case::step_call("call:\n  action: account.deposit\n  args: {}\n")]
-#[case::step_must("must:\n  action: account.deposit\n  args: {}\n")]
-fn raw_step_accepts_a_single_supported_key(#[case] yaml: &str) {
+#[case::let_call("call:\n  action: account.deposit\n  args: {}\n", SingleKey::Call)]
+#[case::let_must("must:\n  action: account.deposit\n  args: {}\n", SingleKey::Must)]
+fn raw_let_binding_accepts_a_single_supported_key(#[case] yaml: &str, #[case] expected: SingleKey) {
+    let binding = serde_saphyr::from_str::<RawLetBinding>(yaml)
+        .expect("a single supported key should decode");
+
+    assert_eq!(
+        SingleKey::from(&binding),
+        expected,
+        "the decoded variant should follow the mapping key"
+    );
+
+    let action = match &binding {
+        RawLetBinding::Call(call) => &call.call.action,
+        RawLetBinding::Must(must) => &must.must.action,
+    };
+    assert_that!(action.value.as_str(), eq("account.deposit"));
+}
+
+#[rstest]
+#[case::step_call("call:\n  action: account.deposit\n  args: {}\n", SingleKey::Call)]
+#[case::step_must("must:\n  action: account.deposit\n  args: {}\n", SingleKey::Must)]
+fn raw_step_accepts_a_single_supported_key(#[case] yaml: &str, #[case] expected: SingleKey) {
     let step =
         serde_saphyr::from_str::<RawStep>(yaml).expect("a single supported key should decode");
 
-    assert!(
-        matches!(step, RawStep::Call(_) | RawStep::Must(_)),
-        "expected a single call or must step",
+    assert_eq!(
+        step_key(&step),
+        Some(expected),
+        "the decoded variant should follow the mapping key"
     );
+
+    let action = step_action(&step).expect("call and must steps carry an action");
+    assert_that!(action.value.as_str(), eq("account.deposit"));
 }
 
 #[test]

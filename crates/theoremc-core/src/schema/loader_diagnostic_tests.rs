@@ -106,6 +106,136 @@ Witness:
     assert_eq!(diagnostic.location.line, 15);
 }
 
+/// An invalid argument must point at the argument key in its own section.
+///
+/// These failures carry no typed span, so the diagnostic comes from the
+/// line-oriented `Let`/`Do` scan. The lowercase cases guard the alias-aware
+/// section matching: a case-sensitive matcher would leave them without a
+/// located diagnostic.
+#[rstest]
+#[case::titlecase_let(
+    concat!(
+        "Theorem: InvalidArg\n",
+        "About: Invalid argument\n",
+        "Let:\n",
+        "  x:\n",
+        "    call:\n",
+        "      action: account.deposit\n",
+        "      args:\n",
+        "        target:\n",
+        "          ref: 'not valid'\n",
+        "Prove:\n",
+        "  - assert: 'true'\n",
+        "    because: trivial\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "Witness:\n",
+        "  - cover: 'true'\n",
+        "    because: reachable\n",
+    ),
+    8,
+    9
+)]
+#[case::lowercase_let(
+    concat!(
+        "Theorem: InvalidArg\n",
+        "About: Invalid argument\n",
+        "let:\n",
+        "  x:\n",
+        "    call:\n",
+        "      action: account.deposit\n",
+        "      args:\n",
+        "        target:\n",
+        "          ref: 'not valid'\n",
+        "Prove:\n",
+        "  - assert: 'true'\n",
+        "    because: trivial\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "Witness:\n",
+        "  - cover: 'true'\n",
+        "    because: reachable\n",
+    ),
+    8,
+    9
+)]
+#[case::titlecase_do(
+    concat!(
+        "Theorem: InvalidArg\n",
+        "About: Invalid argument\n",
+        "Do:\n",
+        "  - call:\n",
+        "      action: account.deposit\n",
+        "      args:\n",
+        "        target:\n",
+        "          ref: 'not valid'\n",
+        "Prove:\n",
+        "  - assert: 'true'\n",
+        "    because: trivial\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "Witness:\n",
+        "  - cover: 'true'\n",
+        "    because: reachable\n",
+    ),
+    7,
+    9
+)]
+#[case::lowercase_do(
+    concat!(
+        "Theorem: InvalidArg\n",
+        "About: Invalid argument\n",
+        "do:\n",
+        "  - call:\n",
+        "      action: account.deposit\n",
+        "      args:\n",
+        "        target:\n",
+        "          ref: 'not valid'\n",
+        "Prove:\n",
+        "  - assert: 'true'\n",
+        "    because: trivial\n",
+        "Evidence:\n",
+        "  kani:\n",
+        "    unwind: 1\n",
+        "    expect: SUCCESS\n",
+        "Witness:\n",
+        "  - cover: 'true'\n",
+        "    because: reachable\n",
+    ),
+    7,
+    9
+)]
+fn invalid_arguments_locate_the_argument_key(
+    #[case] yaml: &str,
+    #[case] expected_line: usize,
+    #[case] expected_column: usize,
+) {
+    let error = load_theorem_docs_with_source(&SourceId::new("bad_argument.theorem"), yaml)
+        .expect_err("invalid argument should fail decoding");
+
+    let diagnostic = error.diagnostic().expect("diagnostic expected");
+
+    assert_eq!(
+        diagnostic.code,
+        super::SchemaDiagnosticCode::ValidationFailure
+    );
+    assert_eq!(diagnostic.location.source, "bad_argument.theorem");
+    assert_eq!(
+        diagnostic.location.line, expected_line,
+        "diagnostic should point at the argument key: {diagnostic:?}"
+    );
+    assert_eq!(
+        diagnostic.location.column, expected_column,
+        "diagnostic should point at the argument key: {diagnostic:?}"
+    );
+}
+
 /// An invalid action name must point at the rejected value itself.
 ///
 /// The typed `Spanned` location decides this, so the case set covers the
