@@ -68,6 +68,10 @@ struct LetBindingDecoder;
 impl<'de> SingleKeyDecoder<'de> for LetBindingDecoder {
     type Output = RawLetBinding;
 
+    /// Decodes the `call` or `must` variant named by `key`.
+    ///
+    /// An unrecognized key returns `Ok(None)` so the shared visitor can
+    /// report the accepted variant names.
     fn decode<A>(self, key: &str, map: &mut A) -> Result<Option<Self::Output>, A::Error>
     where
         A: MapAccess<'de>,
@@ -128,6 +132,10 @@ struct StepDecoder;
 impl<'de> SingleKeyDecoder<'de> for StepDecoder {
     type Output = RawStep;
 
+    /// Decodes the `call`, `must`, or `maybe` variant named by `key`.
+    ///
+    /// An unrecognized key returns `Ok(None)` so the shared visitor can
+    /// report the accepted variant names.
     fn decode<A>(self, key: &str, map: &mut A) -> Result<Option<Self::Output>, A::Error>
     where
         A: MapAccess<'de>,

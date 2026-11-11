@@ -99,6 +99,10 @@ pub(super) fn plan_expansion(
     })
 }
 
+/// Parses every referenced Rust type into a probe type.
+///
+/// Each type is parsed once, in first-seen order, so a malformed declaration
+/// fails before any tokens are rendered.
 fn generated_referenced_type_probes(
     theorem_docs: &[TheoremDoc],
 ) -> Result<Vec<syn::Type>, MacroExpansionError> {
@@ -108,6 +112,7 @@ fn generated_referenced_type_probes(
         .collect()
 }
 
+/// Parses one referenced type, naming the offending spelling on failure.
 fn parse_referenced_type(ty: &str) -> Result<syn::Type, MacroExpansionError> {
     syn::parse_str(ty).map_err(|source| MacroExpansionError::InvalidReferencedType {
         ty: ty.to_owned(),
@@ -115,6 +120,10 @@ fn parse_referenced_type(ty: &str) -> Result<syn::Type, MacroExpansionError> {
     })
 }
 
+/// Builds one harness per theorem, in document order.
+///
+/// Every theorem must declare Kani evidence, because the harness needs an
+/// unwind bound; a missing declaration fails with `MissingKaniEvidence`.
 pub(super) fn generated_harnesses(
     theorem_path: &str,
     theorem_docs: &[TheoremDoc],
@@ -137,6 +146,10 @@ pub(super) fn generated_harnesses(
         .collect()
 }
 
+/// Builds one action probe per distinct referenced canonical action.
+///
+/// The signature index is constructed once so each probe reuses the
+/// declaration selected for its action.
 fn generated_action_probes(
     theorem_docs: &[TheoremDoc],
 ) -> Result<Vec<GeneratedActionProbe>, MacroExpansionError> {
@@ -152,6 +165,10 @@ fn generated_action_probes(
         .collect()
 }
 
+/// Builds the probe for one action from its declared signature.
+///
+/// Parameter types keep their declared order, and the return type is parsed
+/// after them so a failure names the action and the offending spelling.
 fn action_probe(
     canonical: &CanonicalActionName,
     signature: &ActionSignature,
@@ -170,6 +187,7 @@ fn action_probe(
     })
 }
 
+/// Parses one declared action type, naming the action on failure.
 fn parse_action_type(
     canonical: &CanonicalActionName,
     ty: &str,
@@ -180,6 +198,7 @@ fn parse_action_type(
     })
 }
 
+/// Wraps a generated name as an identifier at the call site.
 fn identifier(name: &str) -> Ident {
     Ident::new(name, Span::call_site())
 }

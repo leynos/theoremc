@@ -50,6 +50,7 @@ pub(super) fn action_call(name: &str) -> ActionCall {
     }
 }
 
+/// Parses a test action name, failing loudly when it is not canonical.
 fn canonical_action(name: &str) -> CanonicalActionName {
     CanonicalActionName::new(name).expect("test action names must be canonical")
 }

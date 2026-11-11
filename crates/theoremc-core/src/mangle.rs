@@ -80,6 +80,7 @@ mod prop_tests {
     use crate::canonical_action_name::test_support::valid_canonical_action_name_strategy;
     use proptest::prelude::{prop_assert, prop_assert_eq, prop_assert_ne, prop_assume, proptest};
 
+    /// True when the generated name is a plain ASCII Rust identifier.
     fn is_identifier_safe(identifier: &str) -> bool {
         let mut chars = identifier.chars();
         let Some(first) = chars.next() else {

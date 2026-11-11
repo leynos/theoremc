@@ -21,6 +21,7 @@ use super::identifier::validate_identifier;
 macro_rules! impl_identifier_deserialize {
     ($newtype:ty) => {
         impl<'de> Deserialize<'de> for $newtype {
+            /// Reads a YAML string and validates it as an identifier.
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
                 D: de::Deserializer<'de>,

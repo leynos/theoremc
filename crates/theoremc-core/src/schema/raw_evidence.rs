@@ -77,6 +77,10 @@ impl RawEvidence {
 }
 
 impl RawKaniEvidence {
+    /// Converts this raw Kani declaration into its domain counterpart.
+    ///
+    /// Omitted optional fields keep their documented defaults, so an absent
+    /// `allow_vacuous` becomes `false` and an absent reason stays `None`.
     fn to_kani_evidence(&self) -> KaniEvidence {
         KaniEvidence {
             unwind: self.unwind.value,
@@ -94,6 +98,7 @@ impl RawKaniEvidence {
 }
 
 impl RawKaniExpectation {
+    /// Converts the raw expectation spelling into its domain variant.
     const fn to_expectation(self) -> KaniExpectation {
         match self {
             Self::Success => KaniExpectation::Success,
@@ -114,6 +119,7 @@ impl RawActionSignature {
     }
 }
 
+/// Supplies the default return type for a declaration that omits one.
 fn unit_return_type() -> String {
     "()".to_owned()
 }

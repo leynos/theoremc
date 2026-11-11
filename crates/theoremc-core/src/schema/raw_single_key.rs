@@ -60,6 +60,7 @@ where
 macro_rules! single_key_deserialize {
     ($ty:ty, $expectation:literal, [$($variant:literal),+ $(,)?], $decoder:expr) => {
         impl<'de> Deserialize<'de> for $ty {
+            /// Dispatches on the single mapping key that names the variant.
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
             where
                 D: Deserializer<'de>,
@@ -93,10 +94,12 @@ where
 {
     type Value = D::Output;
 
+    /// Reports the accepted mapping shape when the value is not a mapping.
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.expectation)
     }
 
+    /// Reads the single supported key and hands its value to the decoder.
     fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
     where
         A: MapAccess<'de>,
