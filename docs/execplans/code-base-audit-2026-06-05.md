@@ -991,9 +991,11 @@ the file at 10.00. `441262c` narrowed the `schema/step.rs` header to the
 constraints it actually enforces and scoped the user-facing deserialization
 boundary to the document and step types, listing `TheoremValue` beside
 `TheoremName` and `ForallVar` as the deliberate `Deserialize` exceptions. Every
-deterministic gate passes on that candidate, and hosted `CI / build-test`
-passed on attempt 6 after earlier attempts met GitHub release-download 504
-responses.
+deterministic gate except the local `make test` run passes on that candidate:
+the local run ended at nextest's 30-minute timeout, as recorded above, and the
+explicit exception for that gate is requested separately. Hosted
+`CI / build-test` passed on attempt 6 after earlier attempts met GitHub
+release-download 504 responses.
 
 CodeRabbit's next assessment found one remaining test gap: the valid `must`
 controls asserted only that the decoded value was not a `call`, so they also
