@@ -164,15 +164,17 @@ fn then_the_fixture_crate_builds_without_a_kani_dependency() -> Result<(), Strin
 
 #[then("cargo-kani lists the generated proof harness when installed")]
 fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
-    if !cargo_runner::kani_is_installed() {
-        return skip_without_kani("cargo-kani not installed", "listing");
-    }
-
-    let output = match build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
-        path: "theorems/single.theorem",
-        content: VALID_SINGLE_THEOREM,
-    }) {
-        Ok(output) => output,
+    // A failed availability probe skips the check; a probe that succeeded and
+    // then could not list harnesses is a failure the caller must report.
+    let listing = cargo_runner::list_when_installed(cargo_runner::kani_is_installed(), || {
+        build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
+            path: "theorems/single.theorem",
+            content: VALID_SINGLE_THEOREM,
+        })
+    });
+    let output = match listing {
+        Ok(Some(output)) => output,
+        Ok(None) => return skip_without_kani("cargo-kani not installed", "listing"),
         Err(error) if is_unusable_kani_environment(&error) => {
             return skip_without_kani(
                 &format!("cargo-kani is installed but unusable: {error}"),

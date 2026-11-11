@@ -11,7 +11,8 @@ use cap_std::fs_utf8::Dir;
 ///
 /// # Errors
 ///
-/// Returns an error when the `build` directory cannot be listed.
+/// Returns an error when the `build` directory cannot be listed, and when an
+/// entry named after the package is a file rather than a directory.
 pub fn package_directories(build_dir: &Dir, package_name: &str) -> Result<Vec<String>, String> {
     let prefix = format!("{package_name}-");
     let mut names = Vec::new();
@@ -33,8 +34,10 @@ pub fn package_directories(build_dir: &Dir, package_name: &str) -> Result<Vec<St
 fn hash_directories(build_dir: &Dir, package_dir: &str) -> Result<Vec<String>, String> {
     let children = match build_dir.read_dir(package_dir) {
         Ok(children) => children,
-        // A package directory that is really a file has no per-hash children.
-        Err(error) if is_missing_path(&error) => return Ok(Vec::new()),
+        // A missing package directory is simply absent. A package entry that
+        // is a file is a malformed build layout, not an unbuilt fixture, so it
+        // must not read as "no children".
+        Err(error) if is_not_found(&error) => return Ok(Vec::new()),
         Err(error) => return Err(format!("read {package_dir}: {error}")),
     };
     children
@@ -51,21 +54,24 @@ fn hash_directories(build_dir: &Dir, package_dir: &str) -> Result<Vec<String>, S
 ///
 /// # Errors
 ///
-/// Returns an error when the suite exists but cannot be read.
+/// Returns an error when the suite exists but cannot be read, and when a path
+/// component that should be a directory is a file.
 pub fn read_suite(build_dir: &Dir, name: &str) -> Result<Option<String>, String> {
-    match build_dir.read_to_string(format!("{name}/out/theorem_suite.rs")) {
+    let suite_path = format!("{name}/out/theorem_suite.rs");
+    match build_dir.read_to_string(&suite_path) {
         Ok(contents) => Ok(Some(contents)),
-        Err(error) if is_missing_path(&error) => Ok(None),
-        Err(error) => Err(error.to_string()),
+        Err(error) if is_not_found(&error) => Ok(None),
+        Err(error) => Err(format!("read {suite_path}: {error}")),
     }
 }
 
-/// Whether a read failed because the path (or a parent) does not exist.
-fn is_missing_path(error: &std::io::Error) -> bool {
-    matches!(
-        error.kind(),
-        std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
-    )
+/// Whether a read failed because the path does not exist.
+///
+/// `NotADirectory` is deliberately excluded. A build entry that is a file
+/// where a directory is expected is a malformed layout, and reporting it as
+/// absence would let a broken fixture pass as an unbuilt one.
+fn is_not_found(error: &std::io::Error) -> bool {
+    error.kind() == std::io::ErrorKind::NotFound
 }
 
 #[cfg(test)]
@@ -114,10 +120,10 @@ mod tests {
         assert_suite_found("pkg/0123abcd");
     }
 
-    /// A package directory that is a file has no per-hash children, and a
-    /// missing one is simply absent.
+    /// A package entry that is a file is a malformed layout, not an absent
+    /// package, so listing its children must fail rather than report none.
     #[test]
-    fn a_package_directory_that_is_a_file_lists_no_children() {
+    fn a_package_directory_that_is_a_file_is_an_error() {
         let scratch = tempfile::tempdir().expect("create a scratch directory");
         let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
             .expect("the scratch directory path should be UTF-8");
@@ -127,10 +133,29 @@ mod tests {
             .write("pkg", "not a directory")
             .expect("write a file");
 
-        assert_eq!(
-            package_directories(&build_dir, "pkg").expect("list the package directories"),
-            Vec::<String>::new()
-        );
+        let error = package_directories(&build_dir, "pkg")
+            .expect_err("a package entry that is a file must not read as absent");
+
+        assert!(error.contains("read pkg"), "{error}");
+    }
+
+    /// A build directory that is a file cannot hold a suite, and that is an
+    /// inspection failure rather than an unbuilt fixture.
+    #[test]
+    fn a_build_directory_that_is_a_file_is_an_error() {
+        let scratch = tempfile::tempdir().expect("create a scratch directory");
+        let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
+            .expect("the scratch directory path should be UTF-8");
+        let build_dir =
+            Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
+        build_dir
+            .write("pkg-0123abcd", "not a directory")
+            .expect("write a file");
+
+        let error = read_suite(&build_dir, "pkg-0123abcd")
+            .expect_err("a build directory that is a file must not read as absent");
+
+        assert!(error.contains("pkg-0123abcd"), "{error}");
     }
 
     /// A package with no output reads as having no suite.

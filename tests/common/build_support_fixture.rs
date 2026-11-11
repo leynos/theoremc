@@ -5,14 +5,19 @@
 //! build dependency ([`build_support_fixture_manifest`]), and, for fixtures
 //! that must compile the suite its build script generates, the library source
 //! that includes `OUT_DIR/theorem_suite.rs` ([`SUITE_FIXTURE_LIB_RS`]).
-//! Including the generated file is what type-checks its macro invocations;
-//! a fixture that only reads the suite back may pass a minimal library
-//! instead.
+//! Including the generated file compiles it as Rust and resolves every theorem
+//! path it names, so a suite that points at a missing theorem fails the
+//! fixture build. The stub macro it expands against is not the real procedural
+//! macro, so this does not validate theorem documents; a fixture that only
+//! reads the suite back may pass a minimal library instead.
 
 /// Fixture library source that compiles the generated theorem suite.
 ///
 /// A build-script-enabled fixture must include `OUT_DIR/theorem_suite.rs` for
-/// the generated macro invocations to be type-checked. Fixtures that only read
+/// the generated suite to be compiled and for each theorem path it names to be
+/// resolved. The `theorem_file!` stub expands to `include_str!`, so the suite
+/// is checked as Rust and its paths must exist, but the real procedural macro
+/// never runs and theorem documents are not validated. Fixtures that only read
 /// the generated file back may use a minimal library instead.
 pub const SUITE_FIXTURE_LIB_RS: &str = concat!(
     "//! Fixture crate for build suite behavioural tests.\n",
