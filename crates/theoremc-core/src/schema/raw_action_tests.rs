@@ -26,31 +26,53 @@ fn action_with_arg(arg_name: &str, value: TheoremValue) -> RawActionCall {
 
 // ── Single-key dispatch ─────────────────────────────────────────────
 
+/// The serde message a malformed single-key mapping must report.
+#[derive(Debug, Clone, Copy)]
+enum MappingError {
+    /// More than one key is present.
+    MultipleKeys,
+    /// The key is not one of the supported variants.
+    UnknownVariant(&'static str),
+    /// The mapping holds no key at all.
+    EmptyMapping,
+}
+
+impl MappingError {
+    /// The wording serde must produce for this rejection.
+    fn message(self) -> String {
+        match self {
+            Self::MultipleKeys => "mapping must contain exactly one".to_owned(),
+            Self::UnknownVariant(key) => format!("unknown variant `{key}`"),
+            Self::EmptyMapping => "expected a mapping with exactly one key".to_owned(),
+        }
+    }
+}
+
 #[rstest]
 #[case::two_supported_keys(
     concat!(
         "call:\n  action: account.deposit\n  args: {}\n",
         "must:\n  action: account.deposit\n  args: {}\n",
     ),
-    "mapping must contain exactly one"
+    MappingError::MultipleKeys
 )]
 #[case::extra_key_after_call(
     concat!(
         "call:\n  action: account.deposit\n  args: {}\n",
         "spurious: true\n",
     ),
-    "mapping must contain exactly one"
+    MappingError::MultipleKeys
 )]
 #[case::unknown_key(
     "invoke:\n  action: account.deposit\n  args: {}\n",
-    "unknown variant `invoke`"
+    MappingError::UnknownVariant("invoke")
 )]
-#[case::empty_mapping("{}", "expected a mapping with exactly one key")]
-fn raw_let_binding_rejects_malformed_mappings(#[case] yaml: &str, #[case] expected: &str) {
+#[case::empty_mapping("{}", MappingError::EmptyMapping)]
+fn raw_let_binding_rejects_malformed_mappings(#[case] yaml: &str, #[case] expected: MappingError) {
     let error = serde_saphyr::from_str::<RawLetBinding>(yaml)
         .expect_err("malformed binding mapping should be rejected");
 
-    assert_that!(error.to_string(), contains_substring(expected));
+    assert_that!(error.to_string(), contains_substring(expected.message()));
 }
 
 #[rstest]
@@ -60,25 +82,25 @@ fn raw_let_binding_rejects_malformed_mappings(#[case] yaml: &str, #[case] expect
         "maybe:\n  because: nested\n  do:\n",
         "    - call:\n        action: account.deposit\n        args: {}\n",
     ),
-    "mapping must contain exactly one"
+    MappingError::MultipleKeys
 )]
 #[case::extra_key_after_must(
     concat!(
         "must:\n  action: account.deposit\n  args: {}\n",
         "spurious: true\n",
     ),
-    "mapping must contain exactly one"
+    MappingError::MultipleKeys
 )]
 #[case::unknown_key(
     "perform:\n  action: account.deposit\n  args: {}\n",
-    "unknown variant `perform`"
+    MappingError::UnknownVariant("perform")
 )]
-#[case::empty_mapping("{}", "expected a mapping with exactly one key")]
-fn raw_step_rejects_malformed_mappings(#[case] yaml: &str, #[case] expected: &str) {
+#[case::empty_mapping("{}", MappingError::EmptyMapping)]
+fn raw_step_rejects_malformed_mappings(#[case] yaml: &str, #[case] expected: MappingError) {
     let error = serde_saphyr::from_str::<RawStep>(yaml)
         .expect_err("malformed step mapping should be rejected");
 
-    assert_that!(error.to_string(), contains_substring(expected));
+    assert_that!(error.to_string(), contains_substring(expected.message()));
 }
 
 /// The variant a single-key binding or step decoded to.

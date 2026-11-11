@@ -39,37 +39,36 @@ fn parse_one_raw_doc(yaml: &str) -> RawTheoremDoc {
         .expect("test input should contain one document")
 }
 
-/// A complete document whose `Actions` key is `name`.
-fn document_with_actions_key(name: &str) -> String {
-    format!(
-        concat!(
-            "Theorem: InvalidAction\n",
-            "About: raw conversion rejection\n",
-            "Actions:\n  {name}:\n    params: {{}}\n",
-            "Prove:\n  - assert: 'true'\n    because: trivially true\n",
-            "Evidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\n",
-            "Witness:\n  - cover: 'true'\n    because: always reachable\n",
-        ),
-        name = name,
-    )
+/// The section of a rejection fixture that carries the generated name.
+enum DocumentBody<'a> {
+    /// An `Actions` mapping keyed by the name.
+    ActionsKey(&'a str),
+    /// A single `Do` call whose action is the name.
+    ///
+    /// This body declares no `Actions` mapping, so the `Do` call is the only
+    /// place the name is converted and the failure cannot be attributed to an
+    /// earlier `Actions` key check.
+    DoCall(&'a str),
 }
 
-/// A complete document whose only `Do` call uses `name`.
-///
-/// The document deliberately declares no `Actions` mapping, so the `Do` call
-/// is the only place the generated name is converted and the failure cannot be
-/// attributed to an earlier `Actions` key check.
-fn document_with_do_call(name: &str) -> String {
+/// A complete document whose variable section is `body`.
+fn document_with(body: &DocumentBody<'_>) -> String {
+    let section = match body {
+        DocumentBody::ActionsKey(name) => format!("Actions:\n  {name}:\n    params: {{}}\n"),
+        DocumentBody::DoCall(name) => {
+            format!("Do:\n  - call:\n      action: {name}\n      args: {{}}\n")
+        }
+    };
     format!(
         concat!(
             "Theorem: InvalidAction\n",
             "About: raw conversion rejection\n",
-            "Do:\n  - call:\n      action: {name}\n      args: {{}}\n",
+            "{section}",
             "Prove:\n  - assert: 'true'\n    because: trivially true\n",
             "Evidence:\n  kani:\n    unwind: 1\n    expect: SUCCESS\n",
             "Witness:\n  - cover: 'true'\n    because: always reachable\n",
         ),
-        name = name,
+        section = section,
     )
 }
 
@@ -145,7 +144,7 @@ proptest! {
     fn raw_conversion_rejects_one_invalid_actions_key_segment(
         (name, expected) in crate::canonical_action_name::test_support::one_invalid_segment_strategy(),
     ) {
-        let raw_doc = parse_one_raw_doc(&document_with_actions_key(&name));
+        let raw_doc = parse_one_raw_doc(&document_with(&DocumentBody::ActionsKey(&name)));
         let error = raw_doc
             .to_theorem_doc()
             .expect_err("a malformed Actions key must be rejected");
@@ -164,7 +163,7 @@ proptest! {
     fn raw_conversion_rejects_one_invalid_do_call_segment(
         (name, expected) in crate::canonical_action_name::test_support::one_invalid_segment_strategy(),
     ) {
-        let raw_doc = parse_one_raw_doc(&document_with_do_call(&name));
+        let raw_doc = parse_one_raw_doc(&document_with(&DocumentBody::DoCall(&name)));
         let error = raw_doc
             .to_theorem_doc()
             .expect_err("a malformed Do call name must be rejected");
@@ -184,7 +183,7 @@ proptest! {
         (name, expected) in
             crate::canonical_action_name::test_support::multiple_invalid_segments_strategy(),
     ) {
-        let raw_doc = parse_one_raw_doc(&document_with_actions_key(&name));
+        let raw_doc = parse_one_raw_doc(&document_with(&DocumentBody::ActionsKey(&name)));
         let error = raw_doc
             .to_theorem_doc()
             .expect_err("a malformed Actions key must be rejected");
@@ -201,7 +200,7 @@ proptest! {
         (name, expected) in
             crate::canonical_action_name::test_support::multiple_invalid_segments_strategy(),
     ) {
-        let raw_doc = parse_one_raw_doc(&document_with_do_call(&name));
+        let raw_doc = parse_one_raw_doc(&document_with(&DocumentBody::DoCall(&name)));
         let error = raw_doc
             .to_theorem_doc()
             .expect_err("a malformed Do call name must be rejected");
