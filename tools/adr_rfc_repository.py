@@ -69,14 +69,16 @@ def _is_inside(root: Path, target: Path) -> bool:
 class PathRecordReader(RecordReader):
     """Read ADR/RFC inputs from the local filesystem.
 
-    The constructor resolves the repository root once, so discovery, reads, and
-    link containment all compare against the same real path. Resolution failure
-    is not hidden: it raises, and the composition root reports it as a read
-    error rather than checking links against an unresolved root.
+    The constructor resolves the repository root strictly and once, so
+    discovery, reads, and link containment all compare against the same real
+    path. Strict resolution is deliberate: without it a missing root or a
+    symlink loop resolves to the unresolved path, and the checks would report
+    on a directory that cannot be read. The failure propagates instead, and the
+    composition root reports it as a read error.
     """
 
     def __init__(self, repository_root: Path) -> None:
-        self._root = repository_root.resolve()
+        self._root = repository_root.resolve(strict=True)
 
     @property
     def root(self) -> Path:

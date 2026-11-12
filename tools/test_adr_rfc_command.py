@@ -118,22 +118,20 @@ def test_command_reports_filesystem_failure_without_traceback(
     assert "Traceback" not in result.stderr, result.stderr
 
 
-def test_main_reports_root_resolution_failure_without_traceback(
+def test_main_reports_symlink_loop_root_without_traceback(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    def fail_to_resolve(*_args: object, **_kwargs: object) -> Path:
-        raise OSError("symlink loop")
-
-    monkeypatch.setattr(Path, "resolve", fail_to_resolve)
-    monkeypatch.setattr(check_adr_rfc_names, "REPOSITORY_ROOT", tmp_path)
+    loop_root = tmp_path / "loop"
+    loop_root.symlink_to(loop_root)
+    monkeypatch.setattr(check_adr_rfc_names, "REPOSITORY_ROOT", loop_root)
 
     assert check_adr_rfc_names.main() == 1, "an unresolvable root must fail"
 
     captured = capsys.readouterr()
     assert "could not read repository files" in captured.err, captured.err
-    assert "symlink loop" in captured.err, captured.err
+    assert "Too many levels of symbolic links" in captured.err, captured.err
     assert "Traceback" not in captured.err, captured.err
 
 

@@ -365,13 +365,15 @@ def test_checks_links_through_a_symlinked_repository_root(tmp_path: Path) -> Non
 
     reader = PathRecordReader(symlinked_root)
 
-    assert reader.root == real_root.resolve(), "the reader must resolve its root"
-    assert validate_record_files(reader) == [], (
-        "records under a symlinked root must satisfy the filename contract"
+    assert reader.root == real_root.resolve(), (
+        "the adapter must store the resolved root, not the symlinked path"
     )
-    assert validate_local_record_links(reader) == ([], 1), (
-        "a valid link reached through a symlinked root must not be reported"
-    )
+
+    check = check_adr_rfc_names.check_documentation(symlinked_root)
+
+    assert check.read_error is None, check.read_error
+    assert check.errors == (), check.errors
+    assert (check.records, check.checked_links) == (1, 1), check
 
     (docs_root / "contents.md").write_text(
         "[record](adrs/adr-0001-example.md)\n"
@@ -379,22 +381,34 @@ def test_checks_links_through_a_symlinked_repository_root(tmp_path: Path) -> Non
         encoding="utf-8",
     )
 
-    errors, checked_links = validate_local_record_links(
-        PathRecordReader(symlinked_root)
-    )
+    check = check_adr_rfc_names.check_documentation(symlinked_root)
 
-    assert checked_links == 2, "both links through the symlinked root are checked"
-    assert len(errors) == 1, errors
-    assert "escapes the repository" in errors[0], errors
+    assert check.read_error is None, check.read_error
+    assert check.checked_links == 2, "both links through the symlink are checked"
+    assert len(check.errors) == 1, check.errors
+    assert "escapes the repository" in check.errors[0], check.errors
 
 
+def test_reports_a_real_symlink_loop_as_a_read_error(tmp_path: Path) -> None:
+    """Non-strict resolution would hide this root; strict resolution reports it."""
+    loop_root = tmp_path / "loop"
+    loop_root.symlink_to(loop_root)
+
+    check = check_adr_rfc_names.check_documentation(loop_root)
+
+    assert check.read_error is not None, "a symlink loop must not resolve silently"
+    assert "Too many levels of symbolic links" in check.read_error, check.read_error
+    assert (check.errors, check.records, check.checked_links) == ((), 0, 0), check
+
+
+@pytest.mark.parametrize("error_type", (OSError, RuntimeError))
 def test_reports_root_resolution_failure_before_any_discovery(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, error_type: type[Exception]
 ) -> None:
     """A root that cannot resolve must become a read error, not a check run."""
 
     def fail_to_resolve(*_args: object, **_kwargs: object) -> Path:
-        raise OSError("symlink loop")
+        raise error_type("unresolvable root")
 
     def forbidden_discovery(*_args: object, **_kwargs: object) -> list[str]:
         raise AssertionError("discovery must not run for an unresolvable root")
@@ -406,7 +420,7 @@ def test_reports_root_resolution_failure_before_any_discovery(
 
     check = check_adr_rfc_names.check_documentation(tmp_path)
 
-    assert check.read_error == "symlink loop", check.read_error
+    assert check.read_error == "unresolvable root", check.read_error
     assert (check.errors, check.records, check.checked_links) == ((), 0, 0), check
 
 

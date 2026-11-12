@@ -415,8 +415,9 @@ The checker is split along a port-and-adapter boundary:
 - `tools/adr_rfc_repository.py` implements that port as `PathRecordReader` and
   owns Markdown discovery, file reads, root resolution, and link containment,
   including symlink and encoded-path handling. It resolves the repository root
-  once in its constructor, so discovery, reads, and containment compare against
-  the same real path.
+  strictly, once, in its constructor, so discovery, reads, and containment
+  compare against the same real path, and a missing root or symlink loop
+  becomes a read error rather than a silently unresolved path.
 - `tools/check_adr_rfc_names.py` is the composition root. It builds the adapter
   inside its guarded region, so a root that cannot resolve becomes a
   `DocumentationCheck.read_error` before any discovery runs, and returns a
