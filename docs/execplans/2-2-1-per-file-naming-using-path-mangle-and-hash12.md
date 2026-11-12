@@ -37,8 +37,8 @@ Observable success:
 - `docs/theoremc-design.md`, `docs/users-guide.md`, and the relevant roadmap
   checkbox are updated.
 
-This fulfils signposts `NMR-1`, `ADR-2`, and `DES-7` for the per-file module
-naming slice. Harness naming and theorem-key collision detection remain
+This fulfils signposts `NMR-1`, `ADR-0001-2`, and `DES-7` for the per-file
+module naming slice. Harness naming and theorem-key collision detection remain
 follow-up steps (roadmap items 2.2.2 and 2.2.3).
 
 ## Constraints

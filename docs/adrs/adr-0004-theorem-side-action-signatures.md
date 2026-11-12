@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 004: theorem-side action signatures
+# Architectural decision record (ADR) 0004: Theorem-side action signatures
 
 - Status: accepted
 - Date: 2026-05-25

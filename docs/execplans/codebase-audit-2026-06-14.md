@@ -123,11 +123,11 @@ concerns, and the work is committed as a small logical unit.
   `DES-6`, Step 1.3, Step 7.1, and `TFS-1`.
 - Milestone 2 addresses roadmap Step 1.2 and Step 6.2 by separating validator
   responsibilities along the schema-layer boundary. It satisfies `DES-3.2`,
-  `DES-6`, ADR 003 decision 1, `TFS-1`, `TFS-4`, and `TFS-6`.
+  `DES-6`, ADR-0003 decision 1, `TFS-1`, `TFS-4`, and `TFS-6`.
 - Milestone 3 addresses roadmap Step 2.3 by keeping explicit argument value
   semantics maintainable as nested decode contexts grow. It satisfies `DES-5`,
-  `TFS-5`, and ADR 001 decision 3.
-- Milestone 4 addresses roadmap Step 3.3 and ADR 004 by preserving typed
+  `TFS-5`, and ADR-0001 decision 3.
+- Milestone 4 addresses roadmap Step 3.3 and ADR-0004 by preserving typed
   action probe behaviour while removing repeated signature scans. It satisfies
   `DES-7`, `DES-5`, `TFS-4`, and the theorem-side action-signature decision.
 - Milestone 5 addresses roadmap Steps 1.3, 3.1, and 3.2 by making parser,
@@ -149,7 +149,7 @@ concerns, and the work is committed as a small logical unit.
   `docs/theorem-file-specification.md`, `docs/users-guide.md`, and
   `docs/developers-guide.md`.
 - Milestone 11 addresses dependency policy drift under roadmap Step 6.2 and
-  ADR 003 decision 5. It makes version intent explicit for future
+  ADR-0003 decision 5. It makes version intent explicit for future
   dependency-policy checks without pretending Cargo's existing bare
   requirements are not already caret-compatible.
 - Milestone 12 verifies that all audit work still satisfies the roadmap

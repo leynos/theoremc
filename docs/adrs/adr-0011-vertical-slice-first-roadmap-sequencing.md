@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 005: vertical-slice-first roadmap sequencing
+# Architectural decision record (ADR) 0011: Vertical-slice-first roadmap sequencing
 
 ## Status
 
@@ -106,7 +106,7 @@ into an `idempotent` law, without requiring schema version 2.
 Roadmap Step 4.1 becomes "deliver the Kani vertical slice through the shared
 harness-planning boundary". It includes:
 
-- introduce the internal, backend-neutral harness plan from ADR 006;
+- introduce the internal, backend-neutral harness plan from ADR-0006;
 - lower the supported schema version 1 subset into that plan;
 - promote the existing argument-lowering prototype into the owned macro
   rendering path;
@@ -216,8 +216,8 @@ The roadmap should make the following textual and dependency changes.
 
 _Table 1: Required roadmap changes to put the working proof path first._
 
-The implementation plan for Step 4.1 must cite ADR 006. Work on Step 5.1 and
-RFC 0001 must cite ADR 007.
+The implementation plan for Step 4.1 must cite ADR-0006. Work on Step 5.1 and
+RFC 0001 must cite ADR-0007.
 
 ## Vertical-slice acceptance criteria
 
@@ -284,14 +284,28 @@ basic pipeline defects harder to isolate.
 ### Emit Kani directly from `TheoremDoc` for speed
 
 Rejected. It appears shorter locally, but it creates the exact assertion-only,
-Kani-specific coupling that ADR 006 is designed to prevent.
+Kani-specific coupling that ADR-0006 is designed to prevent.
+
+## Addendum (2026-11-12): renumbering
+
+This record was formerly filed as ADR 005 in
+`docs/adr-005-vertical-slice-first-roadmap-sequencing.md`. The documentation
+style guide now requires a four-digit, zero-padded serial that is unique among
+the ADRs, in a canonical `adrs/adr-nnnn-title-slug.md` filename. The old
+numbering also repeated serial 005, which the build-standard ADR already used.
+The record now carries serial 0011, and its serial is stable from this point.
+
+Earlier references to "ADR 005" or "ADR-005" are ambiguous, because serial 005
+also named the build-standard decision. Read them by their subject: references
+about vertical-slice sequencing describe this decision, and references about
+shared build standards describe that one. Neither names a current record.
 
 ## Related documents
 
-- [RFC 0001: semantic law templates](rfcs/0001-semantic-law-templates.md)
-- [ADR 006: backend-neutral harness planning
-  boundary](adr-006-backend-neutral-harness-planning-boundary.md)
-- [ADR 007: Verus backend preservation
-  invariants](adr-007-verus-backend-preservation-invariants.md)
-- [Development roadmap](roadmap.md)
-- [Theoremc design specification](theoremc-design.md)
+- [RFC 0001: semantic law templates](../rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
+- [ADR-0006: backend-neutral harness planning
+  boundary](adr-0006-backend-neutral-harness-planning-boundary.md)
+- [ADR-0007: Verus backend preservation
+  invariants](adr-0007-verus-backend-preservation-invariants.md)
+- [Development roadmap](../roadmap.md)
+- [Theoremc design specification](../theoremc-design.md)

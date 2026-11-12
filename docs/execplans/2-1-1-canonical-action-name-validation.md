@@ -17,9 +17,9 @@ example missing dots, empty segments, invalid identifier characters, or keyword
 segments like `fn`) fail deterministically during schema validation. Valid
 canonical names continue to load successfully.
 
-This fulfils signposts `NMR-1`, `TFS-4`, and `ADR-1` for the validation slice
-only. Mangling, collision detection, and resolution to `crate::theorem_actions`
-remain separate follow-up steps in roadmap Step 2.1.
+This fulfils signposts `NMR-1`, `TFS-4`, and `ADR-0001-1` for the validation
+slice only. Mangling, collision detection, and resolution to
+`crate::theorem_actions` remain separate follow-up steps in roadmap Step 2.1.
 
 Observable success:
 

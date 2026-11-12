@@ -67,66 +67,66 @@ Use these signposts to trace each roadmap task to the defining requirement.
 - `NMR-2`:
   [docs/name-mangling-rules.md §Stable external theorem identifiers](name-mangling-rules.md#stable-external-theorem-identifiers)
   (stable external theorem identifiers and alias migration rules).
-- `ADR-1`:
-  [ADR 0001 decision 1](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- `ADR-0001-1`:
+  [ADR-0001 decision 1](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (injective action mangling).
-- `ADR-2`:
-  [ADR 0001 decision 2](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- `ADR-0001-2`:
+  [ADR-0001 decision 2](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (injective harness naming).
-- `ADR-3`:
-  [ADR 0001 decision 3](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- `ADR-0001-3`:
+  [ADR-0001 decision 3](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (explicit `{ ref: ... }` semantics).
-- `ADR-4`:
-  [ADR 0001 decision 4](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- `ADR-0001-4`:
+  [ADR-0001 decision 4](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (non-vacuity witness policy).
-- `ADR-5`:
-  [ADR 0001 decision 5](adr-001-theorem-symbol-stability-and-non-vacuity-policy.md)
+- `ADR-0001-5`:
+  [ADR-0001 decision 5](adrs/adr-0001-theorem-symbol-stability-and-non-vacuity-policy.md)
   (stable external IDs and migration aliases).
-- `ADR2-1`:
-  [ADR 002 decision 1](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+- `ADR-0002-1`:
+  [ADR-0002 decision 1](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
   (library-first localizer injection; no theoremc locale negotiation).
-- `ADR2-2`:
-  [ADR 002 decision 2](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+- `ADR-0002-2`:
+  [ADR-0002 decision 2](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
   (stable diagnostic code + args + English fallback as source of truth).
-- `ADR2-3`:
-  [ADR 002 decision 3](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+- `ADR-0002-3`:
+  [ADR-0002 decision 3](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
   (Fluent default backend with consumer-over-default layering).
-- `ADR2-4`:
-  [ADR 002 decision 4](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+- `ADR-0002-4`:
+  [ADR-0002 decision 4](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
   (deterministic English for compile-time and machine-facing artefacts).
-- `ADR2-5`:
-  [ADR 002 decision 5](adr-002-library-first-internationalization-and-localization-with-fluent.md)
+- `ADR-0002-5`:
+  [ADR-0002 decision 5](adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md)
   (parser keyword internationalization deferred to future ADR).
-- `ADR3-1`:
-  [ADR 003 decision 1](adr-003-architectural-boundary-enforcement.md) (explicit
-  schema layer contract and dependency direction).
-- `ADR3-2`:
-  [ADR 003 decision 2](adr-003-architectural-boundary-enforcement.md) (module
-  visibility as first-layer enforcement).
-- `ADR3-3`:
-  [ADR 003 decision 3](adr-003-architectural-boundary-enforcement.md) (baseline
-  CI architecture checks).
-- `ADR3-4`:
-  [ADR 003 decision 4](adr-003-architectural-boundary-enforcement.md) (custom
-  Dylint checks for forbidden edges).
-- `ADR3-5`:
-  [ADR 003 decision 5](adr-003-architectural-boundary-enforcement.md) (optional
-  `cargo-deny` dependency policy checks).
-- `ADR5`:
-  [ADR 005](adr-005-vertical-slice-first-roadmap-sequencing.md) (vertical slice
-  before laws and rich reporting).
-- `ADR6`:
-  [ADR 006](adr-006-backend-neutral-harness-planning-boundary.md) (shared
-  backend-neutral harness plan and resolved invocations).
-- `ADR7`:
-  [ADR 007](adr-007-verus-backend-preservation-invariants.md) (law meaning,
-  backend bindings, identity, and evidence preservation).
-- `ADR8`:
-  [ADR 008](adr-008-workspace-build-support-boundary.md) (workspace build
-  support boundary).
-- `RFC1`:
-  [RFC 0001](rfcs/0001-semantic-law-templates.md) (versioned proof obligations
-  and semantic law templates).
+- `ADR-0003-1`:
+  [ADR-0003 decision 1](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
+  (explicit schema layer contract and dependency direction).
+- `ADR-0003-2`:
+  [ADR-0003 decision 2](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
+  (module visibility as first-layer enforcement).
+- `ADR-0003-3`:
+  [ADR-0003 decision 3](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
+  (baseline CI architecture checks).
+- `ADR-0003-4`:
+  [ADR-0003 decision 4](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
+  (custom Dylint checks for forbidden edges).
+- `ADR-0003-5`:
+  [ADR-0003 decision 5](adrs/adr-0003-architectural-boundary-enforcement-for-schema-layers.md)
+  (optional `cargo-deny` dependency policy checks).
+- `ADR-0011`:
+  [ADR-0011](adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md)
+  (vertical slice before laws and rich reporting).
+- `ADR-0006`:
+  [ADR-0006](adrs/adr-0006-backend-neutral-harness-planning-boundary.md)
+  (shared backend-neutral harness plan and resolved invocations).
+- `ADR-0007`:
+  [ADR-0007](adrs/adr-0007-verus-backend-preservation-invariants.md) (law
+  meaning, backend bindings, identity, and evidence preservation).
+- `ADR-0008`:
+  [ADR-0008](adrs/adr-0008-workspace-build-support-boundary.md) (workspace
+  build support boundary).
+- `RFC-0001`:
+  [RFC 0001](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
+  (versioned proof obligations and semantic law templates).
 
 ## Phase 1: schema and validation foundation
 
@@ -177,7 +177,7 @@ Out of scope: Rust typechecking of expressions.
 - [x] Enforce non-vacuity defaults (`Witness` required unless
   `allow_vacuous: true` with non-empty `vacuity_because`). Acceptance: tests
   cover valid and invalid vacuity declarations and default-failure behaviour.
-  Signposts: `TFS-6`, `ADR-4`, `DES-8`.
+  Signposts: `TFS-6`, `ADR-0001-4`, `DES-8`.
 
 ### Step 1.3: implement diagnostics and parser test corpus
 
@@ -194,7 +194,7 @@ Out of scope: backend-specific error rendering.
 - [x] Build a fixture suite of valid and invalid `.theorem` files that covers
   aliases, nested `maybe`, `must` semantics preconditions, and witness policy.
   Acceptance: fixtures run in continuous integration (CI) and gate parser and
-  validator regressions. Signposts: `TFS-1`, `TFS-4`, `TFS-6`, `ADR-4`.
+  validator regressions. Signposts: `TFS-1`, `TFS-4`, `TFS-6`, `ADR-0001-4`.
 
 ## Phase 2: action resolution and deterministic naming
 
@@ -212,15 +212,16 @@ Out of scope: runtime action registries.
 
 - [x] Implement canonical action-name validation for dot-separated segments with
   per-segment identifier and keyword rules. Acceptance: tests reject malformed
-  names and reserved-keyword segments. Signposts: `NMR-1`, `TFS-4`, `ADR-1`.
+  names and reserved-keyword segments. Signposts: `NMR-1`, `TFS-4`,
+  `ADR-0001-1`.
 - [x] Implement action mangling (`segment_escape`, `action_slug`,
   `hash12(blake3)`) and canonical path resolution into
   `crate::theorem_actions`. Acceptance: golden tests cover representative names
-  and underscore edge cases. Signposts: `NMR-1`, `ADR-1`, `DES-5`.
+  and underscore edge cases. Signposts: `NMR-1`, `ADR-0001-1`, `DES-5`.
 - [x] Fail compilation on duplicate canonical action names and duplicate mangled
   identifiers, reporting all colliding sources. Acceptance: integration tests
   prove both collision classes are detected before backend execution. Signposts:
-  `NMR-1`, `ADR-1`, `DES-5`.
+  `NMR-1`, `ADR-0001-1`, `DES-5`.
 
 ### Step 2.2: implement harness and module naming stability
 
@@ -233,14 +234,15 @@ Out of scope: report-level ID alias resolution.
 
 - [x] Implement per-file module naming using `path_mangle(path_stem(P))` and
   `hash12(P)`. Acceptance: snapshot tests confirm deterministic names for mixed
-  separators and punctuation-heavy paths. Signposts: `NMR-1`, `ADR-2`, `DES-7`.
+  separators and punctuation-heavy paths. Signposts: `NMR-1`, `ADR-0001-2`,
+  `DES-7`.
 - [x] Implement harness naming
   `theorem__{theorem_slug(T)}__h{hash12(P#T)}` with deterministic CamelCase to
   snake_case conversion. Acceptance: tests cover acronym runs, numeric
-  boundaries, and already-snake identifiers. Signposts: `NMR-1`, `ADR-2`.
+  boundaries, and already-snake identifiers. Signposts: `NMR-1`, `ADR-0001-2`.
 - [x] Enforce duplicate theorem-key rejection (`P#T`) at build time. Acceptance:
   integration tests prove collisions fail with actionable theorem source
-  diagnostics. Signposts: `NMR-1`, `ADR-2`, `TFS-1`.
+  diagnostics. Signposts: `NMR-1`, `ADR-0001-2`, `TFS-1`.
 
 ### Step 2.3: implement explicit argument value semantics
 
@@ -254,12 +256,12 @@ Out of scope: implicit reference inference.
 - [x] Implement argument decoding so plain YAML strings are always literals and
   variable references require `{ ref: name }`. Acceptance: tests prove adding a
   new binding cannot alter existing literal argument semantics. Signposts:
-  `TFS-5`, `ADR-3`, `DES-5`.
+  `TFS-5`, `ADR-0001-3`, `DES-5`.
 - [x] Implement optional `{ literal: "text" }` wrapper and reject sentinel
   wrappers with invalid value types (e.g. `{ literal: 42 }`). Single-key maps
   whose key is not a recognized sentinel pass through as struct-literal
   candidates per TFS-5 §5.3. Acceptance: parser tests cover valid wrapper use
-  and deterministic rejection cases. Signposts: `TFS-5`, `ADR-3`.
+  and deterministic rejection cases. Signposts: `TFS-5`, `ADR-0001-3`.
 - [x] Implement struct-literal synthesis from YAML maps based on action
   parameter types, plus recursive list lowering to `vec![...]`. Acceptance:
   compile-fail tests show type mismatches are surfaced by Rust compilation.
@@ -300,7 +302,7 @@ Out of scope: final backend semantics.
 - [x] Implement macro expansion that emits the stable per-file module, includes
   theorem source content via `include_str!`, and builds one harness entry per
   theorem document. Acceptance: macro-expansion snapshots remain stable across
-  repeated builds. Signposts: `DES-7`, `NMR-1`, `ADR-2`.
+  repeated builds. Signposts: `DES-7`, `NMR-1`, `ADR-0001-2`.
 - [x] Gate generated Kani harnesses with `#[cfg(kani)]` and emit required
   `#[kani::proof]` and `#[kani::unwind(n)]` attributes from evidence.
   Acceptance: non-Kani `cargo build` succeeds and Kani-targeted builds discover
@@ -353,15 +355,15 @@ Out of scope: theorem execution and project mutation.
   flags, the selected-command adapter uses the same resolved file chain as
   global settings (including explicit `--config`), profiles reject command
   namespaces as required by v0.10.0, and generated recursive metadata matches
-  the Clap command tree. Signposts: `CLI-DES`, `ADR9`.
+  the Clap command tree. Signposts: `CLI-DES`, `ADR-0009`.
 - [x] Declare Rust 1.89 for every workspace package: `cargo-theorem` requires
   it for `ortho_config` 0.10.0, and the reusable libraries require it for
   `serde-saphyr` 2.0.0. Acceptance: CI runs one Rust 1.89 workspace check.
-  Signposts: `CLI-DES`, `ADR9`, `ADR10`.
+  Signposts: `CLI-DES`, `ADR-0009`, `ADR-0010`.
 - [ ] Implement the versioned JSON application envelope, stdout/stderr stream
   invariants, stable exit classes, and global renderer options. Acceptance:
   snapshots cover success and failure for human and JSON modes, and subprocess
-  output cannot leak beside a JSON document. Signposts: `CLI-DES`, `ADR2-4`.
+  output cannot leak beside a JSON document. Signposts: `CLI-DES`, `ADR-0002-4`.
 - [x] Implement `cargo theorem context --json` from OrthoConfig's compact agent
   context and add agent-native policy checks to CI. Acceptance: the versioned
   context includes every command path and its available behaviour metadata
@@ -500,13 +502,13 @@ explicit non-vacuity guarantees; schema version 2 laws then reuse that path.
 
 ### Step 4.1: deliver the Kani vertical slice through the shared harness-planning boundary
 
-Dependencies: phases 1 to 3. Implementation plans must cite ADR 006.
+Dependencies: phases 1 to 3. Implementation plans must cite ADR-0006.
 
 In scope: a supported version 1 subset, shared planning, Kani rendering, and
 real positive and negative fixtures through normal build integration. Per
-ADR-008, `theoremc-build-support` remains limited to build-script preparation,
+ADR-0008, `theoremc-build-support` remains limited to build-script preparation,
 discovery, and suite writing; `HarnessPlan` belongs in `theoremc-core` per
-ADR-006.
+ADR-0006.
 
 Out of scope: schema version 2 laws, rich reports, and non-Kani backends.
 
@@ -514,20 +516,20 @@ Out of scope: schema version 2 laws, rich reports, and non-Kani backends.
   with resolved invocations, source provenance, stable obligation identities,
   and explicitly opaque Rust predicates. Acceptance: plan fixtures contain no
   token streams, Kani syntax, or generated local names as semantic identities.
-  Signposts: `ADR5`, `ADR6`, `ADR7`, `ADR8`.
+  Signposts: `ADR-0011`, `ADR-0006`, `ADR-0007`, `ADR-0008`.
 - [ ] Lower the supported version 1 subset into the shared plan: ordered typed
   `Forall`, `Assume`, `Let`, infallible `call` with bound results, `Prove`, and
   `Witness`. Acceptance: unit tests cover binding order and identity; all
   source constructs lacking implemented lowering fail deterministically,
   including fallible calls, `must`, and `maybe` until supported. Signposts:
-  `TFS-1`, `TFS-4`, `ADR5`, `ADR6`.
+  `TFS-1`, `TFS-4`, `ADR-0011`, `ADR-0006`.
 - [ ] Promote the argument-lowering prototype into the owned proc-macro
   rendering path, and render plan operations as symbolic bindings, assumptions,
   invocations, assertions with rationales, and covers. Acceptance:
   generated-code snapshots verify literals, references, lists, struct values,
   and declared borrowing without implicit clones or default construction; the
   Kani renderer does not consume schema types directly. Signposts: `TFS-5`,
-  `DES-5`, `DES-8`, `ADR6`.
+  `DES-5`, `DES-8`, `ADR-0006`.
 - [ ] Add a small longhand idempotence example using a pure shared-reference
   primary with an owned result, plus a deliberately false variant. Acceptance:
   fixture crates discover theorems through normal build scripts, ordinary
@@ -537,7 +539,7 @@ Out of scope: schema version 2 laws, rich reports, and non-Kani backends.
   witnesses are emitted and checked. At least one CI path or maintainer gate
   executes Kani; mocked commands or snapshots alone do not complete this step.
   Retain the example for version 2 plan-equivalence fixtures. Signposts:
-  `DES-7`, `DES-8`, `ADR-4`, `ADR5`, `ADR6`.
+  `DES-7`, `DES-8`, `ADR-0001-4`, `ADR-0011`, `ADR-0006`.
 
 ### Step 4.2: expand `call`, `must`, and `maybe` operational semantics
 
@@ -552,16 +554,16 @@ Out of scope: probabilistic branching semantics and a second direct renderer.
   `call` with explicit results; enforce `as` binding rules and reject unbound
   non-unit results in `Do`. Acceptance: semantic tests cover `()`, owned values,
   `Result`, and `Option` signatures. Signposts: `TFS-4`, `DES-4`, `DES-8`,
-  `ADR5`, `ADR6`.
+  `ADR-0011`, `ADR-0006`.
 - [ ] Add `must` over `Result`, then `Option`, then infallible documentary
   `must`, using independently tested increments. Acceptance: real harness tests
   produce counterexamples for failed success obligations and retain source
   identity; successful cases yield the unwrapped value. Signposts: `TFS-4`,
-  `DES-8`, `ADR5`, `ADR6`.
+  `DES-8`, `ADR-0011`, `ADR-0006`.
 - [ ] Add symbolic `maybe` with nested steps through shared plan branching.
   Acceptance: Kani explores both branches under bounded settings and nested
-  obligations retain structural identities. Signposts: `TFS-4`, `DES-8`, `ADR5`,
-  `ADR6`.
+  obligations retain structural identities. Signposts: `TFS-4`, `DES-8`,
+  `ADR-0011`, `ADR-0006`.
 
 ### Step 4.3: implement the minimal Kani runner and evidence policy
 
@@ -577,15 +579,15 @@ orchestration.
   theorem and obligation identities. Acceptance: fixtures distinguish `proved`,
   `falsified`, `unreachable`, `undetermined`, `unsupported`, and
   `execution_error`; resource exhaustion is `undetermined` with reason
-  `resource_exhaustion`. Signposts: `ADR5`, `ADR6`, `ADR7`.
+  `resource_exhaustion`. Signposts: `ADR-0011`, `ADR-0006`, `ADR-0007`.
 - [ ] Compare actual status with `Evidence.kani.expect` and fail mismatches.
   Acceptance: integration tests cover SUCCESS, FAILURE, UNREACHABLE, and
   UNDETERMINED; unreachable and undetermined fail by default unless explicitly
-  expected and justified. Signposts: `TFS-6`, `DES-8`, `ADR-4`, `ADR5`.
+  expected and justified. Signposts: `TFS-6`, `DES-8`, `ADR-0001-4`, `ADR-0011`.
 - [ ] Enforce explicit witnesses unless both `allow_vacuous: true` and a
   non-empty `vacuity_because` justify the override. Acceptance: validation and
   runtime tests reject missing rationale and distinguish unreachable witnesses
-  from successful proofs. Signposts: `TFS-6`, `DES-8`, `ADR-4`, `ADR5`.
+  from successful proofs. Signposts: `TFS-6`, `DES-8`, `ADR-0001-4`, `ADR-0011`.
 
 ### Step 4.4: integrate RFC 0001 semantic laws through the proven Kani path
 
@@ -603,33 +605,37 @@ proofs or cloning adapters.
   reject laws in omitted/version 1 documents, reject unsupported versions, and
   locate malformed or ambiguous obligation shapes. Document the breaking
   `Vec<Assertion>` to `Vec<ProofObligation>` release boundary and migration.
-  Signposts: `RFC1`, `TFS-1`, `ADR5`.
+  Signposts: `RFC-0001`, `TFS-1`, `ADR-0011`.
 - [ ] Add domain types for `idempotent`, `round_trip`, `equivalent`, `refines`,
   `preserves`, and `homomorphism`, plus common primary invocation and relation
   types outside raw adapters. Acceptance: parameterized tests validate action
   signatures, roles, fixed arguments, modes, shared-reference bound parameters,
   composition, and boolean relations; ordinary rustc composition probes cover
   type equivalence beyond structural validation. Extend referenced-action,
-  conflict, and type probes to law primaries. Signposts: `RFC1`, `ADR6`, `ADR7`.
+  conflict, and type probes to law primaries. Signposts: `RFC-0001`, `ADR-0006`,
+  `ADR-0007`.
 - [ ] Lower validated laws into semantic Law IR, then the existing
   `HarnessPlan`, reusing resolved invocations, the Kani renderer, and the
   minimal runner. Acceptance: fixtures retain parent/child obligation identity,
   rationale, provenance, and backend constraints without Kani syntax in either
   semantic representation; complete capability checking rejects unsupported
-  operations before partial emission. Signposts: `RFC1`, `ADR6`, `ADR7`.
+  operations before partial emission. Signposts: `RFC-0001`, `ADR-0006`,
+  `ADR-0007`.
 - [ ] Validate all six laws with positive and negative Kani integration cases,
   including a counterexample for every comparison law and unreachable
   preconditions for `preserves`. Acceptance: longhand version 1 and structured
   version 2 examples yield semantically equivalent plans; generated
   precondition covers supplement explicit witnesses and unreachable checks
-  never count as proved. Signposts: `RFC1`, `ADR-4`, `ADR5`, `ADR6`, `ADR7`.
+  never count as proved. Signposts: `RFC-0001`, `ADR-0001-4`, `ADR-0011`,
+  `ADR-0006`, `ADR-0007`.
 - [ ] Publish versioned examples for normalization, codecs, reference
   equivalence, refinement, state transitions, and collection homomorphisms.
   Acceptance: guidance shows explicit adapters for mutation-heavy APIs,
   explains custom-relation weakness, witness requirements, bounded evidence,
   and when opaque assertions are appropriate. Record future Verus binding
   design as additive follow-up work preserving version 2 law meaning and
-  explicit executable/specification/proof modes. Signposts: `RFC1`, `ADR7`.
+  explicit executable/specification/proof modes. Signposts: `RFC-0001`,
+  `ADR-0007`.
 
 ## Phase 5: execution, reporting, and stable theorem identity
 
@@ -671,7 +677,7 @@ Out of scope: hosted execution and report dashboarding.
 
 ### Step 5.1: implement theorem run result model and report outputs
 
-Dependencies: steps 5.0 and 4.4. Work must cite ADR 007.
+Dependencies: steps 5.0 and 4.4. Work must cite ADR-0007.
 
 In scope: the `cargo theorem` canonical run model and output formats (human
 report plus CI artefacts).
@@ -685,7 +691,7 @@ Out of scope: dashboard hosting.
   round-trip without field loss, preserve the six terminal statuses and
   resource-exhaustion reason, distinguish bounded Kani from future deductive
   Verus evidence, and separate invariant fields from run identity and time.
-  Signposts: `DES-9`, `TFS-1`, `TFS-6`, `CLI-DES`, `RFC1`, `ADR7`.
+  Signposts: `DES-9`, `TFS-1`, `TFS-6`, `CLI-DES`, `RFC-0001`, `ADR-0007`.
 - [ ] Implement Markdown/HTML report rendering from the canonical run record.
   Acceptance: golden snapshots cover pass, fail, unreachable, undetermined,
   timeout, cancellation, and expected-failure examples. Signposts: `DES-9`,
@@ -710,14 +716,14 @@ Out of scope: automatic alias file editing.
 - [ ] Implement canonical external theorem ID generation as
   `{normalized_path(P)}#{T}` with path normalization rules. Acceptance: tests
   cover path separator normalization and leading `./` removal. Signposts:
-  `NMR-2`, `ADR-5`, `DES-9`.
+  `NMR-2`, `ADR-0001-5`, `DES-9`.
 - [ ] Implement alias file loading from `theorems/theorem-id-aliases.yaml` and
   deterministic resolution of deprecated IDs to canonical IDs. Acceptance:
   tests cover direct aliases and multi-hop alias chains. Signposts: `NMR-2`,
-  `ADR-5`, `DES-9`.
+  `ADR-0001-5`, `DES-9`.
 - [ ] Detect and reject alias cycles and ambiguous resolutions at load time.
   Acceptance: cycle and ambiguity fixtures fail with actionable diagnostics.
-  Signposts: `NMR-2`, `ADR-5`.
+  Signposts: `NMR-2`, `ADR-0001-5`.
 
 ### Step 5.3: implement counterexample playback integration
 
@@ -803,22 +809,22 @@ Out of scope: splitting schema layers into separate crates.
   curated re-exports. Acceptance: public `schema` exports include only approved
   API types and loader entry points, and contract tests prove raw adapter
   internals are not importable by consumers. Signposts: `DES-3.2`, `DES-10.1`,
-  `ADR3-1`, `ADR3-2`.
+  `ADR-0003-1`, `ADR-0003-2`.
 - [ ] Add CI acyclicity checks with `cargo modules graph --acyclic --lib`.
   Acceptance: current module graph passes, and a synthetic cycle fixture causes
-  the architecture check to fail. Signposts: `DES-10`, `ADR3-3`.
+  the architecture check to fail. Signposts: `DES-10`, `ADR-0003-3`.
 - [ ] Enforce explicit imports by denying wildcard imports in CI. Acceptance:
   schema modules fail lint checks when wildcard imports are introduced, and CI
   runs with `-D clippy::wildcard_imports` enabled. Signposts: `DES-10`,
-  `ADR3-3`.
+  `ADR-0003-3`.
 - [ ] Implement `theoremc_arch_lint` Dylint rules for forbidden import edges
   (for example, `schema::types` importing `schema::raw`). Acceptance: lint
   fixtures demonstrate expected failures for forbidden edges and no failures
-  for allowed edges. Signposts: `DES-10`, `ADR3-4`.
+  for allowed edges. Signposts: `DES-10`, `ADR-0003-4`.
 - [ ] Add optional `cargo-deny` policy checks for architecture-sensitive
   dependencies (for example, constraining YAML adapter dependencies to adapter
   contexts). Acceptance: dependency policy checks pass in CI and fail on
-  deliberate policy violations in fixtures. Signposts: `DES-10`, `ADR3-5`.
+  deliberate policy violations in fixtures. Signposts: `DES-10`, `ADR-0003-5`.
 
 ### Step 6.3: provide examples and authoring guidance
 
@@ -839,7 +845,7 @@ Out of scope: production deployment templates.
   especially explicit references, witness policy, expected status usage,
   project initialization, backend pins, and run artefacts. Acceptance: docs
   contain copy-paste-ready examples that match implementation semantics.
-  Signposts: `TFS-5`, `ADR-3`, `ADR-4`, `DES-4`, `CLI-DES`.
+  Signposts: `TFS-5`, `ADR-0001-3`, `ADR-0001-4`, `DES-4`, `CLI-DES`.
 - [ ] Keep the [`cargo theorem` user's guide](cargo-theorem-cli-users-guide.md)
   aligned with each shipped command, including installation and first use,
   project initialization, theorem creation, checking, backend installation
@@ -871,11 +877,11 @@ composition.
 - [ ] Define a canonical diagnostic payload type containing code, structured
   arguments, source location, and required English fallback text. Acceptance:
   parser and validator diagnostics are emitted through this model with
-  snapshot-backed stability tests. Signposts: `DES-6`, `DES-6.5`, `ADR2-2`.
+  snapshot-backed stability tests. Signposts: `DES-6`, `DES-6.5`, `ADR-0002-2`.
 - [ ] Define compatibility policy for diagnostic codes and argument schemas.
   Acceptance: contributor documentation and tests guard against accidental
   breaking changes in existing codes and argument keys. Signposts: `DES-6.5`,
-  `ADR2-2`.
+  `ADR-0002-2`.
 
 ### Step 7.2: implement localizer contract and Fluent default backend
 
@@ -889,15 +895,15 @@ Out of scope: process-wide locale globals.
 - [ ] Introduce a library-level `Localizer` trait (or equivalent) that renders
   diagnostic messages from code and structured arguments. Acceptance: theoremc
   APIs accept localization as injected context and never read locale
-  environment variables. Signposts: `DES-6.5`, `ADR2-1`.
+  environment variables. Signposts: `DES-6.5`, `ADR-0002-1`.
 - [ ] Embed theoremc `en-US` Fluent resources and expose them for consumer
   loader composition. Acceptance: integration tests show host applications can
   load theoremc Fluent assets into an existing Fluent language loader.
-  Signposts: `DES-6.5`, `ADR2-3`.
+  Signposts: `DES-6.5`, `ADR-0002-3`.
 - [ ] Implement optional Fluent-backed localizer layering consumer catalogues
   over theoremc defaults with deterministic fallback for missing keys and
   formatting failures. Acceptance: tests cover consumer hit, default fallback,
-  and formatting-error fallback paths. Signposts: `DES-6.5`, `ADR2-3`.
+  and formatting-error fallback paths. Signposts: `DES-6.5`, `ADR-0002-3`.
 
 ### Step 7.3: enforce rendering boundaries and report semantics
 
@@ -910,18 +916,18 @@ Out of scope: parser keyword localization.
 
 - [ ] Keep proc-macro and code-generation diagnostics deterministic English.
   Acceptance: compile-fail and snapshot tests confirm output stability across
-  host locale changes. Signposts: `DES-6.5`, `ADR2-4`.
+  host locale changes. Signposts: `DES-6.5`, `ADR-0002-4`.
 - [ ] Extend `cargo theorem` diagnostic objects to always include stable
   diagnostic code and arguments, include required English fallback text, and
   attach localized text only when a localizer is configured. Acceptance:
   application JSON and report snapshots for Markdown, HTML, JUnit XML, and
   Cucumber JSON confirm invariant machine fields on diagnostic objects and
   optional localized projection fields; successful envelopes do not require
-  diagnostic fields. Signposts: `DES-9`, `DES-6.5`, `ADR2-2`, `ADR2-4`,
+  diagnostic fields. Signposts: `DES-9`, `DES-6.5`, `ADR-0002-2`, `ADR-0002-4`,
   `CLI-DES`.
 - [ ] Add locale-determinism regression tests proving machine-facing artefacts
   are identical across locales while localized human-facing strings vary only
-  in localized fields. Signposts: `DES-9`, `DES-6.5`, `ADR2-4`.
+  in localized fields. Signposts: `DES-9`, `DES-6.5`, `ADR-0002-4`.
 
 ### Step 7.4: document and guard deferred parser keyword internationalization
 
@@ -935,7 +941,7 @@ Out of scope: implementation of localized theorem schema keys.
 - [ ] Document and enforce that `.theorem` top-level keys remain canonical in
   this release line. Acceptance: parser tests reject unsupported localized key
   synonyms and docs explain the deferral policy with migration implications.
-  Signposts: `DES-4`, `DES-4.7`, `ADR2-5`.
+  Signposts: `DES-4`, `DES-4.7`, `ADR-0002-5`.
 
 ## Sequencing summary
 

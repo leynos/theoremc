@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 011: A shared warm target for fixture crates
+# Architectural decision record (ADR) 0012: Shared warm target for fixture crates
 
 ## Status
 
@@ -58,6 +58,17 @@ which the shared target holds no `fx_<suffix>-*` build directory, and a scan
 that cannot read the build directory fails the fixture instead of calling the
 name free. The clock and sequence number make a clash unlikely; the directory
 check makes it impossible.
+
+## Addendum (2026-11-12): renumbering
+
+This record was formerly filed as ADR 011 in
+`docs/adr-011-shared-warm-target-for-fixture-crates.md`. The documentation
+style guide now requires a four-digit, zero-padded serial that is unique among
+the ADRs, in a canonical `adrs/adr-nnnn-title-slug.md` filename. The record now
+carries serial 0012, and its serial is stable from this point.
+
+References to "ADR 011" or "ADR-011" in earlier discussions describe this
+decision. They are historical context only and do not name a current record.
 
 ## Consequences
 
