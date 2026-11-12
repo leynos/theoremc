@@ -1,4 +1,4 @@
-# Architectural Decision Record (ADR) 012: Workspace-complete lint gate
+# Architectural decision record (ADR) 0013: Workspace-complete lint gate
 
 ## Status
 
@@ -125,8 +125,8 @@ the stub-executable contract test possible.
 
 ## Related documents
 
-- [ADR-005: Rust build standard](adr-005-rust-build-standard.md)
-- [ADR-010: reusable-library MSRV for Rust
-  1.89](adr-010-reusable-library-msrv-rust-1-89.md)
-- [Developer's guide](developers-guide.md)
-- [Theoremc design](theoremc-design.md)
+- [ADR-0005: Rust build standard](adr-0005-adopt-the-rust-build-standard-for-development-builds.md)
+- [ADR-0010: reusable-library MSRV for serde-saphyr
+  2.0](adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md)
+- [Developer's guide](../developers-guide.md)
+- [Theoremc design](../theoremc-design.md)

@@ -100,8 +100,8 @@
   crates](adrs/adr-0012-shared-warm-target-for-fixture-crates.md)
   - Decision record for sharing one warm target between fixture crates, their
     unique package names, the seeded lock and offline builds.
-- [Architecture Decision Record (ADR) 012: workspace-complete lint
-  gate](adr-012-workspace-complete-lint-gate.md)
+- [Architectural decision record (ADR) 0013: workspace-complete lint
+  gate](adrs/adr-0013-workspace-complete-lint-gate.md)
   - Decision record for workspace-scoped rustdoc, Clippy, and Whitaker stages,
     the sequential `make lint` aggregate, and the exclusion-free `dylint.toml`.
 
