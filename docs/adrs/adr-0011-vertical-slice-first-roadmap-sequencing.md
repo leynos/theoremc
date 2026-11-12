@@ -295,8 +295,10 @@ the ADRs, in a canonical `adrs/adr-nnnn-title-slug.md` filename. The old
 numbering also repeated serial 005, which the build-standard ADR already used.
 The record now carries serial 0011, and its serial is stable from this point.
 
-References to "ADR 005" or "ADR-005" in earlier discussions describe this
-decision. They are historical context only and do not name a current record.
+Earlier references to "ADR 005" or "ADR-005" are ambiguous, because serial 005
+also named the build-standard decision. Read them by their subject: references
+about vertical-slice sequencing describe this decision, and references about
+shared build standards describe that one. Neither names a current record.
 
 ## Related documents
 
