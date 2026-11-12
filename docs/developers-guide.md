@@ -406,22 +406,27 @@ only `uv` on `PATH`.
 The checker is split along a port-and-adapter boundary:
 
 - `tools/adr_rfc_names.py` holds the pure rules: filename and heading patterns,
-  slug generation, Markdown destination extraction, and the `RecordReader` port
-  that supplies record names, Markdown paths, file text, the canonical
-  repository root, and resolved link targets. It never touches the filesystem
-  directly.
+  slug generation, Markdown destination extraction, and the `RecordReader`
+  port. Everything crossing that port is a domain value: `RecordFile` and
+  `MarkdownDocument` carry repository relative paths and text, and `LinkFacts`
+  carries the two containment answers the rules cannot derive themselves. The
+  module imports no filesystem path type and touches no files; fitness tests in
+  `tools/test_check_adr_rfc_names.py` enforce both.
 - `tools/adr_rfc_repository.py` implements that port as `PathRecordReader` and
-  owns Markdown discovery, file reads, root and link resolution, and symlink
-  and encoded-path handling.
-- `tools/check_adr_rfc_names.py` is the composition root. It wires the adapter
-  into the rules and returns a `DocumentationCheck` value whose `read_error`
-  field reports an unreadable file instead of raising.
+  owns Markdown discovery, file reads, root resolution, and link containment,
+  including symlink and encoded-path handling. It resolves the repository root
+  once in its constructor, so discovery, reads, and containment compare against
+  the same real path.
+- `tools/check_adr_rfc_names.py` is the composition root. It builds the adapter
+  inside its guarded region, so a root that cannot resolve becomes a
+  `DocumentationCheck.read_error` before any discovery runs, and returns a
+  value whose `read_error` field reports an unreadable file instead of raising.
 
 The rules report canonical filenames, unique serials, heading serials, title
 slugs, and local ADR/RFC links that escape the repository or are missing. A
 malformed local destination becomes an error diagnostic rather than a
-traceback. Root and link resolution are supplied through the port, so a test
-double can provide both without a filesystem.
+traceback. Because the adapter answers containment, a test double can supply
+`LinkFacts` without a filesystem.
 
 `make lint` is the aggregate entry point, locally and in CI. It runs three
 stages in order — rustdoc, Clippy, then Whitaker — and recurses through

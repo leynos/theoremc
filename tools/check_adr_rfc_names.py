@@ -13,12 +13,15 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from adr_rfc_names import validate_local_record_links, validate_record_files
+from adr_rfc_names import (
+    RECORD_KINDS,
+    validate_local_record_links,
+    validate_record_files,
+)
 from adr_rfc_repository import PathRecordReader
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-DOCUMENTATION_ROOT = REPOSITORY_ROOT / "docs"
 
 
 @dataclass(frozen=True)
@@ -37,23 +40,22 @@ class DocumentationCheck:
 def check_documentation(repository_root: Path) -> DocumentationCheck:
     """Run every ADR/RFC check, reporting read failures as a value.
 
+    The adapter is built inside the guarded region: resolving the repository
+    root can fail, and that failure must become a `read_error` before any
+    discovery or link containment runs.
+
     Example: an unreadable record returns a `DocumentationCheck` whose
     `read_error` describes the failure instead of raising.
     """
-    reader = PathRecordReader()
     try:
-        # Resolve once so discovery, reads, and link containment all use the
-        # same root even when the repository is reached through a symlink.
-        repository_root = reader.resolve_root(repository_root)
-        docs_root = repository_root / "docs"
-        errors = validate_record_files(reader, docs_root)
-        paths = reader.markdown_paths(repository_root)
-        link_errors, checked_links = validate_local_record_links(
-            reader, repository_root, paths
+        reader = PathRecordReader(repository_root)
+        errors = validate_record_files(reader)
+        link_errors, checked_links = validate_local_record_links(reader)
+        records = sum(
+            len(reader.record_files(record_kind.family))
+            for record_kind in RECORD_KINDS
         )
-        records = len(reader.record_files(docs_root / "adrs"))
-        records += len(reader.record_files(docs_root / "rfcs"))
-    except (OSError, UnicodeError) as error:
+    except (OSError, RuntimeError, UnicodeError) as error:
         return DocumentationCheck((), 0, 0, str(error))
     return DocumentationCheck(tuple(errors + link_errors), records, checked_links, None)
 

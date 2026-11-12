@@ -1,8 +1,10 @@
 """Validate canonical ADR/RFC filenames, headings, and local links.
 
 The rules keep record titles, serials, filenames, and local references
-consistent. ``tools/check_adr_rfc_names.py`` is the command-line entry point;
-``make check-adr-rfc-names`` runs that entry point after this module's tests.
+consistent. They operate on domain values only: the ``RecordReader`` port
+supplies record text and link containment facts, so this module imports no
+filesystem path type. ``tools/check_adr_rfc_names.py`` is the command-line
+entry point; ``make check-adr-rfc-names`` runs it after this module's tests.
 """
 
 from __future__ import annotations
@@ -10,7 +12,6 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Protocol
 from urllib.parse import SplitResult, unquote, urlsplit
 
@@ -49,72 +50,110 @@ SPECIAL_TRANSLITERATIONS = str.maketrans(
 )
 
 
-class RecordReader(Protocol):
-    """Read the filesystem inputs the ADR/RFC checks need.
+@dataclass(frozen=True)
+class RecordFile:
+    """Describe one record file in terms the rules can reason about.
 
-    Example: `PathRecordReader` in ``adr_rfc_repository.py`` supplies the
-    repository's real filesystem reads.
+    The adapter reports paths relative to the repository root, so the rules
+    never need to know how that root is spelled on disk.
+
+    Example: `RecordFile("adr-0001-example.md",
+    "docs/adrs/adr-0001-example.md", "# …")`.
     """
 
-    def record_files(self, directory: Path) -> list[Path]:
-        """Return the Markdown records in a directory."""
+    name: str
+    relative_path: str
+    text: str
+
+
+@dataclass(frozen=True)
+class MarkdownDocument:
+    """Describe one Markdown file whose links the rules must check.
+
+    Example: `MarkdownDocument("docs/contents.md", "[x](adrs/adr-0001.md)")`.
+    """
+
+    relative_path: str
+    text: str
+
+
+@dataclass(frozen=True)
+class LinkFacts:
+    """Describe what the adapter established about a local record link.
+
+    Containment is a filesystem question, so the adapter answers it and the
+    rules decide whether the answer is an error.
+
+    Example: a link to a missing ADR reports `inside_root=True, exists=False`.
+    """
+
+    inside_root: bool
+    exists: bool
+
+
+class RecordReader(Protocol):
+    """Supply the record and link facts the ADR/RFC checks need.
+
+    Every value crossing this port is a domain value: record names, repository
+    relative paths, file text, and containment facts. ``PathRecordReader`` in
+    ``adr_rfc_repository.py`` implements it against the filesystem.
+
+    Example: a test double returns `RecordFile` values from memory, so the
+    rules can be exercised without a repository on disk.
+    """
+
+    def record_files(self, family: str) -> list[RecordFile]:
+        """Return the record files in a family such as `"adrs"`."""
         ...
 
-    def markdown_paths(self, repository_root: Path) -> list[Path]:
-        """Return every repository Markdown file to inspect."""
+    def markdown_documents(self) -> list[MarkdownDocument]:
+        """Return every Markdown document whose links must be inspected."""
         ...
 
-    def read_text(self, path: Path) -> str:
-        """Return a file's UTF-8 text."""
-        ...
-
-    def resolve_root(self, repository_root: Path) -> Path:
-        """Return the canonical root that record links must stay inside.
-
-        Example: a root reached through a symlink resolves to its real path.
-        """
-        ...
-
-    def resolve_link(
+    def link_facts(
         self,
-        repository_root: Path,
-        source: Path,
-        link_path: str,
-    ) -> Path | None:
-        """Resolve a local link path, or return `None` when it is malformed.
+        source: str,
+        destination_path: str,
+    ) -> LinkFacts | None:
+        """Describe a local link target, or return `None` when it is malformed.
 
-        Example: `adrs/adr-0001-example.md` resolves relative to the source.
+        `source` and `destination_path` are repository relative. Example:
+        `link_facts("docs/contents.md", "adrs/adr-0001-example.md")` reports
+        whether that ADR is inside the root and exists.
         """
-        ...
-
-    def is_file(self, path: Path) -> bool:
-        """Return whether a resolved link target is a regular file."""
         ...
 
 
 @dataclass(frozen=True)
 class RecordKind:
-    """Describe the filename and heading rules for one record family."""
+    """Describe the filename and heading rules for one record family.
 
-    docs_root: Path
-    directory: Path
+    Example: the ADR family is `RecordKind("adrs", ADR_FILE, ADR_TITLE, "ADR")`.
+    """
+
+    family: str
     file_pattern: re.Pattern[str]
     title_pattern: re.Pattern[str]
     name: str
+
+
+RECORD_KINDS = (
+    RecordKind("adrs", ADR_FILE, ADR_TITLE, "ADR"),
+    RecordKind("rfcs", RFC_FILE, RFC_TITLE, "RFC"),
+)
 
 
 @dataclass(frozen=True)
 class RecordLink:
     """Describe a local Markdown link that targets a candidate record.
 
-    Example: `[x](adrs/adr-0001-example.md)` yields a link whose `target` is the
-    resolved path of that ADR.
+    Example: `[x](adrs/adr-0001-example.md)` yields a link whose `facts` say
+    whether the destination is inside the repository and exists.
     """
 
-    repository_root: Path
-    source: Path
-    target: Path | None
+    source: str
     destination: str
+    facts: LinkFacts | None
 
 
 def slug_for_title(title: str) -> str:
@@ -212,33 +251,35 @@ def extract_markdown_destinations(markdown: str) -> list[str]:
 def is_record_destination(path: str) -> bool:
     """Return whether a local path refers to a project ADR or RFC filename.
 
+    The path is a link destination, so it is split as text rather than handed to
+    a filesystem path type.
+
     Example: `is_record_destination("docs/adrs/adr-0001-example.md")` returns
     `True`.
     """
     decoded = unquote(path).replace("\\", "/")
-    path_parts = [part.lower() for part in Path(decoded).parts]
+    path_parts = [part.lower() for part in decoded.split("/") if part not in ("", ".")]
     basename = path_parts[-1] if path_parts else ""
-    return (
-        basename.startswith(("adr-", "rfc-"))
-        or (bool(Path(decoded).suffix) and ("adrs" in path_parts or "rfcs" in path_parts))
+    return basename.startswith(("adr-", "rfc-")) or (
+        bool(_file_suffix(basename))
+        and ("adrs" in path_parts or "rfcs" in path_parts)
     )
 
 
-def _record_file_match(
-    path: Path,
-    file_pattern: re.Pattern[str],
-) -> re.Match[str] | None:
-    """Return a canonical filename match, if one exists.
+def _file_suffix(basename: str) -> str:
+    """Return a filename's suffix, treating dotfiles as suffixless.
 
-    Example: a canonical `adr-0001-example.md` filename returns a match.
+    Example: `_file_suffix("adr-0001-example.md")` returns `"md"`, while
+    `_file_suffix(".gitkeep")` returns `""`.
     """
-    return file_pattern.fullmatch(path.name)
+    stem, dot, suffix = basename.rpartition(".")
+    return suffix if dot and stem else ""
 
 
 def _register_serial(
-    serials: dict[str, Path],
+    serials: dict[str, str],
     serial: str,
-    path: Path,
+    record: RecordFile,
     record_kind: RecordKind,
 ) -> str | None:
     """Record a serial once and return an error for a duplicate.
@@ -248,17 +289,15 @@ def _register_serial(
     previous = serials.get(serial)
     if previous:
         return (
-            f"{path.relative_to(record_kind.docs_root.parent)}: duplicate "
-            f"{record_kind.name} serial {serial} also used by "
-            f"{previous.relative_to(record_kind.docs_root.parent)}"
+            f"{record.relative_path}: duplicate {record_kind.name} serial "
+            f"{serial} also used by {previous}"
         )
-    serials[serial] = path
+    serials[serial] = record.relative_path
     return None
 
 
 def _record_heading_errors(
-    reader: RecordReader,
-    path: Path,
+    record: RecordFile,
     filename_match: re.Match[str],
     record_kind: RecordKind,
 ) -> list[str]:
@@ -266,13 +305,14 @@ def _record_heading_errors(
 
     Example: a heading for `0001: Example` requires the slug `example`.
     """
-    relative_path = path.relative_to(record_kind.docs_root.parent)
-    heading = first_heading(reader.read_text(path))
+    heading = first_heading(record.text)
     title = record_kind.title_pattern.fullmatch(heading or "")
     if not title:
         return [
-            f"{relative_path}: first heading is not a numbered "
-            f"{record_kind.name} title"
+            (
+                f"{record.relative_path}: first heading is not a numbered "
+                f"{record_kind.name} title"
+            )
         ]
 
     serial = filename_match.group("serial")
@@ -280,45 +320,37 @@ def _record_heading_errors(
     errors: list[str] = []
     if title.group("serial") != serial:
         errors.append(
-            f"{relative_path}: filename serial {serial} disagrees with heading serial "
-            f"{title.group('serial')}"
+            f"{record.relative_path}: filename serial {serial} disagrees with "
+            f"heading serial {title.group('serial')}"
         )
     expected_slug = slug_for_title(title.group("title"))
     if filename_slug != expected_slug:
         errors.append(
-            f"{relative_path}: filename slug {filename_slug!r} should be "
+            f"{record.relative_path}: filename slug {filename_slug!r} should be "
             f"{expected_slug!r} for its title"
         )
     return errors
 
 
-def validate_record_files(reader: RecordReader, docs_root: Path) -> list[str]:
+def validate_record_files(reader: RecordReader) -> list[str]:
     """Check record serials, heading numbers, and title slugs.
 
     Example: duplicate serials or a slug that disagrees with a title are errors.
     """
     errors: list[str] = []
-    record_kinds = (
-        RecordKind(docs_root, docs_root / "adrs", ADR_FILE, ADR_TITLE, "ADR"),
-        RecordKind(docs_root, docs_root / "rfcs", RFC_FILE, RFC_TITLE, "RFC"),
-    )
-    for record_kind in record_kinds:
-        serials: dict[str, Path] = {}
-        for path in reader.record_files(record_kind.directory):
-            match = _record_file_match(path, record_kind.file_pattern)
+    for record_kind in RECORD_KINDS:
+        serials: dict[str, str] = {}
+        for record in reader.record_files(record_kind.family):
+            match = record_kind.file_pattern.fullmatch(record.name)
             if match is None:
-                errors.append(
-                    f"{path.relative_to(docs_root.parent)}: filename is not canonical"
-                )
+                errors.append(f"{record.relative_path}: filename is not canonical")
                 continue
 
             serial = match.group("serial")
-            serial_error = _register_serial(serials, serial, path, record_kind)
+            serial_error = _register_serial(serials, serial, record, record_kind)
             if serial_error:
                 errors.append(serial_error)
-            errors.extend(
-                _record_heading_errors(reader, path, match, record_kind)
-            )
+            errors.extend(_record_heading_errors(record, match, record_kind))
     return errors
 
 
@@ -332,14 +364,13 @@ def _is_external_destination(parsed_url: SplitResult) -> bool:
 
 def _local_record_link(
     reader: RecordReader,
-    repository_root: Path,
-    source: Path,
+    source: str,
     destination: str,
 ) -> RecordLink | None:
     """Resolve a local ADR/RFC destination, or return `None` when unrelated.
 
     Example: an HTTP link returns `None`; a relative ADR link returns its
-    resolved target.
+    containment facts.
     """
     try:
         parsed_url = urlsplit(destination)
@@ -353,62 +384,41 @@ def _local_record_link(
         return None
     if not is_record_destination(parsed_url.path):
         return None
-    target = reader.resolve_link(repository_root, source, parsed_url.path)
-    return RecordLink(repository_root, source, target, destination)
+    facts = reader.link_facts(source, parsed_url.path)
+    return RecordLink(source, destination, facts)
 
 
-def _relative_source(link: RecordLink) -> Path:
-    """Return the source path relative to the root, or the source itself.
-
-    Example: a source outside the root is reported by its own path rather than
-    raising from `Path.relative_to`.
-    """
-    try:
-        return link.source.relative_to(link.repository_root)
-    except ValueError:
-        return link.source
-
-
-def _local_record_link_error(reader: RecordReader, link: RecordLink) -> str | None:
+def _local_record_link_error(link: RecordLink) -> str | None:
     """Describe a local record link that escapes the repository or is missing.
 
     Example: a link to an absent ADR returns a path-specific error.
     """
-    relative_source = _relative_source(link)
-    if link.target is None:
-        return f"{relative_source}: malformed local record link: {link.destination}"
-    try:
-        link.target.relative_to(link.repository_root)
-    except ValueError:
-        return f"{relative_source}: record link escapes the repository: {link.destination}"
-    if reader.is_file(link.target):
-        return None
-    return (
-        f"{relative_source}: local ADR/RFC link target does not exist: "
-        f"{link.destination}"
-    )
+    if link.facts is None:
+        return f"{link.source}: malformed local record link: {link.destination}"
+    if not link.facts.inside_root:
+        return f"{link.source}: record link escapes the repository: {link.destination}"
+    if not link.facts.exists:
+        return (
+            f"{link.source}: local ADR/RFC link target does not exist: "
+            f"{link.destination}"
+        )
+    return None
 
 
-def validate_local_record_links(
-    reader: RecordReader,
-    repository_root: Path,
-    markdown_paths: list[Path],
-) -> tuple[list[str], int]:
+def validate_local_record_links(reader: RecordReader) -> tuple[list[str], int]:
     """Check that local Markdown links targeting ADRs/RFCs resolve to files.
 
     Example: a missing local ADR destination appears in the returned errors.
     """
     errors: list[str] = []
     checked_links = 0
-    resolved_root = reader.resolve_root(repository_root)
-    for source in markdown_paths:
-        markdown = reader.read_text(source)
-        for destination in extract_markdown_destinations(markdown):
-            link = _local_record_link(reader, resolved_root, source, destination)
+    for document in reader.markdown_documents():
+        for destination in extract_markdown_destinations(document.text):
+            link = _local_record_link(reader, document.relative_path, destination)
             if link is None:
                 continue
             checked_links += 1
-            error = _local_record_link_error(reader, link)
+            error = _local_record_link_error(link)
             if error:
                 errors.append(error)
     return errors, checked_links

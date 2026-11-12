@@ -1,8 +1,9 @@
 """Filesystem adapter for the ADR/RFC documentation checks.
 
 The validation rules in ``adr_rfc_names.py`` depend only on the narrow
-``RecordReader`` port. This module supplies the filesystem implementation used
-by the command-line entry point, so discovery and reads stay outside the rules.
+``RecordReader`` port and their own domain values. This module supplies the
+filesystem implementation used by the command-line entry point, so discovery,
+reads, and link containment stay outside the rules.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import unquote
 
-from adr_rfc_names import RecordReader
+from adr_rfc_names import LinkFacts, MarkdownDocument, RecordFile, RecordReader
 
 
 EXCLUDED_MARKDOWN_DIRECTORIES = frozenset(
@@ -52,67 +53,98 @@ def markdown_files(repository_root: Path) -> list[Path]:
     return sorted(markdown_paths)
 
 
+def _is_inside(root: Path, target: Path) -> bool:
+    """Return whether a resolved target still sits under the repository root.
+
+    Example: a link resolving to `/repo/../outside/adr.md` is not inside
+    `/repo`.
+    """
+    try:
+        target.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
 class PathRecordReader(RecordReader):
-    """Read ADR/RFC inputs from the local filesystem."""
+    """Read ADR/RFC inputs from the local filesystem.
 
-    def record_files(self, directory: Path) -> list[Path]:
-        """Return the Markdown records in a directory, sorted by name.
+    The constructor resolves the repository root once, so discovery, reads, and
+    link containment all compare against the same real path. Resolution failure
+    is not hidden: it raises, and the composition root reports it as a read
+    error rather than checking links against an unresolved root.
+    """
 
-        Example: `record_files(docs / "adrs")` lists every ADR file.
+    def __init__(self, repository_root: Path) -> None:
+        self._root = repository_root.resolve()
+
+    @property
+    def root(self) -> Path:
+        """Return the resolved repository root.
+
+        Example: a reader built from a symlinked path reports the real path.
         """
-        return sorted(directory.glob("*.md"))
+        return self._root
 
-    def markdown_paths(self, repository_root: Path) -> list[Path]:
-        """Return every repository Markdown file to inspect.
+    def _relative_path(self, path: Path) -> str:
+        """Return a repository relative Posix path for diagnostics.
 
-        Example: `markdown_paths(Path("/repo"))` omits generated directories.
+        Example: `_relative_path(root / "docs/contents.md")` returns
+        `"docs/contents.md"`.
         """
-        return markdown_files(repository_root)
+        return path.relative_to(self._root).as_posix()
 
-    def read_text(self, path: Path) -> str:
-        """Return a file's UTF-8 text.
+    def record_files(self, family: str) -> list[RecordFile]:
+        """Return the Markdown records in a family such as `"adrs"`.
 
-        Example: `read_text(record)` returns the record's Markdown source.
+        Example: `record_files("adrs")` lists every ADR with its text.
         """
-        return path.read_text(encoding="utf-8")
+        directory = self._root / "docs" / family
+        return [
+            RecordFile(
+                path.name,
+                self._relative_path(path),
+                path.read_text(encoding="utf-8"),
+            )
+            for path in sorted(directory.glob("*.md"))
+        ]
 
-    def resolve_root(self, repository_root: Path) -> Path:
-        """Return the canonical root that record links must stay inside.
+    def markdown_documents(self) -> list[MarkdownDocument]:
+        """Return every repository Markdown document to inspect.
 
-        Example: a repository reached through a symlink resolves to its real
-        path, so containment checks compare like with like.
+        Example: `markdown_documents()` omits generated directories.
         """
-        try:
-            return repository_root.resolve()
-        except (OSError, RuntimeError):
-            # A symlink loop leaves the root unusable; the rules still report
-            # containment against the path the caller supplied.
-            return repository_root
+        return [
+            MarkdownDocument(
+                self._relative_path(path),
+                path.read_text(encoding="utf-8"),
+            )
+            for path in markdown_files(self._root)
+        ]
 
-    def resolve_link(
+    def link_facts(
         self,
-        repository_root: Path,
-        source: Path,
-        link_path: str,
-    ) -> Path | None:
-        """Resolve a local link path, or report a malformed path as `None`.
+        source: str,
+        destination_path: str,
+    ) -> LinkFacts | None:
+        """Describe a local link target relative to the repository root.
 
         Example: a root-relative `/docs/adrs/adr-0001-example.md` resolves from
-        the repository root.
+        the repository root, while `adrs/adr-0001-example.md` resolves from the
+        source document's directory.
         """
         try:
-            decoded_path = unquote(link_path)
+            decoded_path = unquote(destination_path)
             if decoded_path.startswith("/"):
-                return (repository_root / decoded_path.lstrip("/")).resolve()
-            return (source.parent / decoded_path).resolve()
-        except (OSError, ValueError):
+                target = (self._root / decoded_path.lstrip("/")).resolve()
+            else:
+                target = ((self._root / source).parent / decoded_path).resolve()
+        except (OSError, RuntimeError, ValueError):
             # Encoded null bytes and unresolvable symlink chains are reported
             # by the rules as diagnostics rather than aborting the check.
             return None
-
-    def is_file(self, path: Path) -> bool:
-        """Return whether a resolved link target is a regular file.
-
-        Example: `is_file(record)` is `True` for an existing ADR.
-        """
-        return path.is_file()
+        inside_root = _is_inside(self._root, target)
+        return LinkFacts(
+            inside_root=inside_root,
+            exists=inside_root and target.is_file(),
+        )
