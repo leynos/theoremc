@@ -1,10 +1,11 @@
 """Validate canonical ADR/RFC filenames, headings, and local links.
 
 The rules keep record titles, serials, filenames, and local references
-consistent. They operate on domain values only: the ``RecordReader`` port
-supplies record text and link containment facts, so this module imports no
-filesystem path type. ``tools/check_adr_rfc_names.py`` is the command-line
-entry point; ``make check-adr-rfc-names`` runs it after this module's tests.
+consistent. They operate on domain values only: the ``RecordReader`` port in
+``adr_rfc_ports.py`` supplies record text and link containment facts, so this
+module imports no filesystem path type. ``tools/check_adr_rfc_names.py`` is the
+command-line entry point; ``make check-adr-rfc-names`` runs it after this
+module's tests.
 """
 
 from __future__ import annotations
@@ -12,8 +13,9 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Protocol
 from urllib.parse import SplitResult, unquote, urlsplit
+
+from adr_rfc_ports import LinkFacts, RecordFile, RecordReader
 
 
 FENCED_CODE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
@@ -51,80 +53,6 @@ SPECIAL_TRANSLITERATIONS = str.maketrans(
 
 
 @dataclass(frozen=True)
-class RecordFile:
-    """Describe one record file in terms the rules can reason about.
-
-    The adapter reports paths relative to the repository root, so the rules
-    never need to know how that root is spelled on disk.
-
-    Example: `RecordFile("adr-0001-example.md",
-    "docs/adrs/adr-0001-example.md", "# …")`.
-    """
-
-    name: str
-    relative_path: str
-    text: str
-
-
-@dataclass(frozen=True)
-class MarkdownDocument:
-    """Describe one Markdown file whose links the rules must check.
-
-    Example: `MarkdownDocument("docs/contents.md", "[x](adrs/adr-0001.md)")`.
-    """
-
-    relative_path: str
-    text: str
-
-
-@dataclass(frozen=True)
-class LinkFacts:
-    """Describe what the adapter established about a local record link.
-
-    Containment is a filesystem question, so the adapter answers it and the
-    rules decide whether the answer is an error.
-
-    Example: a link to a missing ADR reports `inside_root=True, exists=False`.
-    """
-
-    inside_root: bool
-    exists: bool
-
-
-class RecordReader(Protocol):
-    """Supply the record and link facts the ADR/RFC checks need.
-
-    Every value crossing this port is a domain value: record names, repository
-    relative paths, file text, and containment facts. ``PathRecordReader`` in
-    ``adr_rfc_repository.py`` implements it against the filesystem.
-
-    Example: a test double returns `RecordFile` values from memory, so the
-    rules can be exercised without a repository on disk.
-    """
-
-    def record_files(self, family: str) -> list[RecordFile]:
-        """Return the record files in a family such as `"adrs"`."""
-        ...
-
-    def markdown_documents(self) -> list[MarkdownDocument]:
-        """Return every Markdown document whose links must be inspected."""
-        ...
-
-    def link_facts(
-        self,
-        source: str,
-        destination_path: str,
-    ) -> LinkFacts | None:
-        """Describe a local link target, or return `None` when it is malformed.
-
-        `source` and `destination_path` are repository relative. Example:
-        `link_facts("docs/contents.md", "adrs/adr-0001-example.md")` reports
-        whether that ADR is inside the root and exists.
-        """
-        ...
-
-
-@dataclass(frozen=True)
 class RecordKind:
     """Describe the filename and heading rules for one record family.
 
@@ -146,6 +74,16 @@ RECORD_KINDS = (
 @dataclass(frozen=True)
 class RecordLink:
     """Describe a local Markdown link that targets a candidate record.
+
+    Attributes
+    ----------
+    source : str
+        Repository-relative path of the document that holds the link.
+    destination : str
+        Destination exactly as written in the document, used in diagnostics.
+    facts : LinkFacts | None
+        What the adapter established about the target, or `None` when the
+        destination cannot be interpreted as a path.
 
     Example: `[x](adrs/adr-0001-example.md)` yields a link whose `facts` say
     whether the destination is inside the repository and exists.

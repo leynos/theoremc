@@ -405,11 +405,14 @@ only `uv` on `PATH`.
 
 The checker is split along a port-and-adapter boundary:
 
+- `tools/adr_rfc_ports.py` defines the `RecordReader` port and the domain
+  values that cross it: `RecordFile` and `MarkdownDocument` carry repository
+  relative paths and text, and `LinkFacts` carries the two containment answers
+  the rules cannot derive themselves. The module imports no filesystem path
+  type, and its public interfaces carry NumPy-style attribute, parameter, and
+  return sections.
 - `tools/adr_rfc_names.py` holds the pure rules: filename and heading patterns,
-  slug generation, Markdown destination extraction, and the `RecordReader`
-  port. Everything crossing that port is a domain value: `RecordFile` and
-  `MarkdownDocument` carry repository relative paths and text, and `LinkFacts`
-  carries the two containment answers the rules cannot derive themselves. The
+  slug generation, Markdown destination extraction, and the validations. The
   module imports no filesystem path type and touches no files; fitness tests in
   `tools/test_check_adr_rfc_names.py` enforce both.
 - `tools/adr_rfc_repository.py` implements that port as `PathRecordReader` and
@@ -417,7 +420,12 @@ The checker is split along a port-and-adapter boundary:
   including symlink and encoded-path handling. It resolves the repository root
   strictly, once, in its constructor, so discovery, reads, and containment
   compare against the same real path, and a missing root or symlink loop
-  becomes a read error rather than a silently unresolved path.
+  becomes a read error rather than a silently unresolved path. It rejects a
+  record directory reached through a symbolic link, because the Markdown scan
+  does not follow symlinked directories, and accepting one would let record and
+  link validation inspect different files. Record discovery matches the
+  Markdown extension case-insensitively, so a `.MD` record reaches the
+  canonical filename check instead of being skipped.
 - `tools/check_adr_rfc_names.py` is the composition root. It builds the adapter
   inside its guarded region, so a root that cannot resolve becomes a
   `DocumentationCheck.read_error` before any discovery runs, and returns a

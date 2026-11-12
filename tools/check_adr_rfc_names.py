@@ -3,8 +3,9 @@
 
 Run it with ``python3 tools/check_adr_rfc_names.py``, or run
 ``make check-adr-rfc-names`` to execute this checker after its pytest suite.
-The validation rules live in ``tools/adr_rfc_names.py`` and the filesystem
-adapter in ``tools/adr_rfc_repository.py``.
+The validation rules live in ``tools/adr_rfc_names.py``, their port and domain
+values in ``tools/adr_rfc_ports.py``, and the filesystem adapter in
+``tools/adr_rfc_repository.py``.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ from adr_rfc_names import (
     validate_local_record_links,
     validate_record_files,
 )
-from adr_rfc_repository import PathRecordReader
+from adr_rfc_repository import PathRecordReader, SymlinkedRecordDirectoryError
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -55,7 +56,12 @@ def check_documentation(repository_root: Path) -> DocumentationCheck:
             len(reader.record_files(record_kind.family))
             for record_kind in RECORD_KINDS
         )
-    except (OSError, RuntimeError, UnicodeError) as error:
+    except (
+        OSError,
+        RuntimeError,
+        UnicodeError,
+        SymlinkedRecordDirectoryError,
+    ) as error:
         return DocumentationCheck((), 0, 0, str(error))
     return DocumentationCheck(tuple(errors + link_errors), records, checked_links, None)
 

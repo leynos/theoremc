@@ -11,7 +11,19 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import unquote
 
-from adr_rfc_names import LinkFacts, MarkdownDocument, RecordFile, RecordReader
+from adr_rfc_ports import LinkFacts, MarkdownDocument, RecordFile, RecordReader
+
+
+class SymlinkedRecordDirectoryError(Exception):
+    """Report a record directory that is reached through a symbolic link.
+
+    ``markdown_files`` does not follow symlinked directories, so records read
+    through one would not be the files link validation inspects. Rejecting the
+    directory keeps both checks on one set of files.
+
+    Example: `docs/adrs` pointing outside the repository raises this error
+    rather than importing external records.
+    """
 
 
 EXCLUDED_MARKDOWN_DIRECTORIES = frozenset(
@@ -66,6 +78,40 @@ def _is_inside(root: Path, target: Path) -> bool:
     return True
 
 
+def _reject_symlinked_record_directories(root: Path, directory: Path) -> None:
+    """Reject a record directory reached through any symbolic link.
+
+    Every component between the repository root and the record directory is
+    checked, because a symlinked `docs` escapes containment exactly as a
+    symlinked `docs/adrs` does.
+
+    Example: `docs/adrs -> /outside/adrs` makes `record_files("adrs")` raise
+    `SymlinkedRecordDirectoryError`.
+    """
+    candidate = root
+    for part in directory.relative_to(root).parts:
+        candidate = candidate / part
+        if candidate.is_symlink():
+            raise SymlinkedRecordDirectoryError(
+                f"{candidate.relative_to(root).as_posix()}: record directory "
+                "must not be a symbolic link"
+            )
+
+
+def _markdown_candidates(directory: Path) -> list[Path]:
+    """Return a record directory's Markdown entries, in any extension case.
+
+    Discovery is case-insensitive so that a record named
+    `adr-0001-example.MD` reaches the canonical filename check instead of
+    being skipped; that check then reports the wrong casing.
+
+    Example: `adr-0001-example.MD` is returned, while `notes.txt` is not.
+    """
+    return sorted(
+        path for path in directory.iterdir() if path.suffix.lower() == ".md"
+    )
+
+
 class PathRecordReader(RecordReader):
     """Read ADR/RFC inputs from the local filesystem.
 
@@ -99,20 +145,46 @@ class PathRecordReader(RecordReader):
     def record_files(self, family: str) -> list[RecordFile]:
         """Return the Markdown records in a family such as `"adrs"`.
 
+        Parameters
+        ----------
+        family : str
+            Record family directory name under `docs/`, such as `"adrs"`.
+
+        Returns
+        -------
+        list[RecordFile]
+            Every Markdown entry in the directory, read as UTF-8. A missing
+            directory yields none.
+
+        Raises
+        ------
+        SymlinkedRecordDirectoryError
+            If the record directory, or any directory between it and the
+            repository root, is a symbolic link.
+
         Example: `record_files("adrs")` lists every ADR with its text.
         """
         directory = self._root / "docs" / family
+        _reject_symlinked_record_directories(self._root, directory)
+        if not directory.is_dir():
+            return []
         return [
             RecordFile(
                 path.name,
                 self._relative_path(path),
                 path.read_text(encoding="utf-8"),
             )
-            for path in sorted(directory.glob("*.md"))
+            for path in _markdown_candidates(directory)
         ]
 
     def markdown_documents(self) -> list[MarkdownDocument]:
         """Return every repository Markdown document to inspect.
+
+        Returns
+        -------
+        list[MarkdownDocument]
+            Every Markdown file outside generated directories, read as UTF-8
+            and ordered by path.
 
         Example: `markdown_documents()` omits generated directories.
         """
@@ -129,11 +201,27 @@ class PathRecordReader(RecordReader):
         source: str,
         destination_path: str,
     ) -> LinkFacts | None:
-        """Describe a local link target relative to the repository root.
+        """Describe a local link target, resolving it from the right directory.
+
+        Parameters
+        ----------
+        source : str
+            Repository-relative path of the document that holds the link.
+        destination_path : str
+            Link destination as written in the document. A leading `/` is
+            repository-relative; anything else is relative to the directory
+            that holds `source`.
+
+        Returns
+        -------
+        LinkFacts | None
+            Whether the resolved target is inside the repository and exists,
+            or `None` when the destination is not an interpretable path.
 
         Example: a root-relative `/docs/adrs/adr-0001-example.md` resolves from
         the repository root, while `adrs/adr-0001-example.md` resolves from the
-        source document's directory.
+        source document's directory, so `docs/contents.md` reaches
+        `docs/adrs/adr-0001-example.md`.
         """
         try:
             decoded_path = unquote(destination_path)

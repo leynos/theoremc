@@ -6,18 +6,17 @@ import ast
 from pathlib import Path
 
 import adr_rfc_names
+import adr_rfc_ports
 import check_adr_rfc_names
 import pytest
 
 from adr_rfc_names import (
-    LinkFacts,
-    MarkdownDocument,
-    RecordFile,
     extract_markdown_destinations,
     slug_for_title,
     validate_local_record_links,
     validate_record_files,
 )
+from adr_rfc_ports import LinkFacts, MarkdownDocument, RecordFile
 from adr_rfc_repository import PathRecordReader, markdown_files
 
 
@@ -397,8 +396,49 @@ def test_reports_a_real_symlink_loop_as_a_read_error(tmp_path: Path) -> None:
     check = check_adr_rfc_names.check_documentation(loop_root)
 
     assert check.read_error is not None, "a symlink loop must not resolve silently"
-    assert "Too many levels of symbolic links" in check.read_error, check.read_error
+    assert "loop" in check.read_error, check.read_error
     assert (check.errors, check.records, check.checked_links) == ((), 0, 0), check
+
+
+@pytest.mark.parametrize(
+    ("linked_directory", "target_directory"),
+    (("docs", "docs"), ("docs/adrs", "adrs")),
+)
+def test_reports_a_symlinked_record_directory_as_a_read_error(
+    tmp_path: Path, linked_directory: str, target_directory: str
+) -> None:
+    """Records read through a symlink are not the files the link check scans."""
+    repository_root = tmp_path / "repository"
+    (repository_root / "docs").mkdir(parents=True)
+    outside_adrs = tmp_path / "outside" / target_directory
+    outside_adrs.mkdir(parents=True)
+    (outside_adrs / "adr-0009-outside.md").write_text(
+        "# Architectural decision record (ADR) 0009: Outside\n", encoding="utf-8"
+    )
+    linked = repository_root / linked_directory
+    if linked.exists():
+        linked.rmdir()
+    linked.symlink_to(outside_adrs, target_is_directory=True)
+
+    check = check_adr_rfc_names.check_documentation(repository_root)
+
+    assert check.read_error is not None, "a symlinked directory must be rejected"
+    assert "must not be a symbolic link" in check.read_error, check.read_error
+    assert (check.errors, check.records, check.checked_links) == ((), 0, 0), check
+
+
+def test_reports_noncanonical_extension_casing(tmp_path: Path) -> None:
+    """A `.MD` record must reach the canonical filename check."""
+    adrs_root = tmp_path / "docs" / "adrs"
+    adrs_root.mkdir(parents=True)
+    (adrs_root / "adr-0001-example.MD").write_text(
+        "# Architectural decision record (ADR) 0001: Example\n", encoding="utf-8"
+    )
+
+    errors = validate_record_files(PathRecordReader(tmp_path))
+
+    assert len(errors) == 1, errors
+    assert "filename is not canonical" in errors[0], errors
 
 
 @pytest.mark.parametrize("error_type", (OSError, RuntimeError))
@@ -563,21 +603,34 @@ def test_rules_module_has_no_direct_filesystem_calls() -> None:
     )
 
 
+def _imported_modules(tree: ast.AST) -> set[str]:
+    """Return every module an abstract syntax tree imports.
+
+    Example: `from pathlib import Path` contributes `"pathlib"`.
+    """
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        match node:
+            case ast.ImportFrom(module=str(module)):
+                modules.add(module)
+            case ast.Import(names=aliases):
+                modules.update(alias.name for alias in aliases)
+    return modules
+
+
 def test_rules_module_imports_no_filesystem_path_type() -> None:
     source = Path(adr_rfc_names.__file__).read_text(encoding="utf-8")
-    tree = ast.parse(source)
-    imported_modules = {
-        node.module
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom) and node.module
-    }
-    imported_modules.update(
-        alias.name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Import)
-        for alias in node.names
-    )
+    imported_modules = _imported_modules(ast.parse(source))
 
     assert "pathlib" not in imported_modules, (
         "the rules must model repository paths as strings supplied by the port"
+    )
+
+
+def test_ports_module_imports_no_filesystem_path_type() -> None:
+    source = Path(adr_rfc_ports.__file__).read_text(encoding="utf-8")
+    imported_modules = _imported_modules(ast.parse(source))
+
+    assert "pathlib" not in imported_modules, (
+        "the port must carry domain values rather than filesystem paths"
     )

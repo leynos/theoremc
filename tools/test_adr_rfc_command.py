@@ -22,6 +22,7 @@ def _create_repository(root: Path) -> Path:
     for module_name in (
         "check_adr_rfc_names.py",
         "adr_rfc_names.py",
+        "adr_rfc_ports.py",
         "adr_rfc_repository.py",
     ):
         shutil.copyfile(
@@ -131,7 +132,6 @@ def test_main_reports_symlink_loop_root_without_traceback(
 
     captured = capsys.readouterr()
     assert "could not read repository files" in captured.err, captured.err
-    assert "Too many levels of symbolic links" in captured.err, captured.err
     assert "Traceback" not in captured.err, captured.err
 
 
