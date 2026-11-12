@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 import adr_rfc_names
@@ -17,7 +18,9 @@ from adr_rfc_repository import PathRecordReader, markdown_files
 
 
 def test_slug_transliterates_accents_and_keeps_kebab_case() -> None:
-    assert slug_for_title("Café and Æther") == "cafe-and-aether"
+    assert slug_for_title("Café and Æther") == "cafe-and-aether", (
+        "accents and ligatures must transliterate"
+    )
 
 
 def test_extracts_local_links_but_ignores_code() -> None:
@@ -34,7 +37,7 @@ def test_extracts_local_links_but_ignores_code() -> None:
     assert extract_markdown_destinations(markdown) == [
         "adrs/adr-0001-example.md#decision",
         "rfcs/rfc-0001-example.md",
-    ]
+    ], "inline links, reference definitions, and HTML links must be extracted"
 
 
 def test_extracts_wrapped_link_text_and_destination() -> None:
@@ -47,7 +50,7 @@ def test_extracts_wrapped_link_text_and_destination() -> None:
 
     assert extract_markdown_destinations(markdown) == [
         "adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md"
-    ]
+    ], "link text and destination may wrap across lines"
 
 
 def test_fence_with_info_string_does_not_close_code_block() -> None:
@@ -62,7 +65,7 @@ def test_fence_with_info_string_does_not_close_code_block() -> None:
 
     assert extract_markdown_destinations(markdown) == [
         "docs/adrs/adr-0002-visible.md"
-    ]
+    ], "an info string must not close the enclosing fence"
 
 
 def test_footnote_continuations_are_not_reference_links() -> None:
@@ -71,7 +74,9 @@ def test_footnote_continuations_are_not_reference_links() -> None:
       (docs/adrs/adr-0001-example.md decision 3)
 """
 
-    assert extract_markdown_destinations(markdown) == []
+    assert extract_markdown_destinations(markdown) == [], (
+        "footnote continuations must not be read as links"
+    )
 
 
 def test_reports_duplicate_record_serials(tmp_path: Path) -> None:
@@ -88,8 +93,8 @@ def test_reports_duplicate_record_serials(tmp_path: Path) -> None:
 
     errors = validate_record_files(PathRecordReader(), tmp_path / "docs")
 
-    assert len(errors) == 1
-    assert "duplicate ADR serial 0001" in errors[0]
+    assert len(errors) == 1, errors
+    assert "duplicate ADR serial 0001" in errors[0], errors
 
 
 def test_checks_noncanonical_names_and_rfc_contract(tmp_path: Path) -> None:
@@ -111,10 +116,12 @@ def test_checks_noncanonical_names_and_rfc_contract(tmp_path: Path) -> None:
 
     errors = validate_record_files(PathRecordReader(), tmp_path / "docs")
 
-    assert sum("filename is not canonical" in error for error in errors) == 2
-    assert any("duplicate RFC serial 0001" in error for error in errors)
-    assert any("disagrees with heading serial 0004" in error for error in errors)
-    assert any("should be 'canonical-title'" in error for error in errors)
+    assert sum("filename is not canonical" in error for error in errors) == 2, errors
+    assert any("duplicate RFC serial 0001" in error for error in errors), errors
+    assert any("disagrees with heading serial 0004" in error for error in errors), (
+        errors
+    )
+    assert any("should be 'canonical-title'" in error for error in errors), errors
 
 
 @pytest.mark.parametrize(
@@ -135,8 +142,8 @@ def test_reports_missing_or_malformed_headings(
 
     errors = validate_record_files(PathRecordReader(), tmp_path / "docs")
 
-    assert len(errors) == 1
-    assert "first heading is not a numbered" in errors[0]
+    assert len(errors) == 1, errors
+    assert "first heading is not a numbered" in errors[0], errors
 
 
 def test_reports_adr_serial_and_slug_mismatch(tmp_path: Path) -> None:
@@ -152,8 +159,8 @@ def test_reports_adr_serial_and_slug_mismatch(tmp_path: Path) -> None:
     assert any(
         "filename serial 0001 disagrees with heading serial 0002" in error
         for error in errors
-    )
-    assert any("should be 'canonical-title'" in error for error in errors)
+    ), errors
+    assert any("should be 'canonical-title'" in error for error in errors), errors
 
 
 def test_markdown_file_scan_prunes_excluded_directories(
@@ -190,9 +197,15 @@ def test_markdown_file_scan_prunes_excluded_directories(
 
     monkeypatch.setattr(Path, "iterdir", track_directory_visits)
 
-    assert markdown_files(tmp_path) == [contents, linked_file]
-    assert not excluded_directories.intersection(path.name for path in visited)
-    assert linked_directory not in visited
+    assert markdown_files(tmp_path) == [contents, linked_file], (
+        "only the contents file and its symlink must be discovered"
+    )
+    assert not excluded_directories.intersection(
+        path.name for path in visited
+    ), "excluded directories must not be scanned"
+    assert linked_directory not in visited, (
+        "a symlinked directory must not be followed"
+    )
 
 
 def test_local_record_links_handle_encoded_root_external_and_escape_paths(
@@ -217,9 +230,9 @@ def test_local_record_links_handle_encoded_root_external_and_escape_paths(
         PathRecordReader(), tmp_path, [source]
     )
 
-    assert checked_links == 3
-    assert len(errors) == 1
-    assert "escapes the repository" in errors[0]
+    assert checked_links == 3, "root, encoded, and escaping links must be checked"
+    assert len(errors) == 1, errors
+    assert "escapes the repository" in errors[0], errors
 
 
 def test_checks_filename_heading_slug_and_record_links(tmp_path: Path) -> None:
@@ -250,10 +263,12 @@ def test_checks_filename_heading_slug_and_record_links(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    assert validate_record_files(PathRecordReader(), docs_root) == []
+    assert validate_record_files(PathRecordReader(), docs_root) == [], (
+        "a canonical record set must produce no errors"
+    )
     assert validate_local_record_links(
         PathRecordReader(), tmp_path, [source, record]
-    ) == ([], 3)
+    ) == ([], 3), "every visible local record link must be checked"
 
 
 @pytest.mark.parametrize(
@@ -271,8 +286,8 @@ def test_reports_missing_record_link(tmp_path: Path, destination: str) -> None:
         PathRecordReader(), tmp_path, [source]
     )
 
-    assert checked_links == 1
-    assert len(errors) == 1
+    assert checked_links == 1, "the single local link must be checked"
+    assert len(errors) == 1, errors
 
 
 def test_validates_html_record_links(tmp_path: Path) -> None:
@@ -293,9 +308,9 @@ def test_validates_html_record_links(tmp_path: Path) -> None:
         PathRecordReader(), tmp_path, [source]
     )
 
-    assert checked_links == 2
-    assert len(errors) == 1
-    assert "adr-0002-missing.md" in errors[0]
+    assert checked_links == 2, "both HTML links must be checked"
+    assert len(errors) == 1, errors
+    assert "adr-0002-missing.md" in errors[0], errors
 
 
 def test_ignores_malformed_external_url(tmp_path: Path) -> None:
@@ -308,7 +323,9 @@ def test_ignores_malformed_external_url(tmp_path: Path) -> None:
         PathRecordReader(), tmp_path, [source]
     )
 
-    assert (errors, checked_links) == ([], 0)
+    assert (errors, checked_links) == ([], 0), (
+        "a malformed external URL must be ignored"
+    )
 
 
 def test_reports_local_path_with_null_byte_as_diagnostic(tmp_path: Path) -> None:
@@ -321,9 +338,9 @@ def test_reports_local_path_with_null_byte_as_diagnostic(tmp_path: Path) -> None
         PathRecordReader(), tmp_path, [source]
     )
 
-    assert checked_links == 1
-    assert len(errors) == 1
-    assert "malformed local record link" in errors[0]
+    assert checked_links == 1, "the malformed link must still be counted"
+    assert len(errors) == 1, errors
+    assert "malformed local record link" in errors[0], errors
 
 
 class _StubReader:
@@ -367,11 +384,12 @@ def test_validation_uses_injected_reader_without_filesystem() -> None:
         {record: "# Architectural decision record (ADR) 0001: Example\n"}
     )
 
-    assert validate_record_files(reader, docs_root) == []
-    assert validate_local_record_links(reader, Path("/nonexistent"), [record]) == (
-        [],
-        0,
+    assert validate_record_files(reader, docs_root) == [], (
+        "validation must read records through the injected reader"
     )
+    assert validate_local_record_links(
+        reader, Path("/nonexistent"), [record]
+    ) == ([], 0), "validation must resolve links through the injected reader"
 
 
 def test_stub_reader_resolves_local_record_links_without_filesystem() -> None:
@@ -387,7 +405,10 @@ def test_stub_reader_resolves_local_record_links_without_filesystem() -> None:
         {"adrs/adr-0001-example.md": record},
     )
 
-    assert validate_local_record_links(reader, repository_root, [source]) == ([], 1)
+    assert validate_local_record_links(reader, repository_root, [source]) == (
+        [],
+        1,
+    ), "the stub reader must resolve the link without a filesystem"
 
 
 def test_uses_reader_resolved_root_for_link_containment() -> None:
@@ -404,7 +425,9 @@ def test_uses_reader_resolved_root_for_link_containment() -> None:
         resolved_root,
     )
 
-    assert validate_local_record_links(reader, supplied_root, [source]) == ([], 1)
+    assert validate_local_record_links(reader, supplied_root, [source]) == ([], 1), (
+        "containment must use the reader's resolved root"
+    )
 
 
 FILESYSTEM_METHODS = (
@@ -419,13 +442,26 @@ FILESYSTEM_METHODS = (
 )
 
 
+def _direct_filesystem_calls(tree: ast.AST) -> list[str]:
+    """Return filesystem calls that bypass the injected `reader` parameter."""
+    calls: list[str] = []
+    for node in ast.walk(tree):
+        match node:
+            case ast.Call(func=ast.Attribute(value=ast.Name(id="reader"))):
+                continue
+            case ast.Call(func=ast.Attribute(attr=attr)) if (
+                attr in FILESYSTEM_METHODS
+            ):
+                calls.append(attr)
+            case ast.Call(func=ast.Name(id="open")):
+                calls.append("open")
+    return sorted(calls)
+
+
 def test_rules_module_has_no_direct_filesystem_calls() -> None:
     source = Path(adr_rfc_names.__file__).read_text(encoding="utf-8")
-    delegated_calls_removed = source.replace("reader.", "")
-    direct_calls = [
-        method
-        for method in FILESYSTEM_METHODS
-        if f".{method}(" in delegated_calls_removed
-    ]
+    tree = ast.parse(source)
 
-    assert direct_calls == []
+    assert _direct_filesystem_calls(tree) == [], (
+        "the rules module must reach the filesystem only through `reader`"
+    )

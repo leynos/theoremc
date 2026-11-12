@@ -54,7 +54,9 @@ def test_command_succeeds_for_valid_records_and_links(tmp_path: Path) -> None:
     result = _run_checker(checker)
 
     assert result.returncode == 0, result.stderr
-    assert "Checked 2 ADR/RFC records and 2 local ADR/RFC links." in result.stdout
+    assert "Checked 2 ADR/RFC records and 2 local ADR/RFC links." in result.stdout, (
+        result.stdout
+    )
 
 
 def test_command_reports_contract_errors(tmp_path: Path) -> None:
@@ -67,9 +69,9 @@ def test_command_reports_contract_errors(tmp_path: Path) -> None:
 
     result = _run_checker(checker)
 
-    assert result.returncode == 1
-    assert "filename is not canonical" in result.stderr
-    assert "local ADR/RFC link target does not exist" in result.stderr
+    assert result.returncode == 1, result.stderr
+    assert "filename is not canonical" in result.stderr, result.stderr
+    assert "local ADR/RFC link target does not exist" in result.stderr, result.stderr
 
 
 def test_command_reports_invalid_utf8_without_traceback(tmp_path: Path) -> None:
@@ -79,9 +81,9 @@ def test_command_reports_invalid_utf8_without_traceback(tmp_path: Path) -> None:
 
     result = _run_checker(checker)
 
-    assert result.returncode == 1
-    assert "could not read repository files" in result.stderr
-    assert "Traceback" not in result.stderr
+    assert result.returncode == 1, result.stderr
+    assert "could not read repository files" in result.stderr, result.stderr
+    assert "Traceback" not in result.stderr, result.stderr
 
 
 def test_command_reports_malformed_destination_without_traceback(
@@ -95,9 +97,9 @@ def test_command_reports_malformed_destination_without_traceback(
 
     result = _run_checker(checker)
 
-    assert result.returncode == 1
-    assert "malformed local record link" in result.stderr
-    assert "Traceback" not in result.stderr
+    assert result.returncode == 1, result.stderr
+    assert "malformed local record link" in result.stderr, result.stderr
+    assert "Traceback" not in result.stderr, result.stderr
 
 
 def test_command_reports_filesystem_failure_without_traceback(
@@ -108,9 +110,9 @@ def test_command_reports_filesystem_failure_without_traceback(
 
     result = _run_checker(checker)
 
-    assert result.returncode == 1
-    assert "could not read repository files" in result.stderr
-    assert "Traceback" not in result.stderr
+    assert result.returncode == 1, result.stderr
+    assert "could not read repository files" in result.stderr, result.stderr
+    assert "Traceback" not in result.stderr, result.stderr
 
 
 def test_make_target_executes_both_checks_with_pinned_interpreter(
@@ -137,10 +139,12 @@ def test_make_target_executes_both_checks_with_pinned_interpreter(
 
     assert result.returncode == 0, result.stderr
     commands = log.read_text(encoding="utf-8").splitlines()
-    assert len(commands) == 2
-    assert all("--python 3.13" in command for command in commands)
+    assert len(commands) == 2, commands
+    assert all("--python 3.13" in command for command in commands), commands
     assert any(
         "-m pytest tools/test_check_adr_rfc_names.py" in command
         for command in commands
-    )
-    assert any(command.endswith("tools/check_adr_rfc_names.py") for command in commands)
+    ), commands
+    assert any(
+        command.endswith("tools/check_adr_rfc_names.py") for command in commands
+    ), commands
