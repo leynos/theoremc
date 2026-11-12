@@ -286,6 +286,18 @@ basic pipeline defects harder to isolate.
 Rejected. It appears shorter locally, but it creates the exact assertion-only,
 Kani-specific coupling that ADR-0006 is designed to prevent.
 
+## Addendum (2026-11-12): renumbering
+
+This record was formerly filed as ADR 005 in
+`docs/adr-005-vertical-slice-first-roadmap-sequencing.md`. The documentation
+style guide now requires a four-digit, zero-padded serial that is unique among
+the ADRs, in a canonical `adrs/adr-nnnn-title-slug.md` filename. The old
+numbering also repeated serial 005, which the build-standard ADR already used.
+The record now carries serial 0011, and its serial is stable from this point.
+
+References to "ADR 005" or "ADR-005" in earlier discussions describe this
+decision. They are historical context only and do not name a current record.
+
 ## Related documents
 
 - [RFC 0001: semantic law templates](../rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)

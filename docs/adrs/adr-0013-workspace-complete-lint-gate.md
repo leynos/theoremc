@@ -123,6 +123,17 @@ the stub-executable contract test possible.
   This decision makes the existing `[workspace.lints.*]` tables reach every
   member; it does not add rules to them.
 
+## Addendum (2026-11-12): renumbering
+
+This record was formerly filed as ADR 012 in
+`docs/adr-012-workspace-complete-lint-gate.md`. The documentation style guide
+now requires a four-digit, zero-padded serial that is unique among the ADRs, in
+a canonical `adrs/adr-nnnn-title-slug.md` filename. The record now carries
+serial 0013, and its serial is stable from this point.
+
+References to "ADR 012" or "ADR-012" in earlier discussions describe this
+decision. They are historical context only and do not name a current record.
+
 ## Related documents
 
 - [ADR-0005: Rust build standard](adr-0005-adopt-the-rust-build-standard-for-development-builds.md)
