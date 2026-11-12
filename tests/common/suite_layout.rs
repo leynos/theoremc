@@ -158,6 +158,31 @@ mod tests {
         assert!(error.contains("pkg-0123abcd"), "{error}");
     }
 
+    /// A package output directory that is a file cannot hold a suite, and that
+    /// is an inspection failure rather than an unbuilt fixture.
+    #[test]
+    fn a_package_output_that_is_a_file_is_an_error() {
+        let scratch = tempfile::tempdir().expect("create a scratch directory");
+        let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
+            .expect("the scratch directory path should be UTF-8");
+        let build_dir =
+            Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
+        build_dir
+            .create_dir("pkg-0123abcd")
+            .expect("create the package directory");
+        build_dir
+            .write("pkg-0123abcd/out", "not a directory")
+            .expect("write a file where the output directory would be");
+
+        let error = read_suite(&build_dir, "pkg-0123abcd")
+            .expect_err("an output path that is a file must not read as absent");
+
+        assert!(
+            error.contains("pkg-0123abcd/out/theorem_suite.rs"),
+            "{error}"
+        );
+    }
+
     /// A package with no output reads as having no suite.
     #[test]
     fn a_missing_suite_reads_as_none() {

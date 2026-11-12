@@ -174,7 +174,9 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     });
     let output = match listing {
         Ok(Some(output)) => output,
-        Ok(None) => return skip_without_kani("cargo-kani not installed", "listing"),
+        Ok(None) => {
+            return skip_without_kani("cargo-kani availability probe failed", "listing");
+        }
         Err(error) if is_unusable_kani_environment(&error) => {
             return skip_without_kani(
                 &format!("cargo-kani is installed but unusable: {error}"),

@@ -79,10 +79,25 @@ fn assert_path_relationships(first: &FixtureCrate, second: &FixtureCrate) -> Res
 /// unbuilt one. The suite must also be absent before either fixture is built,
 /// so a cached suite from a sibling fixture cannot satisfy it.
 fn assert_second_fixture_is_unbuilt(second: &FixtureCrate) -> Result<(), String> {
-    if second.path_exists(Utf8Path::new(FIRST_FIXTURE.theorem))? {
+    assert_unbuilt(
+        second.path_exists(Utf8Path::new(FIRST_FIXTURE.theorem)),
+        second.find_generated_suite(),
+    )
+}
+
+/// Applies the unbuilt-fixture rules to one pair of lookup outcomes.
+///
+/// Taking the outcomes as arguments keeps the failure policy testable without
+/// provoking a real filesystem error. An inspection error is propagated
+/// unchanged, so it can never be mistaken for an absent path.
+fn assert_unbuilt(
+    source_present: Result<bool, String>,
+    suite: Result<Option<String>, String>,
+) -> Result<(), String> {
+    if source_present? {
         return Err("writing one fixture must not change another fixture's sources".to_owned());
     }
-    if second.find_generated_suite()?.is_some() {
+    if suite?.is_some() {
         return Err("an unbuilt fixture must not read a stale shared suite".to_owned());
     }
     Ok(())
@@ -121,4 +136,35 @@ fn assert_suite_contains(
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for the isolation check's failure policy.
+
+    use super::assert_unbuilt;
+
+    #[test]
+    fn a_source_inspection_error_fails_the_isolation_check() {
+        let error = assert_unbuilt(
+            Err("cannot inspect theorems/first.theorem".to_owned()),
+            Ok(None),
+        )
+        .expect_err("a source inspection failure must not read as absence");
+
+        assert_eq!(error, "cannot inspect theorems/first.theorem");
+    }
+
+    #[test]
+    fn a_suite_inspection_error_fails_the_isolation_check() {
+        let error = assert_unbuilt(Ok(false), Err("cannot inspect build".to_owned()))
+            .expect_err("a suite inspection failure must not read as absence");
+
+        assert_eq!(error, "cannot inspect build");
+    }
+
+    #[test]
+    fn an_absent_source_and_suite_pass_the_isolation_check() {
+        assert_unbuilt(Ok(false), Ok(None)).expect("an unbuilt fixture is isolated");
+    }
 }

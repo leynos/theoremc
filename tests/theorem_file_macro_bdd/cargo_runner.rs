@@ -144,10 +144,12 @@ pub(crate) fn kani_is_required() -> bool {
 
 /// Runs the Kani harness listing only when the availability probe succeeded.
 ///
-/// The probe and the listing have different meanings. A missing `cargo-kani`
-/// is a reason to skip the check, but a toolchain that is installed and still
-/// cannot list harnesses is a failure the caller must report. Taking the probe
-/// result as an argument keeps that policy testable without running Kani.
+/// The probe and the listing have different meanings. A failed availability
+/// probe — a missing `cargo-kani`, a launch failure, or a non-zero
+/// `--version` exit — is a reason to skip the check, but a toolchain that
+/// answers the probe and still cannot list harnesses is a failure the caller
+/// must report. Taking the probe result as an argument keeps that policy
+/// testable without running Kani.
 ///
 /// # Errors
 ///
