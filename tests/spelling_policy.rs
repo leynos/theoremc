@@ -1,9 +1,13 @@
 //! Non-vacuous policy test for the repository spelling overlay.
 //!
-//! The test runs the real pinned builder against two temporary, tracked
-//! fixtures. The first exercises every pattern in `typos.local.toml`, so a
-//! pattern that stops matching makes the fixture fail. The second adds one
-//! ordinary misspelling to prove the masked prose is still checked.
+//! The tests run the real pinned builder against temporary, tracked fixtures.
+//! The first exercises every pattern in `typos.local.toml`, so a pattern that
+//! stops matching makes the fixture fail. The second adds one ordinary
+//! misspelling to prove the masked prose is still checked. The third commits a
+//! `typos.toml` that the builder would regenerate differently and then stages
+//! that regeneration, proving the gate's freshness check compares against
+//! `HEAD` and so rejects a stale file whether it is committed or merely
+//! staged.
 //!
 //! The fixture prose lives under `tests/fixtures/spelling/` and is excluded
 //! from the repository gate, because it must contain the spellings the gate
@@ -31,6 +35,51 @@ const FIXTURE_PROSE: &str = include_str!("fixtures/spelling/prose.txt");
 
 /// One ordinary misspelling added to the passing fixture.
 const INTRODUCED_TYPO: &str = include_str!("fixtures/spelling/introduced-typo.txt");
+
+/// The generated configuration the freshness case commits and then stales.
+const TYPOS_FILE: &str = "typos.toml";
+
+/// A hand edit the builder will not reproduce, which makes the file stale.
+const STALE_EDIT: &str = "# stale hand edit\n";
+
+/// The commits a fixture repository records while a case runs.
+///
+/// Naming them keeps the commit helper free of free text, so a caller cannot
+/// pass a message that describes a state the case did not reach.
+#[derive(Clone, Copy)]
+enum FixtureCommit {
+    Initial,
+    Generated,
+    Stale,
+}
+
+impl FixtureCommit {
+    /// Returns the message this step records.
+    const fn message(self) -> &'static str {
+        match self {
+            Self::Initial => "fixture",
+            Self::Generated => "generated",
+            Self::Stale => "stale",
+        }
+    }
+}
+
+/// How the stale configuration reached the repository when the gate ran.
+#[derive(Clone, Copy)]
+enum StaleState {
+    Committed,
+    Staged,
+}
+
+impl StaleState {
+    /// Describes the state in the failure message of the assertion helper.
+    const fn describe(self) -> &'static str {
+        match self {
+            Self::Committed => "the stale file is committed",
+            Self::Staged => "the stale file is committed and the fix is only staged",
+        }
+    }
+}
 
 /// Returns the package root, which holds the Makefile and the pinned builder.
 fn repository_root() -> &'static Path {
@@ -74,8 +123,7 @@ fn stage_fixture(prose: &str) -> Result<tempfile::TempDir, String> {
         .write("prose.md", prose)
         .map_err(|error| format!("write prose: {error}"))?;
     run_git(directory.path(), &["init"])?;
-    run_git(directory.path(), &["add", "-A"])?;
-    run_git(directory.path(), &["commit", "-m", "fixture"])?;
+    commit_fixture(directory.path(), FixtureCommit::Initial)?;
     Ok(directory)
 }
 
@@ -93,6 +141,32 @@ fn run_gate(fixture: &Path) -> Result<Output, String> {
         .env("TYPOS_CONFIG_BUILDER_OFFLINE", "true")
         .output()
         .map_err(|error| format!("run make: {error}"))
+}
+
+/// Appends the stale hand edit to the fixture's tracked configuration.
+///
+/// The freshness case needs a committed `typos.toml` that differs from what
+/// the builder writes, and a hand-appended line is the smallest such edit.
+fn append_stale_edit(directory: &Path) -> Result<(), String> {
+    let fixture = Dir::open_ambient_dir(directory, ambient_authority())
+        .map_err(|error| format!("open fixture: {error}"))?;
+    let existing = fixture
+        .read_to_string(TYPOS_FILE)
+        .map_err(|error| format!("read {TYPOS_FILE}: {error}"))?;
+    fixture
+        .write(TYPOS_FILE, format!("{existing}{STALE_EDIT}"))
+        .map_err(|error| format!("write {TYPOS_FILE}: {error}"))
+}
+
+/// Commits every change in a fixture repository.
+fn commit_fixture(directory: &Path, commit: FixtureCommit) -> Result<(), String> {
+    stage_fixture_changes(directory)?;
+    run_git(directory, &["commit", "-m", commit.message()])
+}
+
+/// Stages every change in a fixture repository without committing it.
+fn stage_fixture_changes(directory: &Path) -> Result<(), String> {
+    run_git(directory, &["add", "-A"])
 }
 
 /// Renders a gate failure with both streams for the test assertion.
@@ -130,4 +204,49 @@ fn overlay_patterns_pass_and_an_introduced_typo_fails() -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+/// Asserts that the gate rejected a stale `typos.toml` with its freshness hint.
+fn check_freshness_failure(output: &Output, state: StaleState) -> Result<(), String> {
+    let scenario = state.describe();
+    if output.status.success() {
+        return Err(format!(
+            "the gate accepted a typos.toml its builder would not, when {scenario}"
+        ));
+    }
+    let rendered = gate_output(output);
+    if !rendered.contains("commit the regenerated file") {
+        return Err(format!(
+            "the gate rejected the stale file without the freshness hint, when \
+             {scenario}:\n{rendered}"
+        ));
+    }
+    Ok(())
+}
+
+#[test]
+fn stale_typos_toml_fails_the_gate_when_committed_or_staged() -> Result<(), String> {
+    let fixture = stage_fixture(FIXTURE_PROSE)?;
+    let generated = run_gate(fixture.path())?;
+    if !generated.status.success() {
+        return Err(gate_failure(&generated));
+    }
+    commit_fixture(fixture.path(), FixtureCommit::Generated)?;
+    let committed = run_gate(fixture.path())?;
+    if !committed.status.success() {
+        return Err(gate_failure(&committed));
+    }
+
+    append_stale_edit(fixture.path())?;
+    commit_fixture(fixture.path(), FixtureCommit::Stale)?;
+    let stale = run_gate(fixture.path())?;
+    check_freshness_failure(&stale, StaleState::Committed)?;
+
+    // The failing gate regenerated the file, so staging that regeneration
+    // leaves the index equal to the worktree while `HEAD` stays stale. A
+    // worktree-to-index comparison would accept this; the check must name
+    // `HEAD` to reject it.
+    stage_fixture_changes(fixture.path())?;
+    let staged = run_gate(fixture.path())?;
+    check_freshness_failure(&staged, StaleState::Staged)
 }

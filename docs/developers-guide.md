@@ -368,19 +368,19 @@ where available, and run the direct Cargo invocations for specialized checks:
 
 **Table:** Quality gates and their commands
 
-| Gate                 | Command                                                                                            | What it checks                                                               |
-| -------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Formatting           | `make check-fmt`                                                                                   | `cargo fmt --all -- --check`                                                 |
-| Linting              | `make lint`                                                                                        | rustdoc, Clippy, then Whitaker, each over the whole workspace                |
-| Type checking        | `make typecheck`                                                                                   | `cargo check --workspace --all-targets --all-features`                       |
-| Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                                     |
-| Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit                     |
-| Architecture linting | planned: `theoremc_arch_lint` (see the roadmap)                                                    | Will flag schema layer boundary and other architecture rule violations       |
-| Tests                | `make test`                                                                                        | nextest test binaries plus Cargo doctests                                    |
-| Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                                         |
-| Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                                         |
-| Spelling             | `make spelling`                                                                                    | Regenerates `typos.toml`, then checks spelling and shared phrase corrections |
-| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all`, then mdtablefix and markdownlint-cli2 `--fix`             |
+| Gate                 | Command                                                                                            | What it checks                                                                                  |
+| -------------------- | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Formatting           | `make check-fmt`                                                                                   | `cargo fmt --all -- --check`                                                                    |
+| Linting              | `make lint`                                                                                        | rustdoc, Clippy, then Whitaker, each over the whole workspace                                   |
+| Type checking        | `make typecheck`                                                                                   | `cargo check --workspace --all-targets --all-features`                                          |
+| Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                                                        |
+| Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit                                        |
+| Architecture linting | planned: `theoremc_arch_lint` (see the roadmap)                                                    | Will flag schema layer boundary and other architecture rule violations                          |
+| Tests                | `make test`                                                                                        | nextest test binaries plus Cargo doctests                                                       |
+| Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                                                            |
+| Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                                                            |
+| Spelling             | `make spelling`                                                                                    | Regenerates `typos.toml`, checks spelling and phrases, and fails on an uncommitted regeneration |
+| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all`, then mdtablefix and markdownlint-cli2 `--fix`                                |
 
 When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 `make nixie` must also pass.
@@ -444,11 +444,22 @@ the tracked `typos.toml` from the live shared en-GB-oxendict dictionary on the
 `typos.local.toml`, and then runs Typos and the shared phrase corrections.
 Because the dictionary is live, `typos.toml` changes whenever shared policy
 changes; CI runs the gate rather than a drift check, and the regenerated file
-is committed. `typos.local.toml` holds narrow repository-specific exceptions
-only: exact or full-line patterns for identifiers and terms the policy cannot
-correct, never bare accepted words. Its one file exclusion covers the spelling
-policy's own fixture data, whose purpose is to contain rejected spellings; the
-builder rejects broad exclusions. Never edit `typos.toml` by hand.
+is committed. The target enforces that last step: after the gate succeeds it
+runs `git diff --quiet HEAD -- typos.toml` and fails, printing the changed
+stat, if the regeneration left the file different from `HEAD`. Naming `HEAD` is
+what makes the check meaningful: a plain `git diff` compares the worktree with
+the index, so staging the regenerated file would satisfy it while the commit
+stayed stale. A stale `typos.toml` therefore cannot pass review just because
+the spellings it rejects are absent. The comparison uses `SPELLING_REPOSITORY`,
+so it inspects the repository the gate just wrote, and it is skipped when that
+path is not inside a Git work tree, where there is no committed version to
+compare against.
+
+`typos.local.toml` holds narrow repository-specific exceptions only: exact or
+full-line patterns for identifiers and terms the policy cannot correct, never
+bare accepted words. Its one file exclusion covers the spelling policy's own
+fixture data, whose purpose is to contain rejected spellings; the builder
+rejects broad exclusions. Never edit `typos.toml` by hand.
 
 The target needs `uv`, taken from the `UV` make variable (`UV ?= uv`), so a
 contributor without `uv` on `PATH` can run `make UV=/path/to/uv spelling`. `uv`
@@ -458,7 +469,10 @@ the recipe and its overrides stay in one place:
 
 - `SPELLING_BUILDER` (default
   `git+https://github.com/leynos/typos-config-builder.git`) and
-  `SPELLING_BUILDER_REF` (default `v0.1.3`) select the builder revision.
+  `SPELLING_BUILDER_REF` (default `c8a4f95d7cf7f6a1b7517f2775d122d47d5721eb`,
+  the commit the `v0.1.3` tag points at) select the builder revision. The
+  default is the SHA rather than the tag so a moved tag cannot change the
+  adopted policy without a review.
 - `SPELLING_REPOSITORY` (default `.`) is the repository the gate inspects.
 - `SPELLING_SCOPE` (default `all`) is the file scope the gate checks.
 
@@ -482,7 +496,7 @@ because it must contain the spellings the gate rejects; the copy staged in the
 temporary repository is not excluded, so the patterns are still exercised. The
 test sets `TYPOS_CONFIG_BUILDER_OFFLINE`, so the dictionary comes from the
 builder's bundled snapshot. The builder package itself is fetched from the
-pinned tag on first use, so the first run needs network or a warm uv cache;
+pinned commit on first use, so the first run needs network or a warm uv cache;
 `make spelling` warms the same cache, and CI runs the gate before the test
 suite.
 

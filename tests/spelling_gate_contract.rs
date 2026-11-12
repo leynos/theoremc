@@ -90,8 +90,8 @@ fn spelling_target_runs_the_pinned_gate() {
     );
     assert_eq!(
         default_assignment(Makefile(MAKEFILE), VariableName("SPELLING_BUILDER_REF")),
-        Some("v0.1.3"),
-        "the builder revision must default to the adopted pin"
+        Some("c8a4f95d7cf7f6a1b7517f2775d122d47d5721eb"),
+        "the builder revision must default to the adopted commit, not a mutable tag"
     );
     assert_eq!(
         default_assignment(Makefile(MAKEFILE), VariableName("SPELLING_REPOSITORY")),
@@ -103,10 +103,18 @@ fn spelling_target_runs_the_pinned_gate() {
         Some("all"),
         "the spelling gate must default to the full scope"
     );
+    let recipe = recipe_lines(Makefile(MAKEFILE), TargetName("spelling"));
     assert_eq!(
-        recipe_lines(Makefile(MAKEFILE), TargetName("spelling")),
-        vec![PINNED_RECIPE],
-        "the spelling target must run SPELLING_COMMAND"
+        recipe.first().copied(),
+        Some(PINNED_RECIPE),
+        "the spelling target must run SPELLING_COMMAND first"
+    );
+    assert!(
+        recipe
+            .iter()
+            .any(|line| line.contains("diff --quiet HEAD -- typos.toml")),
+        "the spelling target must compare the regenerated typos.toml with HEAD rather than the \
+         index, got {recipe:?}"
     );
 }
 
