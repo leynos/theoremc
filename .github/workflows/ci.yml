@@ -22,7 +22,7 @@ jobs:
           # token out of `.git/config` while that code executes.
           persist-credentials: false
       - name: Setup Rust
-        uses: leynos/shared-actions/.github/actions/setup-rust@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/setup-rust@a0519a1476ab769ca7b8badfa794f3751213f1ea
         with:
           install-mold: 'true'
       - name: Install the supported MSRV toolchain
@@ -41,7 +41,7 @@ jobs:
       - name: Install mdtablefix
         # `make check-fmt` runs `mdtablefix --check --git`; 0.6.0 is the
         # first release with `--check` and `--git`.
-        uses: leynos/shared-actions/.github/actions/install-mdtablefix@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/install-mdtablefix@a0519a1476ab769ca7b8badfa794f3751213f1ea
         with:
           version: "0.6.1"
       - name: Setup uv
@@ -61,7 +61,7 @@ jobs:
       - name: Spelling
         run: make spelling
       - name: Install Whitaker
-        uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/install-whitaker@a0519a1476ab769ca7b8badfa794f3751213f1ea
       - name: Lint
         run: make lint
       - name: Typecheck
@@ -79,7 +79,7 @@ jobs:
           # measurement, so it takes neither the parallel frontend nor the mold linker.
           # Assigning RUSTFLAGS displaces every `rustflags` table in .cargo/config.toml.
           RUSTFLAGS: -D warnings
-        uses: leynos/shared-actions/.github/actions/generate-coverage@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        uses: leynos/shared-actions/.github/actions/generate-coverage@a0519a1476ab769ca7b8badfa794f3751213f1ea
         with:
           use-cargo-nextest: "true"
           output-path: lcov.info
