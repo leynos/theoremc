@@ -233,7 +233,19 @@ fn then_kani_verifies_every_generated_proof_harness() -> Result<(), String> {
 
     // Two theorem documents, so two harnesses, each of which must verify. The
     // summary line is Kani's own; a rejected harness reports a failure count.
-    if !output.contains("Complete - 2 successfully verified harnesses, 0 failures, 2 total.") {
+    // Kani also names each harness it checks, so the two generated identifiers
+    // must appear, not just a count.
+    let expected_harnesses = [
+        mangle_theorem_harness("theorems/verify.theorem", "VerifyFirst"),
+        mangle_theorem_harness("theorems/verify.theorem", "VerifySecond"),
+    ];
+    let summary = "Complete - 2 successfully verified harnesses, 0 failures, 2 total.";
+    let names_both = expected_harnesses.iter().all(|harness| {
+        output.lines().any(|line| {
+            line.starts_with("Checking harness ") && line.contains(harness.identifier())
+        })
+    });
+    if !output.contains(summary) || !names_both {
         return Err(format!(
             "expected Kani to verify both generated harnesses, got:\n{output}"
         ));

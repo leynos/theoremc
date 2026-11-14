@@ -81,12 +81,14 @@ install-kani: ## Install the pinned Kani release (front-end in CARGO_HOME/bin, b
 # skipping, so an emission Kani rejects, or a runner without Kani, is a red job.
 # The two scenarios are named exactly, and the recipe requires that both ran: a
 # renamed scenario would otherwise match nothing and pass with zero tests.
-KANI_SCENARIOS ?= kani_lists_the_generated_proof_harness kani_verifies_every_generated_harness
+override KANI_SCENARIOS := kani_lists_the_generated_proof_harness kani_verifies_every_generated_harness
 kani: ## Verify the generated theorem harnesses with cargo kani (requires an installed Kani)
 	@out=$$(THEOREMC_REQUIRE_KANI=1 RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS)" $(CARGO) test --test theorem_file_macro_bdd $(BUILD_JOBS) -- --exact --test-threads=1 $(KANI_SCENARIOS) 2>&1); \
 	status=$$?; printf '%s\n' "$$out"; \
 	[ "$$status" -eq 0 ] || exit "$$status"; \
-	printf '%s\n' "$$out" | grep -q 'test result: ok. 2 passed;' || { echo "kani: expected both Kani scenarios to run" >&2; exit 1; }
+	for scenario in $(KANI_SCENARIOS); do \
+		printf '%s\n' "$$out" | grep -qF "test $$scenario ... ok" || { echo "kani: scenario $$scenario did not run" >&2; exit 1; }; \
+	done
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary

@@ -20,6 +20,8 @@ on:
       - 'build.rs'
       - 'Cargo.toml'
       - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.cargo/config.toml'
       - 'tools/kani/**'
       - 'tools/rust-prover-tools/**'
       - 'Makefile'
