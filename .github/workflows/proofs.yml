@@ -1,0 +1,62 @@
+name: Proofs
+
+# theorem_file! generates Kani proof harnesses, and a generator that nothing
+# checks can emit code Kani rejects without any job going red. This workflow
+# expands the macro in a fixture crate and runs `cargo kani` over the generated
+# harnesses (`make kani`), with THEOREMC_REQUIRE_KANI=1 so that a missing Kani
+# fails the job rather than skipping the scenario.
+#
+# It runs on pull requests that touch the generator, the schema it reads, the
+# fixture builder or the Kani pin, and weekly.
+on:
+  schedule:
+    - cron: '41 4 * * 3' # Weekly, Wednesday 04:41 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'crates/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'build.rs'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.cargo/config.toml'
+      - 'tools/kani/**'
+      - 'tools/rust-prover-tools/**'
+      - 'Makefile'
+      - '.github/workflows/proofs.yml'
+
+# A second push to a pull request supersedes the run already in flight; a
+# scheduled or dispatched run is never replaced.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  kani:
+    name: Kani
+    # GitHub-hosted: the job needs no compiler cache and compute there is free.
+    runs-on: ubuntu-24.04
+    # The fixture crate compiles theoremc and its dependencies twice, once for
+    # the test harness and once under Kani, so a cold run is several minutes.
+    # The ceiling is a runaway guard.
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      # The shared action installs Kani through the pinned rust-prover-tools,
+      # which owns the archive digests. tools/kani/VERSION names the release.
+      - name: Install Kani
+        uses: leynos/shared-actions/.github/actions/install-prover-tools@88ac795de687eda016db24983f87a25d6db49fdb
+        with:
+          tools: kani
+          runner-image: ubuntu2404
+      - name: Verify the generated harnesses
+        run: make kani

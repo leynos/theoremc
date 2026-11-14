@@ -15,8 +15,8 @@ mod referenced_type_fixtures;
 
 use cargo_runner::CargoGuard;
 use fixture_crate::{
-    FIXTURE_LIB_RS, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses, run_fixture_build,
-    run_valid_fixture_build,
+    FIXTURE_LIB_RS, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses,
+    build_fixture_and_verify_kani_harnesses, run_fixture_build, run_valid_fixture_build,
 };
 use referenced_type_fixtures::{
     EMPTY_TYPES_LIB_RS, ExpectedBuildFailure, MISSING_FORALL_TYPE_THEOREM,
@@ -55,6 +55,36 @@ const VALID_MULTI_THEOREM: &str = concat!(
     "---\n",
     "Theorem: SecondMacroDoc\n",
     "About: Second theorem macro coverage\n",
+    "Witness:\n",
+    "  - cover: \"true\"\n",
+    "    because: \"reachable\"\n",
+    "Prove:\n",
+    "  - assert: \"true\"\n",
+    "    because: \"trivial\"\n",
+    "Evidence:\n",
+    "  kani:\n",
+    "    unwind: 1\n",
+    "    expect: SUCCESS\n",
+);
+
+/// Two theorems in one file with different unwind bounds, so the verified
+/// crate carries a multi-harness module and two distinct `unwind` literals.
+const KANI_VERIFY_THEOREM: &str = concat!(
+    "Theorem: VerifyFirst\n",
+    "About: First theorem verified by cargo kani\n",
+    "Witness:\n",
+    "  - cover: \"true\"\n",
+    "    because: \"reachable\"\n",
+    "Prove:\n",
+    "  - assert: \"true\"\n",
+    "    because: \"trivial\"\n",
+    "Evidence:\n",
+    "  kani:\n",
+    "    unwind: 3\n",
+    "    expect: SUCCESS\n",
+    "---\n",
+    "Theorem: VerifySecond\n",
+    "About: Second theorem verified by cargo kani\n",
     "Witness:\n",
     "  - cover: \"true\"\n",
     "    because: \"reachable\"\n",
@@ -133,14 +163,9 @@ fn then_the_fixture_crate_builds_without_a_kani_dependency() -> Result<(), Strin
 }
 
 #[then("cargo-kani lists the generated proof harness when installed")]
-#[expect(
-    clippy::print_stderr,
-    reason = "BDD skip diagnostics should remain non-fallible"
-)]
 fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     if !cargo_runner::kani_is_installed() {
-        eprintln!("cargo-kani not installed; skipping Kani harness listing check");
-        return Ok(());
+        return skip_without_kani("cargo-kani not installed", "listing");
     }
 
     let output = match build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
@@ -149,8 +174,10 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     }) {
         Ok(output) => output,
         Err(error) if is_unusable_kani_environment(&error) => {
-            eprintln!("cargo-kani is installed but unusable; skipping Kani harness listing check");
-            return Ok(());
+            return skip_without_kani(
+                &format!("cargo-kani is installed but unusable: {error}"),
+                "listing",
+            );
         }
         Err(error) => return Err(error),
     };
@@ -160,6 +187,67 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     if !is_expected_single_harness_listing(&output, expected_harness_identifier) {
         return Err(format!(
             "expected Kani list output to contain exactly the SmokeMacro harness, got:\n{output}"
+        ));
+    }
+
+    Ok(())
+}
+
+/// Skips a Kani check, or fails it when `THEOREMC_REQUIRE_KANI=1`.
+///
+/// A skip hides a missing verifier, so the proofs job sets the variable and
+/// turns every would-be skip into a failure.
+#[expect(
+    clippy::print_stderr,
+    reason = "BDD skip diagnostics should remain non-fallible"
+)]
+fn skip_without_kani(reason: &str, check: &str) -> Result<(), String> {
+    if cargo_runner::kani_is_required() {
+        return Err(format!(
+            "THEOREMC_REQUIRE_KANI=1 forbids skipping the Kani {check} check: {reason}"
+        ));
+    }
+    eprintln!("{reason}; skipping Kani harness {check} check");
+    Ok(())
+}
+
+#[then("cargo-kani verifies every generated proof harness")]
+fn then_kani_verifies_every_generated_proof_harness() -> Result<(), String> {
+    if !cargo_runner::kani_is_installed() {
+        return skip_without_kani("cargo-kani not installed", "verification");
+    }
+
+    let output = match build_fixture_and_verify_kani_harnesses(&TheoremFixtureSpec {
+        path: "theorems/verify.theorem",
+        content: KANI_VERIFY_THEOREM,
+    }) {
+        Ok(output) => output,
+        Err(error) if is_unusable_kani_environment(&error) => {
+            return skip_without_kani(
+                &format!("cargo-kani is installed but unusable: {error}"),
+                "verification",
+            );
+        }
+        Err(error) => return Err(error),
+    };
+
+    // Two theorem documents, so two harnesses, each of which must verify. The
+    // summary line is Kani's own; a rejected harness reports a failure count.
+    // Kani also names each harness it checks, so the two generated identifiers
+    // must appear, not just a count.
+    let expected_harnesses = [
+        mangle_theorem_harness("theorems/verify.theorem", "VerifyFirst"),
+        mangle_theorem_harness("theorems/verify.theorem", "VerifySecond"),
+    ];
+    let summary = "Complete - 2 successfully verified harnesses, 0 failures, 2 total.";
+    let names_both = expected_harnesses.iter().all(|harness| {
+        output.lines().any(|line| {
+            line.starts_with("Checking harness ") && line.contains(harness.identifier())
+        })
+    });
+    if !output.contains(summary) || !names_both {
+        return Err(format!(
+            "expected Kani to verify both generated harnesses, got:\n{output}"
         ));
     }
 
@@ -337,7 +425,13 @@ fn a_valid_theorem_file_compiles_without_kani_installed() {}
     path = "tests/features/theorem_file_macro.feature",
     name = "A valid theorem file exposes a Kani proof harness when cargo-kani is installed"
 )]
-fn a_valid_theorem_file_exposes_a_kani_proof_harness() {}
+fn kani_lists_the_generated_proof_harness() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "A multi-document theorem file is verified by cargo-kani"
+)]
+fn kani_verifies_every_generated_harness() {}
 
 #[scenario(
     path = "tests/features/theorem_file_macro.feature",
