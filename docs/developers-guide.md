@@ -953,8 +953,11 @@ under the backend, with CI's environment, and adopt it if every test passes.
 The poisoned-mutex test for `recover_mutex_guard` in
 `tests/theorem_file_macro_bdd/cargo_runner.rs` was removed: it exercised only
 the one-line `unwrap_or_else(PoisonError::into_inner)` recovery and needed
-unwinding (`catch_unwind`), which the Cranelift backend does not provide. No
-test in the repository now depends on `catch_unwind`.
+unwinding (`catch_unwind`). The rustup Cranelift component does not support
+that: measured in another repository on `nightly-2026-11-10`, `catch_unwind`
+failed to catch and a panic on a spawned thread aborted with "failed to
+initiate panic, error 5". This claim is about that component build, not about
+Cranelift in general. No test in the repository now depends on `catch_unwind`.
 
 Recorded state: the pin is `nightly-2026-11-05` and no measurement has been
 taken on it, so the exception stands on the 2026-10-02 result. The review is
