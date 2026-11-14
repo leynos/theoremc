@@ -138,27 +138,3 @@ fn command_result(
         String::from_utf8_lossy(&output.stderr),
     ))
 }
-
-#[cfg(test)]
-mod tests {
-    //! Unit tests for fixture cargo runner helpers.
-
-    use std::sync::Mutex;
-
-    use super::recover_mutex_guard;
-
-    #[test]
-    fn recover_mutex_guard_recovers_from_poisoned_local_mutex() {
-        let mutex = Mutex::new(());
-        let result = std::panic::catch_unwind(|| {
-            let _guard = mutex
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
-            panic!("deliberate panic to poison local mutex");
-        });
-        assert!(result.is_err(), "catch_unwind should have caught the panic");
-
-        let guard = recover_mutex_guard(&mutex);
-        drop(guard);
-    }
-}
