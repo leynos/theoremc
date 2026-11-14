@@ -950,6 +950,12 @@ on this host as well and one more under Cranelift, so the suite is not shown to
 pass under it. Revisit on the next toolchain bump: measure the whole suite
 under the backend, with CI's environment, and adopt it if every test passes.
 
+The poisoned-mutex test for `recover_mutex_guard` in
+`tests/theorem_file_macro_bdd/cargo_runner.rs` was removed: it exercised only
+the one-line `unwrap_or_else(PoisonError::into_inner)` recovery and needed
+unwinding (`catch_unwind`), which the Cranelift backend does not provide. No
+test in the repository now depends on `catch_unwind`.
+
 Recorded state: the pin is `nightly-2026-11-05` and no measurement has been
 taken on it, so the exception stands on the 2026-10-02 result. The review is
 deferred to 1 April 2027, when the whole suite is re-measured under both
