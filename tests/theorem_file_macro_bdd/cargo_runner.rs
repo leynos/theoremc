@@ -15,6 +15,8 @@ use test_helpers::hermetic_cargo;
 pub(crate) enum CargoSubcommand {
     Build,
     KaniList,
+    /// Verifies every generated harness rather than only listing them.
+    Kani,
 }
 
 impl CargoSubcommand {
@@ -22,6 +24,7 @@ impl CargoSubcommand {
         match self {
             Self::Build => &["build", "--color", "never"],
             Self::KaniList => &["kani", "list"],
+            Self::Kani => &["kani"],
         }
     }
 
@@ -29,6 +32,7 @@ impl CargoSubcommand {
         match self {
             Self::Build => "build",
             Self::KaniList => "kani list",
+            Self::Kani => "kani",
         }
     }
 }
@@ -116,6 +120,15 @@ pub(crate) fn kani_is_installed() -> bool {
         .args(["kani", "--version"])
         .output()
         .is_ok_and(|o| o.status.success())
+}
+
+/// Returns `true` when the run must fail rather than skip without Kani.
+///
+/// `make kani` and the proofs workflow set `THEOREMC_REQUIRE_KANI=1`, so a
+/// runner without a usable Kani is a red job instead of a silent pass. A
+/// developer without Kani leaves it unset and the Kani scenarios skip.
+pub(crate) fn kani_is_required() -> bool {
+    std::env::var_os("THEOREMC_REQUIRE_KANI").is_some_and(|value| value == "1")
 }
 
 fn command_result(

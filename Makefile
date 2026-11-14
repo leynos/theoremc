@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint lint-rustdoc lint-clippy lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv check-adr-rfc-names
+.PHONY: help all clean test build release lint lint-rustdoc lint-clippy lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv check-adr-rfc-names install-kani kani
 
 TARGET ?= cargo-theorem
 
@@ -59,6 +59,34 @@ check-agent-native: ## Check OrthoConfig agent-native command policy
 
 msrv: ## Check the workspace minimum supported Rust version
 	RUSTFLAGS="" $(CARGO) +1.89 check --workspace --all-targets --all-features --locked
+
+# The shared rust-prover-tools package owns Kani acquisition. CI installs it
+# through the shared install-prover-tools action; `install-kani` is the local
+# equivalent. The package revision is read from one file, and the Kani release
+# from tools/kani/VERSION.
+override PROVER_TOOLS_REF := $(strip $(shell awk '/^ref:/ { print $$2; exit }' tools/rust-prover-tools/REF))
+PROVER_TOOLS ?= $(UV) tool run --python 3.14 \
+	--from git+https://github.com/leynos/rust-prover-tools@$(PROVER_TOOLS_REF) prover-tools
+# The prebuilt Kani covers Linux x86_64 only, so any other host builds it.
+KANI_HOST_KERNEL := $(shell uname -s)
+KANI_HOST_MACHINE := $(shell uname -m)
+KANI_INSTALL_FLAGS ?= $(if $(and $(filter Linux,$(KANI_HOST_KERNEL)),$(filter x86_64,$(KANI_HOST_MACHINE))),,--compile)
+
+install-kani: ## Install the pinned Kani release (front-end in CARGO_HOME/bin, bundle in KANI_HOME)
+	$(PROVER_TOOLS) kani install --repo-root . $(KANI_INSTALL_FLAGS)
+
+# The Kani scenarios of the macro behavioural suite expand `theorem_file!` in a
+# fixture crate and run `cargo kani` over the generated harnesses. With
+# THEOREMC_REQUIRE_KANI=1 a missing or unusable Kani fails them instead of
+# skipping, so an emission Kani rejects, or a runner without Kani, is a red job.
+# The two scenarios are named exactly, and the recipe requires that both ran: a
+# renamed scenario would otherwise match nothing and pass with zero tests.
+KANI_SCENARIOS ?= kani_lists_the_generated_proof_harness kani_verifies_every_generated_harness
+kani: ## Verify the generated theorem harnesses with cargo kani (requires an installed Kani)
+	@out=$$(THEOREMC_REQUIRE_KANI=1 RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS)" $(CARGO) test --test theorem_file_macro_bdd $(BUILD_JOBS) -- --exact --test-threads=1 $(KANI_SCENARIOS) 2>&1); \
+	status=$$?; printf '%s\n' "$$out"; \
+	[ "$$status" -eq 0 ] || exit "$$status"; \
+	printf '%s\n' "$$out" | grep -q 'test result: ok. 2 passed;' || { echo "kani: expected both Kani scenarios to run" >&2; exit 1; }
 
 build: target/debug/$(TARGET) ## Build debug binary
 release: target/release/$(TARGET) ## Build release binary

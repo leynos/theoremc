@@ -47,6 +47,15 @@ impl FixtureCrate {
         )
     }
 
+    pub(crate) fn cargo_kani_verify(&self, guard: &CargoGuard<'_>) -> Result<String, String> {
+        cargo_run_output(
+            self.inner.manifest_dir(),
+            self.inner.target_dir(),
+            CargoSubcommand::Kani,
+            guard,
+        )
+    }
+
     fn cargo_run(&self, subcommand: CargoSubcommand, guard: &CargoGuard<'_>) -> Result<(), String> {
         cargo_run(
             self.inner.manifest_dir(),
@@ -104,6 +113,16 @@ pub(crate) fn run_fixture_build(lib_rs: &str, spec: &TheoremFixtureSpec<'_>) -> 
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
     fixture.cargo_build(&guard)
 }
+/// Builds the fixture crate and runs `cargo kani` over every generated harness.
+pub(crate) fn build_fixture_and_verify_kani_harnesses(
+    spec: &TheoremFixtureSpec<'_>,
+) -> Result<String, String> {
+    let guard = CargoGuard::acquire();
+    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
+    fixture.write(Utf8Path::new(spec.path), spec.content)?;
+    fixture.cargo_kani_verify(&guard)
+}
+
 pub(crate) fn build_fixture_and_list_kani_harnesses(
     spec: &TheoremFixtureSpec<'_>,
 ) -> Result<String, String> {

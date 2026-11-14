@@ -750,6 +750,32 @@ When theorem expansion behaviour changes, prefer testing it in two layers:
 1. direct proc-macro unit tests in `crates/theoremc-macros`, and
 2. fixture-crate behavioural tests in `tests/theorem_file_macro_bdd.rs`.
 
+#### Checking the generated harnesses with Kani
+
+`theorem_file!` emits `#[kani::proof]` harnesses under `cfg(kani)`. Today each
+harness body is empty, because step lowering is not implemented, so what Kani
+checks is that the emission is valid Kani input: the module compiles under
+Kani's toolchain, every harness is discovered, and each carries an accepted
+`#[kani::unwind(N)]`. Two scenarios in `tests/theorem_file_macro_bdd.rs` cover
+this: `kani_lists_the_generated_proof_harness` runs `cargo kani list` over a
+one-theorem file, and `kani_verifies_every_generated_harness` runs `cargo kani`
+over a two-theorem file with unwind bounds 3 and 1 and requires
+`2 successfully verified harnesses, 0 failures`.
+
+Both scenarios skip when `cargo-kani` is absent, so a developer without Kani
+still gets a green `make test`. With `THEOREMC_REQUIRE_KANI=1` they fail
+instead of skipping. `make kani` sets that variable and runs exactly these
+scenarios by name (and fails if either did not run), and
+`.github/workflows/proofs.yml` runs `make kani` on pull requests that touch the
+generator and weekly. `make install-kani` installs the Kani release in
+`tools/kani/VERSION` through the `rust-prover-tools` revision in
+`tools/rust-prover-tools/REF`; CI uses the shared `install-prover-tools` action
+instead.
+
+No negative fixture is checked yet: with empty bodies no harness can fail. When
+step lowering lands, add a theorem whose assertion is false and whose `expect`
+is `FAILURE`, run it through Kani, and require the failure.
+
 ### 3.7 CodeScene coverage publication
 
 Main owns CodeScene. `.github/workflows/coverage-main.yml` is the one
