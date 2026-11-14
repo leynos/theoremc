@@ -213,9 +213,12 @@ project:
 
     ```sh
     cargo fmt --all -- --check
+    mdtablefix --check --git --include-untracked --wrap --renumber --breaks \
+      --ellipsis --fences
     ```
 
-    validating formatting across the entire workspace without modifying files.
+    validating Rust formatting across the entire workspace and the layout of
+    tracked and untracked Markdown files without modifying anything.
   - `make lint` runs three stages, in order, over the whole workspace:
 
     ```sh
@@ -236,6 +239,9 @@ project:
     running rustdoc, then Clippy, then the Whitaker Dylint suite through its
     `whitaker` wrapper. Each stage recurses through `$(MAKE)`, so the stages stay
     sequential even under `make -j` and a failing stage stops the aggregate.
+    The rustdoc and Clippy stages compose the development build standard
+    (`-Zthreads=8` and, on Linux, the `mold` linker) onto any inherited
+    `RUSTFLAGS`; the displayed commands omit that detail.
     `LINT_PACKAGES ?= --workspace` and `LINT_TARGET_FLAGS ?= --all-targets
     --all-features` name the scope once, because a bare Cargo invocation selects
     only the root package. Whitaker's own `--workspace` is forwarded to the
@@ -372,6 +378,8 @@ project:
   `mockable::MockEnv` in tests. A narrow closure seam of the same shape is
   acceptable where a trait object would be disproportionate. Production code
   must not reach for `std::env::var`/`var_os` outside that composition root.
+  The CLI's existing injected OrthoConfig environment sources, tested with
+  `MapEnv`, are an accepted form of the same seam.
 - **Process-wide locks are not an escape hatch.** Serializing environment
   mutation behind a shared `Mutex`, `OnceLock`, or `serial_test` attribute is
   not an accepted fallback. It serializes the suite, defeats property-based
@@ -379,10 +387,11 @@ project:
   dependency embedded in the production signature. Where injection looks
   impossible the signature is wrong; correct the signature.
 - **Subprocess isolation is the sole exemption.** End-to-end behavioural tests
-  invoking the generated application binary through `assert_cmd` may configure
-  the environment via `Command::env`/`Command::env_clear`, because the mutation
-  is confined to the child process. A test manipulating the environment
-  in-process does not qualify, whatever layer it claims to occupy.
+  invoking the generated application binary through `assert_cmd`, and test
+  helpers that run a child process such as Cargo, may configure the child's
+  environment via `Command::env`/`Command::env_clear`, because the mutation is
+  confined to the child process. A test manipulating the environment in-process
+  does not qualify, whatever layer it claims to occupy.
 
 ### Dependency management
 
