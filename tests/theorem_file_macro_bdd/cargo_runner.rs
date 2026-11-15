@@ -127,6 +127,10 @@ pub(crate) fn kani_is_installed() -> bool {
 /// `make kani` and the proofs workflow set `THEOREMC_REQUIRE_KANI=1`, so a
 /// runner without a usable Kani is a red job instead of a silent pass. A
 /// developer without Kani leaves it unset and the Kani scenarios skip.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the CI proofs workflow and `make kani` export THEOREMC_REQUIRE_KANI to the test process, so the harness reads the host's value at this boundary"
+)]
 pub(crate) fn kani_is_required() -> bool {
     std::env::var_os("THEOREMC_REQUIRE_KANI").is_some_and(|value| value == "1")
 }
