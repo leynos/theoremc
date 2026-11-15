@@ -1,4 +1,4 @@
-# Implement structured diagnostics for parser and validation failures
+# Task 1.3.1: implement structured diagnostics for parser and validation failures
 
 This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

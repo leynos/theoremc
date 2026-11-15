@@ -181,7 +181,7 @@ fixes omitted `Schema` as version 1 permanently and adds explicit `Schema: 2`
 for mixed opaque assertions and structured laws. Merely setting `Schema: 2`
 does not enable law support in the current implementation.
 
-[Roadmap step 4.4](roadmap.md#step-44-integrate-rfc-0001-semantic-laws-through-the-proven-kani-path)
+[Roadmap step 5.4](roadmap.md#54-integrate-rfc-0001-semantic-laws-through-the-proven-kani-path)
 tracks version validation, law parsing, and Kani lowering after the working
 version 1 proof path. The planned public `prove` field becomes
 `Vec<ProofObligation>` rather than `Vec<Assertion>` at a documented breaking

@@ -1,4 +1,4 @@
-# Step 3.1.2: generate `OUT_DIR/theorem_suite.rs` and wire the crate include
+# Task 3.1.2: generate `OUT_DIR/theorem_suite.rs` and wire the crate include
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

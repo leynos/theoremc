@@ -1,4 +1,4 @@
-# Enforce `Step` and `LetBinding` shape rules
+# Task 1.2.3: enforce `Step` and `LetBinding` shape rules
 
 This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

@@ -1,4 +1,4 @@
-# Step 3.2.2: gate generated Kani harnesses
+# Task 3.2.2: gate generated Kani harnesses
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

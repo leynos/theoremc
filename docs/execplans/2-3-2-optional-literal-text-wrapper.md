@@ -1,4 +1,4 @@
-# Step 2.3.2: optional `{ literal: "text" }` wrapper and sentinel key rejection
+# Task 2.3.2: optional `{ literal: "text" }` wrapper and sentinel key rejection
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

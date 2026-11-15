@@ -1,4 +1,4 @@
-# Enforce non-vacuity defaults for theorem validation
+# Task 1.2.4: enforce non-vacuity defaults for theorem validation
 
 This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

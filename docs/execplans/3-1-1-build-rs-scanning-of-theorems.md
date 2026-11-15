@@ -1,4 +1,4 @@
-# Step 3.1.1: `build.rs` scanning of theorem files
+# Task 3.1.1: `build.rs` scanning of theorem files
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

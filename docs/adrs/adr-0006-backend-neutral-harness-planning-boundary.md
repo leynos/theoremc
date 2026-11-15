@@ -382,6 +382,13 @@ most of the architectural protection without requiring that public break.
 Rejected. One backend does not provide evidence for the right trait surface.
 Capabilities and rendering functions remain explicit until Verus work begins.
 
+## Addendum (2026-11-15): roadmap renumbering
+
+The roadmap restructure of this date promoted the former "Phase 3.1" CLI
+foundation to phase 4 and renumbered the later phases. References in this
+record to roadmap "Phase 4", the working Kani proof path, now name phase 5, "A
+working Kani proof path with explicit non-vacuity". The decision is unchanged.
+
 ## Related documents
 
 - [ADR-0011: vertical-slice-first roadmap

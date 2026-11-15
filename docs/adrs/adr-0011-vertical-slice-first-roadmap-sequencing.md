@@ -300,6 +300,21 @@ also named the build-standard decision. Read them by their subject: references
 about vertical-slice sequencing describe this decision, and references about
 shared build standards describe that one. Neither names a current record.
 
+On 2026-11-15 the roadmap was restructured into the grammar that `mapsplice`
+edits, and its phases were renumbered. Read the roadmap references in this
+record with the following mapping. The decisions are unchanged.
+
+| Reference in this record | Current roadmap item                                  |
+| ------------------------ | ----------------------------------------------------- |
+| Phase 4                  | Phase 5, the working Kani proof path                  |
+| Steps 4.1 to 4.4         | Steps 5.1 to 5.4                                      |
+| Phase 5                  | Phase 6, durable theorem runs and reports             |
+| Step 5.1                 | Step 6.3, the canonical run record and report outputs |
+| Step 6.3                 | Step 7.3, runnable examples and guidance              |
+
+The former "Phase 3.1" CLI foundation became phase 4. Stable external IDs moved
+from step 5.2 to step 6.1, and canonical ID generation to task 4.2.2.
+
 ## Related documents
 
 - [RFC 0001: semantic law templates](../rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)

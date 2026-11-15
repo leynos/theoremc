@@ -1,6 +1,6 @@
 //! Theorem suite generation for Cargo build integration.
 //!
-//! Step 3.1.2 generates `OUT_DIR/theorem_suite.rs` with one `theorem_file!(...)`
+//! Task 3.1.2 generates `OUT_DIR/theorem_suite.rs` with one `theorem_file!(...)`
 //! invocation per discovered theorem path. This module provides deterministic
 //! rendering and write-if-changed semantics to minimize build churn.
 

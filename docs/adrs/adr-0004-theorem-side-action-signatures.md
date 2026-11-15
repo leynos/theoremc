@@ -220,6 +220,13 @@ arguments.[^5] That is good prior art for keeping behaviour in ordinary code,
 but theoremc also needs a document-owned type contract before generating Rust
 harnesses and probes.
 
+## Addendum (2026-11-15): roadmap renumbering
+
+The roadmap now numbers each task directly, in the grammar that `mapsplice`
+edits. References in this record to "Step 3.3.1" name what the roadmap now
+calls task 3.3.1, typed action probes. The number is unchanged; only the level
+label differs. The decision is unchanged.
+
 ## Related documents
 
 - `docs/theoremc-design.md`

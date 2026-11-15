@@ -1,9 +1,9 @@
-# Adopt OrthoConfig v0.10.0 in the cargo theorem CLI foundation
+# Task 4.1.2: adopt OrthoConfig v0.10.0 in the cargo theorem CLI foundation
 
 This ExecPlan is a living record. Update it at each milestone and before
 stopping work.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -25,7 +25,7 @@ published as a draft pull request.
   for OrthoConfig, and the reusable libraries require it for `serde-saphyr`
   2.0.0 (ADR-0010).
 - Keep OrthoConfig default features enabled. Do not use unreleased APIs.
-- Follow roadmap Phase 3.1; do not implement backend, proof-run, project-edit,
+- Follow roadmap Phase 4; do not implement backend, proof-run, project-edit,
   or other later command handlers in this change.
 - Do not mutate process environment in tests. Use OrthoConfig source injection
   and isolated child processes for binary contracts.
@@ -66,7 +66,7 @@ published as a draft pull request.
 - Risk: the designed CLI surface is much larger than this foundation milestone.
   Severity: medium. Likelihood: high. Mitigation: keep operational commands
   outside scope and implement only configuration, metadata, and the entry shape
-  assigned to Phase 3.1.
+  assigned to Phase 4.
 
 ## Progress
 
@@ -133,8 +133,8 @@ published as a draft pull request.
   acceptance findings against the current code, roadmap, ADR, and guide.
 - [x] Include the declared `theorem` wrapper in generated agent context and add
   an end-to-end regression that executes the emitted context path.
-- [x] Reconcile CONFIG-WORKSPACE with step 3.1.1's standalone context contract
-  and defer nested-workspace resolution and its root/member fixture to 3.1.2.
+- [x] Reconcile CONFIG-WORKSPACE with step 4.1's standalone context contract
+  and defer nested-workspace resolution and its root/member fixture to 4.2.
 - [x] (2026-10-31) Adopt `serde-saphyr` 2.0.0, raise every workspace package
   to Rust 1.89, simplify `make msrv` and CI to one workspace check, and record
   ADR-0010.
@@ -404,7 +404,7 @@ latest formatting command passed; restart the complete gate sequence.
   the root `theoremc` package has a greeting stub binary. Evidence: baseline
   tree has no `crates/cargo-theorem`; `src/main.rs` prints
   `Hello from Theorem Compiler!`; there are no CLI test files. Impact: Phase
-  3.1's dedicated package will replace the placeholder binary as prescribed by
+  4's dedicated package will replace the placeholder binary as prescribed by
   the accepted design. This does not claim compatibility with a previously
   shipped `cargo theorem` command.
 - Observation: no other `leynos` repository code-search result invokes the
@@ -434,19 +434,19 @@ latest formatting command passed; restart the complete gate sequence.
   root argument. Evidence: Firecrawl scrape of the official Cargo Book's
   [External Tools](https://doc.rust-lang.org/cargo/reference/external-tools.html)
   page on 2026-10-26. Inference: project commands must resolve the workspace
-  root themselves and pass it to OrthoConfig. Impact: step 3.1.1 tests that
+  root themselves and pass it to OrthoConfig. Impact: step 4.1 tests that
   `context --json` ignores automatic project configuration and skips workspace
   discovery to meet its standalone contract. Nested-member workspace-root
   resolution and the competing root/member configuration fixture belong to
-  roadmap step 3.1.2 and are not claimed as verified in this foundation.
+  roadmap step 4.2 and are not claimed as verified in this foundation.
 
 ## Decision log
 
 - Decision: implement the configuration spine as the existing roadmap's
-  Phase 3.1 CLI foundation, not as a standalone package or early backend CLI.
-  Rationale: Phase 3.1 explicitly owns package structure, configuration,
-  command metadata, MSRV, and Cargo invocation. Date/Author: 2026-10-26, Codex
-  under issue #200.
+  Phase 4 CLI foundation, not as a standalone package or early backend CLI.
+  Rationale: Phase 4 explicitly owns package structure, configuration, command
+  metadata, MSRV, and Cargo invocation. Date/Author: 2026-10-26, Codex under
+  issue #200.
 - Decision: depend on `ortho_config` 0.10.0 only in the application crate,
   with its default features. Keep reusable libraries at Rust 1.88 and do not
   add a direct `ortho_l10n` dependency while no library implementation needs a
@@ -488,12 +488,16 @@ latest formatting command passed; restart the complete gate sequence.
   metadata beneath it. Rationale: an agent must be able to execute the emitted
   `cargo-theorem theorem context` path with the required `--json` flag. Keep
   CONFIG-WORKSPACE limited to the foundation's no-discovery contract; roadmap
-  step 3.1.2 owns `cargo metadata`, nested-member resolution, and the competing
+  step 4.2 owns `cargo metadata`, nested-member resolution, and the competing
   root/member configuration fixture. This corrects an unfulfilled plan claim
   without starting deferred project commands. Date/Author: 2026-10-27, Codex
   following hosted assessment comment `6441857666`.
 
 ## Outcomes & retrospective
+
+The accepted scope merged in #204 (`86dfdcf`), and roadmap task 4.1.2 is marked
+done. This record is complete; later roadmap slices extend the foundation under
+their own plans.
 
 The pre-readiness assessment of `7fc73fe` found a real agent-context invocation
 bug and an ExecPlan acceptance mismatch. The current repair derives the
@@ -637,7 +641,7 @@ reported zero findings; the review log is
 ## Context and orientation
 
 The CLI is planned in `docs/cargo-theorem-cli-design.md`; its foundation is
-Phase 3.1 in `docs/roadmap.md`. The current workspace has the `theoremc` facade,
+Phase 4 in `docs/roadmap.md`. The current workspace has the `theoremc` facade,
 `theoremc-core`, `theoremc-macros`, build support, and test helpers, all now
 sharing the workspace's Rust 1.89 MSRV. The root `src/main.rs` was only a
 greeting placeholder and this change deletes it. The new application package
@@ -658,10 +662,9 @@ The imported guides are `docs/ortho-config/users-guide.md` and
   deliver a draft PR (REQ-6).
 - `docs/cargo-theorem-cli-design.md` §4–§6 and §19: application boundary,
   external-subcommand shape, workspace MSRV, config discovery and precedence.
-- `docs/roadmap.md` step 3.1.1: package, command metadata, configuration,
-  workspace MSRV, direct/Cargo invocation, and base output contracts. Step
-  3.1.2 owns Cargo workspace/package discovery and its nested-workspace
-  fixtures.
+- `docs/roadmap.md` step 4.1: package, command metadata, configuration,
+  workspace MSRV, direct/Cargo invocation, and base output contracts. Step 4.2
+  owns Cargo workspace/package discovery and its nested-workspace fixtures.
 - `docs/adrs/adr-0002-library-first-internationalization-and-localization-with-fluent.md`:
   keep localization ownership at the application boundary.
 - Repository instructions in `AGENTS.md`: Rust, documentation, test, commit,
@@ -703,10 +706,10 @@ Trace links:
   valid context JSON with successful status and empty stderr. Artefact:
   `context_ignores_malformed_automatic_project_configuration`. Negative
   control: automatic file loading would parse the malformed TOML and fail.
-  Deferred to roadmap step 3.1.2: resolve a nested member with
-  `cargo metadata`, pass the workspace root to OrthoConfig, and prove that the
-  root project file wins over a competing member-local file. This foundation
-  does not claim that deferred implementation or fixture as verified.
+  Deferred to roadmap step 4.2: resolve a nested member with `cargo metadata`,
+  pass the workspace root to OrthoConfig, and prove that the root project file
+  wins over a competing member-local file. This foundation does not claim that
+  deferred implementation or fixture as verified.
 - Obligation CONFIG-ERROR: malformed, unreadable, explicit-missing, invalid,
   and rejected unknown-key files produce an actionable configuration error;
   absence of an optional discovered file remains non-fatal. Method: table tests
@@ -1087,8 +1090,8 @@ that gate before proceeding. Never discard unrelated changes.
   overstated the foundation's workspace discovery evidence. The working-tree
   repair adds the declared wrapper metadata and an executable emitted-path
   regression, and assigns nested-workspace discovery evidence to roadmap step
-  3.1.2. The sequential gates and candidate-bound confirmation remain pending;
-  no new formal proof is introduced by this repair.
+  4.2. The sequential gates and candidate-bound confirmation remain pending; no
+  new formal proof is introduced by this repair.
 - 2026-10-31: User-directed dependency decision: adopt `serde-saphyr` 2.0.0
   instead of holding 1.1.0 to keep the Rust 1.88 library floor. All workspace
   packages now declare Rust 1.89; `make msrv` and CI run one

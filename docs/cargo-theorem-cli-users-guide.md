@@ -9,7 +9,7 @@ initializing a project, creating and inspecting theorems, checking a project,
 installing and pinning proof backends, running proofs, reading reports, and
 migrating from `rust-prover-tools`.
 
-The Phase 3.1.1 foundation is implemented in this branch and registers only
+The step 4.1 foundation is implemented in this branch and registers only
 `context`. It is not yet a released binary. The remaining command surface is
 planned; later commands appear as their roadmap slices ship. The target surface
 is defined normatively in the
@@ -609,7 +609,7 @@ remains available.
 - [`cargo theorem` CLI design](cargo-theorem-cli-design.md) — the normative
   definition of every command, contract, and boundary summarized here.
 - [Theoremc development roadmap](roadmap.md) — the implementation sequence,
-  including Phase 3.1 for the CLI foundation and Step 5.4 for migration
+  including phase 4 for the CLI foundation and step 6.5 for migration
   completion.
 - [Theorem file format](theorem-file-specification.md) — the `.theorem` schema
   that `create`, `list`, and `check` operate on.

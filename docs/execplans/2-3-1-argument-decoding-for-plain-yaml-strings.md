@@ -1,4 +1,4 @@
-# Step 2.3.1: argument decoding for plain YAML strings
+# Task 2.3.1: argument decoding for plain YAML strings
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,
