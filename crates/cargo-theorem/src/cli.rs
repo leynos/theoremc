@@ -184,19 +184,7 @@ fn execute(
     sources: &ConfigurationSources,
 ) -> Result<(), ApplicationError> {
     let CargoCommand::Theorem(cli) = entry.command;
-    let settings =
-        if should_load_configuration(&cli.command, &cli.options, sources.discovery.as_ref()) {
-            let config_args = config_arguments(&cli.options, cli.profile.as_deref());
-            GlobalOptions::load_with_sources(
-                config_args,
-                sources.discovery.clone(),
-                sources.merge.clone(),
-            )?
-            .config()
-            .clone()
-        } else {
-            cli.options.clone()
-        };
+    let settings = effective_settings(&cli, sources)?;
     let _effective = settings.resolve()?;
 
     let project_root = Path::new(".");
@@ -216,7 +204,29 @@ fn execute(
             || Ok::<_, std::convert::Infallible>(settings),
         )?;
 
-    match selected.command {
+    run_selected(selected.command, stdout)
+}
+
+/// Load the global settings when configuration applies, else keep the flags.
+fn effective_settings(
+    cli: &TheoremArgs,
+    sources: &ConfigurationSources,
+) -> Result<GlobalOptions, ApplicationError> {
+    if !should_load_configuration(&cli.command, &cli.options, sources.discovery.as_ref()) {
+        return Ok(cli.options.clone());
+    }
+    let config_args = config_arguments(&cli.options, cli.profile.as_deref());
+    let loaded = GlobalOptions::load_with_sources(
+        config_args,
+        sources.discovery.clone(),
+        sources.merge.clone(),
+    )?;
+    Ok(loaded.config().clone())
+}
+
+/// Run the selected subcommand against `stdout`.
+fn run_selected(command: Commands, stdout: &mut dyn Write) -> Result<(), ApplicationError> {
+    match command {
         Commands::Context(context_args) if context_args.json => {
             writeln!(stdout, "{}", agent_context::to_json()?)?;
             Ok(())
