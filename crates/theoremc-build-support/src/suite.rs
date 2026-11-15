@@ -73,6 +73,7 @@ mod build_only {
     use super::render_theorem_suite;
     use crate::BuildDiscovery;
 
+    /// Filename into which build scripts generate the theorem suite.
     const SUITE_FILENAME: &str = "theorem_suite.rs";
 
     /// Errors returned while writing the generated theorem suite.

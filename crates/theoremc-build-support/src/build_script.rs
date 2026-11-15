@@ -11,7 +11,9 @@ use crate::{BuildDiscoveryError, BuildSuiteError, discover_theorem_inputs, write
 /// Cargo metadata that the root build-script adapter must emit.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildScriptOutput {
+    /// Whether the generated suite contains at least one theorem.
     has_theorems: bool,
+    /// Paths emitted as Cargo rerun-if-changed directives.
     rerun_paths: Vec<Utf8PathBuf>,
 }
 

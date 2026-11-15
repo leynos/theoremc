@@ -16,10 +16,13 @@ use super::value::TheoremValue;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawEvidence {
+    /// Optional Kani evidence block.
     #[serde(default)]
     pub(crate) kani: Option<RawKaniEvidence>,
+    /// Optional Verus evidence value.
     #[serde(default)]
     pub(crate) verus: Option<TheoremValue>,
+    /// Optional Stateright evidence value.
     #[serde(default)]
     pub(crate) stateright: Option<TheoremValue>,
 }
@@ -28,10 +31,14 @@ pub(crate) struct RawEvidence {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawKaniEvidence {
+    /// Unwind bound with its source location.
     pub(crate) unwind: Spanned<u32>,
+    /// Expected Kani outcome.
     pub(crate) expect: RawKaniExpectation,
+    /// Whether vacuous success is permitted, with its source location.
     #[serde(default, deserialize_with = "deserialize_optional_allow_vacuous")]
     pub(crate) allow_vacuous: Option<Spanned<bool>>,
+    /// Justification for allowing vacuity, with its source location.
     #[serde(default)]
     pub(crate) vacuity_because: Option<Spanned<String>>,
 }

@@ -55,10 +55,15 @@ pub const TRIVIAL_THEOREM: &str = concat!(
 
 /// Temporary Cargo crate used by integration tests that exercise build scripts.
 pub struct FixtureCrate {
+    /// Temporary directory kept alive for the fixture's lifetime.
     _temp_dir: tempfile::TempDir,
+    /// Absolute path to the fixture crate's manifest directory.
     manifest_dir: Utf8PathBuf,
+    /// Shared target directory used by all fixture builds.
     target_dir: Utf8PathBuf,
+    /// Package name used in generated manifests and lookups.
     package_name: String,
+    /// Capability-scoped handle to the fixture's manifest directory.
     dir: Dir,
 }
 
@@ -94,32 +99,33 @@ impl FixtureCrate {
             dir,
         };
 
-        fixture.write(Utf8Path::new("Cargo.toml"), &manifest)?;
-        fixture.write(Utf8Path::new("Cargo.lock"), WORKSPACE_LOCK)?;
-        fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
-        fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
-        fixture.write(
-            Utf8Path::new("build-support/Cargo.toml"),
-            &fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?,
-        )?;
-        fixture.write(
-            Utf8Path::new("build-support/src/lib.rs"),
-            BUILD_SUPPORT_LIB_SOURCE,
-        )?;
-        fixture.write(
-            Utf8Path::new("build-support/src/build_script.rs"),
-            BUILD_SUPPORT_BUILD_SCRIPT_SOURCE,
-        )?;
-        fixture.write(
-            Utf8Path::new("build-support/src/discovery.rs"),
-            BUILD_DISCOVERY_SOURCE,
-        )?;
-        fixture.write(
-            Utf8Path::new("build-support/src/suite.rs"),
-            BUILD_SUITE_SOURCE,
-        )?;
+        fixture.write_scaffold(&manifest, lib_rs)?;
 
         Ok(fixture)
+    }
+
+    /// Writes the manifest, lock, build script, library source and the
+    /// build-support crate into the fixture directory.
+    fn write_scaffold(&self, manifest: &str, lib_rs: &str) -> Result<(), String> {
+        let build_support_manifest = fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?;
+        let files = [
+            ("Cargo.toml", manifest),
+            ("Cargo.lock", WORKSPACE_LOCK),
+            ("build.rs", BUILD_SCRIPT_SOURCE),
+            ("src/lib.rs", lib_rs),
+            ("build-support/Cargo.toml", build_support_manifest.as_str()),
+            ("build-support/src/lib.rs", BUILD_SUPPORT_LIB_SOURCE),
+            (
+                "build-support/src/build_script.rs",
+                BUILD_SUPPORT_BUILD_SCRIPT_SOURCE,
+            ),
+            ("build-support/src/discovery.rs", BUILD_DISCOVERY_SOURCE),
+            ("build-support/src/suite.rs", BUILD_SUITE_SOURCE),
+        ];
+        for (path, contents) in files {
+            self.write(Utf8Path::new(path), contents)?;
+        }
+        Ok(())
     }
 
     /// Reads a file relative to the fixture crate root.
@@ -292,6 +298,7 @@ impl FixtureCrate {
         Err("generated theorem_suite.rs was not found".to_owned())
     }
 
+    /// Advances the modification time of `path`'s parent directory.
     fn advance_parent_mtime(&self, path: &Utf8Path) -> Result<(), String> {
         if let Some(parent) = path.parent()
             && !parent.as_str().is_empty()
@@ -301,6 +308,7 @@ impl FixtureCrate {
         Ok(())
     }
 
+    /// Advances `path`'s modification time to defeat Cargo caching.
     fn advance_mtime(&self, path: &Utf8Path) -> Result<(), String> {
         let absolute_path = self.manifest_dir.join(path);
         let advanced_mtime = SystemTime::now()
@@ -311,6 +319,7 @@ impl FixtureCrate {
     }
 }
 
+/// Builds a fixture manifest with lints disabled for build-script tests.
 fn fixture_build_support_cargo_toml(manifest: &str) -> Result<String, String> {
     let mut removed_lints = false;
     let mut inside_lints = false;

@@ -2,6 +2,7 @@
 
 use super::diagnostic::SchemaDiagnostic;
 
+/// Joins duplicate-key diagnostics into one message.
 fn format_duplicate_theorem_key_collisions(collisions: &[SchemaDiagnostic]) -> String {
     collisions
         .iter()

@@ -39,6 +39,7 @@ impl BuildLog {
         &self.0
     }
 
+    /// Asserts whether the log contains or omits `needle`.
     fn check(&self, expect_present: bool, needle: ExpectedFragment<'_>) -> Result<(), String> {
         let found = self.0.contains(needle.as_str());
         if found == expect_present {

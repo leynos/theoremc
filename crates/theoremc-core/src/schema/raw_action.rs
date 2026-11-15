@@ -92,6 +92,7 @@ impl<'de> SingleKeyDecoder<'de> for LetBindingDecoder {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawLetCall {
+    /// Action invocation bound to the `Let` name.
     pub(crate) call: RawActionCall,
 }
 
@@ -99,6 +100,7 @@ pub(crate) struct RawLetCall {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawLetMust {
+    /// Action invocation whose success value is bound to the `Let` name.
     pub(crate) must: RawActionCall,
 }
 
@@ -159,6 +161,7 @@ impl<'de> SingleKeyDecoder<'de> for StepDecoder {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawStepCall {
+    /// Action invocation performed by the step.
     pub(crate) call: RawActionCall,
 }
 
@@ -166,6 +169,7 @@ pub(crate) struct RawStepCall {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawStepMust {
+    /// Action invocation the step requires to succeed.
     pub(crate) must: RawActionCall,
 }
 
@@ -173,6 +177,7 @@ pub(crate) struct RawStepMust {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawStepMaybe {
+    /// Symbolic branching block for this step.
     pub(crate) maybe: RawMaybeBlock,
 }
 
@@ -292,12 +297,10 @@ pub(crate) fn convert_let_binding(
 ) -> Result<LetBinding, RawActionCallDecodeError> {
     match raw {
         RawLetBinding::Call(c) => {
-            let call = convert_action_call(&c.call)?;
-            Ok(LetBinding::Call(LetCall { call }))
+            convert_action_call(&c.call).map(|call| LetBinding::Call(LetCall { call }))
         }
         RawLetBinding::Must(m) => {
-            let must = convert_action_call(&m.must)?;
-            Ok(LetBinding::Must(LetMust { must }))
+            convert_action_call(&m.must).map(|must| LetBinding::Must(LetMust { must }))
         }
     }
 }
@@ -306,17 +309,10 @@ pub(crate) fn convert_let_binding(
 /// converting nested maybe blocks.
 pub(crate) fn convert_step(raw: &RawStep) -> Result<Step, RawActionCallDecodeError> {
     match raw {
-        RawStep::Call(c) => {
-            let call = convert_action_call(&c.call)?;
-            Ok(Step::Call(StepCall { call }))
-        }
-        RawStep::Must(m) => {
-            let must = convert_action_call(&m.must)?;
-            Ok(Step::Must(StepMust { must }))
-        }
+        RawStep::Call(c) => convert_action_call(&c.call).map(|call| Step::Call(StepCall { call })),
+        RawStep::Must(m) => convert_action_call(&m.must).map(|must| Step::Must(StepMust { must })),
         RawStep::Maybe(m) => {
-            let maybe = convert_maybe_block(&m.maybe)?;
-            Ok(Step::Maybe(StepMaybe { maybe }))
+            convert_maybe_block(&m.maybe).map(|maybe| Step::Maybe(StepMaybe { maybe }))
         }
     }
 }

@@ -45,14 +45,19 @@ pub(super) struct ExpansionPlan {
 
 /// A generated Kani proof harness.
 pub(super) struct GeneratedHarness {
+    /// Mangled harness function name.
     pub(super) ident: Ident,
+    /// Kani unwind bound rendered as an integer literal.
     pub(super) unwind_literal: syn::LitInt,
 }
 
 /// A generated compile-time action-signature probe.
 pub(super) struct GeneratedActionProbe {
+    /// Mangled probe function name.
     pub(super) ident: Ident,
+    /// Declared parameter types, in order.
     pub(super) param_types: Vec<syn::Type>,
+    /// Declared return type.
     pub(super) return_type: syn::Type,
 }
 
