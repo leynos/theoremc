@@ -19,7 +19,7 @@ before rendering backend code.
 
 The generated `theorem_file!` expansion already owns stable modules, Kani proof
 attributes, action probes, and referenced-type probes. Its harness bodies are
-empty. The most direct implementation of roadmap Phase 5 would make the proc
+empty. The most direct implementation of roadmap Phase 4 would make the proc
 macro walk `TheoremDoc` and emit Kani tokens for every `Forall`, `Assume`,
 `Let`, `Do`, `Prove`, and `Witness` item.
 
@@ -381,6 +381,13 @@ most of the architectural protection without requiring that public break.
 
 Rejected. One backend does not provide evidence for the right trait surface.
 Capabilities and rendering functions remain explicit until Verus work begins.
+
+## Addendum (2026-11-15): roadmap renumbering
+
+The roadmap restructure of this date promoted the former "Phase 3.1" CLI
+foundation to phase 4 and renumbered the later phases. References in this
+record to roadmap "Phase 4", the working Kani proof path, now name phase 5, "A
+working Kani proof path with explicit non-vacuity". The decision is unchanged.
 
 ## Related documents
 

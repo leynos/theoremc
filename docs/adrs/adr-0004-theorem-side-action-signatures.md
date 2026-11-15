@@ -75,7 +75,7 @@ function being checked, the probe merely restates the current code.
 ### 2. Add theorem-side action signature declarations
 
 Each theorem document may declare the expected signatures for the actions it
-references in a top-level `Actions` mapping. For Task 3.3.1 and later action
+references in a top-level `Actions` mapping. For Step 3.3.1 and later action
 lowering work, every action referenced by that document's `Let` and `Do`
 sections must have an `Actions` entry.
 
@@ -189,7 +189,7 @@ compatibility with a stable expected signature.
 
 ### Generate signature aliases from `#[theorem_action]`
 
-Rejected as the source for Task 3.3.1. If the alias is generated from the
+Rejected as the source for Step 3.3.1. If the alias is generated from the
 current function signature, it changes when the function changes and cannot
 detect drift. If the attribute requires an explicit signature, the macro still
 cannot inspect that alias during `theorem_file!` expansion for argument
@@ -207,7 +207,7 @@ do not supply theorem-owned expected signatures.
 
 Deferred. A build-generated manifest could become a future ergonomics layer,
 especially if it validates explicit action declarations and writes a
-`theorem-actions.generated.yaml` file. It is not the Task 3.3.1 source because
+`theorem-actions.generated.yaml` file. It is not the Step 3.3.1 source because
 generating the manifest from current Rust actions repeats the inference
 problem, while adding a checked-in manifest introduces another file discovery
 and synchronization design.
@@ -219,6 +219,13 @@ bind prose steps to executable methods and transform captures into method
 arguments.[^5] That is good prior art for keeping behaviour in ordinary code,
 but theoremc also needs a document-owned type contract before generating Rust
 harnesses and probes.
+
+## Addendum (2026-11-15): roadmap renumbering
+
+The roadmap now numbers each task directly, in the grammar that `mapsplice`
+edits. References in this record to "Step 3.3.1" name what the roadmap now
+calls task 3.3.1, typed action probes. The number is unchanged; only the level
+label differs. The decision is unchanged.
 
 ## Related documents
 

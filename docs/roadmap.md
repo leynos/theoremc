@@ -67,9 +67,16 @@ Tasks cite these sources with `§` section references. ADRs are cited by number.
 
 ## Sequencing rules
 
-- Execute phases in order, except where `Requires` bullets explicitly permit
-  parallel work. Step 4.4 may proceed in parallel with phase 5 because tool
-  management does not depend on completed theorem lowering.
+- Phases record delivery intent, not a strict barrier: a task may start once
+  every item in its `Requires` bullet is complete. Phase 5 depends only on the
+  completed compile-time foundation, not on phase 4, so steps 4.2 to 4.5 may
+  proceed alongside phase 5. Theorem execution in step 6.2 joins the two
+  streams.
+- Keep work off the vertical-slice path unless it directly blocks the slice,
+  as ADR-0011 decision 7 requires. That covers build-support crate extraction
+  (4.3.1), stable ID aliases (step 6.1), rich report rendering (step 6.3),
+  concrete playback (step 6.4), Dylint enforcement (step 7.1), localization
+  (phase 8), the full RFC 0001 law catalogue, and Verus bindings.
 - Do not implement high-level `cargo theorem run` until both Kani execution
   semantics and the backend provider and pin-check contracts are stable.
 - Make the real version 1 Kani proof and counterexample in step 5.1 the next
@@ -412,19 +419,28 @@ cargo-theorem-cli-design.md §§6.4, 8.5, 9.3, 10.3.
   - Success: fixtures cover virtual workspaces, ambiguous names, excluded
     members, and explicit manifests; ambiguity diagnostics enumerate valid
     package identifiers.
-- [ ] 4.2.2. Implement bounded top-level `list` and `get` theorem commands
+- [ ] 4.2.2. Implement canonical external theorem ID generation as
+  `{normalized_path(P)}#{T}` with path normalization rules.
+  - Requires 4.2.1.
+  - Keep these external IDs distinct from the Kani harness identifiers that
+    task 2.2.2 generates.
+  - See name-mangling-rules.md "Stable external theorem identifiers",
+    theoremc-design.md §9, and ADR-0001 decision 5.
+  - Success: tests cover path separator normalization and leading `./`
+    removal for package-relative theorem paths.
+- [ ] 4.2.3. Implement bounded top-level `list` and `get` theorem commands
   plus `action list` and `action get`, using stable ordering, `--limit`, and
   opaque cursors.
-  - Requires 4.2.1, 4.1.4, 2.2.2.
+  - Requires 4.2.2, 4.1.4, 2.1.2.
   - See cargo-theorem-cli-design.md §§8.5, 9.3 and name-mangling-rules.md
     "Stable external theorem identifiers".
   - Success: JSON snapshots contain stable theorem IDs, paths, backends,
     action names, signatures, and next-cursor metadata without unbounded
     source or log content.
-- [ ] 4.2.3. Implement read-only `check` composition for schema, action
+- [ ] 4.2.4. Implement read-only `check` composition for schema, action
   signatures, and build integration.
   - Requires 4.2.1, 4.1.4, 3.3.2.
-  - Alias and backend-pin components join `check` in 6.1.2 and 4.4.2.
+  - Alias and backend-pin components join `check` in 6.1.1 and 4.4.2.
   - See cargo-theorem-cli-design.md §10.3 and theoremc-design.md §§6, 7.
   - Success: `check` never performs installation or network mutation, and
     every failing component produces a stable diagnostic code and application
@@ -493,7 +509,7 @@ cargo-theorem-cli-design.md §12.
 - [ ] 4.4.2. Implement `theoremc.toml` backend intent, a deterministic
   `theoremc.lock`, content-addressed platform cache entries, and `backend list`,
   `get`, `install`, `check`, `sync`, `update`, and `delete`.
-  - Requires 4.4.1, 4.2.3, 4.3.2.
+  - Requires 4.4.1, 4.2.4, 4.3.2.
   - Extend `check` with the configured backend-pin component.
   - See cargo-theorem-cli-design.md §§12.2-12.3.
   - Success: installation mutations support `--dry-run`, pin checks never
@@ -740,30 +756,23 @@ This phase connects the Kani path from phase 5 to the command spine from phase
 4 and replaces the reporting scope formerly assigned to `theoremd`. See
 cargo-theorem-cli-design.md §§11, 13 and theoremc-design.md §9.
 
-### 6.1. Give theorems stable external identities across renames
+### 6.1. Keep theorem identities stable across renames
 
-This step answers whether canonical theorem IDs and an alias graph can keep run
-history and selection stable when files move. Automatic alias file editing is
-out of scope. See name-mangling-rules.md "Stable external theorem identifiers"
-and ADR-0001 decision 5.
+This step answers whether an alias graph over the canonical theorem IDs from
+4.2.2 can keep run history and selection stable when files move. Automatic
+alias file editing is out of scope. See name-mangling-rules.md "Stable external
+theorem identifiers" and ADR-0001 decision 5.
 
-- [ ] 6.1.1. Implement canonical external theorem ID generation as
-  `{normalized_path(P)}#{T}` with path normalization rules.
-  - Requires 4.2.1, 5.3.1.
-  - See name-mangling-rules.md "Stable external theorem identifiers",
-    theoremc-design.md §9, and ADR-0001 decision 5.
-  - Success: tests cover path separator normalization and leading `./`
-    removal.
-- [ ] 6.1.2. Implement alias file loading from
+- [ ] 6.1.1. Implement alias file loading from
   `theorems/theorem-id-aliases.yaml` and deterministic resolution of deprecated
   IDs to canonical IDs, and add the alias component to `check`.
-  - Requires 6.1.1, 4.2.3.
+  - Requires 4.2.2, 4.2.4.
   - See name-mangling-rules.md "Stable external theorem identifiers" and
     ADR-0001 decision 5.
   - Success: tests cover direct aliases and multi-hop alias chains.
-- [ ] 6.1.3. Detect and reject alias cycles and ambiguous resolutions at load
+- [ ] 6.1.2. Detect and reject alias cycles and ambiguous resolutions at load
   time.
-  - Requires 6.1.2.
+  - Requires 6.1.1.
   - See name-mangling-rules.md "Stable external theorem identifiers" and
     ADR-0001 decision 5.
   - Success: cycle and ambiguity fixtures fail with actionable diagnostics.
@@ -778,7 +787,7 @@ of scope. See cargo-theorem-cli-design.md §§11.1-11.2, 13.1.
 - [ ] 6.2.1. Implement shared selection by theorem ID, path, tag, package,
   backend, and changed revision, with stable ordering and an explicit
   empty-selection policy.
-  - Requires 6.1.3, 4.2.1.
+  - Requires 6.1.2, 4.2.1.
   - See cargo-theorem-cli-design.md §11.1 and name-mangling-rules.md "Stable
     external theorem identifiers".
   - Success: property tests cover category intersection, repeated-filter

@@ -3,7 +3,7 @@
 This ExecPlan is a living record. Update it at each milestone and before
 stopping work.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 ## Purpose / big picture
 
@@ -494,6 +494,10 @@ latest formatting command passed; restart the complete gate sequence.
   following hosted assessment comment `6441857666`.
 
 ## Outcomes & retrospective
+
+The accepted scope merged in #204 (`86dfdcf`), and roadmap task 4.1.2 is marked
+done. This record is complete; later roadmap slices extend the foundation under
+their own plans.
 
 The pre-readiness assessment of `7fc73fe` found a real agent-context invocation
 bug and an ExecPlan acceptance mismatch. The current repair derives the

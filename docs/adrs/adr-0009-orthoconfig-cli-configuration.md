@@ -15,7 +15,7 @@ mixed-MSRV boundary was superseded on 2026-10-31 by
 
 The merged `cargo theorem` design assigns command parsing and configuration to
 the dedicated `crates/cargo-theorem/` application package. Issue #200 adopts
-the published `ortho_config` 0.10.0 release as part of roadmap Phase 4. That
+the published `ortho_config` 0.10.0 release as part of roadmap Phase 3.1. That
 release requires Rust 1.89.0; the facade, `theoremc-core`, `theoremc-macros`,
 and build-support packages currently declare Rust 1.88.
 
@@ -158,7 +158,7 @@ check against the CLI package; it does not infer behaviour from command names.
   chain as global settings because the v0.10 helper cannot consume a custom
   filename or explicit file selector.
 - Profiles and configuration namespaces are part of the planned CLI contract.
-- Only the Phase 4 foundation ships in this slice. Backend execution,
+- Only the Phase 3.1 foundation ships in this slice. Backend execution,
   project mutation, profile management, and translated catalogues remain later
   roadmap work.
 
@@ -177,9 +177,17 @@ implemented localization service that justifies the change.
 
 ### Keep configuration unimplemented until later CLI commands land
 
-Rejected. Phase 4 owns the configuration and command spine. Building the
+Rejected. Phase 3.1 owns the configuration and command spine. Building the
 configuration boundary now prevents later handlers from inventing incompatible
 discovery, environment, precedence, or command namespace rules.
+
+## Addendum (2026-11-15): roadmap renumbering
+
+The roadmap restructure of this date promoted the former "Phase 3.1"
+`cargo theorem` foundation to phase 4, "One Cargo-native entry point for
+project integration". Its former steps 3.1.1 to 3.1.5 are now steps 4.1 to 4.5,
+and the OrthoConfig adoption this record governs is task 4.1.2. References in
+this record to "Phase 3.1" name phase 4. The decision is unchanged.
 
 ## Related documents
 

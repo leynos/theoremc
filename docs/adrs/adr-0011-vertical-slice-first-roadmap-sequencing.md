@@ -58,7 +58,7 @@ backend would immediately have to dismantle.
 
 ## Non-goals
 
-- Complete every Phase 5 construct before proving one useful theorem.
+- Complete every Phase 4 construct before proving one useful theorem.
 - Implement RFC 0001 before the existing language works end to end.
 - Build rich Markdown, HTML, JUnit, or Cucumber reports for the first slice.
 - Implement stable theorem ID aliases or concrete playback for the first slice.
@@ -101,9 +101,9 @@ A small idempotence theorem expressed longhand is the preferred example. It
 exercises the same composable-primary shape that RFC 0001 will later compress
 into an `idempotent` law, without requiring schema version 2.
 
-### 2. Recast roadmap Step 5.1 around the shared harness plan
+### 2. Recast roadmap Step 4.1 around the shared harness plan
 
-Roadmap Step 5.1 becomes "deliver the Kani vertical slice through the shared
+Roadmap Step 4.1 becomes "deliver the Kani vertical slice through the shared
 harness-planning boundary". It includes:
 
 - introduce the internal, backend-neutral harness plan from ADR-0006;
@@ -118,9 +118,9 @@ harness-planning boundary". It includes:
 The first slice may support only infallible `call` invocations. It must reject
 fallible calls, `must`, or `maybe` if their semantics have not landed.
 
-### 3. Keep semantic breadth in Step 5.2
+### 3. Keep semantic breadth in Step 4.2
 
-After the slice works, Step 5.2 expands operational semantics in small,
+After the slice works, Step 4.2 expands operational semantics in small,
 independently testable increments:
 
 1. value-returning and unit-returning `call`;
@@ -135,12 +135,12 @@ construct receives a second, direct Kani renderer.
 
 ### 4. Split execution policy from rich reporting
 
-Roadmap Step 5.3 becomes a minimal Kani runner and evidence-policy milestone.
+Roadmap Step 4.3 becomes a minimal Kani runner and evidence-policy milestone.
 It may invoke Kani, associate outcomes with stable obligation identities, and
 compare actual status with `Evidence.kani.expect`.
 
 It does not need to render Markdown, HTML, JUnit XML, Cucumber JSON, or
-concrete playback artefacts. Those remain in Phase 6.
+concrete playback artefacts. Those remain in Phase 5.
 
 The minimal runner must distinguish:
 
@@ -156,7 +156,7 @@ expected and justified.
 
 ### 5. Place RFC 0001 after the vertical slice and before rich reporting
 
-Add a new roadmap Step 5.4 for RFC 0001:
+Add a new roadmap Step 4.4 for RFC 0001:
 
 1. freeze omitted `Schema` as the version 1 compatibility profile;
 2. add schema version 2 and `ProofObligation`;
@@ -173,7 +173,7 @@ than a simultaneous redesign of the frontend, middle end, backend, and runner.
 ### 6. Pull one example forward and leave broad examples later
 
 The small vertical-slice example moves from the late examples phase into Step
-5.1. It should use a pure, shared-reference primary with an owned result, such
+4.1. It should use a pure, shared-reference primary with an owned result, such
 as normalization of a bounded integer or compact configuration value.
 
 The richer `account` and Hierarchical Navigable Small World (HNSW) examples
@@ -205,18 +205,18 @@ The roadmap should make the following textual and dependency changes.
 
 | Existing area      | Amendment                                                         |
 | ------------------ | ----------------------------------------------------------------- |
-| Phase 5 outcome    | Name a working Kani proof path as the primary outcome             |
-| Step 5.1           | Add the harness plan, real fixture execution, and pass/fail slice |
-| Step 5.2           | Retain breadth work for `call`, `must`, and `maybe`               |
-| Step 5.3           | Add a minimal runner; move rich formats to Phase 6                |
-| New Step 5.4       | Integrate RFC 0001 only after the slice works                     |
-| Step 6.3           | Model generic obligations and backend-indexed evidence            |
-| Step 7.3           | Keep broad examples, but remove the first-slice dependency        |
+| Phase 4 outcome    | Name a working Kani proof path as the primary outcome             |
+| Step 4.1           | Add the harness plan, real fixture execution, and pass/fail slice |
+| Step 4.2           | Retain breadth work for `call`, `must`, and `maybe`               |
+| Step 4.3           | Add a minimal runner; move rich formats to Phase 5                |
+| New Step 4.4       | Integrate RFC 0001 only after the slice works                     |
+| Step 5.1           | Model generic obligations and backend-indexed evidence            |
+| Step 6.3           | Keep broad examples, but remove the first-slice dependency        |
 | Sequencing summary | Make the vertical slice the gate before laws or reports           |
 
 _Table 1: Required roadmap changes to put the working proof path first._
 
-The implementation plan for Step 5.1 must cite ADR-0006. Work on Step 6.3 and
+The implementation plan for Step 4.1 must cite ADR-0006. Work on Step 5.1 and
 RFC 0001 must cite ADR-0007.
 
 ## Vertical-slice acceptance criteria
@@ -253,14 +253,14 @@ Positive consequences:
 Costs and trade-offs:
 
 - Step numbering and roadmap prose require revision.
-- Some Phase 5 semantics remain temporarily unsupported after the first slice.
+- Some Phase 4 semantics remain temporarily unsupported after the first slice.
 - The minimal runner may later be absorbed into `theoremd`.
 - One small example appears before the polished example suite.
 - Maintainers must enforce fail-closed behaviour to avoid partial semantics.
 
 ## Alternatives considered
 
-### Complete the current Phase 5 horizontally
+### Complete the current Phase 4 horizontally
 
 Rejected. It delays end-to-end evidence and encourages direct schema-to-Kani
 rendering before a reusable middle boundary has proven necessary.
@@ -299,6 +299,21 @@ Earlier references to "ADR 005" or "ADR-005" are ambiguous, because serial 005
 also named the build-standard decision. Read them by their subject: references
 about vertical-slice sequencing describe this decision, and references about
 shared build standards describe that one. Neither names a current record.
+
+On 2026-11-15 the roadmap was restructured into the grammar that `mapsplice`
+edits, and its phases were renumbered. Read the roadmap references in this
+record with the following mapping. The decisions are unchanged.
+
+| Reference in this record | Current roadmap item                                  |
+| ------------------------ | ----------------------------------------------------- |
+| Phase 4                  | Phase 5, the working Kani proof path                  |
+| Steps 4.1 to 4.4         | Steps 5.1 to 5.4                                      |
+| Phase 5                  | Phase 6, durable theorem runs and reports             |
+| Step 5.1                 | Step 6.3, the canonical run record and report outputs |
+| Step 6.3                 | Step 7.3, runnable examples and guidance              |
+
+The former "Phase 3.1" CLI foundation became phase 4. Stable external IDs moved
+from step 5.2 to step 6.1, and canonical ID generation to task 4.2.2.
 
 ## Related documents
 
