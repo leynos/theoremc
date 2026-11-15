@@ -68,19 +68,10 @@ fn document(name: &str, actions: &str, do_block: &str) -> String {
 /// `2 + 6 * level`: each `maybe:` wrapper indents its `because` and `do` keys
 /// four columns below its own dash, and the `do` list one level below that.
 fn do_with_deposit_reference(depth: usize, args: &[(&str, &str)]) -> String {
-    let indent = |level: usize| " ".repeat(2 + 6 * level);
-    let pad = indent(depth);
-    let mut arg_lines = String::new();
-    for (name, value) in args {
-        arg_lines.push_str(&pad);
-        arg_lines.push_str("      ");
-        arg_lines.push_str(name);
-        arg_lines.push_str(": ");
-        arg_lines.push_str(value);
-        arg_lines.push('\n');
-    }
+    let pad = nesting_indent(depth);
+    let arg_lines = deposit_arg_lines(&pad, args);
 
-    let mut steps = format!(
+    let deposit = format!(
         concat!(
             "{pad}- call:\n",
             "{pad}    action: account.deposit\n",
@@ -91,21 +82,45 @@ fn do_with_deposit_reference(depth: usize, args: &[(&str, &str)]) -> String {
         arg_lines = arg_lines,
     );
 
-    for level in (0..depth).rev() {
-        let level_pad = indent(level);
-        steps = format!(
-            concat!(
-                "{level_pad}- maybe:\n",
-                "{level_pad}    because: optional nesting level\n",
-                "{level_pad}    do:\n",
-                "{steps}",
-            ),
-            level_pad = level_pad,
-            steps = steps,
-        );
-    }
+    let steps = (0..depth)
+        .rev()
+        .fold(deposit, |steps, level| wrap_in_maybe(level, &steps));
 
     format!("Do:\n{steps}")
+}
+
+/// Returns the dash indentation of a step at nesting level `level`.
+fn nesting_indent(level: usize) -> String {
+    " ".repeat(2 + 6 * level)
+}
+
+/// Renders one `name: value` argument line per entry, indented under `pad`.
+fn deposit_arg_lines(pad: &str, args: &[(&str, &str)]) -> String {
+    let mut lines = String::new();
+    for (name, value) in args {
+        lines.push_str(pad);
+        lines.push_str("      ");
+        lines.push_str(name);
+        lines.push_str(": ");
+        lines.push_str(value);
+        lines.push('\n');
+    }
+    lines
+}
+
+/// Wraps `steps` in a `maybe:` block whose dash sits at nesting level `level`.
+fn wrap_in_maybe(level: usize, steps: &str) -> String {
+    let level_pad = nesting_indent(level);
+    format!(
+        concat!(
+            "{level_pad}- maybe:\n",
+            "{level_pad}    because: optional nesting level\n",
+            "{level_pad}    do:\n",
+            "{steps}",
+        ),
+        level_pad = level_pad,
+        steps = steps,
+    )
 }
 
 /// Declares `account.deposit` with `account: u64` and `returns: bool`.

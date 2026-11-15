@@ -5,7 +5,8 @@
 //! is bounded here and fails with a message when it overruns.
 
 use std::io::{self, Read};
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use camino::Utf8Path;
@@ -33,33 +34,51 @@ pub(super) fn run_within_deadline(
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()?;
-    let mut pipe = child
-        .stderr
-        .take()
-        .ok_or_else(|| io::Error::other("child stderr was not captured"))?;
-    let reader = std::thread::spawn(move || {
-        let mut text = String::new();
-        pipe.read_to_string(&mut text).map(|_| text)
-    });
-    let started = Instant::now();
-    let status = loop {
-        if let Some(status) = child.try_wait()? {
-            break status;
-        }
-        if started.elapsed() >= deadline {
-            child.kill()?;
-            child.wait()?;
-            return Err(io::Error::new(
-                io::ErrorKind::TimedOut,
-                format!("the compiler did not finish within {deadline:?}"),
-            ));
-        }
-        std::thread::sleep(POLL_INTERVAL);
-    };
+    let reader = drain_stderr(&mut child)?;
+    let status = wait_within_deadline(&mut child, deadline)?;
     let stderr = reader
         .join()
         .map_err(|_| io::Error::other("the stderr reader panicked"))??;
     Ok((status.success(), stderr))
+}
+
+/// Starts a thread that reads the child's stderr to the end.
+fn drain_stderr(child: &mut Child) -> io::Result<JoinHandle<io::Result<String>>> {
+    let mut pipe = child
+        .stderr
+        .take()
+        .ok_or_else(|| io::Error::other("child stderr was not captured"))?;
+    Ok(std::thread::spawn(move || {
+        let mut text = String::new();
+        pipe.read_to_string(&mut text).map(|_| text)
+    }))
+}
+
+/// Polls `child` until it exits, killing it and failing once `deadline` passes.
+fn wait_within_deadline(child: &mut Child, deadline: Duration) -> io::Result<ExitStatus> {
+    let started = Instant::now();
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Ok(status);
+        }
+        if started.elapsed() >= deadline {
+            return Err(kill_overrunning(child, deadline));
+        }
+        std::thread::sleep(POLL_INTERVAL);
+    }
+}
+
+/// Kills and reaps a child that outlived `deadline`, returning the error to report.
+///
+/// A failure to kill or reap the child takes precedence over the timeout.
+fn kill_overrunning(child: &mut Child, deadline: Duration) -> io::Error {
+    match child.kill().and_then(|()| child.wait()) {
+        Ok(_) => io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!("the compiler did not finish within {deadline:?}"),
+        ),
+        Err(error) => error,
+    }
 }
 
 #[test]
