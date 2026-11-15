@@ -466,8 +466,9 @@ declared once instead of carrying per-site expectations.
 `clippy::missing_docs_in_private_items` was the last baseline rule to arrive:
 it waited on documenting every private item it reports, concentrated in
 `crates/theoremc-core` and `crates/theoremc-macros`. That documentation is in
-place and the rule is denied, so a new private item without a doc comment now
-fails `make lint` rather than passing unnoticed.
+place and the rule is denied, so a new private item the lint reports, without a
+doc comment, now fails `make lint` rather than passing unnoticed. The lint does
+not check items compiled only into test harnesses.
 
 Where a rule is adopted but tuned differently, record the reason beside the
 setting: `clippy.toml` keeps `cognitive-complexity-threshold = 9` to match

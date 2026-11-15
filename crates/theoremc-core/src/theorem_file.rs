@@ -162,7 +162,8 @@ enum TheoremPathViolation {
     ParentTraversal,
 }
 
-/// Classifies a theorem path that escapes the crate root.
+/// Classifies a theorem path that is root-anchored, drive-prefixed, or contains
+/// a `..` component (even one that would stay within the crate root).
 fn theorem_path_violation(path: &Utf8Path) -> Option<TheoremPathViolation> {
     let normalized_path = crate::path_format::normalize_path_separators(path.as_str());
     let candidate_path = Utf8Path::new(&normalized_path);

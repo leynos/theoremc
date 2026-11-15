@@ -11,8 +11,8 @@ use theoremc_core::{TheoremFileLoadError, schema::SchemaDiagnostic};
 /// Failures raised while planning or rendering a theorem macro expansion.
 #[derive(Debug, thiserror::Error)]
 pub(super) enum MacroExpansionError {
-    /// The crate root cannot be resolved because the manifest directory
-    /// variable is unset.
+    /// The crate root cannot be resolved because `CARGO_MANIFEST_DIR` cannot
+    /// be read (it is unset or not valid Unicode).
     #[error("`CARGO_MANIFEST_DIR` is not set during theorem macro expansion")]
     MissingManifestDir,
     /// A theorem omits the Kani evidence the harness needs.
