@@ -480,12 +480,15 @@ test passes a stub value or error instead of changing global state. The only
 sanctioned reads are the boundary seams in the macro, build script, and test
 harnesses that must inherit Cargo's or the host's values, and the `OrthoConfig`
 derive on `GlobalOptions` in `crates/cargo-theorem`, whose expansion reads the
-process environment. That derive sits alone in `config/global_options.rs`, so
-its module-level expectation covers it and nothing else; callers that need
-isolation inject sources through `GlobalOptions::load_with_sources`. Each
-carries `#[expect(clippy::disallowed_methods, reason = "...")]`, and `allow` is
-never used. `unsafe_code = "forbid"` is set workspace-wide, so no expectation
-can re-open it.
+process environment. Clippy reports that read at the derive, which an
+item-level expectation on the struct does not reach, so the struct alone sits in
+`config/global_options.rs` and `config/mod.rs` declares that module under the
+expectation; the helper the struct uses stays outside it, and a direct read
+added anywhere else in `config` stays denied. Callers that need isolation
+inject sources through `GlobalOptions::load_with_sources`. Each carries
+`#[expect(clippy::disallowed_methods, reason = "...")]`, and `allow` is never
+used. `unsafe_code = "forbid"` is set workspace-wide, so no expectation can
+re-open it.
 
 `make lint-whitaker` runs the Whitaker Dylint suite through the `whitaker`
 wrapper. Install it with `whitaker-installer` so that `whitaker` is on `PATH`,

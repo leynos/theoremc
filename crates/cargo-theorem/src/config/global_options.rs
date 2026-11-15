@@ -1,19 +1,9 @@
 //! The `GlobalOptions` settings struct and its `OrthoConfig` derive.
 //!
 //! The derive is the only code in this crate that reads the process
-//! environment, so the lint expectation lives here, in the one module that
-//! holds nothing else: a later direct read elsewhere in `config` stays denied.
-
-// The `OrthoConfig` derive expands to a process-environment read, and Clippy
-// reports that read at the derive on `GlobalOptions`. An expectation on the
-// struct does not reach the derive expansion, so it is declared at module
-// scope, which this module keeps to the derive alone. Callers that need
-// isolation inject sources through `GlobalOptions::load_with_sources` instead
-// of relying on this read.
-#![expect(
-    clippy::disallowed_methods,
-    reason = "the OrthoConfig derive expands to a process-environment read; callers that need isolation inject sources through load_with_sources"
-)]
+//! environment. `config/mod.rs` declares this module under the lint
+//! expectation, and this module holds the struct and nothing else, so the
+//! expectation covers the derive alone.
 
 use std::collections::BTreeMap;
 
@@ -22,15 +12,7 @@ use ortho_config::OrthoConfig;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// Consume `OrthoConfig`'s internal config selector without treating it as a
-/// persisted setting.
-fn ignore_config_path<'de, D>(deserializer: D) -> Result<Option<std::path::PathBuf>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let _ignored = serde::de::IgnoredAny::deserialize(deserializer)?;
-    Ok(None)
-}
+use super::ignore_config_path;
 
 /// Global options and selected-command namespaces for the application.
 ///

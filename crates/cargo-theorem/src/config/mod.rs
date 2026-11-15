@@ -1,8 +1,16 @@
 //! `OrthoConfig` settings, validation, and selected-command resolution.
 
-// `GlobalOptions` and its `OrthoConfig` derive live in their own module so the
-// lint expectation for the derive's process-environment read covers that
-// struct alone; a direct environment read added here stays denied.
+// The `OrthoConfig` derive expands to a process-environment read, and Clippy
+// reports that read at the derive on `GlobalOptions`. An expectation on the
+// struct does not reach the derive expansion, so the struct sits alone in an
+// inline-scoped module and the expectation is declared on that module item.
+// Nothing else in this file is covered, so a direct environment read added
+// here stays denied. Callers that need isolation inject sources through
+// `GlobalOptions::load_with_sources` instead of relying on the derive's read.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the OrthoConfig derive expands to a process-environment read; callers that need isolation inject sources through load_with_sources"
+)]
 mod global_options;
 
 pub use global_options::GlobalOptions;
@@ -13,10 +21,23 @@ use ortho_config::{
     EnvSource, OrthoError, OrthoResult, ProfileLoadOutcome, SelectedSubcommandMerge,
     SelectedSubcommandMergeError, SharedEnvSource, SharedScanEnvSource, SubcommandFileContext,
 };
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
 use crate::cli::Commands;
+
+/// Consume `OrthoConfig`'s internal config selector without treating it as a
+/// persisted setting.
+///
+/// It lives here, outside the module that carries the derive's lint
+/// expectation, because it reads nothing from the environment.
+fn ignore_config_path<'de, D>(deserializer: D) -> Result<Option<std::path::PathBuf>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let _ignored = serde::de::IgnoredAny::deserialize(deserializer)?;
+    Ok(None)
+}
 
 // Keep namespaces for deferred top-level commands so documented future
 // settings remain usable, while rejecting misspellings before dispatch. This
