@@ -146,58 +146,58 @@
 
 - [Execution plans](execplans/) - Living plans for roadmap tasks,
   audit findings, and accepted changes.
-  - [Step 1.1: `TheoremDoc` and subordinate schema
+  - [Task 1.1.1: `TheoremDoc` and subordinate schema
     types](execplans/1-1-1-theorem-doc-and-subordinate-schema-types.md)
     - ExecPlan for strict theorem document deserialization.
-  - [Step 1.2.1: Validate required fields and non-empty
+  - [Task 1.2.1: Validate required fields and non-empty
     constraints](execplans/1-2-1-validate-required-fields-and-non-empty-constraints.md)
     - ExecPlan for post-deserialization semantic validation rules.
-  - [Step 1.2.2: Parse expression fields as
+  - [Task 1.2.2: Parse expression fields as
     `syn::Expr`](execplans/1-2-2-parse-assume-prove-and-witness-expressions.md)
     - ExecPlan for expression syntax validation and statement block rejection.
-  - [Step 1.2.3: Enforce `Step` and `LetBinding` shape
+  - [Task 1.2.3: Enforce `Step` and `LetBinding` shape
     rules](execplans/1-2-3-enforce-step-and-let-binding.md)
     - ExecPlan for step and let-binding structural validation.
-  - [Step 1.2.4: Enforce non-vacuity
+  - [Task 1.2.4: Enforce non-vacuity
     defaults](execplans/1-2-4-enforce-non-vacuity-defaults.md)
     - ExecPlan for vacuity policy defaults and override validation.
-  - [Step 1.3.1: Structured diagnostics for parser
+  - [Task 1.3.1: Structured diagnostics for parser
     failures](execplans/1-3-1-structured-diagnostics-for-parser-failures.md)
     - ExecPlan for source-located diagnostics and parser regression fixtures.
-  - [Step 2.1.1: Canonical action-name
+  - [Task 2.1.1: Canonical action-name
     validation](execplans/2-1-1-canonical-action-name-validation.md)
     - ExecPlan for dot-separated action-name grammar and keyword validation.
-  - [Step 2.1.2: Action mangling](execplans/2-1-2-action-mangling.md)
+  - [Task 2.1.2: Action mangling](execplans/2-1-2-action-mangling.md)
     - ExecPlan for deterministic canonical action-name mangling.
-  - [Step 2.1.3: Reject duplicate action names](execplans/2-1-3-fail-compilation-on-duplicate-action-names.md)
+  - [Task 2.1.3: Reject duplicate action names](execplans/2-1-3-fail-compilation-on-duplicate-action-names.md)
     - ExecPlan for detecting duplicate action names at compile time.
-  - [Step 2.2.1: Per-file naming with path mangle and hash12](execplans/2-2-1-per-file-naming-using-path-mangle-and-hash12.md)
+  - [Task 2.2.1: Per-file naming with path mangle and hash12](execplans/2-2-1-per-file-naming-using-path-mangle-and-hash12.md)
     - ExecPlan for deterministic per-file module naming.
-  - [Step 2.2.2: Deterministic harness naming](execplans/2-2-2-deterministic-harness-naming.md)
+  - [Task 2.2.2: Deterministic harness naming](execplans/2-2-2-deterministic-harness-naming.md)
     - ExecPlan for stable generated Kani harness identifiers.
-  - [Step 2.3.1: Argument decoding for plain YAML strings](execplans/2-3-1-argument-decoding-for-plain-yaml-strings.md)
+  - [Task 2.3.1: Argument decoding for plain YAML strings](execplans/2-3-1-argument-decoding-for-plain-yaml-strings.md)
     - ExecPlan for argument-decoding semantics.
-  - [Step 2.3.2: Optional literal text wrapper](execplans/2-3-2-optional-literal-text-wrapper.md)
+  - [Task 2.3.2: Optional literal text wrapper](execplans/2-3-2-optional-literal-text-wrapper.md)
     - ExecPlan for explicit literal-wrapper decoding.
-  - [Step 2.3.3: Struct literal synthesis from YAML maps](execplans/2-3-3-struct-literal-synthesis-from-yaml-maps.md)
+  - [Task 2.3.3: Struct literal synthesis from YAML maps](execplans/2-3-3-struct-literal-synthesis-from-yaml-maps.md)
     - ExecPlan for map-backed argument lowering.
-  - [Step 3.1.1: Build-script theorem scanning](execplans/3-1-1-build-rs-scanning-of-theorems.md)
+  - [Task 3.1.1: Build-script theorem scanning](execplans/3-1-1-build-rs-scanning-of-theorems.md)
     - ExecPlan for theorem discovery in the Cargo build script.
-  - [Step 3.1.2: Generate the `OUT_DIR` theorem suite](execplans/3-1-2-generate-out-dir-theorem-suite-rs.md)
+  - [Task 3.1.2: Generate the `OUT_DIR` theorem suite](execplans/3-1-2-generate-out-dir-theorem-suite-rs.md)
     - ExecPlan for generated theorem-suite wiring.
-  - [Step 3.2.1: Stable per-file macro expansions](execplans/3-2-1-stable-per-file-module-macro-expansions.md)
+  - [Task 3.2.1: Stable per-file macro expansions](execplans/3-2-1-stable-per-file-module-macro-expansions.md)
     - ExecPlan for per-file `theorem_file!` expansion.
-  - [Step 3.2.2: Gate generated Kani harnesses](execplans/3-2-2-gate-generated-kani-harnesses.md)
+  - [Task 3.2.2: Gate generated Kani harnesses](execplans/3-2-2-gate-generated-kani-harnesses.md)
     - ExecPlan for cfg-gated Kani proof-harness generation.
-  - [Step 3.3.1: Emit typed action probes](execplans/3-3-1-emit-typed-action-probes.md)
+  - [Task 3.3.1: Emit typed action probes](execplans/3-3-1-emit-typed-action-probes.md)
     - ExecPlan for typed theorem action probes.
-  - [Step 3.3.2: Emit referenced-type probes](execplans/3-3-2-referenced-type-probes-for-generated-struct-literal-synthesis.md)
+  - [Task 3.3.2: Emit referenced-type probes](execplans/3-3-2-referenced-type-probes-for-generated-struct-literal-synthesis.md)
     - ExecPlan for generated struct-literal synthesis type probes.
+  - [Task 4.1.2: Adopt OrthoConfig v0.10.0](execplans/4-1-2-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli.md)
+    - Living plan for the CLI configuration foundation, validation, and draft PR.
   - [Resolve the 2026-06-14 codebase
     audit](execplans/codebase-audit-2026-06-14.md)
     - ExecPlan for resolving audit findings across diagnostics, validation,
       tests, documentation, and dependency policy.
-  - [Issue 200: adopt OrthoConfig v0.10.0](execplans/issue-200-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli.md)
-    - Living plan for the CLI configuration foundation, validation, and draft PR.
   - [Include provenance in action-signature conflict diagnostics](execplans/issue-51-include-provenance-in-macro-action-signature-conflict-diagnostics.md)
     - ExecPlan for adding theorem provenance to signature-conflict errors.

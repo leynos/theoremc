@@ -53,9 +53,9 @@ let docs = load_theorem_file_from_manifest_dir(
 - [`docs/theoremc-design.md`](docs/theoremc-design.md) records architecture
   rationale and planned evolution.
 
-## Workspace split (since Step 3.2.1)
+## Workspace split (since task 3.2.1)
 
-Before Step 3.2.1, `theorem_file!` was a `macro_rules!` bridge in `src/lib.rs`.
+Before task 3.2.1, `theorem_file!` was a `macro_rules!` bridge in `src/lib.rs`.
 The real proc-macro now lives in `crates/theoremc-macros`, and schema,
 mangling, and IO logic live in `crates/theoremc-core`. The root `theoremc`
 crate re-exports both. Import paths from `theoremc` are unchanged.

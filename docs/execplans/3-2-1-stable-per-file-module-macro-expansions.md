@@ -1,4 +1,4 @@
-# Step 3.2.1: stable per-file `theorem_file!` macro expansions
+# Task 3.2.1: stable per-file `theorem_file!` macro expansions
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

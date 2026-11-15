@@ -1,4 +1,4 @@
-# Step 2.2.1: per-file module naming using path_mangle and hash12
+# Task 2.2.1: per-file module naming using path_mangle and hash12
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

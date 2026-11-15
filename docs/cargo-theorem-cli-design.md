@@ -395,9 +395,9 @@ slice. Machine-readable diagnostic codes and JSON fields remain non-localized.
 Libraries receive an injected localizer and do not read process locale
 variables.
 
-### 6.6 Phase 3.1 foundation scope
+### 6.6 Phase 4 foundation scope
 
-The Phase 3.1.1 foundation owns the package, OrthoConfig-derived configuration,
+The step 4.1 foundation owns the package, OrthoConfig-derived configuration,
 selected-subcommand merge boundary, command metadata, Cargo entry shape, and
 configuration error mapping. Its initial registered handler is
 `context --json`. It does not implement backend execution, proof runs, project

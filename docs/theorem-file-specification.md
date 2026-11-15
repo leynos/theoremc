@@ -6,7 +6,7 @@ Decision context for symbol stability and vacuity policy is recorded in
 [RFC 0001](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md)
 is accepted and defines schema version 2. This specification records that
 target contract as well as the version 1 compatibility profile. Version 2
-implementation is pending roadmap step 4.4, after the working version 1 Kani
+implementation is pending roadmap step 5.4, after the working version 1 Kani
 vertical slice. The current public model and raw adapter still use
 assertion-only proof lists; accepted syntax below must not be read as a claim
 of current parser or backend support.
@@ -132,7 +132,7 @@ A theorem document is a YAML mapping with these fields.
 
 These are the accepted version-selection requirements from RFC 0001; enforcing
 version 2 and unsupported-version diagnostics remains implementation work in
-step 4.4.
+step 5.4.
 
 ### 3.2 `Theorem` (required)
 
@@ -307,7 +307,7 @@ Semantics:
 - The generated probe checks the declared signature against the resolved
   `crate::theorem_actions::{mangled_identifier}` export.
 - Every declared parameter and return type also participates in the
-  referenced-type probe, even before Phase 4 action execution wiring exists.
+  referenced-type probe, even before Phase 5 action execution wiring exists.
 
 ### 3.10 `Prove` (required)
 
@@ -927,7 +927,7 @@ ______________________________________________________________________
 
 ## 8. Minimal Rust struct skeleton (to make implementation straightforward)
 
-This sketch describes the accepted domain model after step 4.4, not the current
+This sketch describes the accepted domain model after step 5.4, not the current
 assertion-only public API. Version-aware raw decoding and semantic validation
 enforce the version rules before conversion to these domain types. The separate
 Serde-derived raw adapters are omitted here.

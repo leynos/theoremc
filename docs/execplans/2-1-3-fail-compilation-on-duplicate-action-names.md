@@ -1,4 +1,4 @@
-# Step 2.1.3: fail compilation on duplicate action names
+# Task 2.1.3: fail compilation on duplicate action names
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

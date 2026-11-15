@@ -1,4 +1,4 @@
-# Step 3.3.2: emit referenced-type probes for generated struct-literal synthesis
+# Task 3.3.2: emit referenced-type probes for generated struct-literal synthesis
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

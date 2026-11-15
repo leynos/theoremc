@@ -1,4 +1,4 @@
-# Step 2.3.3: struct literal synthesis from YAML maps
+# Task 2.3.3: struct literal synthesis from YAML maps
 
 This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

@@ -19,7 +19,7 @@ before rendering backend code.
 
 The generated `theorem_file!` expansion already owns stable modules, Kani proof
 attributes, action probes, and referenced-type probes. Its harness bodies are
-empty. The most direct implementation of roadmap Phase 4 would make the proc
+empty. The most direct implementation of roadmap Phase 5 would make the proc
 macro walk `TheoremDoc` and emit Kani tokens for every `Forall`, `Assume`,
 `Let`, `Do`, `Prove`, and `Witness` item.
 

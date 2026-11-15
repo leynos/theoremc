@@ -112,18 +112,18 @@ with two variants:
 An absent `theorems/` directory is not an error; it returns a root-only watch
 set so Cargo can detect when the directory is created later.
 
-#### Suite generation (Step 3.1.2)
+#### Suite generation (Task 3.1.2)
 
-Step 3.1.1 (see
+Task 3.1.1 (see
 [`execplans/3-1-1-build-rs-scanning-of-theorems.md`](execplans/3-1-1-build-rs-scanning-of-theorems.md))
-introduced discovery and Cargo invalidation; Step 3.1.2 added generated-suite
+introduced discovery and Cargo invalidation; Task 3.1.2 added generated-suite
 writing. ADR-0008 records the current ownership boundary: the
 `theoremc-build-support` crate performs discovery and writes
 `OUT_DIR/theorem_suite.rs` with `theorem_file!("...")` invocations. The root
 `build.rs` adapter emits the cfg and rerun metadata from the returned
 `BuildScriptOutput`. The hidden `__theoremc_generated_suite` module in
 `src/lib.rs` imports the real `theorem_file!` proc macro before including the
-generated suite. Step 3.2.1 keeps the generated callsites unchanged while the
+generated suite. Task 3.2.1 keeps the generated callsites unchanged while the
 per-file expansion logic belongs to `crates/theoremc-macros`.
 
 ## 2. Module architecture
@@ -208,7 +208,7 @@ validation happens during decoding and cannot be bypassed.
 ### Accepted harness-planning boundary (pending implementation)
 
 [ADR-0011](adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md) makes a
-real version 1 Kani proof and counterexample the next release gate. Step 4.1
+real version 1 Kani proof and counterexample the next release gate. Step 5.1
 introduces the internal `HarnessPlan` in `theoremc-core`; the Kani renderer
 remains in `theoremc-macros`, as specified by
 [ADR-0006](adrs/adr-0006-backend-neutral-harness-planning-boundary.md). Schema
@@ -218,7 +218,7 @@ invocations. The plan retains source provenance and stable obligation identity
 without Kani syntax, tokens, or generated local names as identity. Opaque Rust
 predicates are explicitly backend-constrained.
 
-Step 4.4 then adds versioned raw proof-obligation adapters, dedicated domain
+Step 5.4 then adds versioned raw proof-obligation adapters, dedicated domain
 law types, semantic validation, Law IR, and lowering into that same plan.
 [ADR-0007](adrs/adr-0007-verus-backend-preservation-invariants.md) governs
 backend capability checking, evidence distinctions, and additive future Verus
@@ -227,8 +227,8 @@ until that step; the public API break requires release and migration
 documentation. See
 [RFC 0001](rfcs/rfc-0001-semantic-law-templates-over-composable-primaries.md#implementation-sequence)
 and the
-[roadmap](roadmap.md#phase-4-working-kani-proof-path-safety-policy-and-semantic-laws)
-for implementation acceptance criteria.
+[roadmap](roadmap.md#5-a-working-kani-proof-path-with-explicit-non-vacuity) for
+implementation acceptance criteria.
 
 ### 2.1 Schema validation diagnostics
 
@@ -732,7 +732,7 @@ To add new build-time discovery or generation:
 
 The current implementation keeps discovery and suite writing in
 `crates/theoremc-build-support`; the root `build.rs` adapter emits cfg and
-rerun metadata from `BuildScriptOutput`. Step 3.2.1 keeps the generated
+rerun metadata from `BuildScriptOutput`. Task 3.2.1 keeps the generated
 `theorem_file!("...")` callsite unchanged, while the hidden
 `__theoremc_generated_suite` module in `src/lib.rs` imports the real proc macro
 re-exported by the root facade.
@@ -941,6 +941,34 @@ matching `describe_*` declaration for each. Metric labels are drawn only from
 closed enumerations the CLI or a provider descriptor controls; run IDs, paths,
 theorem IDs, and raw error text are event fields, never labels. Libraries emit
 instrumentation but never install global subscribers or recorders.
+
+### 3.9 Roadmap and ExecPlan conventions
+
+[`docs/roadmap.md`](roadmap.md) uses the roadmap grammar that `mapsplice`
+edits. Phases are `## N.` headings, each opening with a falsifiable `Idea:`;
+steps are `### N.M.` headings that state the question the workstream answers;
+and tasks are `- [ ] N.M.K.` checklist items. Content before the first phase,
+such as the sources and sequencing rules, is preamble. No unnumbered heading
+may follow the first phase.
+
+Each task records its dependencies in one nested bullet that begins with
+`Requires`, listing task anchors (`4.2.1`) or step anchors (`4.2`) separated by
+commas. Do not use ranges such as `4.1.1-4.1.3` or prose such as "phase 4",
+because `mapsplice` neither expands ranges nor resolves prose. Design citations
+follow on a `See` bullet with `§` section references, and observable acceptance
+criteria on a `Success:` bullet. Keep the word `Requires` out of other bullets
+so that only dependency clauses are rewritten.
+
+Make structural edits with `mapsplice insert`, `replace`, `delete`, or `append`
+rather than by hand, so dependent `Requires` anchors are renumbered and
+dangling dependencies fail closed. Preview to standard output, review the diff,
+then apply with `--in-place`.
+
+Name the ExecPlan for a roadmap task `docs/execplans/N-M-K-<slug>.md` and title
+it `Task N.M.K: <summary>`. When a restructure renumbers a task with a live
+ExecPlan, rename the file, retitle it, and update its index entry in
+[`docs/contents.md`](contents.md). Completed ExecPlans keep their historical
+bodies; only the filename and title follow the roadmap.
 
 ## 4. Filesystem and path conventions
 

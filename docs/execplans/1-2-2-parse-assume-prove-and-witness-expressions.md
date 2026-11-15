@@ -1,4 +1,4 @@
-# Parse `Assume.expr`, `Prove.assert`, and `Witness.cover` as `syn::Expr`
+# Task 1.2.2: parse `Assume.expr`, `Prove.assert`, and `Witness.cover` as `syn::Expr`
 
 This Execution Plan (ExecPlan) is a living document. The sections `Constraints`,
 `Tolerances`, `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`,

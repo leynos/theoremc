@@ -1,4 +1,4 @@
-# Validate required fields and non-empty constraints
+# Task 1.2.1: validate required fields and non-empty constraints
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and

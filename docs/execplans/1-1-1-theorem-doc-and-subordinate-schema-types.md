@@ -1,4 +1,4 @@
-# Implement TheoremDoc and subordinate schema types
+# Task 1.1.1: implement TheoremDoc and subordinate schema types
 
 This ExecPlan is a living document. The sections `Constraints`, `Tolerances`,
 `Risks`, `Progress`, `Surprises & Discoveries`, `Decision Log`, and

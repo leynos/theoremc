@@ -56,14 +56,14 @@ reduce drift risk, normative definitions are centralized:
   in `theoremc-core` as specified by ADR-0006.
 
 The accepted law and planning changes remain pending implementation in
-[roadmap steps 4.1 to 4.4](roadmap.md#phase-4-working-kani-proof-path-safety-policy-and-semantic-laws).
+[roadmap steps 5.1 to 5.4](roadmap.md#5-a-working-kani-proof-path-with-explicit-non-vacuity).
 The current public schema and raw adapter still contain assertion-only proof
 lists. The target contract is normative even where implementation is pending.
 
 Sections 3 and 8 record the current Kani MVP: harness stubs, action and type
 probes, and empty harness bodies. Treat these as the starting point for roadmap
-Step 4.1, not as completion of its real version 1 proof/counterexample gate;
-semantic laws remain in Step 4.4 after that gate.
+step 5.1, not as completion of its real version 1 proof/counterexample gate;
+semantic laws remain in step 5.4 after that gate.
 
 Law-reference integration must reuse the existing action-signature comparison
 and provenance contract from issue #51. Repeated declarations compare parameter
@@ -792,10 +792,10 @@ across YAML anchors.[^3] The loader wraps parse and validation failures into
 theoremc structured diagnostics (code plus source, line, column, and fallback
 message), leaving renderer-specific formatting to downstream consumers.
 
-### 6.4 Implementation decisions (Step 1.2.1)
+### 6.4 Implementation decisions (Task 1.2.1)
 
 The following decisions were taken during the implementation of
-post-deserialization semantic validation (Step 1.2.1 of the roadmap):
+post-deserialization semantic validation (task 1.2.1 of the roadmap):
 
 - Non-empty string validation uses `str::trim()`, which strips
   Unicode whitespace (characters satisfying `char::is_whitespace`). The spec
@@ -815,10 +815,10 @@ post-deserialization semantic validation (Step 1.2.1 of the roadmap):
 - Error messages for indexed fields (assertions, assumptions,
   witnesses) use 1-based indices for human readability.
 
-### 6.5 Implementation decisions (Step 1.2.2)
+### 6.5 Implementation decisions (Task 1.2.2)
 
 The following decisions were taken during the implementation of expression
-syntax validation (Step 1.2.2 of the roadmap):
+syntax validation (task 1.2.2 of the roadmap):
 
 - `syn` is added as a direct dependency with the `parsing`, `full`,
   `clone-impls`, and `printing` features (`default-features = false`). The
@@ -896,14 +896,14 @@ deserialization (Step 1.1 of the roadmap):
   as a library. Cargo supports this layout natively for a single package with
   both `lib` and `bin` targets.
 - `rstest-bdd` v0.5.0 was evaluated during Step 1.1 and initially deferred
-  because concrete usage patterns were sparse. Step 1.2.4 later adopts
+  because concrete usage patterns were sparse. Task 1.2.4 later adopts
   `rstest-bdd` for vacuity-policy behavioural scenarios once project-local
   patterns were established.
 
-### 6.7 Implementation decisions (Step 1.2.3)
+### 6.7 Implementation decisions (Task 1.2.3)
 
 The following decisions were taken during the implementation of `Step` and
-`LetBinding` shape validation (Step 1.2.3 of the roadmap):
+`LetBinding` shape validation (task 1.2.3 of the roadmap):
 
 - `LetBinding` variant restriction: the `LetBinding` enum has only `Call` and
   `Must` variants. Serde's `#[serde(untagged)]` deserialization rejects any
@@ -913,7 +913,7 @@ The following decisions were taken during the implementation of `Step` and
   "Let allows only call or must". Improving the error message is a Step 1.3
   concern (diagnostics quality).
 - Validation logic is extracted into `crates/theoremc-core/src/schema/step.rs`,
-  following the `expr.rs` pattern from Step 1.2.2. The module provides
+  following the `expr.rs` pattern from Task 1.2.2. The module provides
   `pub(crate)` functions returning `Result<(), String>`, allowing `validate.rs`
   to wrap errors with theorem-level context. This keeps `validate.rs` under the
   400-line limit.
@@ -924,10 +924,10 @@ The following decisions were taken during the implementation of `Step` and
   into one function to reclaim line budget in `validate.rs`. The behaviour is
   identical.
 
-### 6.7.1 Implementation decisions (Step 1.2.4)
+### 6.7.1 Implementation decisions (Task 1.2.4)
 
 The following decisions were taken during implementation of non-vacuity
-defaults (Step 1.2.4 of the roadmap):
+defaults (task 1.2.4 of the roadmap):
 
 - Vacuity policy enforcement stays in
   `crates/theoremc-core/src/schema/validate.rs` under two focused helpers:
@@ -969,10 +969,10 @@ diagnostics and parser regression corpus work (Step 1.3 of the roadmap):
   witness policy scenarios, and behavioural tests with `rstest-bdd` v0.5.0 for
   source-located diagnostics behaviour.
 
-### 6.7.3 Implementation decisions (Step 2.1.1)
+### 6.7.3 Implementation decisions (Task 2.1.1)
 
 The following decisions were taken during implementation of canonical
-action-name validation (Step 2.1.1 of the roadmap):
+action-name validation (task 2.1.1 of the roadmap):
 
 - Canonical action-name grammar is now enforced during schema validation for
   every `ActionCall.action` path (`Let`, `Do`, and nested `maybe.do`):
@@ -990,10 +990,10 @@ action-name validation (Step 2.1.1 of the roadmap):
   feature file and scenarios for canonical happy path, malformed names, and
   reserved-keyword segments.
 
-### 6.7.4 Implementation decisions (Step 2.1.2)
+### 6.7.4 Implementation decisions (Task 2.1.2)
 
 The following decisions were taken during implementation of action name
-mangling (Step 2.1.2 of the roadmap):
+mangling (task 2.1.2 of the roadmap):
 
 - Action mangling is placed in a new top-level `mangle` module
   (`crates/theoremc-core/src/mangle.rs`), separate from the `schema` module,
@@ -1005,7 +1005,7 @@ mangling (Step 2.1.2 of the roadmap):
   licensed under CC0/Apache-2.0.
 - All mangling functions (`segment_escape`, `action_slug`, `hash12`,
   `mangle_action_name`) are infallible, assuming pre-validated input from
-  `validate_canonical_action_name` (Step 2.1.1). This keeps the API clean and
+  `validate_canonical_action_name` (Task 2.1.1). This keeps the API clean and
   avoids redundant error paths.
 - Building-block functions (`segment_escape`, `action_slug`, `hash12`) are
   public for reuse in Step 2.2 (harness naming) and by downstream consumers.
@@ -1014,10 +1014,10 @@ mangling (Step 2.1.2 of the roadmap):
 - Behavioural coverage uses `rstest-bdd` v0.5.0 with scenarios for slug
   correctness, underscore injectivity, and resolution path structure.
 
-### 6.7.5 Implementation decisions (Step 2.1.3)
+### 6.7.5 Implementation decisions (Task 2.1.3)
 
 The following decisions were taken during implementation of action name
-collision detection (Step 2.1.3 of the roadmap):
+collision detection (task 2.1.3 of the roadmap):
 
 - Collision detection is placed in a new top-level `collision` module
   (`crates/theoremc-core/src/collision.rs`), separate from both `schema` and
@@ -1039,10 +1039,10 @@ collision detection (Step 2.1.3 of the roadmap):
   deduplicated. The infrastructure is structured for future cross-file
   collision detection when multi-file loading arrives (Step 3.x).
 
-### 6.7.6 Implementation decisions (Step 2.3.1)
+### 6.7.6 Implementation decisions (Task 2.3.1)
 
 The following decisions were taken during implementation of argument value
-decoding for plain YAML strings (Step 2.3.1 of the roadmap):
+decoding for plain YAML strings (task 2.3.1 of the roadmap):
 
 - Two new domain types `ArgValue` and `LiteralValue` are placed in a dedicated
   `crates/theoremc-core/src/schema/arg_value.rs` module to keep
@@ -1071,7 +1071,7 @@ decoding for plain YAML strings (Step 2.3.1 of the roadmap):
   but retain `TheoremValue` in `args` for serde compatibility.
 - YAML maps that are not `{ ref: <name> }` are passed through as
   `ArgValue::RawMap(IndexMap<String, TheoremValue>)`, preserving forward
-  compatibility for Step 2.3.2 (`{ literal: ... }` wrapper) and Step 2.3.3
+  compatibility for Task 2.3.2 (`{ literal: ... }` wrapper) and Task 2.3.3
   (struct-literal synthesis). Sequences are similarly passed through as
   `ArgValue::RawSequence(Vec<TheoremValue>)`.
 - The `{ ref: <name> }` target is validated using the existing
@@ -1080,12 +1080,12 @@ decoding for plain YAML strings (Step 2.3.1 of the roadmap):
   reference targets and theorem identifiers follow the same lexical rules.
 - Decoding errors are routed through `SchemaError::ValidationFailed` with a
   descriptive reason string. A distinct error variant is not warranted at this
-  stage and may need to change when Steps 2.3.2 and 2.3.3 extend decoding.
+  stage and may need to change when Tasks 2.3.2 and 2.3.3 extend decoding.
 
-### 6.7.7 Implementation decisions (Step 2.2.1)
+### 6.7.7 Implementation decisions (Task 2.2.1)
 
 The following decisions were taken during implementation of per-file module
-naming (Step 2.2.1 of the roadmap):
+naming (task 2.2.1 of the roadmap):
 
 - Per-file module naming functions (`path_stem`, `path_mangle`,
   `mangle_module_path`, and the `MangledModule` struct) are added to the
@@ -1108,10 +1108,10 @@ naming (Step 2.2.1 of the roadmap):
   deterministic naming, separator normalization, and punctuation-collision
   disambiguation.
 
-### 6.7.8 Implementation decisions (Step 2.2.2)
+### 6.7.8 Implementation decisions (Task 2.2.2)
 
 The following decisions were taken during implementation of deterministic
-theorem harness naming and duplicate theorem-key rejection (Step 2.2.2 of the
+theorem harness naming and duplicate theorem-key rejection (task 2.2.2 of the
 roadmap):
 
 - Harness naming helpers are added as additive public API in `theoremc::mangle`
@@ -1143,10 +1143,10 @@ roadmap):
   theorem-key rejection stay explicit rather than being folded into unrelated
   module-naming scenarios.
 
-### 6.7.9 Implementation decisions (Step 2.3.2)
+### 6.7.9 Implementation decisions (Task 2.3.2)
 
 The following decisions were taken during implementation of the optional
-`{ literal: "text" }` wrapper and sentinel key rejection (Step 2.3.2 of the
+`{ literal: "text" }` wrapper and sentinel key rejection (task 2.3.2 of the
 roadmap):
 
 - A new `NonStringLiteralValue` variant is added to `ArgDecodeError`, analogous
@@ -1169,10 +1169,10 @@ roadmap):
   through as `ArgValue::RawMap` — these are struct-literal candidates per TFS-5
   §5.3, not ambiguous wrappers.
 
-### 6.7.10 Implementation decisions (Step 2.3.3)
+### 6.7.10 Implementation decisions (Task 2.3.3)
 
 The following decisions were taken during implementation of struct literal
-synthesis from YAML maps and recursive list lowering (Step 2.3.3 of the
+synthesis from YAML maps and recursive list lowering (task 2.3.3 of the
 roadmap):
 
 - A new internal `arg_lowering` module was added at the crate root (alongside
@@ -1460,7 +1460,7 @@ Cargo versions and edge cases.
 
 ### 7.1.1 Current implementation and boundary
 
-Steps 3.1.1 and 3.1.2 introduced discovery, Cargo invalidation, and generated
+Tasks 3.1.1 and 3.1.2 introduced discovery, Cargo invalidation, and generated
 suite writing. ADR-0008 records why the existing discovery and suite
 implementation now belongs in a dedicated crate: importing source files with
 `#[path]` coupled build-script compilation to file placement also used by
@@ -1492,7 +1492,7 @@ state, where no `theorems/` directory is committed yet.
 Because Cargo treats watched directories as change roots, edits elsewhere under
 the watched `theorems/` tree may still rerun the build script even when the
 edited file is not itself a discovered theorem input. The semantic guarantee of
-Step 3.1.1 is therefore about which files are discovered and emitted as theorem
+Task 3.1.1 is therefore about which files are discovered and emitted as theorem
 inputs, while tolerating conservative reruns from the directory watch.
 
 ### 7.2 The `theorem_file!()` proc macro
@@ -1521,9 +1521,9 @@ normal `cargo build` fail unless it is gated (because the `kani` crate is not
 present in non-Kani builds).[^8] Therefore, theoremc emits Kani-specific
 attributes only inside `#[cfg(kani)]` generated items.
 
-### 7.2.1 Implementation decisions (Step 3.2.1)
+### 7.2.1 Implementation decisions (Task 3.2.1)
 
-Step 3.2.1 keeps the generated suite contract from Step 3.1.2 unchanged: the
+Task 3.2.1 keeps the generated suite contract from Task 3.1.2 unchanged: the
 support crate writes one bare `theorem_file!("path/to/file.theorem");`
 invocation per discovered theorem file. What changed is the meaning of that
 callsite.
@@ -1581,7 +1581,7 @@ sequenceDiagram
 
 Figure 7. Build-time theorem discovery and per-file proc-macro expansion flow.
 
-Step 3.2.1 made the macro expansion intentionally structural and lint-neutral.
+Task 3.2.1 made the macro expansion intentionally structural and lint-neutral.
 For each theorem file it emitted:
 
 - a private module named by `mangle_module_path`,
@@ -1598,9 +1598,9 @@ its deterministic diagnostics. This keeps theorem parsing, validation, and
 compile-time code generation on one shared contract rather than introducing a
 second parser in the macro crate.
 
-### 7.2.2 Implementation decisions (Step 3.2.2)
+### 7.2.2 Implementation decisions (Task 3.2.2)
 
-Step 3.2.2 keeps the generated suite and per-file module contracts unchanged.
+Task 3.2.2 keeps the generated suite and per-file module contracts unchanged.
 The generated Kani backend module is now gated with `#[cfg(kani)]`, and each
 generated harness stub carries:
 
@@ -1608,7 +1608,7 @@ generated harness stub carries:
 - `#[kani::unwind(n)]`, where `n` is read from that theorem document's
   validated `Evidence.kani.unwind` value.
 
-The generated harness bodies remain empty stubs in this step. Phase 4 still
+The generated harness bodies remain empty stubs in this step. Phase 5 still
 owns symbolic input generation, assumptions, assertions, witnesses, and action
 lowering.
 
@@ -1662,7 +1662,7 @@ which treats insignificant whitespace differences such as `Vec<u8>` and
 declared `syn::Type` expression, including nested generic arguments and
 references, as Rust sees it in the theorem owner crate. It does not inspect
 struct fields, decompose generic arguments for field-level checks, or
-synthesize struct literals; Phase 4 harness emission owns those behaviours.
+synthesize struct literals; Phase 5 harness emission owns those behaviours.
 
 This ensures that renames, signature drift, or missing re-exports fail
 compilation immediately, not “later when running theoremd”.
