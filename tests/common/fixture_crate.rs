@@ -99,32 +99,38 @@ impl FixtureCrate {
             dir,
         };
 
-        fixture.write(Utf8Path::new("Cargo.toml"), &manifest)?;
-        fixture.write(Utf8Path::new("Cargo.lock"), WORKSPACE_LOCK)?;
-        fixture.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
-        fixture.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
-        fixture.write(
+        fixture.write_scaffold(&manifest, lib_rs)?;
+
+        Ok(fixture)
+    }
+
+    /// Writes the manifest, lock, build script, library source and the
+    /// build-support crate into the fixture directory.
+    fn write_scaffold(&self, manifest: &str, lib_rs: &str) -> Result<(), String> {
+        self.write(Utf8Path::new("Cargo.toml"), manifest)?;
+        self.write(Utf8Path::new("Cargo.lock"), WORKSPACE_LOCK)?;
+        self.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
+        self.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
+        self.write(
             Utf8Path::new("build-support/Cargo.toml"),
             &fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?,
         )?;
-        fixture.write(
+        self.write(
             Utf8Path::new("build-support/src/lib.rs"),
             BUILD_SUPPORT_LIB_SOURCE,
         )?;
-        fixture.write(
+        self.write(
             Utf8Path::new("build-support/src/build_script.rs"),
             BUILD_SUPPORT_BUILD_SCRIPT_SOURCE,
         )?;
-        fixture.write(
+        self.write(
             Utf8Path::new("build-support/src/discovery.rs"),
             BUILD_DISCOVERY_SOURCE,
         )?;
-        fixture.write(
+        self.write(
             Utf8Path::new("build-support/src/suite.rs"),
             BUILD_SUITE_SOURCE,
-        )?;
-
-        Ok(fixture)
+        )
     }
 
     /// Reads a file relative to the fixture crate root.
