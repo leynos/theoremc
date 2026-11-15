@@ -107,30 +107,25 @@ impl FixtureCrate {
     /// Writes the manifest, lock, build script, library source and the
     /// build-support crate into the fixture directory.
     fn write_scaffold(&self, manifest: &str, lib_rs: &str) -> Result<(), String> {
-        self.write(Utf8Path::new("Cargo.toml"), manifest)?;
-        self.write(Utf8Path::new("Cargo.lock"), WORKSPACE_LOCK)?;
-        self.write(Utf8Path::new("build.rs"), BUILD_SCRIPT_SOURCE)?;
-        self.write(Utf8Path::new("src/lib.rs"), lib_rs)?;
-        self.write(
-            Utf8Path::new("build-support/Cargo.toml"),
-            &fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?,
-        )?;
-        self.write(
-            Utf8Path::new("build-support/src/lib.rs"),
-            BUILD_SUPPORT_LIB_SOURCE,
-        )?;
-        self.write(
-            Utf8Path::new("build-support/src/build_script.rs"),
-            BUILD_SUPPORT_BUILD_SCRIPT_SOURCE,
-        )?;
-        self.write(
-            Utf8Path::new("build-support/src/discovery.rs"),
-            BUILD_DISCOVERY_SOURCE,
-        )?;
-        self.write(
-            Utf8Path::new("build-support/src/suite.rs"),
-            BUILD_SUITE_SOURCE,
-        )
+        let build_support_manifest = fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?;
+        let files = [
+            ("Cargo.toml", manifest),
+            ("Cargo.lock", WORKSPACE_LOCK),
+            ("build.rs", BUILD_SCRIPT_SOURCE),
+            ("src/lib.rs", lib_rs),
+            ("build-support/Cargo.toml", build_support_manifest.as_str()),
+            ("build-support/src/lib.rs", BUILD_SUPPORT_LIB_SOURCE),
+            (
+                "build-support/src/build_script.rs",
+                BUILD_SUPPORT_BUILD_SCRIPT_SOURCE,
+            ),
+            ("build-support/src/discovery.rs", BUILD_DISCOVERY_SOURCE),
+            ("build-support/src/suite.rs", BUILD_SUITE_SOURCE),
+        ];
+        for (path, contents) in files {
+            self.write(Utf8Path::new(path), contents)?;
+        }
+        Ok(())
     }
 
     /// Reads a file relative to the fixture crate root.
