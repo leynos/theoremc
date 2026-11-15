@@ -110,6 +110,10 @@ pub enum BuildScriptError {
 ///
 /// Returns [`BuildScriptError`] when Cargo's environment is incomplete, the
 /// theorem tree cannot be inspected, or the generated suite cannot be written.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "a Cargo build script can only learn its crate root and output directory from Cargo's environment, so this single reader is the boundary seam injected into the pure preparation step"
+)]
 pub fn prepare_build_script() -> Result<BuildScriptOutput, BuildScriptError> {
     prepare_build_script_with_env(env::var)
 }

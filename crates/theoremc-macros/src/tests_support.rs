@@ -1,18 +1,16 @@
 //! Shared test helpers for theorem-file macro expansion tests.
 //!
-//! This module sits below `tests.rs` and owns the fixture-writing, environment
-//! isolation, and expected-token rendering needed to exercise
-//! `expand_theorem_file_at` without going through the public proc-macro entry
-//! point. Keeping these helpers separate lets the unit tests focus on macro
-//! behaviour while reusing one fixture shape for stability, diagnostics, and
-//! property-style coverage.
+//! This module sits below `tests.rs` and owns the fixture writing and
+//! expected-token rendering needed to exercise `expand_theorem_file_at` without
+//! going through the public proc-macro entry point. Keeping these helpers
+//! separate lets the unit tests focus on macro behaviour while reusing one
+//! fixture shape for stability, diagnostics, and property-style coverage.
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use googletest::prelude::*;
 use rstest::rstest;
 use tempfile::TempDir;
-pub(super) use test_helpers::set_cargo_manifest_dir_for_test;
 use theoremc_core::mangle::{mangle_module_path, mangle_theorem_harness};
 
 use super::expand_theorem_file_at;

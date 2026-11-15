@@ -6,7 +6,8 @@ use anyhow::{Result, ensure};
 use ortho_config::AgentContext;
 use rstest::rstest;
 
-use super::{BINARY, CargoSubcommandEnvironment, cargo_subcommand_environment, isolated_command};
+use super::process::isolated_command;
+use super::{BINARY, CargoSubcommandEnvironment, cargo_subcommand_environment};
 
 #[rstest]
 fn emitted_context_invocation_is_executable(

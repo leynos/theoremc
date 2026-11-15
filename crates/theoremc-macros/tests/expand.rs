@@ -3,6 +3,10 @@
 use camino::Utf8PathBuf;
 use cap_std::{ambient_authority, fs_utf8::Dir as Utf8Dir};
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "trybuild must stage fixtures into the target directory the host Cargo invocation is using, so the test reads the ambient CARGO_TARGET_DIR"
+)]
 fn stage_fixture(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let crate_root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let source = crate_root.join("tests/expand").join(name);

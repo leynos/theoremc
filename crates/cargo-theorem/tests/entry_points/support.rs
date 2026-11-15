@@ -6,7 +6,7 @@ use anyhow::Result;
 use cap_std::{ambient_authority, fs::Dir};
 use rstest::fixture;
 
-use super::{install_subcommand, isolated_path};
+use super::process::{install_subcommand, isolated_path};
 
 pub(super) struct CargoSubcommandEnvironment {
     pub(super) directory: tempfile::TempDir,
