@@ -297,12 +297,10 @@ pub(crate) fn convert_let_binding(
 ) -> Result<LetBinding, RawActionCallDecodeError> {
     match raw {
         RawLetBinding::Call(c) => {
-            let call = convert_action_call(&c.call)?;
-            Ok(LetBinding::Call(LetCall { call }))
+            convert_action_call(&c.call).map(|call| LetBinding::Call(LetCall { call }))
         }
         RawLetBinding::Must(m) => {
-            let must = convert_action_call(&m.must)?;
-            Ok(LetBinding::Must(LetMust { must }))
+            convert_action_call(&m.must).map(|must| LetBinding::Must(LetMust { must }))
         }
     }
 }
@@ -311,17 +309,10 @@ pub(crate) fn convert_let_binding(
 /// converting nested maybe blocks.
 pub(crate) fn convert_step(raw: &RawStep) -> Result<Step, RawActionCallDecodeError> {
     match raw {
-        RawStep::Call(c) => {
-            let call = convert_action_call(&c.call)?;
-            Ok(Step::Call(StepCall { call }))
-        }
-        RawStep::Must(m) => {
-            let must = convert_action_call(&m.must)?;
-            Ok(Step::Must(StepMust { must }))
-        }
+        RawStep::Call(c) => convert_action_call(&c.call).map(|call| Step::Call(StepCall { call })),
+        RawStep::Must(m) => convert_action_call(&m.must).map(|must| Step::Must(StepMust { must })),
         RawStep::Maybe(m) => {
-            let maybe = convert_maybe_block(&m.maybe)?;
-            Ok(Step::Maybe(StepMaybe { maybe }))
+            convert_maybe_block(&m.maybe).map(|maybe| Step::Maybe(StepMaybe { maybe }))
         }
     }
 }

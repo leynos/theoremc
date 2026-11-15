@@ -10,7 +10,7 @@ use serde_saphyr::{Location, Spanned};
 
 use super::newtypes::{ForallVar, TheoremName};
 use super::raw_action::{RawLetBinding, RawStep};
-use super::raw_evidence::{RawActionSignature, RawEvidence};
+use super::raw_evidence::{RawActionSignature, RawEvidence, RawKaniEvidence};
 use super::types::TheoremDoc;
 use super::validation_reason::{IndexedValidationField, ValidationReasonKind};
 
@@ -164,58 +164,73 @@ impl RawTheoremDoc {
     fn location_for_reason(&self, reason: ValidationReasonKind) -> Option<Location> {
         match reason {
             ValidationReasonKind::AboutEmpty => Some(self.about.referenced),
-            ValidationReasonKind::Prove { index, field } => {
-                let prove = self.prove.get(index)?;
-                Some(location_for_indexed_field(
-                    field,
-                    prove.assert_expr.referenced,
-                    prove.because.referenced,
-                ))
+            ValidationReasonKind::Prove { index, field } => self.prove_location(index, field),
+            ValidationReasonKind::Assume { index, field } => self.assume_location(index, field),
+            ValidationReasonKind::Witness { index, field } => self.witness_location(index, field),
+            ValidationReasonKind::KaniUnwind => {
+                self.kani_location(|kani| Some(kani.unwind.referenced))
             }
-            ValidationReasonKind::Assume { index, field } => {
-                let assume = self.assume.get(index)?;
-                Some(location_for_indexed_field(
-                    field,
-                    assume.expr.referenced,
-                    assume.because.referenced,
-                ))
-            }
-            ValidationReasonKind::Witness { index, field } => {
-                let witness = self.witness.get(index)?;
-                Some(location_for_indexed_field(
-                    field,
-                    witness.cover.referenced,
-                    witness.because.referenced,
-                ))
-            }
-            ValidationReasonKind::KaniUnwind => self
-                .evidence
-                .kani
-                .as_ref()
-                .map(|kani| kani.unwind.referenced),
-            ValidationReasonKind::KaniAllowVacuousRequired => {
-                self.evidence.kani.as_ref().and_then(|kani| {
-                    kani.allow_vacuous
-                        .as_ref()
-                        .map(|allow_vacuous| allow_vacuous.referenced)
-                })
+            ValidationReasonKind::KaniAllowVacuousRequired
+            | ValidationReasonKind::KaniWitnessRequired => {
+                self.kani_location(allow_vacuous_location)
             }
             ValidationReasonKind::KaniVacuityBecauseNonEmpty => {
-                self.evidence.kani.as_ref().and_then(|kani| {
-                    kani.vacuity_because
-                        .as_ref()
-                        .map(|vacuity_because| vacuity_because.referenced)
-                })
-            }
-            ValidationReasonKind::KaniWitnessRequired => {
-                self.evidence.kani.as_ref().and_then(|kani| {
-                    kani.allow_vacuous
-                        .as_ref()
-                        .map(|allow_vacuous| allow_vacuous.referenced)
-                })
+                self.kani_location(vacuity_because_location)
             }
         }
     }
+
+    /// Locates the field of the `index`th `Prove` assertion, if it exists.
+    fn prove_location(&self, index: usize, field: IndexedValidationField) -> Option<Location> {
+        let prove = self.prove.get(index)?;
+        Some(location_for_indexed_field(
+            field,
+            prove.assert_expr.referenced,
+            prove.because.referenced,
+        ))
+    }
+
+    /// Locates the field of the `index`th `Assume` entry, if it exists.
+    fn assume_location(&self, index: usize, field: IndexedValidationField) -> Option<Location> {
+        let assume = self.assume.get(index)?;
+        Some(location_for_indexed_field(
+            field,
+            assume.expr.referenced,
+            assume.because.referenced,
+        ))
+    }
+
+    /// Locates the field of the `index`th `Witness` check, if it exists.
+    fn witness_location(&self, index: usize, field: IndexedValidationField) -> Option<Location> {
+        let witness = self.witness.get(index)?;
+        Some(location_for_indexed_field(
+            field,
+            witness.cover.referenced,
+            witness.because.referenced,
+        ))
+    }
+
+    /// Applies `select` to the Kani evidence block, when one is present.
+    fn kani_location(
+        &self,
+        select: impl FnOnce(&RawKaniEvidence) -> Option<Location>,
+    ) -> Option<Location> {
+        self.evidence.kani.as_ref().and_then(select)
+    }
+}
+
+/// Selects the `allow_vacuous` location of a Kani evidence block.
+fn allow_vacuous_location(kani: &RawKaniEvidence) -> Option<Location> {
+    kani.allow_vacuous
+        .as_ref()
+        .map(|allow_vacuous| allow_vacuous.referenced)
+}
+
+/// Selects the `vacuity_because` location of a Kani evidence block.
+fn vacuity_because_location(kani: &RawKaniEvidence) -> Option<Location> {
+    kani.vacuity_because
+        .as_ref()
+        .map(|vacuity_because| vacuity_because.referenced)
 }
 
 /// Selects the value or justification location for an indexed check.
