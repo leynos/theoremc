@@ -11,7 +11,9 @@ use std::borrow::Borrow;
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("invalid canonical action name '{name}': {reason}")]
 pub struct InvalidCanonicalActionName {
+    /// Offending action name.
     name: String,
+    /// Why the name was rejected.
     reason: CanonicalActionNameInvalidReason,
 }
 
@@ -169,6 +171,7 @@ pub fn validate_canonical_action_name(name: &str) -> Result<(), InvalidCanonical
 /// error wrapping, so each helper has one responsibility. Construct it with a
 /// struct literal; there is deliberately no constructor to maintain.
 struct Candidate<'a> {
+    /// The complete candidate name under validation.
     name: &'a str,
 }
 
@@ -201,7 +204,9 @@ impl Candidate<'_> {
 
 /// One dot-separated segment of a candidate name with its one-based position.
 struct Segment<'a> {
+    /// The segment text between separators.
     text: &'a str,
+    /// One-based position of the segment within the name.
     position: usize,
 }
 
