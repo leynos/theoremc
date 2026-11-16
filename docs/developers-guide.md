@@ -1035,11 +1035,13 @@ skipping, so a missing tool cannot read as a pass.
 ### Cranelift
 
 Exception: Cranelift is not the development-profile backend. The estate adopts
-it only where the full suite passes under it, and that is not shown here on the
-pinned `nightly-2026-01-30` (measured 2026-10-02): four tests fail under LLVM
-on this host as well and one more under Cranelift, so the suite is not shown to
-pass under it. Revisit on the next toolchain bump: measure the whole suite
-under the backend, with CI's environment, and adopt it if every test passes.
+it only where the full suite passes under the backend in CI's environment; a
+green run on one host is evidence, not adoption. The suite has not been shown
+to pass under it: measured on 2026-10-02, on the pin then in use
+(`nightly-2026-01-30`) and on one host, four tests fail under LLVM there as
+well and one more under Cranelift, so that run is not comparable to CI.
+Re-measure the whole suite under both backends at the recorded review date
+below, rather than at every toolchain bump.
 
 The poisoned-mutex test for `recover_mutex_guard` in
 `tests/theorem_file_macro_bdd/cargo_runner.rs` was removed: it exercised only
@@ -1047,15 +1049,34 @@ the one-line `unwrap_or_else(PoisonError::into_inner)` recovery and needed
 unwinding (`catch_unwind`). The rustup Cranelift component does not support
 that: measured in another repository on `nightly-2026-11-10`, `catch_unwind`
 failed to catch and a panic on a spawned thread aborted with "failed to
-initiate panic, error 5". This claim is about that component build, not about
-Cranelift in general. No test in the repository now calls `catch_unwind`
-directly; `#[should_panic]` tests remain, and they rely on the test harness's
-own panic handling.
+initiate panic, error 5". This repository confirmed it independently on
+2026-11-17, on a later pin; the measurement is recorded below. This claim is
+about that component build, not about Cranelift in general. No test in the
+repository now calls `catch_unwind` directly. The one `#[should_panic]` test,
+`duplicate_step_names_are_rejected` in `tests/spelling_gate_contract.rs`,
+remains, and it relies on the test harness's own panic handling. The one helper
+thread, in `src/arg_lowering_rustc_deadline.rs`, returns a `Result` rather than
+panicking, so the current suite is not expected to abort.
 
-Recorded state: the pin is `nightly-2026-11-13` and no measurement has been
-taken on it, so the exception stands on the 2026-10-02 result. The review is
-deferred to 1 April 2027, when the whole suite is re-measured under both
-backends.
+Recorded state: on 2026-11-17, on the pin then in use (`nightly-2026-11-16`)
+with the `rustc-codegen-cranelift-preview` component installed, a probe crate
+with no dependencies was built and run under `-Zcodegen-backend=cranelift` with
+`[unstable] codegen-backend = true`. A plain unit test passed, and so did a
+`#[should_panic]` test, so the backend does compile and run code.
+`std::panic::catch_unwind` around a panic in a closure did not catch it: the
+panic escaped and failed the calling test, and around a panicking function item
+it behaved the same. Joining a spawned thread that panicked aborted the whole
+test process with `fatal runtime error: failed to initiate panic, error 5`
+(SIGABRT, with no test summary printed). The same probe passed every case under
+the LLVM backend on that toolchain, so the difference is the backend, not the
+probe. Adoption is therefore blocked by the component's panic runtime, not only
+by individual test failures: a suite cannot rely on `catch_unwind` or on a
+panicking helper thread under it. The pin advances by automated dependency pull
+requests, almost daily, so this is a snapshot of the pin at that date rather
+than a claim about the current one. The review stays deferred to 1 April 2027,
+when the whole suite is re-measured under both backends. The decision is
+machine-checked by `tests/build_standard_support/cranelift.rs`, which pins
+`SELECTED: bool = false`.
 
 ### Development build footprint
 
