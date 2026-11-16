@@ -372,20 +372,20 @@ where available, and run the direct Cargo invocations for specialized checks:
 
 **Table:** Quality gates and their commands
 
-| Gate                 | Command                                                                                            | What it checks                                                                                    |
-| -------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Formatting           | `make check-fmt`                                                                                   | Checks Rust and Markdown table formatting                                                          |
-| Linting              | `make lint`                                                                                        | rustdoc, Clippy, then Whitaker, each over the whole workspace                                     |
-| Type checking        | `make typecheck`                                                                                   | `cargo check --workspace --all-targets --all-features`                                             |
-| Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                                                          |
-| Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit                                          |
-| Architecture linting | planned: `theoremc_arch_lint` (see the roadmap)                                                    | Will flag schema layer boundary and other architecture rule violations                            |
-| Tests                | `make test`                                                                                        | nextest test binaries plus Cargo doctests                                                         |
-| Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                                                              |
-| Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                                                              |
+| Gate                 | Command                                                                                            | What it checks                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Formatting           | `make check-fmt`                                                                                   | Checks Rust and Markdown table formatting                                                                    |
+| Linting              | `make lint`                                                                                        | rustdoc, Clippy, then Whitaker, each over the whole workspace                                                |
+| Type checking        | `make typecheck`                                                                                   | `cargo check --workspace --all-targets --all-features`                                                       |
+| Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                                                                     |
+| Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit                                                     |
+| Architecture linting | planned: `theoremc_arch_lint` (see the roadmap)                                                    | Will flag schema layer boundary and other architecture rule violations                                       |
+| Tests                | `make test`                                                                                        | nextest test binaries plus Cargo doctests                                                                    |
+| Markdown lint        | `make markdownlint`                                                                                | markdownlint-cli2 on all `.md` files                                                                         |
+| Mermaid diagrams     | `make nixie`                                                                                       | Validates Mermaid blocks in Markdown                                                                         |
 | Spelling             | `make spelling`                                                                                    | Regenerates `typos.toml`, checks spelling and phrases, and fails on an untracked or uncommitted regeneration |
-| ADR/RFC names        | `make check-adr-rfc-names`                                                                         | Checks canonical filenames, unique serials, titles, and local record links                        |
-| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all`, then mdtablefix and markdownlint-cli2 `--fix`                                   |
+| ADR/RFC names        | `make check-adr-rfc-names`                                                                         | Checks canonical filenames, unique serials, titles, and local record links                                   |
+| Formatting fix       | `make fmt`                                                                                         | `cargo fmt --all`, then mdtablefix and markdownlint-cli2 `--fix`                                             |
 
 When documentation changes are in scope, `make fmt`, `make markdownlint`, and
 `make nixie` must also pass.
@@ -533,16 +533,24 @@ the tracked `typos.toml` from the live shared en-GB-oxendict dictionary on the
 `typos.local.toml`, and then runs Typos and the shared phrase corrections.
 Because the dictionary is live, `typos.toml` changes whenever shared policy
 changes; CI runs the gate rather than a drift check, and the regenerated file
-is committed. The target enforces that last step: after the gate succeeds it
-runs `git diff --quiet HEAD -- typos.toml` and fails, printing the changed
-stat, if the regeneration left the file different from `HEAD`. Naming `HEAD` is
-what makes the check meaningful: a plain `git diff` compares the worktree with
-the index, so staging the regenerated file would satisfy it while the commit
-stayed stale. A stale `typos.toml` therefore cannot pass review just because
-the spellings it rejects are absent. The comparison uses `SPELLING_REPOSITORY`,
-so it inspects the repository the gate just wrote, and it is skipped when that
-path is not inside a Git work tree, where there is no committed version to
-compare against.
+is committed. The target enforces that last step, requiring `git` on `PATH` and
+failing when it is absent. Inside a work tree it first requires the generated
+file to be tracked; `git ls-files --error-unmatch typos.toml` must succeed, and
+the target fails with a clear message when the file is untracked, so a first
+run that merely creates the file fails until the file is committed. Only then
+does it run `git diff --quiet HEAD -- typos.toml` and compare the tracked file
+with `HEAD`, and it fails, printing the changed stat, if the regeneration left
+the file different from `HEAD`. Naming `HEAD` is what makes the check
+meaningful: a plain `git diff` compares the worktree with the index, so staging
+the regenerated file would satisfy it while the commit stayed stale. A stale
+`typos.toml` therefore cannot pass review just because the spellings it rejects
+are absent. A freshness mismatch and a Git failure are reported differently,
+rather than both being read as a stale file: `git diff --quiet` exiting 1 means
+the file differs from `HEAD`, while a greater exit means Git itself failed, and
+the same distinction applies to `git ls-files`. The comparison uses
+`SPELLING_REPOSITORY`, so it inspects the repository the gate just wrote, and
+it is skipped when that path is not inside a Git work tree, where there is no
+committed version to compare against.
 
 `typos.local.toml` holds narrow repository-specific exceptions only: exact or
 full-line patterns for identifiers and terms the policy cannot correct, never

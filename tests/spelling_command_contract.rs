@@ -109,6 +109,59 @@ fn run_spelling(
         .map_err(|error| format!("run make: {error}"))
 }
 
+/// Runs one git command in `directory` and fails on a non-zero status.
+///
+/// The identity and signing settings are passed per command, so the test does
+/// not depend on, or write, the developer's global Git configuration.
+fn run_git(directory: &Path, arguments: &[&str]) -> Result<(), String> {
+    let output = Command::new("git")
+        .arg("-c")
+        .arg("user.name=Spelling Contract")
+        .arg("-c")
+        .arg("user.email=spelling@example.invalid")
+        .arg("-c")
+        .arg("commit.gpgsign=false")
+        .args(arguments)
+        .current_dir(directory)
+        .output()
+        .map_err(|error| format!("run git: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "git {arguments:?} failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    ))
+}
+
+/// Creates `name` under the stub root as its own Git work tree with a
+/// committed `typos.toml`, and returns its path.
+///
+/// The recipe resolves the tracked-file question with `git -C` on
+/// `SPELLING_REPOSITORY`, so a directory that is merely part of this work tree
+/// would be judged by this repository's index, where the generated file is not
+/// tracked under the fixture's own path. A gated repository therefore needs a
+/// repository of its own. The stub `uv` writes nothing, so the committed file
+/// is all the freshness check needs.
+fn create_committed_checkout(stub: &StubUv, name: &str) -> Result<PathBuf, String> {
+    stub.dir
+        .create_dir(name)
+        .map_err(|error| format!("create {name}: {error}"))?;
+    let checkout = stub.path().join(name);
+    let fs = Dir::open_ambient_dir(&checkout, ambient_authority())
+        .map_err(|error| format!("open {name}: {error}"))?;
+    fs.write(
+        "typos.toml",
+        "# Committed so the recipe's freshness check passes.\n",
+    )
+    .map_err(|error| format!("write typos.toml: {error}"))?;
+    run_git(&checkout, &["init"])?;
+    run_git(&checkout, &["add", "typos.toml"])?;
+    run_git(&checkout, &["commit", "-m", "checkout", "typos.toml"])?;
+    Ok(checkout)
+}
+
 /// Reads a log written by the stub, one recorded value per line.
 fn read_lines(directory: &Dir, name: &str) -> Result<Vec<String>, String> {
     let text = directory
@@ -179,10 +232,7 @@ fn a_repository_path_with_spaces_stays_one_argument(
     stub_uv: Result<StubUv, String>,
 ) -> Result<(), String> {
     let stub = stub_uv?;
-    stub.dir
-        .create_dir("spelling checkout")
-        .map_err(|error| format!("create checkout: {error}"))?;
-    let spaced_repository = stub.path().join("spelling checkout");
+    let spaced_repository = create_committed_checkout(&stub, "spelling checkout")?;
     let repository = spaced_repository
         .to_str()
         .ok_or_else(|| "the temporary path must be valid UTF-8".to_owned())?;

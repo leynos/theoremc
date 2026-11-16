@@ -162,12 +162,32 @@ SPELLING_COMMAND = $(UV_ENV) "$(UV)" tool run --python 3.14 \
 
 spelling: ## Check spelling and shared phrase corrections
 	$(SPELLING_COMMAND)
-	@if git -C "$(SPELLING_REPOSITORY)" rev-parse --is-inside-work-tree \
-			>/dev/null 2>&1 && \
-		! git -C "$(SPELLING_REPOSITORY)" diff --quiet HEAD -- typos.toml; then \
-		echo "typos.toml differs from HEAD; commit the regenerated file." >&2; \
-		git -C "$(SPELLING_REPOSITORY)" diff --stat HEAD -- typos.toml >&2; \
+	@if ! command -v git >/dev/null 2>&1; then \
+		echo "git is required to verify that typos.toml is committed." >&2; \
 		exit 1; \
+	fi
+	@if [ "$$(git -C "$(SPELLING_REPOSITORY)" rev-parse --is-inside-work-tree \
+			2>/dev/null)" = "true" ]; then \
+		git -C "$(SPELLING_REPOSITORY)" ls-files --error-unmatch typos.toml \
+			>/dev/null 2>&1; \
+		status=$$?; \
+		if [ $$status -eq 1 ]; then \
+			echo "typos.toml is not tracked; commit the generated file." >&2; \
+			exit 1; \
+		elif [ $$status -gt 1 ]; then \
+			echo "git ls-files failed while checking typos.toml." >&2; \
+			exit 1; \
+		fi; \
+		git -C "$(SPELLING_REPOSITORY)" diff --quiet HEAD -- typos.toml; \
+		status=$$?; \
+		if [ $$status -eq 1 ]; then \
+			echo "typos.toml differs from HEAD; commit the regenerated file." >&2; \
+			git -C "$(SPELLING_REPOSITORY)" diff --stat HEAD -- typos.toml >&2; \
+			exit 1; \
+		elif [ $$status -gt 1 ]; then \
+			echo "git diff failed while checking typos.toml." >&2; \
+			exit 1; \
+		fi; \
 	fi
 
 check-adr-rfc-names: ## Check ADR/RFC filenames, serials, titles, and local links

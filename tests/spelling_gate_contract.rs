@@ -110,6 +110,17 @@ fn spelling_target_runs_the_pinned_gate() {
         "the spelling target must run SPELLING_COMMAND first"
     );
     assert!(
+        recipe.iter().any(|line| line.contains("command -v git")),
+        "the spelling target must fail with a clear message when git is unavailable, got \
+         {recipe:?}"
+    );
+    assert!(
+        recipe
+            .iter()
+            .any(|line| line.contains("ls-files --error-unmatch typos.toml")),
+        "the spelling target must reject a typos.toml that git does not track, got {recipe:?}"
+    );
+    assert!(
         recipe
             .iter()
             .any(|line| line.contains("diff --quiet HEAD -- typos.toml")),
