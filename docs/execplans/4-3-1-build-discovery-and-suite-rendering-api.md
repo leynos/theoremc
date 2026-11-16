@@ -6,7 +6,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Conformance basis`, and `Verification plan` must be kept up to date as work
 proceeds.
 
-Status: DRAFT
+Status: DRAFT (design review applied; awaiting user approval)
 
 Branch: `4-3-1-build-discovery-and-suite-rendering-api`
 
@@ -46,7 +46,10 @@ fn main() -> Result<(), theoremc_build_support::BuildScriptError> {
 An adopter who wants theorems in their own crate therefore has to copy this
 adapter, and the planned `cargo theorem build-script run` and
 `cargo theorem generate --kind suite` commands (roadmap tasks 4.3.4 and 4.3.5)
-have no reusable service to call.
+have no reusable service to call. The adapter also has a latent defect: a
+directory named `x` followed by a line feed and `cargo::rustc-cfg=injected`
+produces two directive lines, so a file name can inject an arbitrary Cargo
+directive.
 
 After this change:
 
@@ -63,30 +66,42 @@ After this change:
    ```
 
    The helper reads Cargo's environment, discovers theorems, writes
-   `OUT_DIR/theorem_suite.rs` only when its contents change, prints every Cargo
-   directive, and on failure prints one deterministic
+   `OUT_DIR/theorem_suite.rs` atomically and only when its contents change,
+   prints every Cargo directive, and on failure prints one
    `cargo::error=<code>: <message>` line and exits with status 1.
-3. A separate fallible API, `theoremc::build::prepare_suite(crate_root)`
-   returning a `PreparedSuite`, plus `PreparedSuite::write_to(out_dir)`,
-   performs the same discovery and rendering with explicit paths, no process
-   environment, no standard output, and no process exit. This is the "direct
-   execution" path that the future CLI commands will call.
+3. A separate fallible API performs the same discovery and rendering against
+   capability handles (`cap_std::fs_utf8::Dir`) supplied by the caller, with no
+   process environment, no standard output, and no process exit:
+   `theoremc::build::prepare_suite(&crate_root)` returns a `PreparedSuite` whose
+   `contents()`, `cargo_directives()`, and `write_to(&out_dir)` give the
+   future CLI commands everything the build script produces.
 4. The root `build.rs` becomes the same one-line call (through
-   `theoremc_build`, because a package cannot be its own build dependency), and
-   a shared fixture corpus proves that the Cargo build-script path and the
-   direct path produce byte-identical suites, identical rerun paths, and the
-   same theorem-presence flag.
+   `theoremc_build`, because a package cannot be its own build dependency). A
+   shared fixture corpus owned by `theoremc-build` proves that the Cargo
+   build-script path and the direct path produce byte-identical suites and
+   identical directive streams.
 
 Preserved behaviour: the discovery contract in `docs/theoremc-design.md` §7.1.1
 (recursive `theorems/**/*.theorem`, forward-slash crate-relative paths,
-lexicographic order, the always-emitted `cargo::rerun-if-changed=theorems`
+deterministic order, the always-emitted `cargo::rerun-if-changed=theorems`
 line, per-file rerun lines, write-if-changed suite output, and the
-`theoremc_has_theorems` cfg). Deliberately changed behaviour: build failures
-become one stable `cargo::error=` diagnostic with a machine-readable code
-instead of a `Debug`-formatted `Err` returned from `main`, and theorem-tree
-entries whose crate-relative path cannot be written as a single Cargo directive
-line are rejected with a stable diagnostic instead of silently corrupting the
-directive stream (see `Decision log` D5).
+`theoremc_has_theorems` cfg). Deliberately changed behaviour, each recorded in
+`Decision log` and the users' guide:
+
+- build failures become one `cargo::error=` diagnostic with a stable code
+  instead of a `Debug`-formatted `Err` returned from `main` (D6);
+- a rerun path that cannot be written as one Cargo directive line is omitted
+  and reported with a `cargo::warning=` line instead of corrupting the
+  directive stream (D5);
+- symbolic links under `theorems/`, previously skipped silently below the root
+  and followed at the root, are rejected with a stable diagnostic (D8);
+- path separators are always `/`, including on Windows hosts (D9);
+- the suite file is replaced atomically and an unreadable previous suite is
+  overwritten rather than failing every later build (D10);
+- non-ASCII control characters and bidirectional formatting characters in
+  theorem paths are escaped as `\u{...}` in the generated suite so the
+  deny-by-default `text_direction_codepoint_in_literal` lint cannot reject it
+  (D11).
 
 This closes roadmap task 4.3.1. It does not implement any `cargo theorem`
 command; tasks 4.3.4 and 4.3.5 consume this API.
@@ -100,34 +115,43 @@ command; tasks 4.3.4 and 4.3.5 consume this API.
   `expect` outside tests; lints are silenced only with item-scoped
   `#[expect(lint, reason = "...")]`; en-GB Oxford spelling in prose and
   comments.
-- Production code must not read the process environment except at one
-  composition-root function, `theoremc_build::emit_suite_from_env_or_exit`,
-  which passes `std::env::var_os` into an injected lookup closure under a
-  single item-scoped `#[expect(clippy::disallowed_methods, reason = "...")]`.
-  Tests inject a closure; no test mutates the process environment in-process.
-  Child `cargo` processes may receive environment through `Command::env`.
+- Production code must not read the process environment or open directories
+  with ambient authority except in one composition root,
+  `theoremc_build::emit_suite_from_env_or_exit`. It passes `std::env::var_os`
+  into an injected lookup closure under a single item-scoped
+  `#[expect(clippy::disallowed_methods, reason = "...")]` and opens the crate
+  root and `OUT_DIR` with `cap_std::ambient_authority()`. Library functions take
+  `&cap_std::fs_utf8::Dir` capabilities. Tests inject closures and
+  capabilities; no test mutates the process environment in-process. Child
+  `cargo` processes may receive environment through `Command::env`.
 - Filesystem access stays capability-oriented through `cap_std::fs_utf8` and
-  `camino`, as in the existing crate. Do not introduce `std::fs` or `std::path`
-  in production code.
-- Do not share build-support source with `#[path]` or `include_str!` copies;
-  ADR-0008's crate-boundary decision remains in force.
+  `camino`. Do not introduce `std::fs` or `std::path` in production code.
+- Do not share build-support source with `#[path]` or `include_str!` copies.
+  ADR-0014 restates this rule from ADR-0008.
 - The workspace minimum supported Rust version stays 1.89 (ADR-0010). The
-  `cargo::error=` directive is stable from Cargo 1.84, so it is available.
+  `cargo::error=` directive is stable from Cargo 1.84.
 - `cargo-theorem` gains no new command, dependency, or behaviour in this task.
-  Commands that call the direct API belong to roadmap tasks 4.3.4 and 4.3.5.
+- Stay off the Kani vertical-slice path (ADR-0011 decision 7, roadmap
+  sequencing rule 2): the `theorem_file_macro_bdd` fixtures, which `make kani`
+  and `.github/workflows/proofs.yml` build, change only their dependency name
+  and path, never their build-script call or dependency graph.
 - The package rename is atomic: every caller, manifest, fixture, live
   document, and nextest filter changes in the same milestone. No alias crate,
   re-export shim, or deprecated name is introduced. The workspace has no
   release tag and no published crate, so no compatibility commitment exists.
-- The generated file name `theorem_suite.rs`, the theorem root `theorems`, the
-  cfg name `theoremc_has_theorems`, the suite line format
-  `theorem_file!("<escaped path>");`, and the empty-suite content (a single
-  newline) are persisted contracts consumed by `src/lib.rs` and adopters'
-  `include!` sites. They must not change.
-- Completed ExecPlans under `docs/execplans/` are historical and must not be
-  edited. ADR-0008 is preserved; it receives only an `Amended by` banner and an
-  `## Amendments` entry pointing to the new ADR, as
-  `docs/documentation-style-guide.md` prescribes.
+- Persisted contracts consumed by `src/lib.rs` and adopters' `include!` sites
+  must not change except as listed in `Purpose / big picture`: the file name
+  `theorem_suite.rs`, the theorem root `theorems`, the cfg name
+  `theoremc_has_theorems`, the line format `theorem_file!("<escaped path>");`,
+  the empty-suite content (a single newline), the existing ASCII escape
+  spellings (`\\`, `\"`, `\n`, `\r`, `\t`, `\xNN`), and the segment-wise path
+  order (D12).
+- Diagnostic codes are introduced as provisional stable identifiers. Their
+  long-term compatibility policy belongs to roadmap task 8.1.2; message text is
+  never a contract.
+- Completed ExecPlans under `docs/execplans/` and accepted ADRs other than
+  ADR-0008's status line are historical and must not be edited. ADR-0008 is
+  marked `Superseded by ADR-0014` as the documentation style guide prescribes.
 - Gates run sequentially: `make check-fmt`, `make lint`, `make test`, then the
   Markdown gates for documentation changes. Full gate runs are delegated to the
   `scrutineer` agent where practical.
@@ -139,12 +163,13 @@ drafting time) and exclude every file under `docs/execplans/`. Each category is
 enforced independently; spare capacity in one category does not offset another.
 Counts measure net lines (additions minus deletions), because the rename and
 the replacement of `build_script.rs` delete substantial existing code. A pure
-`git mv` contributes zero net lines.
+`git mv` contributes zero net lines; a renamed file that Git no longer detects
+as a rename counts as one deletion and one addition.
 
 Classification rules:
 
-- Code: `*.rs` files, `build.rs`, `.feature` files, and `insta` snapshot files
-  (`*.snap`).
+- Code: `*.rs` files, `build.rs`, `.feature` files, `insta` snapshot files
+  (`*.snap`), and `proptest-regressions/` files.
 - Configuration: `Cargo.toml` files, `Cargo.lock`, `.config/nextest.toml`,
   `Makefile`, and `.github/**`.
 - Documentation: `*.md` outside `docs/execplans/`, plus `typos.local.toml`.
@@ -153,38 +178,40 @@ Counting commands:
 
 ```bash
 base=$(git merge-base HEAD origin/main)
-git diff --numstat "$base" -- '*.rs' '*.feature' '*.snap' \
+git diff --numstat "$base" -- '*.rs' '*.feature' '*.snap' '**/proptest-regressions/**' \
   | awk '{n += $1 - $2} END {print "code", n}'
 git diff --numstat "$base" -- '*Cargo.toml' Cargo.lock .config Makefile .github \
   | awk '{n += $1 - $2} END {print "config", n}'
 git diff --numstat "$base" -- '*.md' typos.local.toml ':!docs/execplans/**' \
   | awk '{n += $1 - $2} END {print "docs", n}'
-git diff --name-only "$base" -- ':!docs/execplans/**' | wc -l
+git diff --name-only -M "$base" -- ':!docs/execplans/**' | wc -l
 ```
 
 Budget survey. The existing crate is 1,305 lines including tests
 (`build_script.rs` 195, `build_script_tests.rs` 244, `discovery.rs` 267,
 `discovery_tests.rs` 346, `suite.rs` 148, `suite_tests.rs` 90, `lib.rs` 15).
-The plan replaces `build_script.rs` and its tests, adds four small production
-modules (Cargo environment, error codes, directive rendering, emission), adds
-property tests, snapshot tests, a shared fixture corpus, a parity test and a
-behavioural feature, and deletes the five `include_str!` source copies and the
-manifest rewriter in `tests/common/fixture_crate.rs`. The estimate is roughly
-+1,250 net code lines. Comparable history: the task 3.1.1 plan budgeted 10
-files or 600 net lines and the task 3.1.2 plan 12 files or 700 net lines; the
-task 4.1.2 plan used scope-based tolerances only. None of the three records a
-budget increase, and none records its final size, so the history neither
-confirms nor refutes those estimates. This task is broader than either (rename,
-new public boundary, parity fixtures, and new verification), so the budgets
-below carry about 20% contingency over the estimate.
+The plan replaces `build_script.rs` and its tests; adds production modules for
+errors and codes, directive rendering, atomic writing, the Cargo boundary, and
+the test-support corpus; splits `discovery_tests.rs` (already 346 lines) before
+adding the representability and symlink tables; adds exhaustive character
+checks, property tests, three consolidated snapshot files, a parity behavioural
+suite, and a JSON-message Cargo helper; and deletes the five `include_str!`
+source copies and the manifest rewriter in `tests/common/fixture_crate.rs`. The
+planning estimate is about +1,350 net code lines across roughly 50 files, and
+about 450 net documentation lines. Comparable history: the task 3.1.1 plan
+budgeted 10 files or 600 net lines and the task 3.1.2 plan 12 files or 700 net
+lines; the task 4.1.2 plan used scope-based tolerances only. None of the three
+records a budget increase or its final size, so the history neither confirms
+nor refutes those estimates. This task is broader than either, so the budgets
+below carry about 15-20% contingency over the review-corrected estimate.
 
-- Files: if more than 45 non-ExecPlan files change (renames count once), stop
-  and escalate.
-- Code: if code changes exceed 1,500 net lines, stop and escalate.
+- Files: if more than 58 non-ExecPlan files change (detected renames count
+  once), stop and escalate.
+- Code: if code changes exceed 1,600 net lines, stop and escalate.
 - Configuration: if configuration changes exceed 100 net lines, stop and
   escalate. `Cargo.lock` package-name churn from the rename is expected and
   counted.
-- Documentation: if documentation changes exceed 550 net lines, stop and
+- Documentation: if documentation changes exceed 600 net lines, stop and
   escalate.
 - Interface: if any public item beyond those listed in
   `Interfaces and dependencies` is needed, or any existing public item of
@@ -195,52 +222,62 @@ below carry about 20% contingency over the estimate.
   existing version requirement, requires escalation.
 - Architecture: if the work requires `theoremc-build` to depend on
   `theoremc-core`, `theoremc-macros`, `cargo-theorem`, `clap`, or
-  `ortho_config`, or requires the CLI to own discovery or rendering logic, stop
-  and escalate.
+  `ortho_config` in its normal or test-support graph, or requires the CLI to
+  own discovery or rendering logic, stop and escalate.
 - Iterations: if a focused test still fails after three implementation
   attempts, stop and escalate.
 - Time: if any milestone takes more than four hours of active work, stop and
   escalate.
-- Ambiguity: if probe `EP-M0` contradicts `AXIOM-cargo-directive-parse`, or a
-  reviewer requires the CLI command itself in this task, stop and present
-  options.
+- Ambiguity: if probe `EP-M0` contradicts `AXIOM-cargo-directive-parse` or
+  `AXIOM-cargo-rerun`, or a reviewer requires the CLI command itself in this
+  task, stop and present options.
 
 ## Risks
 
-- Risk: Fixture crates that build-depend on `theoremc` (the facade) compile
-  `theoremc-core` and `theoremc-macros` for the host, lengthening the
-  `nested-cargo-builds` test group that is already near its 600-second
-  allowance. Severity: medium. Likelihood: medium. Mitigation: only the
-  adopter-path scenarios depend on the facade; the discovery, suite, and parity
-  fixtures depend on `theoremc-build` alone. All fixtures share the warm target
-  from ADR-0012. Record measured durations in `Artefacts and notes`; escalate
-  before raising any nextest timeout.
+- Risk: Each real-Cargo fixture build adds serial time to the
+  `nested-cargo-builds` nextest group, which is already near its 600-second
+  per-test allowance on cold runs. Severity: medium. Likelihood: medium.
+  Mitigation: only four new real-Cargo builds (two parity cases, one failure
+  case, one adopter case); the full corpus runs in-process. The adopter fixture
+  reuses the macro fixtures' dependency declarations so their compiled units
+  are shared in the warm target (ADR-0012). Most host-side cost of the facade
+  already exists because `theoremc-macros` depends on `theoremc-core`. D4 also
+  removes today's per-fixture recompilation of the copied support crate. Record
+  measured durations in `Artefacts and notes`; escalate before raising any
+  nextest timeout.
+- Risk: The new test binary runs outside the serialized nextest group and
+  competes for Cargo's package-cache lock and compile slots. Severity: high.
+  Likelihood: certain unless addressed. Mitigation: `EP-M3` adds
+  `binary(=build_boundary_bdd)` to the group filter in `.config/nextest.toml`.
 - Risk: Switching fixture crates from copied sources to an absolute path
   dependency on `crates/theoremc-build` changes how `[lints] workspace = true`
   is resolved for the dependency. Severity: low. Likelihood: low. Mitigation:
   the `theorem_file_macro_bdd` fixtures already path-depend on the workspace
-  crate successfully (`tests/theorem_file_macro_bdd/fixture_crate.rs`), so the
-  mechanism is proven. Cargo caps lints for non-local dependencies.
-- Risk: Cargo's directive parser trims values, so a watched directory whose
-  name ends in whitespace would be watched under the wrong path, and a path
-  containing a line break would inject a second directive. Severity: medium.
-  Likelihood: low (unusual names). Mitigation: the representability rule (D5),
-  its unit and property tests, and probe `EP-M0`.
-- Risk: `cargo kani` in `.github/workflows/proofs.yml` builds the
-  `theorem_file_macro_bdd` fixtures, whose build script changes to the facade
-  call. Severity: medium. Likelihood: low. Mitigation: `make kani` is run
-  locally in `EP-M3` if Kani is installed. The memory note on the local Kani
-  behavioural test failing on a clean `main` applies, so a local failure is
-  compared against `main` before it is treated as a regression.
+  crate successfully, and Cargo caps lints for non-local dependencies.
+- Risk: Cargo's handling of directive values differs from
+  `AXIOM-cargo-directive-parse` on the pinned toolchain. Severity: medium.
+  Likelihood: low. Mitigation: probe `EP-M0` before any implementation, with an
+  explicit go/no-go.
+- Risk: `proofs.yml` builds the Kani fixtures whose dependency name changes.
+  Severity: medium. Likelihood: low. Mitigation: those fixtures keep their
+  dependency graph and copied root `build.rs`; a green `proofs.yml` run on the
+  pull request is an `EP-M3` acceptance item. The local `make kani` scenario is
+  known to fail on a clean `main` because of the rustup library path, so local
+  results are compared with `main` rather than treated as evidence.
+- Risk: Rejecting symbolic links (D8) breaks a layout someone relies on.
+  Severity: low. Likelihood: low (no release, no known adopter). Mitigation:
+  the rejection names the link and a stable code; the users' guide documents
+  the rule; relaxing it later to "follow links that stay inside the crate" is
+  additive.
 - Risk: The rename touches many live documents; a stale
   `theoremc-build-support` reference survives. Severity: low. Likelihood:
-  medium. Mitigation: the stale-reference search in `EP-M4` with an explicit
-  exclusion for completed ExecPlans and the amended ADR-0008 text.
+  medium. Mitigation: the stale-reference search in `EP-M4`, excluding
+  completed ExecPlans and historical ADRs.
 - Risk: `make check-fmt` does not detect committed Markdown problems because
   `mdtablefix --git` only inspects uncommitted files. Severity: low.
   Likelihood: medium. Mitigation: run `mdtablefix --check` and
-  `make markdownlint` explicitly on every edited Markdown file before
-  committing.
+  `markdownlint-cli2` explicitly on every edited Markdown file before each
+  commit.
 
 ## Progress
 
@@ -249,16 +286,18 @@ below carry about 20% contingency over the estimate.
   facade, CLI, gates, documentation, and historical plans completed.
 - [x] (2026-11-16T19:02Z) External facts gathered: Cargo build-script
   directives and parser behaviour, and `build-rs` prior art.
-- [x] (2026-11-16) Initial draft written.
-- [ ] Community-of-experts design review applied.
+- [x] (2026-11-16T19:40Z) Initial draft written and committed.
+- [x] (2026-11-16T20:30Z) Community-of-experts design review (structure and
+  contracts, alternatives and viability, failure modes and cost, verification
+  strategy) applied; verdict "proceed with conditions"; all conditions folded
+  into this revision.
 - [ ] Plan approved by the user.
 - [ ] `EP-M0` directive-parsing probe recorded.
-- [ ] `EP-M1` atomic rename to `theoremc-build`, ADR-0014, fixture path
-  dependencies.
-- [ ] `EP-M2` fallible direct API, directive rendering, and the build-script
-  boundary.
-- [ ] `EP-M3` `theoremc::build` facade, shared fixture corpus, parity and
-  behavioural tests.
+- [ ] `EP-M1` ADR-0014, atomic rename to `theoremc-build`, fixture path
+  dependencies, nextest group.
+- [ ] `EP-M2` capability-based direct API, test-support corpus, directive
+  rendering, and the build-script boundary.
+- [ ] `EP-M3` `theoremc::build` facade, parity and behavioural tests.
 - [ ] `EP-M4` documentation closure and roadmap update.
 
 ## Surprises & discoveries
@@ -266,9 +305,9 @@ below carry about 20% contingency over the estimate.
 - Observation: the target crate name, public path, and visibility in roadmap
   4.3.1 contradict accepted ADR-0008 and `docs/developers-guide.md` §1.3.
   Evidence: ADR-0008 "Decision" says the support crate "does not make the
-  package part of the public `theoremc` library API"; roadmap line 455 asks for
-  `theoremc::build::emit_suite_from_env_or_exit()`. Impact: a new ADR must
-  amend ADR-0008 before the rename lands (D1).
+  package part of the public `theoremc` library API"; roadmap 4.3.1 asks for
+  `theoremc::build::emit_suite_from_env_or_exit()`. Impact: ADR-0014 must
+  supersede ADR-0008 before the rename lands (D1).
 - Observation: root behavioural fixtures copy the build-support sources with
   `include_str!` into each temporary crate, contrary to the crate-level
   documentation that says fixtures depend on the crate. Evidence:
@@ -279,98 +318,185 @@ below carry about 20% contingency over the estimate.
 - Observation: Verus is not wired into this repository (no `verus!` source,
   no Makefile target, no workflow); Kani runs only against generated harnesses
   in fixture crates. Evidence: reconnaissance of `Makefile`, `tools/`, and
-  `.github/workflows/`. Impact: informs the formal-verification decision (D7).
-- Observation: Cargo trims the whole directive line and trims trailing
-  whitespace from the value, and `cargo::error=` fails the build even when the
-  script exits 0. Evidence: DeepWiki answer over `rust-lang/cargo`
+  `.github/workflows/`. Impact: informs D7.
+- Observation: Cargo trims the whole directive line, trims trailing whitespace
+  from the value, and treats `cargo::error=` as a failure even when the script
+  exits 0. Evidence: DeepWiki answer over `rust-lang/cargo`
   (`BuildOutput::parse`) and the Cargo Book build-script reference. Impact:
-  `AXIOM-cargo-directive-parse`, D5, and `EP-M0`.
+  `AXIOM-cargo-directive-parse`, D5, D6, and `EP-M0`.
+- Observation: `Utf8PathBuf` orders paths segment by segment, not as strings,
+  so `theorems/a/x.theorem` sorts before `theorems/a-b.theorem` although
+  `"a-b" < "a/x"` as strings. Evidence: design review of
+  `crates/theoremc-build-support/src/discovery.rs` (`sort_and_dedup`). Impact:
+  the order contract is pinned as segment-wise (D12) and the property oracle
+  uses segment vectors.
+- Observation: discovery builds paths with `Utf8Path::join`, which uses `\` on
+  Windows, contradicting the documented forward-slash contract; CI runs only on
+  Linux. Evidence: `discovery.rs` `collect_entry`. Impact: D9.
+- Observation: a symbolic link below `theorems/` is skipped silently, while a
+  symbolic link at the root is followed. Evidence: `collect_entry` uses
+  `DirEntry::file_type()`; `open_theorem_root` uses `Dir::metadata`. Impact: D8.
+- Observation: `docs/rstest-bdd-users-guide.md`, listed among the required
+  references, does not exist in this repository. Evidence: `ls docs`. Impact:
+  Scenario Outline support was confirmed from the `rstest-bdd` 0.6 source in
+  the Cargo registry and from the existing `tests/*_bdd.rs` suites; no other
+  change.
 
 ## Decision log
 
 - D1. Decision: rename `crates/theoremc-build-support` to
   `crates/theoremc-build` (package `theoremc-build`, library `theoremc_build`)
-  and make it the reusable build-integration library; record this in a new
-  ADR-0014, "Reusable `theoremc-build` library and stable build-script
-  boundary", which amends ADR-0008's visibility and reuse decision while
-  keeping its crate-boundary decision. Rationale:
-  `docs/cargo-theorem-cli-design.md` §5 Table 1 assigns reusable discovery,
-  suite rendering, and build-script entry points to `theoremc-build`, and the
-  roadmap names that crate. Keeping `theoremc-build-support` and adding a second
-  `theoremc-build` crate on top would create two crates for one
-  responsibility. A feature-grouped module inside the root facade was rejected
-  because the root `build.rs` cannot build-depend on its own package. The
-  workspace has no release, so the rename needs no alias. Date/Author:
-  2026-11-16, planning agent (pending user approval).
-- D2. Decision: in this task, "direct CLI path" means the fallible library
-  service `prepare_suite` plus `PreparedSuite::write_to`, which
-  `cargo theorem build-script run` (4.3.4) and `generate --kind suite` (4.3.5)
-  will call. No CLI command is added now. Rationale: the roadmap assigns those
-  commands to 4.3.4 and 4.3.5, which also require the mutation plan (4.3.2) and
-  the JSON envelope (4.1.4). Adding a dependency from `cargo-theorem` with no
-  caller would trip unused-dependency checks and pre-empt those tasks. The
-  success criterion is met by proving that the build-script path and the direct
-  service consume the same fixtures and produce identical output. Date/Author:
-  2026-11-16, planning agent (pending user approval; flagged for explicit
-  confirmation).
+  and make it the reusable build-integration library. Record this in ADR-0014,
+  "Reusable `theoremc-build` library and stable build-script boundary", which
+  supersedes ADR-0008, restates ADR-0008's crate-boundary and no-`#[path]`
+  rule, and explains its relation to ADR-0011 decision 7 (this task is off the
+  vertical-slice path and does not make broad extraction a policy). ADR-0014 is
+  written with status `Proposed` and becomes `Accepted` in `EP-M1` once `EP-M0`
+  has confirmed D5 and D6. Rationale: CLI design §5 Table 1 assigns reusable
+  discovery, suite rendering, and build-script entry points to
+  `theoremc-build`, and the roadmap names that crate. Keeping
+  `theoremc-build-support` beside a second crate would split one
+  responsibility. A module inside the root facade was rejected because the root
+  `build.rs` cannot build-depend on its own package. Amendment of ADR-0008 was
+  rejected in review: ADR-0014 reverses its status summary, adapter location,
+  API, and "no downstream contract" clause, which the style guide treats as
+  supersession. Date/Author: 2026-11-16, planning agent after design review
+  (pending user approval).
+- D2. Decision: "the direct CLI path" in the success criterion means the
+  fallible library service (`prepare_suite`, `PreparedSuite::write_to`,
+  `PreparedSuite::cargo_directives`) that `cargo theorem build-script run`
+  (4.3.4) and `generate --kind suite` (4.3.5) will call. No CLI command is
+  added now, and `cargo-theorem` gains no dependency. Rationale: CLI design
+  §10.1 says the fallible API "supports tests and direct CLI execution"; the
+  commands belong to 4.3.4 and 4.3.5, which also need the mutation plan (4.3.2)
+  and JSON envelope (4.1.4), and 4.3.5 already owns the byte-for-byte CLI
+  criterion. The corpus lives in `theoremc-build` behind a `test-support`
+  feature so later CLI tests reuse the same fixtures (D13). Date/Author:
+  2026-11-16, planning agent (flagged for explicit user confirmation).
 - D3. Decision: the stable adopter boundary is
-  `theoremc::build::emit_suite_from_env_or_exit()`, a re-export from the root
-  facade. The repository's own `build.rs` calls
-  `theoremc_build::emit_suite_from_env_or_exit()` because Cargo forbids a
-  package from build-depending on itself; both names denote the same function.
-  Rationale: the CLI design §10.1 fixes the adopter-facing path; the facade
-  keeps adopters on one dependency. A `build` Cargo feature on `theoremc` to
-  avoid compiling `theoremc-build` for normal builds was rejected: the crate's
-  dependencies (`camino`, `cap-std`, `thiserror`) are already in the graph, and
-  a feature would make the stable call conditional. Date/Author: 2026-11-16,
-  planning agent.
+  `theoremc::build::emit_suite_from_env_or_exit()`, re-exported from the root
+  facade; the repository's own `build.rs` calls
+  `theoremc_build::emit_suite_from_env_or_exit()`. Both names denote the same
+  function. The 4.3.4 injector adds `theoremc` as the adopter's build
+  dependency. Rationale: CLI design §10.1 fixes the adopter path and one
+  dependency is simpler for adopters. A `build` feature on `theoremc` was
+  rejected because `theoremc-core` already brings `camino`, `cap-std`, and
+  `thiserror`, and a feature would make the stable call conditional. Having
+  adopters build-depend on `theoremc-build` directly saves little, because
+  `theoremc-macros` already compiles `theoremc-core` for the host. Date/Author:
+  2026-11-16, planning agent.
 - D4. Decision: fixture crates depend on the real workspace crate through an
   absolute path dependency instead of receiving copied sources. Rationale:
-  removes the brittle file list, honours ADR-0008's no-copy intent, and mirrors
-  the existing `theorem_file_macro_bdd` fixtures. Date/Author: 2026-11-16,
-  planning agent.
-- D5. Decision: discovery rejects a theorem-tree entry whose crate-relative
-  path contains a line feed or carriage return, or (for watched directories)
-  ends with whitespace, returning `BuildError::UnrepresentablePath` with code
-  `build.unrepresentable_path`. Rationale: Cargo directives are line-oriented
-  and their values are trimmed (`AXIOM-cargo-directive-parse`). Such a path
-  cannot be watched correctly, and a line break would let a file name inject an
-  arbitrary directive such as `cargo::rustc-link-arg`. Escaping is impossible
-  because Cargo defines no escape syntax; silently skipping the path would
-  break the guarantee that edits rerun the build. `.theorem` files cannot end
-  in whitespace because they must end with the `.theorem` extension. Rejection
-  is a deliberate behaviour change recorded in the users' guide. Date/Author:
-  2026-11-16, planning agent (pending user approval).
+  removes the brittle file list, honours the no-copy rule, mirrors the existing
+  `theorem_file_macro_bdd` fixtures, and lets the shared warm target compile
+  the crate once. Date/Author: 2026-11-16, planning agent.
+- D5. Decision: a rerun path is representable when it contains no line feed or
+  carriage return and does not end with a `char::is_whitespace` character. An
+  unrepresentable theorem file or watched directory stays in the suite and in
+  `PreparedSuite::rerun_paths()`, but its `cargo::rerun-if-changed=` line is
+  omitted and one `cargo::warning=build.unwatched_path: <escaped path>` line is
+  emitted instead. Rationale: Cargo directives are line-oriented with trimmed
+  values and no escape syntax (`AXIOM-cargo-directive-parse`), so such a path
+  cannot be watched exactly and a line break would inject a directive.
+  Rejecting the build, as the first draft proposed, rested on a false premise:
+  the always-emitted root watch `theorems` already reruns the script for any
+  change below it (`AXIOM-cargo-rerun`), so omitting the line loses no
+  invalidation and breaks nobody. The warning keeps the omission visible.
+  Date/Author: 2026-11-16, planning agent after design review.
 - D6. Decision: build failures render as exactly one line,
-  `cargo::error=<code>: <message>`, where `<code>` is a stable `BuildErrorCode`
-  string and `<message>` is the error's display text with control characters
-  escaped; the helper then exits with status 1. Rationale: `cargo::error` is
-  stable from Cargo 1.84 and is shown by Cargo without `-vv`; a stable code lets
-  `cargo theorem check` (4.2.4) and `build-script run` (4.3.4) classify the
-  same failures. Exiting non-zero as well as emitting the directive makes
-  failure independent of directive support. Codes follow the existing
+  `cargo::error=<code>: <message>`, after which the helper flushes standard
+  output and exits with status 1. `<code>` matches `^build\.[a-z_]+$`.
+  `<message>` is the error's display text in which every path is rendered with
+  `str::escape_debug` inside double quotes, every remaining `char::is_control`
+  character is escaped as `\u{...}`, and trailing whitespace is escaped as
+  `\u{...}`, so the line never contains a line break or ends with whitespace.
+  Only the code is a contract; message text is not. Nothing else is printed on
+  failure, even when discovery succeeded before a later write failed. Rationale:
+  `cargo::error` is shown by Cargo without `-vv`; a stable code lets `check`
+  (4.2.4) and `build-script run` (4.3.4) classify the same failures. Exiting
+  non-zero makes failure independent of directive support. Codes follow the
   `schema.parse_failure` style in
-  `crates/theoremc-core/src/schema/diagnostic.rs`. Date/Author: 2026-11-16,
-  planning agent.
-- D7. Decision: no Verus proof and no Kani harness for this task; use
-  parameterized tests, `proptest` properties with independent oracles, `insta`
-  snapshots, and real-Cargo behavioural tests. Rationale: see
-  `Formal verification decision`. The invariants are about agreement with two
-  external grammars (Rust string-literal lexing and Cargo's directive parser);
-  a Verus model would have to axiomatize exactly those grammars, so a proof
-  would rest on an unverified restatement of the risk. Testing against `syn`
-  and against real Cargo exercises the real interfaces. Date/Author:
-  2026-11-16, planning agent.
+  `crates/theoremc-core/src/schema/diagnostic.rs` and are provisional until
+  roadmap task 8.1.2 defines the compatibility policy. Date/Author: 2026-11-16,
+  planning agent after design review.
+- D7. Decision: no Verus proof and no Kani harness. Character-level functions
+  (`esc`, `sanitize`, `representable`) are verified by exhaustive enumeration
+  over every Unicode scalar value, which is cheaper and stronger than a bounded
+  Kani harness and can use `syn` as an oracle. Order and tree-shape properties
+  use `proptest` with independent oracles; the Cargo integration uses real
+  Cargo. Rationale: see `Formal verification decision`. Date/Author:
+  2026-11-16, planning agent after design review.
+- D8. Decision: any symbolic link at or below `theorems` is rejected with
+  `build.symlink_unsupported`, naming the crate-relative link path. Rationale:
+  the current behaviour is inconsistent and silently drops linked theorems
+  below the root, which `AGENTS.md` forbids (silent absence). Following links
+  safely needs a containment rule that is out of scope; rejection is explicit
+  and can later be relaxed additively. Date/Author: 2026-11-16, planning agent
+  after design review (pending user approval).
+- D9. Decision: crate-relative paths are built by joining segments with a
+  literal `/` through one pure helper, never with `Utf8Path::join`. Rationale:
+  makes the documented forward-slash contract true on every host and keeps
+  4.3.5 byte parity and 4.2.2 identifiers host-independent. Date/Author:
+  2026-11-16, planning agent after design review.
+- D10. Decision: `write_to` compares the previous suite as bytes, treats an
+  unreadable or non-UTF-8 previous file as different, writes a temporary sibling
+  (`.theorem_suite.rs.tmp`) in `OUT_DIR`, and renames it over
+  `theorem_suite.rs`; on failure it removes the temporary file best-effort.
+  Rationale: an interrupted in-place write today can leave a truncated,
+  invalid-UTF-8 suite that fails every later build until `cargo clean`. Rename
+  within one directory is atomic on supported platforms (`AXIOM-cap-std`).
+  Cargo runs one instance of a package's build script per `OUT_DIR`, so a fixed
+  temporary name cannot collide. Date/Author: 2026-11-16, planning agent after
+  design review.
+- D11. Decision: the suite escape keeps the existing ASCII spellings and also
+  escapes non-ASCII `char::is_control` characters and the bidirectional
+  formatting characters U+202A-U+202E and U+2066-U+2069 as `\u{...}`.
+  Rationale: rustc's deny-by-default `text_direction_codepoint_in_literal` lint
+  rejects raw bidirectional characters in string literals, so an unusual file
+  name could otherwise break compilation of the generated suite. Date/Author:
+  2026-11-16, planning agent after design review.
+- D12. Decision: the order contract is segment-wise: paths are compared one
+  `/`-separated segment at a time, each segment by its UTF-8 bytes. This is the
+  existing `Utf8PathBuf` ordering for the forward-slash relative paths produced
+  by discovery, and is now stated explicitly in design §7.1.1 and ADR-0014.
+  Rationale: preserves today's persisted suite order while removing the
+  ambiguity of "lexicographic". Date/Author: 2026-11-16, planning agent after
+  design review.
+- D13. Decision: the shared fixture corpus (`BuildCase` values and a
+  `materialize(&Dir)` function) lives in `theoremc-build` behind a
+  `test-support` Cargo feature, following the `theoremc-core` precedent, and is
+  re-exported by `crates/test-helpers`. Rationale: the crate that owns the
+  contract owns its corpus; dependencies still point downward; the root tests,
+  the crate's own tests, and future `cargo-theorem` tests all use one corpus
+  without a cycle and without pulling `theoremc-core` into the build crate's
+  graph. A data-file corpus was rejected because it would need a parser
+  dependency and cannot express symbolic links or file-in-place-of-directory
+  cases. Date/Author: 2026-11-16, planning agent after design review.
+- D14. Decision: the theorem root stays fixed at `theorems`. A configurable
+  root (CLI design §10.2 "configured theorem root") will arrive later through a
+  new, additive function taking an options value, not by changing
+  `prepare_suite`. Rationale: no current consumer configures it; adding options
+  now would be speculative. Date/Author: 2026-11-16, planning agent.
+- D15. Decision: public errors are split by operation:
+  `PrepareError` (discovery), `WriteError` (suite writing), and a crate-private
+  `BuildScriptError` (environment and ambient directory opening, wrapping the
+  other two) used only by the boundary. All carry `code()` returning a
+  `#[non_exhaustive]` `BuildDiagnosticCode`; public enums and their struct
+  variants are `#[non_exhaustive]`; a compile-time assertion checks
+  `Send + Sync + 'static`. Rationale: direct callers never see environment
+  variants they cannot trigger, while every boundary failure still has a stable
+  code. Error sizes stay well below the `result_large_err` threshold, so no
+  boxing is needed. Date/Author: 2026-11-16, planning agent after design review.
 
 ## Outcomes & retrospective
 
 Not started. Complete at each milestone boundary and at completion, including
-measured sizes against `Tolerances`.
+measured sizes against `Tolerances` and fixture build durations.
 
 ## Context and orientation
 
 Inspected base revision: `4c05966` on `main` ("Chore(deps): bump rust-toolchain
-(#255)"). Line numbers below refer to that revision; relocate symbols with
+(#255)"). Line references below refer to that revision; relocate symbols with
 `rg -n '<symbol>' crates src tests build.rs`.
 
 The workspace (`Cargo.toml`) has five members: `crates/test-helpers`,
@@ -379,7 +505,7 @@ The workspace (`Cargo.toml`) has five members: `crates/test-helpers`,
 `theoremc` (`src/lib.rs`, 41 lines) is the consumer-facing facade. It re-exports
 `theoremc_core::{collision, mangle, schema}` and
 `theoremc_macros::theorem_file`, and its private hidden module
-`__theoremc_generated_suite` (`src/lib.rs:25-41`) does:
+`__theoremc_generated_suite` does:
 
 ```rust
 #[cfg(theoremc_has_theorems)]
@@ -388,27 +514,28 @@ include!(concat!(env!("OUT_DIR"), "/theorem_suite.rs"));
 ```
 
 `theoremc-build-support` is a `[build-dependencies]` entry of the root package
-(`Cargo.toml:25`) and has these modules:
+and depends only on `camino`, `cap-std` (`fs_utf8`), and `thiserror`. Its
+modules:
 
 - `src/discovery.rs`: `discover_theorem_inputs(manifest_dir)` opens the crate
-  root with ambient authority, returns `BuildDiscovery` (sorted, deduplicated
-  `theorem_files` and `watched_directories`, forward-slash crate-relative), or
+  root with ambient authority and returns `BuildDiscovery` (sorted, deduplicated
+  `theorem_files` and `watched_directories`) or
   `BuildDiscoveryError::{Io, TheoremRootNotDirectory}`. An absent `theorems`
-  directory yields a root-only watch set. Classification uses
-  `DirEntry::file_type()`, so symbolic links inside the tree are skipped
-  (untested).
+  directory yields a root-only watch set. Entries are classified with
+  `DirEntry::file_type()` (links not followed, so links are skipped); the root
+  is checked with `Dir::metadata` (links followed). Paths are joined with
+  `Utf8Path::join`. A non-UTF-8 entry name fails with `Io`.
 - `src/suite.rs`: private `render_theorem_suite` emits one
   `theorem_file!("<escaped>");` line per file, or a single newline when empty;
   private `escape_rust_string` escapes `\`, `"`, `\n`, `\r`, `\t`, and other
-  ASCII controls as `\xNN`. Public `write_theorem_suite(out_dir, discovery)`
-  writes `theorem_suite.rs` only when the contents differ, with error
-  `BuildSuiteError::Io`.
+  ASCII controls as `\xNN`, passing every other character through raw. Public
+  `write_theorem_suite(out_dir: &Dir, discovery)` reads the old file as a
+  string, fails on any read error except `NotFound`, and writes in place.
 - `src/build_script.rs`: `prepare_build_script()` is the only environment
-  reader. It passes `std::env::var` (under an item-scoped
-  `#[expect(clippy::disallowed_methods)]`) into a private
-  `prepare_build_script_with_env` closure seam, reads `CARGO_MANIFEST_DIR` and
-  `OUT_DIR`, discovers, opens `OUT_DIR`, writes, and returns
-  `BuildScriptOutput { has_theorems, rerun_paths }`. Errors are
+  reader (`std::env::var` under an item-scoped
+  `#[expect(clippy::disallowed_methods)]`, passed into a private closure seam).
+  It reads `CARGO_MANIFEST_DIR` and `OUT_DIR`, discovers, opens `OUT_DIR`,
+  writes, and returns `BuildScriptOutput { has_theorems, rerun_paths }` or
   `BuildScriptError::{Environment, OpenOutputDirectory, Discovery, Suite}`.
 - Unit tests live in `*_tests.rs` siblings using `rstest` and `tempfile`.
 
@@ -419,73 +546,82 @@ scenarios plus a shared-target isolation test). They build temporary fixture
 crates with real `cargo build` through `test_helpers::FixtureCrate`
 (`tests/common/fixture_crate.rs`), which copies the root `build.rs` and the
 build-support sources into the fixture and rewrites its manifest to drop the
-`[lints]` table. `crates/test-helpers/src/lib.rs` re-exports
-`tests/common/mod.rs` through a `#[path]` module. All fixture crates share one
-warm target directory (ADR-0012) and run serially in the nextest group
-`nested-cargo-builds` (`.config/nextest.toml`), each with a 600-second
-allowance. `tests/theorem_file_macro_bdd/fixture_crate.rs` builds macro
-fixtures that path-depend on the root package and on
-`crates/theoremc-build-support`; `make kani` runs two of those scenarios under
-Kani in `.github/workflows/proofs.yml`.
+`[lints]` table. `tests/common/suite_layout.rs` locates a fixture's `OUT_DIR`
+by matching package directories in the shared target, which can match a stale
+directory. `crates/test-helpers/src/lib.rs` re-exports `tests/common/mod.rs`
+through a `#[path]` module and depends on `theoremc-core`, not on `theoremc`.
+All fixture crates share one warm target directory (ADR-0012) and run serially
+in the nextest group `nested-cargo-builds` (`.config/nextest.toml`), whose
+filter names test binaries explicitly; each test has a 600-second allowance and
+the run a 30-minute global timeout.
+`tests/theorem_file_macro_bdd/fixture_crate.rs` builds macro fixtures that
+path-depend on the root package and on `crates/theoremc-build-support`;
+`make kani` runs two of those scenarios under Kani in
+`.github/workflows/proofs.yml`, whose path filter includes `build.rs`.
 
 `crates/cargo-theorem` implements only `cargo theorem context --json`.
 `build-script` and `generate` appear only in its configuration-key allowlist
-(`crates/cargo-theorem/src/config/mod.rs:46-63`). It has no dependency on the
+(`crates/cargo-theorem/src/config/mod.rs`). It has no dependency on the
 build-support crate.
 
 Tooling: nightly `nightly-2026-11-16` (`rust-toolchain.toml`), MSRV 1.89
 checked by `make msrv`. Test frameworks already configured in the workspace:
-`rstest` 0.28, `rstest-bdd` 0.6, `proptest` 1.11, `googletest` 0.14,
-`pretty_assertions` 1.4, `insta` 1.47 (macros crate only), `syn` 3 (root
-dev-dependency). Gates: `make check-fmt`, `make lint` (rustdoc, Clippy,
-Whitaker), `make test` (nextest plus doctests), `make markdownlint`,
-`make nixie`, `make spelling`. `mockable`, `mockall`, and `assert_cmd` are not
+`rstest` 0.28, `rstest-bdd` 0.6 (Scenario Outline supported), `proptest` 1.11,
+`googletest` 0.14, `pretty_assertions` 1.4, `insta` 1.47 (macros crate only),
+`syn` 3 (root dev-dependency), `filetime` 0.2 (root dev-dependency). Gates:
+`make check-fmt`, `make lint` (rustdoc, Clippy, Whitaker), `make test` (nextest
+plus doctests), `make markdownlint`, `make nixie`, `make spelling`,
+`make check-adr-rfc-names`. `mockable`, `mockall`, and `assert_cmd` are not
 used anywhere; the environment seam convention here is a narrow closure, which
 `AGENTS.md` accepts.
 
-Documentation that names the build-support crate and must change: ADR-0008
-(banner only), `docs/developers-guide.md` §§1.1-1.3 and §2 layer table,
-`docs/theoremc-design.md` overview diagram and §§7.1-7.1.1,
-`docs/repository-layout.md`, `docs/contents.md`, `docs/users-guide.md` "Build
-discovery", and `docs/roadmap.md` (the 4.3.1 checkbox and the 5.1 note that
-names `theoremc-build-support`). `docs/cargo-theorem-cli-design.md` already
-uses the target name. `docs/CHANGELOG.md` is the imported OrthoConfig
-changelog, not a project changelog, so it is not updated.
+Documentation that names the build-support crate or its API and must change:
+ADR-0008 (status line only), `docs/developers-guide.md` §§1.1-1.3, §2 layer
+table, §2.3 "Build system API", and §3.6 "Extending the build system";
+`docs/theoremc-design.md` overview diagram, the build sequence diagram, and
+§§7.1-7.1.1; `docs/repository-layout.md`; `docs/contents.md`;
+`docs/users-guide.md` "Build discovery"; `docs/cargo-theorem-cli-design.md`
+§10.1; and `docs/roadmap.md` (the 4.3.1 checkbox and the 5.1 note naming
+`theoremc-build-support`). ADR-0010 also names the old crate but is historical
+and stays unchanged. `docs/CHANGELOG.md` is the imported OrthoConfig changelog,
+not a project changelog, so it is not updated.
 
 Prior art consulted: rust-lang's `build-rs` crate (0.3.5) offers typed Cargo
 input and output, but its input functions such as
 `build_rs::input::out_dir() -> PathBuf` panic on absence, which conflicts with
 the fallible-API requirement; it is not adopted. `prost-build` and
 `tonic-build` return `io::Result` from their compile functions and leave
-process exit to the caller, which matches the fallible-core and thin `_or_exit`
+process exit to the caller, which matches the fallible core and thin `_or_exit`
 adapter split chosen here.
 
 Skills and documents to keep open while implementing: `rust-router` (then
-`rust-types-and-apis` for the public surface, `rust-errors` for the error enum,
-`rust-unit-testing` and `proptest` for tests), `hexagonal-architecture` for the
-port and adapter split, `execplans` for maintaining this plan, and
-`docs/rust-testing-with-rstest-fixtures.md`, `docs/rstest-bdd-users-guide.md`,
+`rust-types-and-apis` for the public surface, `rust-errors` for the error enums,
+`rust-unit-testing` and `proptest` for tests), `hexagonal-architecture` for
+the port and adapter split, `execplans` for maintaining this plan,
+`docs/rust-testing-with-rstest-fixtures.md`,
 `docs/reliable-testing-in-rust-via-dependency-injection.md`,
 `docs/rust-doctest-dry-guide.md`,
 `docs/complexity-antipatterns-and-refactoring-strategies.md`, and
-`docs/developers-guide.md`. `docs/ortho-config-users-guide.md` is not needed
-because no CLI configuration changes. `docs/theorem-file-specification.md` is
-relevant only for the `.theorem` extension and the trivial fixture theorem.
+`docs/developers-guide.md`. `docs/rstest-bdd-users-guide.md` is absent (see
+`Surprises & discoveries`); use the existing `tests/*_bdd.rs` suites as the
+house pattern. `docs/ortho-config-users-guide.md` is not needed because no CLI
+configuration changes. `docs/theorem-file-specification.md` is relevant only
+for the `.theorem` extension and the trivial fixture theorem.
 
 ## Conformance basis
 
 Upstream artefacts at revision `4c05966`:
 
-- `docs/roadmap.md` task 4.3.1 and its success criterion.
+- `docs/roadmap.md` task 4.3.1 and its success criterion; sequencing rule 2.
 - `docs/cargo-theorem-cli-design.md` §5 (Table 1 package responsibilities and
-  dependency directions), §10.1 (managed call contract), §10.2
-  (`build-script run` uses "the same fallible build service directly"), §10.3
-  (`generate` determinism), §8.4 (exit taxonomy, for later CLI mapping).
+  dependency directions; cap-std for project services), §10.1 (managed call
+  contract), §10.2 (`build-script run` uses "the same fallible build service
+  directly"), §10.3 (`generate` determinism), §8.4 (exit taxonomy, for later
+  CLI mapping).
 - `docs/theoremc-design.md` §7.1 and §7.1.1 (discovery and invalidation
   contract).
-- ADR-0008 (crate boundary; amended here), ADR-0010 (MSRV), ADR-0012 (shared
-  warm target), ADR-0011 decision 7 (build-support extraction stays off the
-  Kani vertical-slice path; this task does not block slice work).
+- ADR-0008 (superseded here), ADR-0010 (MSRV), ADR-0011 decision 7 (stay off
+  the vertical-slice path), ADR-0012 (shared warm target).
 - No Terms of Reference document exists for this repository.
 
 Requirements:
@@ -496,14 +632,14 @@ Requirements:
   `theoremc::build::emit_suite_from_env_or_exit()`, which owns environment
   reading, discovery, rerun output, suite writing, deterministic error
   rendering, and process termination (CLI design §10.1).
-- `REQ-fallible-direct`: a fallible API performs the same work with explicit
-  inputs, without process environment, standard output, or exit (CLI design
-  §10.1-10.2).
+- `REQ-fallible-direct`: a fallible, capability-based API performs the same
+  work without process environment, standard output, or exit (CLI design §§5,
+  10.1-10.2).
 - `REQ-shared-fixtures`: the root build script and the direct path use the
   same discovery and rendering fixtures and agree on outputs (roadmap success
   criterion).
 - `REQ-preserve-contract`: the §7.1.1 discovery, ordering, invalidation, and
-  file-name contract is unchanged.
+  file-name contract is unchanged except for the listed deliberate changes.
 
 Gaps:
 
@@ -512,10 +648,13 @@ Gaps:
   `build.rs`, not in the library.
 - `GAP-no-error-contract`: failures surface as a `Debug` print of `Err` from
   `main`, with no stable code.
-- `GAP-directive-injection`: unrepresentable paths can corrupt the directive
+- `GAP-directive-injection`: unrepresentable paths corrupt the directive
   stream.
 - `GAP-copied-fixtures`: fixtures copy sources instead of depending on the
   crate.
+- `GAP-silent-absence`: symbolic links below the root are skipped silently.
+- `GAP-host-separators`: Windows hosts produce `\` separators.
+- `GAP-non-atomic-write`: an interrupted write can wedge later builds.
 
 Trace links:
 
@@ -523,237 +662,314 @@ Trace links:
 Roadmap 4.3.1 -> REQ-reusable-crate -> GAP-internal-only -> D1, ADR-0014
   -> EP-M1 -> cargo tree -p theoremc-build shows no application crates
 CLI §10.1 -> REQ-stable-boundary -> GAP-adapter-in-root, GAP-no-error-contract
-  -> D3, D6 -> EP-M2, EP-M3 -> build_boundary_bdd scenarios 2 and 3
-CLI §10.2 -> REQ-fallible-direct -> D2 -> EP-M2
-  -> theoremc-build prepare tests and write tests
-Roadmap 4.3.1 success -> REQ-shared-fixtures -> GAP-copied-fixtures -> D4
-  -> EP-M1, EP-M3 -> build_boundary_bdd scenario 1 (parity)
-DES §7.1.1 -> REQ-preserve-contract -> INV-order, INV-literal, INV-write-idempotent
-  -> EP-M2 -> existing BDD suites unchanged and green
+  -> D3, D6, D15 -> EP-M2, EP-M3 -> emit_tests, build_boundary_bdd scenarios 2-3
+CLI §§5, 10.2 -> REQ-fallible-direct -> D2, D15 -> EP-M2
+  -> prepare and write unit tests on capability handles
+Roadmap 4.3.1 success -> REQ-shared-fixtures -> GAP-copied-fixtures -> D4, D13
+  -> EP-M1, EP-M2, EP-M3 -> corpus_parity tests, build_boundary_bdd scenario 1
+DES §7.1.1 -> REQ-preserve-contract -> D9, D10, D11, D12
+  -> INV-order, INV-literal, INV-write -> EP-M2 -> existing BDD suites green
 Cargo protocol -> GAP-directive-injection -> D5, INV-directive-line
-  -> EP-M0, EP-M2 -> directive property tests
+  -> EP-M0, EP-M2 -> injection regression test, directive checks
+AGENTS.md silent absence -> GAP-silent-absence -> D8 -> EP-M2 -> symlink table
 ```
 
 ## Verification plan
 
 ### Abstract model
 
-Let a theorem tree be a finite set `E` of crate-relative entries below
-`theorems/`, each a directory or a file, with forward-slash paths. Define:
+A theorem tree is a finite tree of entries below `theorems/` in a crate root.
+Each entry has a name (a non-empty sequence of Unicode scalar values without
+`/`) and a kind: directory, regular file, symbolic link, or other. Its
+crate-relative path is `"theorems"` followed by `"/" + name` for each ancestor
+and itself (D9). Define:
 
-- `F(E)`: the set of regular files in `E` whose name ends in `.theorem`.
-- `W(E)`: `{"theorems"}` when `theorems` is absent; otherwise `"theorems"`
-  together with every directory in `E`.
-- `representable(p)`: `p` contains no `\n` or `\r`, and `p` does not end with
-  a Unicode whitespace character.
-- `prepare(E)`: if any `p` in `F(E)` or `W(E)` is not representable, the error
-  `build.unrepresentable_path`; else `PreparedSuite` with `files = sort(F(E))`,
-  `watched = sort(W(E))`, `contents = concat(line(p) for p in files)` or `"\n"`
-  when empty, where `line(p) = "theorem_file!(\"" + esc(p) + "\");\n"`, and
-  `has_theorems = files non-empty`.
-- `directives(S)` is the following ordered list:
+- `F`: the set of paths of regular files whose name ends in `.theorem`.
+- `W`: `{"theorems"}` when `theorems` is absent; otherwise `"theorems"` and the
+  path of every directory in the tree.
+- `order`: compare paths segment by segment, each segment by UTF-8 bytes,
+  a proper prefix first (D12); `sort(X)` sorts by `order` without duplicates.
+- `esc(s)`: replace `\` by `\\`, `"` by `\"`, line feed by `\n`, carriage
+  return by `\r`, tab by `\t`, other ASCII controls by `\x` and two upper-case
+  hexadecimal digits, non-ASCII controls and bidirectional formatting
+  characters by `\u{` hexadecimal `}` (D11); keep every other character.
+- `representable(p)`: `p` contains no line feed or carriage return and does
+  not end with a `char::is_whitespace` character (D5).
+- `prepare(tree)`:
+  - the error `build.symlink_unsupported` naming the first symbolic link in
+    `order` if the root or any entry is a link (D8);
+  - the error `build.theorem_root_not_directory` if `theorems` exists and is
+    not a directory;
+  - the error `build.non_utf8_entry` naming the parent directory if an entry
+    name is not UTF-8;
+  - otherwise `PreparedSuite` with `files = sort(F)`, `watched = sort(W)`,
+    `contents` equal to the concatenation of
+    `"theorem_file!(\"" + esc(p) + "\");\n"` for `p` in `files`, or `"\n"` when
+    `files` is empty, and `has_theorems` equal to `files` being non-empty.
+- `directives(S)` is the following ordered list, where
+  `R = S.watched ++ S.files` (the rerun order):
 
   ```plaintext
   ["cargo::rustc-check-cfg=cfg(theoremc_has_theorems)"]
   ++ (["cargo::rustc-cfg=theoremc_has_theorems"] if S.has_theorems)
-  ++ ["cargo::rerun-if-changed=" + p for p in S.watched ++ S.files]
+  ++ ["cargo::rerun-if-changed=" + p for p in R if representable(p)]
+  ++ ["cargo::warning=build.unwatched_path: " + quote(p) for p in R if not representable(p)]
   ```
 
-- `failure(e) = ["cargo::error=" + code(e) + ": " + sanitize(msg(e))]` with
-  exit status 1, where `sanitize` escapes every control character.
+- `failure(e)` is the single line
+  `"cargo::error=" + code(e) + ": " + sanitize(message(e))`, followed by exit
+  status 1, where `quote(p)` is `"\"" + p.escape_debug() + "\""` and `sanitize`
+  escapes every remaining `char::is_control` character and any trailing
+  whitespace as `\u{...}`.
+- `boundary(env, crate_root, out_dir)`: read `CARGO_MANIFEST_DIR` and
+  `OUT_DIR`; open both; `S = prepare(crate_root)`; `S.write_to(out_dir)`; then
+  print `directives(S)` as one block. Any error at any step prints only
+  `failure(e)`.
 
-Preconditions: Cargo supplies `CARGO_MANIFEST_DIR` and `OUT_DIR` as UTF-8
-paths, and `OUT_DIR` exists. Violations produce `build.missing_environment`,
-`build.non_utf8_environment`, or `build.output_directory` failures rather than
+Preconditions: Cargo supplies `CARGO_MANIFEST_DIR` and `OUT_DIR` as UTF-8 paths
+and `OUT_DIR` exists. Violations produce `build.missing_environment`,
+`build.non_utf8_environment`, or `build.open_directory` failures rather than
 panics.
 
 ### Invariants and lemmas
 
-- `INV-order` (REQ-preserve-contract): `prepare(E).contents` and the directive
-  list depend only on the set `E`, not on creation or directory-iteration order.
-- `INV-literal` (REQ-preserve-contract): for every representable path `p`,
-  `esc(p)` inside double quotes lexes as a Rust string literal whose value is
-  exactly `p`.
-- `INV-directive-line` (GAP-directive-injection): every line the build-script
+- `INV-order` (REQ-preserve-contract, D12): `contents`, `rerun_paths`, and
+  `directives` depend only on the tree, not on creation or directory-iteration
+  order, and list paths in `order`.
+- `INV-presence` (REQ-preserve-contract): `has_theorems` holds exactly when
+  `files` is non-empty, `contents` is exactly `"\n"` when it is empty, and the
+  cfg line appears exactly when `has_theorems` holds.
+- `INV-literal` (REQ-preserve-contract, D11): for every string `s`,
+  `"\"" + esc(s) + "\""` lexes as a Rust string literal whose value is exactly
+  `s` and contains no raw bidirectional formatting character; the ASCII
+  spellings are exactly those of the base revision.
+- `INV-directive-line` (GAP-directive-injection, D5, D6): every line the
   boundary writes to standard output, on success or failure, starts with
-  `cargo::`, contains no `\n` or `\r`, and does not end with whitespace; the
-  number of lines equals `|directives(S)|` on success and 1 on failure.
-- `INV-representable` (D5): `prepare` rejects exactly the trees containing an
-  unrepresentable file or watched directory path, naming the first such path in
-  sorted order.
-- `INV-write-idempotent` (REQ-preserve-contract): `write_to` creates or
-  replaces `theorem_suite.rs` with `contents`, returns `Written` when the
-  previous file was absent or different, returns `Unchanged` and performs no
-  write when identical, and a second call always returns `Unchanged`.
+  `cargo::`, contains no line feed or carriage return, and does not end with
+  whitespace; success writes `|directives(S)|` lines and failure writes exactly
+  one.
+- `INV-watch-coverage` (D5): every path in `rerun_paths` is either emitted as
+  a `rerun-if-changed` line or reported by exactly one `build.unwatched_path`
+  warning, and `cargo::rerun-if-changed=theorems` is always emitted.
+- `INV-classification` (D8, D9, GAP-silent-absence): discovery never skips a
+  symbolic link silently, never returns a path containing `\`, and reports a
+  non-UTF-8 entry with `build.non_utf8_entry`.
+- `INV-write` (D10): `write_to` returns `Written` and leaves `contents` in
+  `theorem_suite.rs` when the previous file was absent, different, or
+  unreadable; returns `Unchanged` and performs no write when identical; leaves
+  no temporary file; and changes no other entry of the output directory.
+- `INV-late-failure` (D6): if `prepare` succeeds and opening or writing the
+  output fails, the boundary prints exactly one `cargo::error=` line and no cfg
+  or rerun line.
 - `INV-parity` (REQ-shared-fixtures, REQ-stable-boundary): for every shared
-  fixture case, the suite file Cargo's run of the build script leaves in
-  `OUT_DIR`, the rerun paths in Cargo's recorded build-script output, and the
-  presence of the cfg equal `prepare(E).contents`, `watched ++ files`, and
-  `has_theorems` from the direct API.
-- `INV-failure-contract` (D6): every `BuildError` maps to exactly one stable
-  code; the boundary emits exactly one `cargo::error=` line beginning with that
-  code and exits with status 1; the direct API returns the same error value
-  without writing to standard output.
+  corpus case built through Cargo, the suite file in the `out_dir` reported by
+  Cargo's `build-script-executed` message is byte-identical to
+  `prepare(tree).contents`, and the directive lines in the sibling `output`
+  file equal `directives(prepare(tree))`.
+- `INV-codes` (D6, D15): every error variant maps to exactly one code; codes
+  are pairwise distinct and match `^build\.[a-z_]+$`.
 - `INV-env-seam` (constraints): only `emit_suite_from_env_or_exit` reads the
-  process environment.
-- `L-boundary-composes-direct`: the build-script boundary is the composition
-  `lookup -> CargoBuildEnv -> prepare_suite -> write_to -> directives`, so
+  process environment or uses ambient filesystem authority.
+- `L-boundary-composes-direct`: `boundary` is the composition
+  `lookup -> open -> prepare_suite -> write_to -> cargo_directives`, so
   `INV-parity` reduces to `INV-order` plus the fact that Cargo runs the
-  boundary with the fixture's own paths. This is a structural lemma checked by
-  code review and by the in-process boundary unit test that compares its output
-  with `directives(prepare_suite(...))`.
+  boundary with the fixture's own paths. It is checked by an in-process test of
+  the private runner against handwritten expected line vectors (not against a
+  second call of the same functions) and by review.
 
 ### Axioms (trusted, not verified here)
 
 - `AXIOM-cargo-directive-parse`: Cargo reads build-script standard output line
   by line, trims each line, splits at the first `=`, trims trailing whitespace
-  from the value, treats `cargo::error=` as a build failure even when the
-  script exits 0, and fails the build when the script exits non-zero. Source:
-  the Cargo Book build-script reference and `BuildOutput::parse` in
-  `rust-lang/cargo` (via DeepWiki). Boundary: `directives.rs` and `emit.rs`.
-  Probed in `EP-M0`; exercised by the behavioural failure scenario.
+  from the value, keeps leading whitespace, treats `cargo::error=` as a failure
+  even when the script exits 0, and fails the build when the script exits
+  non-zero. Source: Cargo Book build-script reference and `BuildOutput::parse`
+  in `rust-lang/cargo` (via DeepWiki). Boundary: `directives.rs`, `emit.rs`.
+  Probed in `EP-M0` (exit 0 and exit 1, trailing space, leading space, `=`
+  inside a value, and a nonexistent path).
 - `AXIOM-cargo-rerun`: `cargo::rerun-if-changed=<dir>` reruns the script when
-  anything under the directory changes, including a missing directory being
-  created. Source: Cargo Book; already exercised by
-  `tests/features/build_discovery.feature`.
+  anything below the directory changes, including creation of a missing
+  directory; Cargo records no fingerprint for a failed build-script run, so it
+  reruns next time. Source: Cargo Book; already exercised by
+  `tests/features/build_discovery.feature`; probed in `EP-M0` for an edit below
+  a directory whose name ends in a space.
 - `AXIOM-syn-lexer`: `syn::LitStr::value()` implements Rust string-literal
-  unescaping. Used only as a test oracle for `INV-literal`.
-- `AXIOM-cap-std`: `cap_std::fs_utf8::Dir` read and write operations behave as
-  their documented POSIX counterparts, and `DirEntry::file_type()` does not
-  follow symbolic links.
+  unescaping. Used only as a test oracle.
+- `AXIOM-cap-std`: `cap_std::fs_utf8::Dir` operations behave as their
+  documented POSIX counterparts; `symlink_metadata` does not follow links;
+  `rename` within one directory is atomic; ambient opening is the only
+  authority escape.
+- `AXIOM-rustc-bidi-lint`: rustc's `text_direction_codepoint_in_literal` lint
+  is deny-by-default and fires on raw bidirectional formatting characters in
+  literals, including literals reached through `include!`. Exercised by the
+  `mixed_tree` Cargo parity case, whose file names include U+202E.
 
 ### Methods per obligation
 
-- Obligation: `INV-order`.
-  Method: property test. Rationale: the input space is sets of paths with
-  arbitrary creation order; sampled permutations with an independent oracle
-  give proportionate confidence. Domain: 1-12 distinct relative paths drawn
-  from a small segment alphabet (letters, digits, `-`, `_`, space, Unicode
-  letters) at depth 1-3, created in a generated permutation in a temporary
-  directory. Artefact: `crates/theoremc-build/tests/prepare_properties.rs`.
-  Evidence: `cargo nextest run -p theoremc-build --test prepare_properties`
-  passes 256 cases. Non-vacuity: the oracle is a `BTreeSet` of the generated
-  paths, independent of discovery; the suite is parsed with `syn` into macro
-  invocations whose literal values must equal the oracle in order. A seeded
-  fault that removes `sort_and_dedup` must fail (run once, recorded, reverted).
-  Generator classification records cases with nesting and with more than one
-  file.
 - Obligation: `INV-literal`.
-  Method: property test plus the existing named table. Rationale: escaping is a
-  pure function over an open input space. Domain: arbitrary strings from
-  `proptest`'s `\PC*` plus injected ASCII controls, quotes, backslashes, and
-  astral characters, filtered to representable paths (filter rate recorded;
-  must stay below 5%). Artefact: `crates/theoremc-build/src/suite_tests.rs`
-  (named table kept) and `crates/theoremc-build/tests/prepare_properties.rs`
-  (property). Evidence: `syn::parse_str::<syn::LitStr>` succeeds and `.value()`
-  equals the input for all cases. Non-vacuity: the generator must hit every
-  escape branch; a seeded fault that drops the `\t` arm or the `\x` arm must
-  fail.
-- Obligation: `INV-directive-line`.
-  Method: property test plus `insta` snapshots. Rationale: the property covers
-  arbitrary representable paths and arbitrary error text; snapshots pin the
-  exact order and spelling. Domain: generated `PreparedSuite` values (through
-  generated trees) and generated error messages containing arbitrary
-  characters, including `\n`, `\r`, and trailing spaces. Artefact:
-  `crates/theoremc-build/src/directives_tests.rs` and
-  `crates/theoremc-build/src/snapshots/`. Evidence: every rendered line
-  satisfies the predicate; snapshot files for "empty", "theorems present", and
-  each `BuildErrorCode`. Non-vacuity: generated messages must include line
-  breaks in at least 10% of cases (classified); a seeded fault that skips
-  `sanitize` must fail.
-- Obligation: `INV-representable`.
-  Method: parameterized `rstest` table. Rationale: a finite partition (clean,
-  line feed, carriage return, trailing space in a directory, trailing tab,
-  leading space accepted, space inside accepted). Artefact:
-  `crates/theoremc-build/src/discovery_tests.rs`. Evidence: rejected cases
-  return `UnrepresentablePath` naming the path; accepted cases discover
-  normally. Non-vacuity: each rejected row creates the offending entry on the
-  host filesystem before calling `prepare_suite`; the test asserts the entry
-  exists first.
-- Obligation: `INV-write-idempotent`.
+  Method: exhaustive enumeration over every Unicode scalar value plus the
+  existing named table. Rationale: `esc` works one character at a time, so
+  checking every character (and adjacency within blocks) is complete for
+  single-character behaviour and cheaper than Kani; `syn` is an independent
+  lexer oracle. Domain: all 1,112,064 scalar values, in blocks of 4,096
+  consecutive values escaped as one literal (about 272 parses); plus the named
+  table pinning the exact ASCII spellings. Artefact:
+  `crates/theoremc-build/src/escape_tests.rs`;
+  `crates/theoremc-build/src/suite_tests.rs` (named table kept). Evidence:
+  every block parses and round-trips; no rendered block contains a raw
+  bidirectional formatting character; the named table passes unchanged.
+  Non-vacuity: block count is asserted (272); seeded faults, each run once and
+  reverted, must fail: drop the `"` arm, drop the `\\` arm, drop both the `\r`
+  arm and the control arm (leaving a raw carriage return), and format `\x`
+  without zero padding. The named table, not the round trip, catches a dropped
+  `\t` arm, because `\x09` also round-trips; that division is deliberate.
+- Obligation: `INV-directive-line` and `INV-watch-coverage`.
+  Method: exhaustive enumeration over characters for `representable` and
+  `sanitize`, a property test over generated trees, `insta` snapshots, and an
+  injection regression test. Domain: for every character `c`,
+  `representable("theorems/d" + c)` matches the specification and
+  `sanitize("m" + c)` and `sanitize("m" + c + " ")` contain no line break and
+  do not end with whitespace; generated trees include directory names with
+  embedded line feeds and trailing spaces. Artefact:
+  `crates/theoremc-build/src/directives_tests.rs`,
+  `crates/theoremc-build/src/snapshots/` (one success snapshot per output
+  family and one failure table snapshot). Evidence: predicates hold for all
+  characters and generated cases; the injection regression test asserts that a
+  directory named `x\ncargo::rustc-cfg=injected` yields one
+  `build.unwatched_path` warning and no `rustc-cfg=injected` line. Non-vacuity:
+  the regression test is written first against a stub renderer that formats
+  like the base-revision `build.rs` and must fail with two lines; seeded fault
+  "skip `sanitize`" must fail; generated-case classification records the share
+  of trees with an unrepresentable path (must be non-zero).
+- Obligation: `INV-order` and `INV-presence`.
+  Method: property test with a tree generator and a segment oracle, plus named
+  `rstest` rows. Rationale: creation order and tree shape span a large space;
+  the oracle is independent of `Utf8PathBuf`. Domain: generated trees of depth
+  1-3 with 0-12 files, segment names drawn from letters, digits, `-`, `_`, `.`,
+  interior spaces, and non-ASCII letters, never starting or ending with
+  whitespace; created in a generated permutation in a temporary directory; 256
+  cases. Named rows pin `theorems/a/x.theorem` before `theorems/a-b.theorem` and
+  `theorems/a b.theorem`. Artefact:
+  `crates/theoremc-build/tests/prepare_properties.rs`; the named rows in
+  `crates/theoremc-build/src/order_tests.rs`. Evidence: the suite parsed with
+  `syn` into macro invocations yields literal values equal to the oracle, a
+  `BTreeSet<Vec<String>>` of segments, in order;
+  `has_theorems == !oracle.is_empty()`; contents are exactly `"\n"` when the
+  oracle is empty. Non-vacuity: classification records empty trees,
+  directories-only trees, and nested trees, each required to occur; seeded
+  fault "remove the sort" must fail; `proptest-regressions/` is committed if a
+  failure is ever found.
+- Obligation: `INV-classification`.
+  Method: parameterized `rstest` tables. Domain: symbolic link to a file, to a
+  directory, to outside the crate, and as the root; a non-UTF-8 directory name
+  and file name (Unix only, created with `std::os::unix::ffi::OsStrExt` in the
+  test); nested paths (asserting no `\`); the D9 join helper on segments
+  containing spaces and Unicode. Artefact:
+  `crates/theoremc-build/src/classification_tests.rs` (new file so
+  `discovery_tests.rs`, already 346 lines, stays under 400). Evidence: each row
+  returns the expected `PrepareError` variant and code, naming the expected
+  crate-relative path. Non-vacuity: each row asserts the offending entry
+  exists, using `symlink_metadata`, before calling `prepare_suite`.
+- Obligation: `INV-write`.
   Method: named unit tests. Artefact:
-  `crates/theoremc-build/src/suite_tests.rs`. Evidence: absent then `Written`;
-  identical then `Unchanged` with unchanged modification time; different then
-  `Written`; directory in place of the file then `build.suite_write` error.
-  Non-vacuity: the `Unchanged` case first writes a sentinel modification time
-  with `filetime` (already a root dev-dependency; added as a dev-dependency of
-  `theoremc-build`) and asserts it is preserved.
+  `crates/theoremc-build/src/write_tests.rs`. Evidence: absent then `Written`;
+  identical then `Unchanged` with a sentinel modification time preserved (set
+  with `filetime`); different then `Written`; previous file containing invalid
+  UTF-8 then `Written`; a directory in place of the file then `WriteError` with
+  code `build.suite_write`; the directory listing before and after differs only
+  in `theorem_suite.rs`, and no `.theorem_suite.rs.tmp` remains. Non-vacuity:
+  seeded fault "write in place without rename" is caught by a test that injects
+  a failing rename through a read-only temporary sibling and asserts the
+  previous suite is intact.
+- Obligation: `INV-late-failure`, `INV-codes`, and the exit contract.
+  Method: in-process tests of the private runner with an injected lookup,
+  capability directories, and in-memory or failing writers; a wildcard-free
+  `match` over `BuildDiagnosticCode` in the test helper so a new variant fails
+  to compile until it is tested; one consolidated `insta` snapshot of every
+  code with a synthetic error's rendered line. Artefact:
+  `crates/theoremc-build/src/emit_tests.rs`,
+  `crates/theoremc-build/src/error_tests.rs`. Evidence: missing and non-UTF-8
+  variables, an unopenable `OUT_DIR`, and a directory in place of
+  `theorem_suite.rs` each produce one error line, the failure status, and no
+  other line; a writer that fails produces the failure status; success returns
+  `Success` with the handwritten expected lines. Non-vacuity: seeded fault
+  "print directives before writing" must fail the late-failure case.
 - Obligation: `INV-parity`.
-  Method: behavioural test with real Cargo over the shared fixture corpus.
-  Rationale: the property concerns the real Cargo integration, which no
-  in-process test can stand in for. Domain: shared cases `no_theorem_root`,
-  `empty_theorem_root`, `single_theorem`, `nested_with_ignored_files`,
-  `unsorted_creation`, `unusual_names` (spaces, quotes, Unicode). Artefact:
-  `tests/build_boundary_bdd.rs`, `tests/features/build_boundary.feature`, and
-  the corpus in `tests/common/build_cases.rs`. Evidence: the parity scenario
-  passes for every case. Non-vacuity: each case asserts its own expected
-  theorem count before comparing, so an empty corpus or a build script that
-  never ran fails; the comparison reads Cargo's recorded `output` file, not the
-  direct API.
-- Obligation: `INV-failure-contract`.
-  Method: exhaustive `rstest` table over `BuildErrorCode` plus a behavioural
-  scenario. Artefact: `crates/theoremc-build/src/error_tests.rs`,
-  `crates/theoremc-build/src/emit_tests.rs`, and the failure scenario in
-  `tests/features/build_boundary.feature`. Evidence: codes are distinct and
-  stable (snapshot of the full code list); the in-process boundary runner
-  returns failure status and writes one line; the Cargo fixture with `theorems`
-  as a file fails with `cargo::error=build.theorem_root_not_directory` visible
-  in the build log. Non-vacuity: the fixture asserts the build failed and that
-  the log contains the code, so a passing build or a missing directive fails
-  the scenario.
+  Method: in-process parity over the whole corpus, plus behavioural tests with
+  real Cargo over two corpus cases. Rationale: `L-boundary-composes-direct`
+  reduces parity to `INV-order` plus Cargo actually running the boundary; two
+  real builds establish the latter without the cost of one build per case.
+  Domain: corpus cases `no_theorem_root`, `empty_theorem_root`,
+  `single_theorem`, `nested_with_ignored_files`, `unsorted_creation`,
+  `unusual_names`, `unwatched_directory`, `mixed_tree` (nested, unsorted,
+  ignored files, quotes, spaces, Unicode, and U+202E in a file name),
+  `theorem_root_is_file`, and `symlinked_theorem` (Unix). Real Cargo runs
+  `no_theorem_root` and `mixed_tree`. Artefact:
+  `crates/theoremc-build/tests/corpus_parity.rs`; `tests/build_boundary_bdd.rs`,
+  `tests/features/build_boundary.feature`. Evidence: in-process, the runner's
+  output for each case equals the handwritten expectation stored with the case;
+  through Cargo, the files at the `out_dir` reported by `--message-format=json`
+  match the direct API exactly. Non-vacuity: each case asserts its expected
+  theorem count before comparing; exactly one `output` file must exist beside
+  `out_dir`; seeded fault "swap the watched and files order in the renderer"
+  must fail the outline.
 - Obligation: `INV-env-seam`.
-  Method: lint (`clippy::disallowed_methods`, configured in `clippy.toml`) plus
-  review. Evidence: `make lint` passes with exactly one `#[expect]` for that
-  lint in `crates/theoremc-build`; `rg -n 'env::var' crates/theoremc-build/src`
-  shows one site.
-- Obligation: `L-boundary-composes-direct`.
-  Method: in-process unit test of the private boundary runner with an injected
-  lookup and an in-memory writer, compared against `prepare_suite` on the same
-  temporary tree. Artefact: `crates/theoremc-build/src/emit_tests.rs`.
+  Method: lint and search. Evidence: `make lint` passes with exactly one
+  `#[expect]` for `clippy::disallowed_methods` in `crates/theoremc-build`;
+  `rg -n 'env::var|ambient_authority' crates/theoremc-build/src` lists only
+  `emit.rs` outside `*_tests.rs` files (`test_support::materialize` writes into
+  a `Dir` supplied by the caller and never opens ambient paths).
+
+Assertion libraries: `pretty_assertions::assert_eq!` for whole suite contents
+and directive vectors; `googletest` (`assert_that!`, `matches_pattern!`,
+`elements_are!`) for error shapes, rerun-path lists, and `WriteOutcome`;
+`prop_assert_eq!` inside property bodies; `insta` only for the three
+consolidated snapshots, never for generated cases.
 
 ### Formal verification decision
 
 No Verus proof and no Kani harness are planned (D7). Verus is warranted for
-contractual logic whose guarantee must hold for all inputs and which has a
-small pure kernel independent of external semantics. The kernels here are a
-string-escape function and a line-rendering function whose correctness is
-defined entirely by agreement with Rust's lexer and Cargo's parser. A Verus
-proof would require modelling both as specifications; those models would be
-unverified axioms equivalent to the property at risk, so the proof would add
-ceremony without adding assurance. The escape function also predates this task
-(task 3.1.2). Kani could exhaust short character sequences, but `syn`-oracle
-property tests reach the same equivalence classes, including astral characters
-that a small Kani bound would exclude, and run in the ordinary `make test`
-gate. Introducing Verus would also require new toolchain and CI wiring with no
-other consumer. The residual gap is that property tests sample rather than
-exhaust the input space; the escape function has seven branches, each forced by
-the generator and guarded by a seeded-fault check. No proof milestone exists,
-so no Verus command is part of acceptance.
+contractual logic whose guarantee must hold over an unbounded domain and that
+has a small pure kernel independent of external semantics. The kernels here are
+character-level (`esc`, `sanitize`, `representable`) or ordering functions. The
+character-level kernels have a finite domain (every Unicode scalar value),
+which the plan enumerates exhaustively, so a proof would add nothing over
+complete enumeration; their correctness is also defined by agreement with
+Rust's lexer and Cargo's parser, which a Verus model would have to restate as
+unverified axioms. The ordering kernel delegates to standard library
+comparison, whose correctness is an axiom, and the property test with an
+independent segment oracle checks that the composition preserves it. Kani could
+explore short strings, but it cannot run `syn`, and exhaustive character
+enumeration dominates it here. Introducing Verus would also require new
+toolchain and CI wiring with no other consumer. Residual gap: multi-character
+interactions in `esc` are covered by contiguous blocks and the property test
+rather than exhaustively; since `esc` is a per-character map with no state,
+this is not a material gap. No proof milestone exists, so no Verus command is
+part of acceptance.
 
 ### Suggested BDD features
 
 Adopted, path `tests/features/build_boundary.feature`, runner
-`cargo nextest run -p theoremc --test build_boundary_bdd`:
+`cargo nextest run -p theoremc --test build_boundary_bdd`. Given steps
+materialize corpus cases into a fixture, When steps run Cargo with
+`--message-format=json` and keep the result in a step fixture, and Then steps
+read the files Cargo reported; no step does the whole scenario.
 
 ```gherkin
 Feature: Stable build-script boundary and direct suite generation
   Theorem adopters call one build-script function, and tools call a fallible
-  service; both must produce the same generated suite.
+  service; both must produce the same generated suite and Cargo directives.
 
   Scenario Outline: The build script and direct generation agree
-    Given the shared build fixture "<case>"
-    When Cargo builds the fixture through the theoremc-build boundary
-    And the same fixture is prepared through the direct API
-    Then the generated suite files are byte-identical
-    And the rerun paths and theorem cfg agree
+    Given the shared build corpus case "<case>"
+    When Cargo builds the case through the theoremc-build boundary
+    Then the generated suite equals the direct API's suite byte for byte
+    And the recorded build-script directives equal the direct API's directives
 
     Examples:
-      | case                      |
-      | no_theorem_root           |
-      | single_theorem            |
-      | nested_with_ignored_files |
-      | unsorted_creation         |
-      | unusual_names             |
+      | case            |
+      | no_theorem_root |
+      | mixed_tree      |
 
   Scenario: An adopter crate compiles theorems through the facade call
     Given an adopter crate whose build script calls theoremc::build::emit_suite_from_env_or_exit
@@ -762,137 +978,156 @@ Feature: Stable build-script boundary and direct suite generation
     Then the build succeeds and the theorem suite is compiled
 
   Scenario: A misconfigured theorem root fails with a stable diagnostic
-    Given the shared build fixture "theorem_root_is_file"
-    When Cargo builds the fixture through the theoremc-build boundary
+    Given the shared build corpus case "theorem_root_is_file"
+    When Cargo builds the case through the theoremc-build boundary
     Then the build fails
-    And the build log contains "cargo::error=build.theorem_root_not_directory"
+    And the build log shows the diagnostic code "build.theorem_root_not_directory"
 ```
 
-Existing features `tests/features/build_discovery.feature` and
+The exact rendering asserted by the failure scenario (Cargo's `error:` line for
+a `cargo::error=` directive, or the `--- stdout` dump for a non-zero exit) is
+fixed from the `EP-M0` transcript, not guessed. Existing features
+`tests/features/build_discovery.feature` and
 `tests/features/build_suite.feature` stay unchanged and must pass before and
-after every milestone (`REQ-preserve-contract`).
+after every milestone.
 
 ## Plan of work
 
 ### `EP-M0` directive-parsing probe (prototype, deleted)
 
 Question: does Cargo on the pinned toolchain behave as
-`AXIOM-cargo-directive-parse` states? In a scratch crate under
-`/tmp/theoremc-probe/` (never inside the worktree), write a `build.rs` that
-prints `cargo::rerun-if-changed=<directory name ending in one space>` and
-`cargo::error=probe: message`, then exits 0. Run
-`cargo build -vv 2>&1 | tee /tmp/probe-theoremc-4-3-1.out`. Expected: the build
-fails with "build script logged errors", and the fingerprint file under
-`target/debug/build/*/output` shows the trailing space removed. Go: implement
-D5 and D6 as planned. No-go: record the observed behaviour in
-`Surprises & discoveries`, adjust D5/D6, and escalate. Delete the scratch crate
-afterwards. This probe runs only after approval.
+`AXIOM-cargo-directive-parse` and `AXIOM-cargo-rerun` state? In a scratch crate
+under `/tmp/theoremc-probe/` (never inside the worktree), write a `build.rs`
+that prints, in separate runs controlled by a file the script reads: a
+`rerun-if-changed` line whose value ends in one space; a value with a leading
+space; a value containing `=`; a nonexistent path; and
+`cargo::error=probe: message`, once with exit status 0 and once with exit
+status 1. Run each with
+`cargo build -vv --message-format=json 2>&1 | tee /tmp/probe-theoremc-4-3-1.out`.
+Record: whether the trailing space is removed in the recorded `output` file;
+whether an edit below a directory whose name ends in a space reruns the script
+through the root watch; how Cargo renders the error in each exit mode; and the
+shape of the `build-script-executed` message (`out_dir`, `cfgs`). Go: implement
+D5 and D6 as planned and fix the failure-scenario assertion from the
+transcript. No-go: record the behaviour in `Surprises & discoveries`, revise D5
+or D6, and escalate. Delete the scratch crate afterwards. The probe runs only
+after approval.
 
-### `EP-M1` atomic rename, ADR-0014, and fixture dependencies
+### `EP-M1` ADR-0014, atomic rename, and fixture dependencies
 
 Assigned: `REQ-reusable-crate`, `GAP-internal-only`, `GAP-copied-fixtures`, D1,
 D4.
 
 1. Write
    `docs/adrs/adr-0014-reusable-theoremc-build-library-and-stable-build-script-boundary.md`
-   (status Accepted on plan approval) recording D1, D2, D3, D5, and D6 in
-   Y-statement form, with the rejected alternatives. Add the
-   `Amended by ADR-0014 (2026-11-16)` banner and an `## Amendments` section to
-   ADR-0008. Index ADR-0014 in `docs/contents.md`. Run
-   `make check-adr-rfc-names`.
-2. `git mv crates/theoremc-build-support crates/theoremc-build`; set
-   `name = "theoremc-build"` in its `Cargo.toml`; update the workspace member
-   list and the root `[build-dependencies]` entry; update `build.rs` to call
-   `theoremc_build::prepare_build_script()` (behaviour unchanged at this
-   plateau); update every `theoremc_build_support` path in doctests and crate
-   documentation. Run `cargo update -w` to refresh `Cargo.lock`.
-3. Replace the copied-source scaffold in `tests/common/fixture_crate.rs`:
+   following the style guide template, recording D1-D3, D5, D6, D8, D12-D15,
+   the rejected alternatives, the cap-std 4 public-surface trade-off, the
+   relation to ADR-0011 decision 7, the reuse policy, and the note that
+   emitting any `rerun-if-changed` line disables Cargo's default of rerunning
+   the build script on any package file change (which the 4.3.4
+   `build-script check` must consider). Status `Accepted` (the probe has passed
+   by this point). Mark ADR-0008 `Superseded by ADR-0014`. Index ADR-0014 in
+   `docs/contents.md`. Run `make check-adr-rfc-names`.
+2. Before the rename, run `rg -n 'include_str!\("../../crates' tests` and
+   record the matches (expected: the five source copies).
+3. `git mv crates/theoremc-build-support crates/theoremc-build`; set
+   `name = "theoremc-build"`; update the workspace member list, the root
+   `[build-dependencies]` entry, `build.rs`
+   (`theoremc_build::prepare_build_script()`; behaviour unchanged at this
+   plateau), and every `theoremc_build_support` path in doctests and crate
+   documentation. Run `cargo update -w`.
+4. Replace the copied-source scaffold in `tests/common/fixture_crate.rs`:
    delete the `BUILD_SUPPORT_*` constants, `BUILD_DISCOVERY_SOURCE`,
-   `BUILD_SUITE_SOURCE`, `fixture_build_support_cargo_toml`, and its tests;
-   change `tests/common/build_support_fixture.rs` to emit
+   `BUILD_SUITE_SOURCE`, `fixture_build_support_cargo_toml`, and its tests; make
+   `tests/common/build_support_fixture.rs` (renamed `build_fixture.rs`) emit
    `theoremc-build = { path = "<absolute workspace>/crates/theoremc-build" }`
-   using the same TOML escaping helper as
-   `tests/theorem_file_macro_bdd/fixture_crate.rs`; update the macro fixture
-   manifest and `crates/test-helpers` re-exports. Rename
-   `build_support_fixture_manifest` to `build_fixture_manifest`.
-4. Update `.config/nextest.toml` comments that name the old crate.
+   with the TOML escaping used by
+   `tests/theorem_file_macro_bdd/fixture_crate.rs`; rename
+   `build_support_fixture_manifest` to `build_fixture_manifest`; update the
+   macro fixture manifest's dependency name and path only; update
+   `crates/test-helpers` re-exports. Rerun the step 2 search (expected: no
+   matches).
+5. Update `.config/nextest.toml` comments that name the old crate.
 
-Red/green: this is a behaviour-preserving rename, so there is no new failing
-test. The existing suites `build_discovery_bdd`, `build_suite_bdd`,
-`theorem_file_macro_bdd`, and the crate's unit tests are the regression net;
-they must pass before the change (baseline) and after. A deliberate check that
-the copy is gone: `rg -n 'include_str!\("../../crates' tests` returns nothing.
+Red/green: this milestone preserves behaviour, so there is no new failing test.
+The regression net is the existing `build_discovery_bdd`, `build_suite_bdd`,
+`theorem_file_macro_bdd`, and crate unit tests, run as a baseline before the
+change and again after.
 
-### `EP-M2` fallible direct API, directive rendering, and boundary
+### `EP-M2` capability-based direct API, corpus, directives, and boundary
 
 Assigned: `REQ-fallible-direct`, `REQ-stable-boundary` (library half),
-`GAP-adapter-in-root`, `GAP-no-error-contract`, `GAP-directive-injection`, D5,
-D6.
+`REQ-shared-fixtures` (corpus), `GAP-adapter-in-root`, `GAP-no-error-contract`,
+`GAP-directive-injection`, `GAP-silent-absence`, `GAP-host-separators`,
+`GAP-non-atomic-write`, D5-D15.
 
-Red first. Add, before production code, the focused tests that specify the new
-surface and confirm they fail to compile or fail for the intended reason:
+Red first, with real assertion failures rather than compile errors:
 
-1. `crates/theoremc-build/src/error_tests.rs`: code table over every
-   `BuildErrorCode` and a snapshot of the code list (fails: type absent).
-2. `crates/theoremc-build/src/discovery_tests.rs`: the `INV-representable`
-   table (fails: no rejection).
-3. `crates/theoremc-build/src/suite_tests.rs`: the `INV-write-idempotent`
-   tests against `PreparedSuite::write_to` (fails: method absent).
-4. `crates/theoremc-build/src/directives_tests.rs`: snapshots and the
-   `INV-directive-line` property (fails: module absent).
-5. `crates/theoremc-build/src/emit_tests.rs`: the in-process boundary runner
-   with injected lookup and `Vec<u8>` writer, covering missing variables,
-   non-UTF-8 variables (via `OsString::from_vec` on Unix), success output equal
-   to `directives(prepare_suite(..))`, and failure status with one line.
-6. `crates/theoremc-build/tests/prepare_properties.rs`: `INV-order` and
-   `INV-literal` properties (fails: `prepare_suite` absent).
+1. Land the public signatures from `Interfaces and dependencies` as stubs that
+   delegate to the existing behaviour: `prepare_suite` wraps
+   `discover_theorem_inputs` without symlink, representability, or separator
+   changes; `cargo_directives` formats like the base-revision `build.rs`;
+   `write_to` writes in place; error codes exist. Commit only after the next
+   step's tests are in place and fail.
+2. Add the tests from `Methods per obligation` (escape, directives, order,
+   classification, write, emit, error, corpus parity) and the `test_support`
+   corpus. Run them and record the expected failures: the injection regression
+   test reports two lines; the symlink rows report silent skips; the
+   invalid-UTF-8 write row reports an error; the late-failure test sees
+   directives before the error; the bidirectional-character block contains a
+   raw U+202E.
 
-Green. Implement the modules listed in `Interfaces and dependencies`:
+Green, module by module, keeping each file under 400 lines:
 
-- `error.rs`: `BuildError` (flattened from the three existing error enums)
-  and `BuildErrorCode` with `as_str`.
-- `cargo_env.rs`: `CargoBuildEnv::from_lookup`.
-- `discovery.rs`: keep traversal; make `BuildDiscovery` crate-private; add the
-  representability check; return `BuildError`.
-- `suite.rs`: `TheoremSuite` rendering (pure), `PreparedSuite`,
-  `prepare_suite`, `write_to`, `WriteOutcome`.
-- `directives.rs`: pure rendering of success and failure directive lines.
-- `emit.rs`: private `run_build_script(lookup, writer) -> BuildScriptStatus`
-  and public `emit_suite_from_env_or_exit()`.
-- Delete `build_script.rs` and `build_script_tests.rs`; migrate their
-  still-relevant cases into `emit_tests.rs`.
-- Replace the root `build.rs` body with
-  `theoremc_build::emit_suite_from_env_or_exit();`.
+- `error.rs`: `PrepareError`, `WriteError`, crate-private `BuildScriptError`,
+  `BuildDiagnosticCode` with `as_str` and `Display`, and the
+  `Send + Sync + 'static` assertion.
+- `path.rs`: the D9 join helper and the D5 `representable` predicate.
+- `discovery.rs`: crate-private traversal using `symlink_metadata`, D8, D9,
+  and `build.non_utf8_entry`.
+- `escape.rs`: `esc` with D11.
+- `suite.rs`: `prepare_suite`, `PreparedSuite`, rendering.
+- `write.rs`: `write_to` and `WriteOutcome` with D10.
+- `directives.rs`: `CargoDirectives`, success rendering with warnings, and
+  failure rendering with `sanitize`.
+- `emit.rs`: the private `run_build_script(lookup, writer) -> RunStatus` and
+  `emit_suite_from_env_or_exit()`: render the whole block into one `String`,
+  `write_all` and `flush` once on locked standard output (no `BufWriter`); on a
+  writer error, write a one-line message to standard error and exit 1; never
+  panic; return normally on success.
+- `test_support.rs` (feature `test-support`): `BuildCase`, `CORPUS`, and
+  `materialize(&Dir)`.
+- Delete `build_script.rs` and `build_script_tests.rs`, migrating their
+  still-relevant cases into `emit_tests.rs`. Replace the root `build.rs` body
+  with `theoremc_build::emit_suite_from_env_or_exit();`.
 
-Refactor: keep each file under 400 lines, keep functions small, rerun the
-focused tests, then all gates. The existing behavioural suites must stay green
-without edits to their feature files.
+Refactor: keep functions small, rerun the focused tests, run each seeded fault
+once and revert it, then run all gates. The existing behavioural suites must
+stay green without edits to their feature files.
 
-### `EP-M3` facade, shared fixture corpus, parity and behavioural tests
+### `EP-M3` facade, parity, and behavioural tests
 
 Assigned: `REQ-stable-boundary` (adopter half), `REQ-shared-fixtures`, D2, D3.
 
-1. Red: add `tests/features/build_boundary.feature` and
-   `tests/build_boundary_bdd.rs` with the three scenarios above; add the shared
-   corpus `tests/common/build_cases.rs` (`BuildCase` with a name, a list of
-   entries, and an expected theorem count, plus `materialize(&Dir)`), and
-   re-export it from `crates/test-helpers`. The adopter scenario fails because
-   `theoremc::build` does not exist.
-2. Green: add to `src/lib.rs` a documented `pub mod build` that re-exports
-   `theoremc_build::{emit_suite_from_env_or_exit, prepare_suite,
-   PreparedSuite, WriteOutcome, BuildError, BuildErrorCode, SUITE_FILE_NAME}`,
-   and add `theoremc-build` to the root `[dependencies]`. Switch the
-   `theorem_file_macro_bdd` fixtures to build-depend on `theoremc` and to write
-   their own two-line `build.rs` calling
-   `theoremc::build::emit_suite_from_env_or_exit()`, so the macro suite and
-   Kani scenarios exercise the adopter boundary.
-3. Make `crates/theoremc-build` unit tests for discovery consume the same
-   `BuildCase` corpus through a dev-dependency on `test-helpers` where the
-   cases overlap, so "same fixtures" holds below the Cargo layer too. If this
-   introduces a dependency cycle or pulls `theoremc-core` into the build
-   crate's normal graph, keep the corpus in `test-helpers` only and record the
-   decision.
-4. Refactor and run all gates, plus `make kani` when Kani is installed.
+1. Add `tests/common` support for `cargo build --message-format=json`: parse
+   the `build-script-executed` message for the fixture package, return its
+   `out_dir`, and require exactly one sibling `output` file. Use `serde_json`
+   (already a root dev-dependency).
+2. Red: add `tests/features/build_boundary.feature` and
+   `tests/build_boundary_bdd.rs`, re-export the corpus from
+   `crates/test-helpers`, and add `binary(=build_boundary_bdd)` to the
+   `nested-cargo-builds` filter in `.config/nextest.toml`. The adopter scenario
+   fails because rustc reports `E0433` for `theoremc::build`; assert that code
+   in the red transcript.
+3. Green: add to `src/lib.rs` a documented `pub mod build` that only
+   re-exports the items listed in `Interfaces and dependencies`, and add
+   `theoremc-build` to the root `[dependencies]`. The adopter fixture uses the
+   macro fixtures' dependency declarations (`fixture_cargo_toml`) plus its own
+   two-line `build.rs`, so compiled units are shared. The
+   `theorem_file_macro_bdd` fixtures are not otherwise changed.
+4. Run the parity seeded fault once and revert it. Run all gates. Push and
+   confirm that `proofs.yml` and `ci.yml` pass on the pull request, recording
+   the `proofs.yml` duration.
 
 ### `EP-M4` documentation closure
 
@@ -900,83 +1135,93 @@ Assigned: all requirements (documentation), roadmap.
 
 Update `docs/users-guide.md` ("Build discovery" becomes "Build integration":
 the one-line adopter `build.rs`, the `[build-dependencies]` entry, the
-`include!` pattern with `SUITE_FILE_NAME`, the `theoremc_has_theorems` cfg, the
-failure codes, the representability rule, and migration guidance for the
-repository's own former adapter); `docs/developers-guide.md` §§1.1-1.3 and §2
-(crate ownership, reuse policy: the CLI and adopters call `prepare_suite` and
-the boundary, never re-implement discovery or rendering; the environment seam;
-the fixture corpus and how to add a case); `docs/theoremc-design.md` overview
-diagram and §7.1 (new `### 7.1.2 Implementation decisions (Task 4.3.1)`
-referencing ADR-0014); `docs/cargo-theorem-cli-design.md` §10.1 (name the
-fallible API and link ADR-0014); `docs/repository-layout.md` and
-`docs/contents.md`; and `docs/roadmap.md` (mark 4.3.1 done; update the 5.1 note
-naming the old crate). Search for stale references:
+`include!` pattern with `SUITE_FILE_NAME`, the `theoremc_has_theorems` cfg,
+that emitting rerun directives disables Cargo's default rerun-on-any-change,
+the diagnostic codes and their provisional status, the unwatched-path warning,
+the symbolic-link and non-UTF-8 rules, segment-wise ordering, and the non-UTF-8
+`OUT_DIR` limitation); `docs/developers-guide.md` §§1.1-1.3, §2 layer table,
+§2.3 "Build system API", and §3.6 "Extending the build system" (crate
+ownership; the reuse policy; the environment and capability seams; the corpus
+and how to add a case; why only two corpus cases run through Cargo);
+`docs/theoremc-design.md` overview and sequence diagrams and §7.1 (pin
+segment-wise order in §7.1.1; add
+`### 7.1.2 Implementation decisions (Task 4.3.1)` referencing ADR-0014, D5, D8,
+D10, D11, and D12); `docs/cargo-theorem-cli-design.md` §10.1 (name the fallible
+API and link ADR-0014); `docs/repository-layout.md`; `docs/contents.md`; and
+`docs/roadmap.md` (mark 4.3.1 done; update the 5.1 note naming the old crate).
+Search for stale references:
 
 ```bash
 rg -n 'theoremc-build-support|theoremc_build_support|prepare_build_script|BuildScriptOutput' \
-  --glob '!docs/execplans/**' --glob '!docs/adrs/adr-0008-*' .
+  --glob '!docs/execplans/**' --glob '!docs/adrs/**' .
+rg -n 'theoremc-build-support' docs/adrs --glob '!adr-0008-*' --glob '!adr-0010-*' --glob '!adr-0014-*'
 ```
 
-Expected: no matches. Run the Markdown gates.
+Expected: no matches from either command. Run `make markdownlint`, `make nixie`
+(diagrams change), `make spelling`, and `mdtablefix --check` on each edited
+file.
 
 ## Milestones and plateaus
 
 - Identifier and outcome: `EP-M0`, recorded evidence that Cargo's directive
-  parsing matches `AXIOM-cargo-directive-parse`.
+  handling matches the axioms.
   - Requirements and gaps: `GAP-directive-injection` (evidence only).
   - Acceptance evidence: transcript in `Artefacts and notes`.
   - Conformance check: no repository change; scratch crate deleted.
   - Recovery: rerun the probe; it is side-effect free.
   - Remaining gaps: all implementation.
   - Compatibility decision: none.
-- Identifier and outcome: `EP-M1`, crate renamed, ADR-0014 accepted, fixtures
+- Identifier and outcome: `EP-M1`, ADR-0014 accepted, crate renamed, fixtures
   depend on the real crate; behaviour unchanged.
   - Requirements and gaps: `REQ-reusable-crate` (name and ownership),
-    `GAP-internal-only` (decision recorded), `GAP-copied-fixtures`.
+    `GAP-internal-only`, `GAP-copied-fixtures`.
   - Acceptance evidence: all gates green; existing behavioural suites pass;
     `cargo tree -p theoremc-build --edges normal` lists only `camino`,
-    `cap-std`, `thiserror` and their transitive dependencies.
+    `cap-std`, `thiserror` and their transitive dependencies; the
+    `include_str!` search is empty.
   - Conformance check:
     - REQ-reusable-crate satisfied for naming; API reshaping remains.
-    - ADR-0008 crate-boundary decision still followed; ADR-0014 accepted.
+    - ADR-0014 accepted; ADR-0008 marked superseded.
     - No upstream assumption falsified.
     - No new public interface; the rename is the authorized change.
     - No trust-boundary or persisted-format change.
     - Trace links current.
-  - Recovery: revert the milestone commits; the rename is a single coherent
+  - Recovery: revert the milestone commits; the rename is one coherent
     change.
-  - Remaining gaps: `GAP-adapter-in-root`, `GAP-no-error-contract`,
-    `GAP-directive-injection`.
+  - Remaining gaps: every other gap.
   - Compatibility decision: none (unreleased, no external consumer).
 - Identifier and outcome: `EP-M2`, the library owns the whole build-script
-  boundary and the fallible direct API; root `build.rs` is one call.
+  boundary and the capability-based direct API; root `build.rs` is one call.
   - Requirements and gaps: `REQ-fallible-direct`, `REQ-stable-boundary`
-    (library), `GAP-adapter-in-root`, `GAP-no-error-contract`,
-    `GAP-directive-injection`.
-  - Acceptance evidence: new unit, property, and snapshot tests pass; seeded
-    faults recorded; existing behavioural suites pass unchanged.
+    (library), `REQ-shared-fixtures` (corpus), `GAP-adapter-in-root`,
+    `GAP-no-error-contract`, `GAP-directive-injection`,
+    `GAP-silent-absence`, `GAP-host-separators`, `GAP-non-atomic-write`.
+  - Acceptance evidence: new unit, enumeration, property, and snapshot tests
+    pass; red failures and seeded-fault rejections recorded; existing
+    behavioural suites pass unchanged.
   - Conformance check:
     - Requirements above satisfied.
-    - CLI design §10.1 split (boundary versus fallible service) followed.
-    - AXIOM-cargo-directive-parse still consistent with EP-M0.
+    - CLI design §§5 and 10.1 split (capability-based service versus Cargo
+      boundary) followed.
+    - Axioms still consistent with `EP-M0`.
     - Public surface equals `Interfaces and dependencies`.
-    - Persisted contract (file name, line format, cfg) unchanged, checked by
-      the unchanged behavioural suites and snapshots.
+    - Persisted contract unchanged except for the listed deliberate changes.
     - Trace links current.
   - Recovery: revert to the `EP-M1` commit.
-  - Remaining gaps: facade path and parity evidence.
+  - Remaining gaps: facade path and Cargo parity evidence.
   - Compatibility decision: none.
 - Identifier and outcome: `EP-M3`, adopters use
-  `theoremc::build::emit_suite_from_env_or_exit()`; parity over the shared
-  corpus is proven through real Cargo.
+  `theoremc::build::emit_suite_from_env_or_exit()`; parity is proven through
+  real Cargo.
   - Requirements and gaps: `REQ-stable-boundary` (adopter),
     `REQ-shared-fixtures`.
-  - Acceptance evidence: `build_boundary_bdd` scenarios pass;
-    `theorem_file_macro_bdd` passes using the facade; `make kani` passes or is
-    shown to fail identically on `main`.
+  - Acceptance evidence: `build_boundary_bdd` scenarios pass inside the
+    serialized group; `theorem_file_macro_bdd` passes unchanged in behaviour;
+    `ci.yml` and `proofs.yml` pass on the pull request.
   - Conformance check:
     - Requirements satisfied.
     - Facade re-exports only; no logic in the root package.
+    - Kani fixtures unchanged apart from dependency name and path.
     - No new dependency beyond the authorized list.
     - Trace links current.
   - Recovery: revert to the `EP-M2` commit.
@@ -985,7 +1230,7 @@ Expected: no matches. Run the Markdown gates.
 - Identifier and outcome: `EP-M4`, documentation and roadmap reflect the
   shipped boundary.
   - Requirements and gaps: all, documentation only.
-  - Acceptance evidence: stale-reference search returns nothing; Markdown
+  - Acceptance evidence: stale-reference searches return nothing; Markdown
     gates pass; roadmap 4.3.1 checked.
   - Conformance check: upstream design documents reconciled with ADR-0014.
   - Recovery: documentation-only revert.
@@ -995,7 +1240,7 @@ Expected: no matches. Run the Markdown gates.
 ## Concrete steps
 
 Working directory: the repository root of the worktree. Use `set -o pipefail`
-in every shell that pipes a gate through `tee`. Log names follow
+in every shell that pipes a gate through `tee`. Logs follow
 `/tmp/$ACTION-theoremc-4-3-1-build-discovery-and-suite-rendering-api.out`.
 
 Baseline before `EP-M1`:
@@ -1005,24 +1250,27 @@ set -o pipefail
 make test 2>&1 | tee /tmp/test-theoremc-4-3-1-build-discovery-and-suite-rendering-api.out
 ```
 
-Expected: all tests pass (record the count; the local Kani behavioural scenario
-may self-skip when Kani is absent).
+Expected: all tests pass; record the count.
 
 Focused commands during `EP-M2`:
 
 ```plaintext
-Red:   cargo nextest run -p theoremc-build -> compile errors naming prepare_suite, BuildErrorCode, PreparedSuite
-Green: cargo nextest run -p theoremc-build -> all unit, property, and snapshot tests pass
-Fault: remove sort_and_dedup call -> prepare_properties::order_is_independent_of_creation fails; revert
-Fault: skip sanitize in failure rendering -> directives_tests property fails; revert
-Accept snapshots: cargo insta review (only after reading each snapshot)
+Red:   cargo nextest run -p theoremc-build --all-features
+       -> assertion failures listed in EP-M2 step 2 (not compile errors)
+Green: cargo nextest run -p theoremc-build --all-features -> all pass
+Faults (each run once, then reverted): drop '"' arm; drop '\\' arm;
+       drop '\r' and control arms; unpadded \x; remove sort; skip sanitize;
+       in-place write; print directives before writing
+Snapshots: cargo insta review (accept only after reading each snapshot)
 ```
 
 Focused commands during `EP-M3`:
 
 ```plaintext
-Red:   cargo nextest run -p theoremc --test build_boundary_bdd -> adopter scenario fails: unresolved module theoremc::build
+Red:   cargo nextest run -p theoremc --test build_boundary_bdd
+       -> adopter scenario fails with E0433 for theoremc::build
 Green: cargo nextest run -p theoremc --test build_boundary_bdd -> all scenarios pass
+Fault: swap watched/files order in the renderer -> parity outline fails; revert
 ```
 
 Gate sequence at the end of each milestone (sequential, via `scrutineer` where
@@ -1040,9 +1288,8 @@ make check-adr-rfc-names 2>&1 | tee /tmp/adr-names-theoremc-4-3-1-build-discover
 
 `make nixie` runs whenever a Mermaid diagram changes (`EP-M4`). Known
 host-specific behaviour: the Kani behavioural scenario can fail locally because
-of the rustup library path even on `main`; CI does not install Kani, so it
-self-skips there. A local Kani failure is compared against `main` before being
-treated as a regression.
+of the rustup library path even on `main`; CI does not install Kani for
+`ci.yml`, so it self-skips there, and `proofs.yml` is the authority.
 
 ## Validation and acceptance
 
@@ -1052,35 +1299,40 @@ Behavioural acceptance:
   `[dependencies] theoremc = { path = ... }`, a `build.rs` containing only
   `theoremc::build::emit_suite_from_env_or_exit();`, a `src/lib.rs` with the
   documented `include!` pattern, and `theorems/smoke.theorem`, `cargo build`
-  succeeds, and the build output file contains
+  succeeds, and the build-script `output` file contains
   `cargo::rustc-cfg=theoremc_has_theorems` and
   `cargo::rerun-if-changed=theorems/smoke.theorem`.
-- Replacing `theorems/` with a file makes `cargo build` fail with a line
-  containing `build.theorem_root_not_directory`.
-- `theoremc::build::prepare_suite(crate_root)` on the same tree returns
-  contents byte-identical to `OUT_DIR/theorem_suite.rs`.
+- Replacing `theorems/` with a file makes `cargo build` fail and show
+  `build.theorem_root_not_directory`.
+- `theoremc::build::prepare_suite(&crate_root)` on the same tree returns
+  contents byte-identical to `OUT_DIR/theorem_suite.rs` and
+  `cargo_directives()` equal to the recorded directive lines.
 
 Quality criteria:
 
-- Tests: `make test` passes, including the new `build_boundary_bdd` scenarios
-  and the unchanged `build_discovery_bdd`, `build_suite_bdd`, and
-  `theorem_file_macro_bdd` suites.
+- Tests: `make test` passes, including the new `theoremc-build` tests, the new
+  `build_boundary_bdd` scenarios, and the unchanged `build_discovery_bdd`,
+  `build_suite_bdd`, and `theorem_file_macro_bdd` suites.
 - Verification: every obligation in `Methods per obligation` passes with its
-  non-vacuity evidence recorded; no Verus or Kani obligation exists (D7).
+  non-vacuity evidence and seeded-fault rejection recorded; no Verus or Kani
+  obligation exists (D7).
 - Lint and formatting: `make check-fmt` and `make lint` pass with no new
   `#[expect]` other than the single environment seam.
-- Documentation: Markdown gates pass and the stale-reference search is empty.
+- CI: `ci.yml` and `proofs.yml` pass on the pull request.
+- Documentation: Markdown gates pass and the stale-reference searches are
+  empty.
 
 ## Idempotence and recovery
 
 Every step is repeatable. The rename uses `git mv`; repeating it after success
-is a no-op error that can be ignored. `cargo update -w` is idempotent. Snapshot
-acceptance is repeatable with `cargo insta test --review`. Each milestone ends
-in a commit, so recovery is `git revert` of that milestone's commits or a reset
-to the previous milestone commit on this branch. The probe lives only under
-`/tmp` and is deleted afterwards. Fixture crates are temporary directories
-cleaned automatically; the shared fixture target directory follows ADR-0012 and
-needs no manual cleanup.
+fails harmlessly. `cargo update -w` is idempotent. Snapshot acceptance is
+repeatable with `cargo insta test --review`. Seeded faults are applied and
+reverted within one working session and never committed; `git diff` must be
+empty of fault edits before each commit. Each milestone ends in a commit, so
+recovery is `git revert` of that milestone's commits or a reset to the previous
+milestone commit on this branch. The probe lives only under `/tmp` and is
+deleted afterwards. Fixture crates are temporary directories cleaned
+automatically; the shared fixture target follows ADR-0012.
 
 ## Artefacts and notes
 
@@ -1103,89 +1355,132 @@ match (key, value) {
     (Some(a), Some(b)) => Ok((a, b.trim_end())),
 ```
 
-Implementation transcripts, seeded-fault results, fixture timing, and final
+Design review summary (2026-11-16): four reviewers. Structure and contracts:
+capability handles instead of paths, split errors, `#[non_exhaustive]`,
+explicit exit path, public directive output, D5 rationale corrected.
+Alternatives and viability: supersede ADR-0008, larger file budget, split
+`discovery_tests.rs`, keep Kani fixtures off the facade, Windows separators,
+symbolic links. Failure modes and cost: atomic suite write, symbolic-link
+policy, single flushed write, nextest group membership, two real-Cargo parity
+cases, JSON messages for locating `OUT_DIR`. Verification: segment-wise
+ordering oracle, effective seeded faults, exhaustive character enumeration,
+late-failure obligation, bidirectional-character hazard, real red stages.
+
+Implementation transcripts, seeded-fault results, fixture timings, and final
 size counts are added here as milestones complete.
 
 ## Interfaces and dependencies
 
-Crate `theoremc-build` (`crates/theoremc-build`), library `theoremc_build`. It
-depends only on `camino`, `cap-std` (`fs_utf8`), and `thiserror`. Layering:
-pure rendering (`suite.rs` rendering half, `directives.rs`, `error.rs`) has no
-I/O; driven ports are the injected environment lookup closure, the
-`cap_std::fs_utf8::Dir` capabilities for the crate root and output directory,
-and an `io::Write` sink; driving entry points are `prepare_suite` with
-`PreparedSuite::write_to` (direct execution) and `emit_suite_from_env_or_exit`
-(Cargo adapter and composition root). Public surface at the end of `EP-M2`:
+Crate `theoremc-build` (`crates/theoremc-build`), library `theoremc_build`. Its
+normal dependencies are only `camino`, `cap-std` (`fs_utf8`), and `thiserror`.
+Layering: pure kernels (`escape.rs`, `path.rs`, rendering in `suite.rs`,
+`directives.rs`, `error.rs`) perform no I/O; driven ports are the injected
+environment lookup closure, the `cap_std::fs_utf8::Dir` capabilities for the
+crate root and output directory, and an `io::Write` sink; driving entry points
+are `prepare_suite` with `PreparedSuite::write_to` and
+`PreparedSuite::cargo_directives` (direct execution) and
+`emit_suite_from_env_or_exit` (Cargo adapter and composition root). Public
+surface at the end of `EP-M2` (doc comments abbreviated):
 
 ```rust
-/// Crate-relative directory scanned for theorem files.
 pub const THEOREM_ROOT: &str = "theorems";
-/// File name written under the output directory.
 pub const SUITE_FILE_NAME: &str = "theorem_suite.rs";
-/// Cfg emitted when at least one theorem file exists.
 pub const HAS_THEOREMS_CFG: &str = "theoremc_has_theorems";
 
 /// Discovers and renders the suite for one crate root without writing.
-pub fn prepare_suite(crate_root: &Utf8Path) -> Result<PreparedSuite, BuildError>;
+pub fn prepare_suite(crate_root: &cap_std::fs_utf8::Dir) -> Result<PreparedSuite, PrepareError>;
 
-pub struct PreparedSuite { /* discovery result and rendered contents */ }
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PreparedSuite { /* private */ }
 impl PreparedSuite {
-    pub fn contents(&self) -> &str;
-    pub fn has_theorems(&self) -> bool;
+    #[must_use] pub fn contents(&self) -> &str;
+    #[must_use] pub const fn has_theorems(&self) -> bool;
     pub fn theorem_files(&self) -> impl Iterator<Item = &Utf8Path>;
     pub fn rerun_paths(&self) -> impl Iterator<Item = &Utf8Path>;
-    /// Writes `SUITE_FILE_NAME` under `out_dir` when its contents differ.
-    pub fn write_to(&self, out_dir: &Utf8Path) -> Result<WriteOutcome, BuildError>;
+    #[must_use] pub fn cargo_directives(&self) -> CargoDirectives;
+    /// Atomically writes SUITE_FILE_NAME under out_dir when its contents differ.
+    pub fn write_to(&self, out_dir: &cap_std::fs_utf8::Dir) -> Result<WriteOutcome, WriteError>;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CargoDirectives { /* private */ }
+impl CargoDirectives {
+    pub fn lines(&self) -> impl Iterator<Item = &str>;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WriteOutcome { Written, Unchanged }
 
 #[derive(Debug, thiserror::Error)]
-pub enum BuildError {
-    MissingEnvironment { variable: &'static str },
-    NonUtf8Environment { variable: &'static str },
-    DiscoveryIo { operation: &'static str, path: Utf8PathBuf, source: io::Error },
-    TheoremRootNotDirectory { path: Utf8PathBuf },
-    UnrepresentablePath { path: Utf8PathBuf },
-    OutputDirectory { path: Utf8PathBuf, source: io::Error },
-    SuiteWrite { path: Utf8PathBuf, source: io::Error },
+#[non_exhaustive]
+pub enum PrepareError {
+    #[non_exhaustive] Io { operation: &'static str, path: Utf8PathBuf, source: io::Error },
+    #[non_exhaustive] TheoremRootNotDirectory { path: Utf8PathBuf },
+    #[non_exhaustive] SymlinkUnsupported { path: Utf8PathBuf },
+    #[non_exhaustive] NonUtf8Entry { parent: Utf8PathBuf },
 }
-impl BuildError { pub const fn code(&self) -> BuildErrorCode; }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BuildErrorCode { /* one variant per BuildError variant */ }
-impl BuildErrorCode { pub const fn as_str(self) -> &'static str; }
-// "build.missing_environment", "build.non_utf8_environment", "build.discovery_io",
-// "build.theorem_root_not_directory", "build.unrepresentable_path",
-// "build.output_directory", "build.suite_write"
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum WriteError {
+    #[non_exhaustive] Io { operation: &'static str, source: io::Error },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum BuildDiagnosticCode {
+    MissingEnvironment, NonUtf8Environment, OpenDirectory, DiscoveryIo,
+    TheoremRootNotDirectory, SymlinkUnsupported, NonUtf8Entry, SuiteWrite,
+    UnwatchedPath,
+}
+impl BuildDiagnosticCode { #[must_use] pub const fn as_str(self) -> &'static str; }
+impl fmt::Display for BuildDiagnosticCode { /* writes as_str */ }
+impl PrepareError { #[must_use] pub const fn code(&self) -> BuildDiagnosticCode; }
+impl WriteError { #[must_use] pub const fn code(&self) -> BuildDiagnosticCode; }
+// Codes: "build.missing_environment", "build.non_utf8_environment",
+// "build.open_directory", "build.discovery_io", "build.theorem_root_not_directory",
+// "build.symlink_unsupported", "build.non_utf8_entry", "build.suite_write",
+// "build.unwatched_path" (warning only).
 
 /// Cargo build-script entry point: reads Cargo's environment, prepares and
 /// writes the suite, prints directives, and exits with status 1 on failure.
+/// Emitting rerun directives disables Cargo's default rerun-on-any-change.
 pub fn emit_suite_from_env_or_exit();
+
+#[cfg(feature = "test-support")]
+pub mod test_support {
+    pub struct BuildCase { /* name, entries, expected theorem count, expected directives */ }
+    pub const CORPUS: &[BuildCase];
+    pub fn materialize(case: &BuildCase, root: &cap_std::fs_utf8::Dir) -> io::Result<()>;
+}
 ```
 
-Crate-private items: `BuildDiscovery`, `CargoBuildEnv`, `run_build_script`,
-`BuildScriptStatus`, directive rendering functions. Removed public items:
-`prepare_build_script`, `BuildScriptOutput`, `BuildScriptError`,
-`BuildDiscovery`, `BuildDiscoveryError`, `discover_theorem_inputs`,
-`write_theorem_suite`, `BuildSuiteError`. Their only callers are the root
-`build.rs`, the fixtures, and documentation, all updated in the same milestones.
+Crate-private items: traversal, `BuildScriptError`, `RunStatus`,
+`run_build_script`, `esc`, `sanitize`, `representable`, and the join helper.
+Removed public items: `prepare_build_script`, `BuildScriptOutput`,
+`BuildScriptError`, `BuildDiscovery`, `BuildDiscoveryError`,
+`discover_theorem_inputs`, `write_theorem_suite`, `BuildSuiteError`. Their only
+callers are the root `build.rs`, fixtures, and documentation, all updated in
+the same milestones.
 
 Root facade `theoremc` (`src/lib.rs`): a documented `pub mod build` that
 re-exports `emit_suite_from_env_or_exit`, `prepare_suite`, `PreparedSuite`,
-`WriteOutcome`, `BuildError`, `BuildErrorCode`, `SUITE_FILE_NAME`,
-`THEOREM_ROOT`, and `HAS_THEOREMS_CFG`. It contains no logic.
+`CargoDirectives`, `WriteOutcome`, `PrepareError`, `WriteError`,
+`BuildDiagnosticCode`, `SUITE_FILE_NAME`, `THEOREM_ROOT`, and
+`HAS_THEOREMS_CFG`. It contains no logic and does not re-export `test_support`.
 
 Reuse policy (recorded in ADR-0014 and `docs/developers-guide.md`): only
 `theoremc-build` discovers theorem files, renders the suite, or renders Cargo
-directives. `cargo-theorem` and adopters call `prepare_suite`, `write_to`, or
-the boundary; they must not reparse directives or re-implement traversal. New
-build-integration features (manifest and `build.rs` integration plans for
-4.3.4) extend this crate, not the CLI.
+directives. `cargo-theorem` and adopters call `prepare_suite`, `write_to`,
+`cargo_directives`, or the boundary; they must not re-implement traversal,
+reparse directives, or open project directories with ambient authority outside
+their own composition root. Read-only consumers such as `list` (4.2.3) use
+`prepare_suite(..).theorem_files()`. New build-integration features (manifest
+and `build.rs` integration plans for 4.3.4, a configurable root per D14) extend
+this crate additively, not the CLI.
 
 Authorized dependency changes are listed below. All versions already resolve in
-`Cargo.lock`. The `test-helpers` entry applies only if `EP-M3` step 3 holds.
+`Cargo.lock`.
 
 ```toml
 # Root Cargo.toml
@@ -1196,6 +1491,9 @@ theoremc-build = { version = "0.1.0", path = "crates/theoremc-build" }
 theoremc-build = { version = "0.1.0", path = "crates/theoremc-build" }
 
 # crates/theoremc-build/Cargo.toml
+[features]
+test-support = []
+
 [dev-dependencies]
 filetime = "0.2.29"
 googletest = "0.14.3"
@@ -1203,7 +1501,10 @@ insta = "1.47.2"
 pretty_assertions = "1.4.1"
 proptest = { version = "1.11.0", default-features = false, features = ["std"] }
 syn = { version = "3.0.3", default-features = false, features = ["parsing", "full", "printing"] }
-test-helpers = { path = "../test-helpers" }
+
+# crates/test-helpers/Cargo.toml
+[dependencies]
+theoremc-build = { path = "../theoremc-build", features = ["test-support"] }
 ```
 
 No other dependency is added or changed.
@@ -1211,4 +1512,17 @@ No other dependency is added or changed.
 ## Revision note
 
 - 2026-11-16: initial draft from Wyvern reconnaissance, design documents, and
-  external research. Awaiting community-of-experts review and user approval.
+  external research.
+- 2026-11-16: community-of-experts review applied. Changed: ADR-0008 is
+  superseded rather than amended (D1); the public API takes `Dir` capabilities
+  and splits errors by operation (D15); D5 now omits unrepresentable rerun
+  lines with a warning instead of failing; new decisions D8-D14 (symbolic links,
+  `/` joins, atomic writes, bidirectional escapes, segment-wise order, corpus
+  ownership, fixed root); Kani fixtures stay off the facade; only two corpus
+  cases run through Cargo, located via JSON messages; the new test binary joins
+  the serialized nextest group; verification now uses exhaustive character
+  enumeration, a segment-vector ordering oracle, effective seeded faults, real
+  red stages, and a late-failure obligation; file and documentation budgets
+  raised to 58 files and 600 lines after a file-by-file count. Effect on
+  remaining work: milestone order unchanged; `EP-M2` scope grows by D8-D11;
+  `EP-M3` real-Cargo work shrinks.
