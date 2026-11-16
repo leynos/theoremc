@@ -515,8 +515,11 @@ with options supported by cargo-nextest, and use `DOCTEST_FLAGS` for doctest
 scope.
 
 CI runs `make check-fmt`, the markdownlint-cli2 action, `make spelling`,
-`make lint`, `make typecheck`, and `make test`. A separate coverage measurement
-step precedes `make test` and installs `cargo-nextest`.
+`make nixie`, `make lint`, `make typecheck`, and `make test`. A separate
+coverage measurement step precedes `make test` and installs `cargo-nextest`.
+`make nixie` needs Nixie on the `PATH`, so the workflow installs the pinned
+`install-nixie` action before it, in the same job as the other documentation
+gates.
 
 Capture long command output through `tee` with `set -o pipefail` to avoid
 losing truncated results:
