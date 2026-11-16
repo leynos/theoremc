@@ -913,15 +913,14 @@ Assigned: `RM-4.1.4` (subprocess clause), `DES-CLI-8.6-BOUNDS`,
 Add `crates/cargo-theorem/src/process/`:
 
 - `capture.rs`: `BoundedCapture { retained: Vec<u8>, seen: u64, limit: u64 }`
-  with `new(limit)`, `push(&mut self, chunk: &[u8])`, and
-  `finish(self) ->
-  CapturedStream { bytes: Vec<u8>, bytes_seen, bytes_retained, limit_bytes,
-  truncated }`.
-  `push` uses saturating arithmetic on `seen` and documents the overflow
-  precondition mirrored by Verus.
-- `mod.rs`: the driven port
-  `trait ProcessRunner { fn run(&self, request: &ProcessRequest) -> Result<ProcessOutput, ProcessError>; }`.
-  `ProcessRequest` holds program, arguments (as `OsString`), working
+  with `new(limit)`, `push(&mut self, chunk: &[u8])`, and `finish(self)`,
+  which returns a `CapturedStream` holding `bytes`, `bytes_seen`,
+  `bytes_retained`, `limit_bytes`, and `truncated`. `push` uses saturating
+  arithmetic on `seen` and documents the overflow precondition mirrored by
+  Verus.
+- `mod.rs`: the driven port `ProcessRunner`, a trait with one method,
+  `run(&self, request: &ProcessRequest)`, returning
+  `Result<ProcessOutput, ProcessError>`. `ProcessRequest` holds program, arguments (as `OsString`), working
   directory, an explicit environment (`env_clear` plus listed variables),
   per-stream limits (default and maximum 16 MiB, design §8.6), and a required
   deadline. `ProcessOutput` holds the exit status (`Option<i32>` code and
