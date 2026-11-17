@@ -2206,7 +2206,6 @@ dependencies = [
  "rstest",
  "syn 3.0.10",
  "tempfile",
- "test-helpers",
  "theoremc-core",
  "thiserror 2.0.21",
  "trybuild",
