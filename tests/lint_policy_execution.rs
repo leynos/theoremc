@@ -38,6 +38,37 @@ impl<'a> Manifest<'a> {
     }
 }
 
+/// One manifest line, scanned as TOML rather than as raw text.
+#[derive(Clone, Copy)]
+struct Line<'a>(
+    /// The line, without its terminator.
+    &'a str,
+);
+
+impl<'a> Line<'a> {
+    /// Returns the line before any trailing comment and its net brace count.
+    ///
+    /// A `#` or brace inside a quoted value is data, not syntax, so only
+    /// double-quoted escapes and single-quoted literals hide it. That is the
+    /// full extent of the value syntax these lint tables use.
+    fn scan(self) -> (&'a str, i32) {
+        let (mut depth, mut quote, mut escaped) = (0, None, false);
+        for (index, character) in self.0.char_indices() {
+            match (quote, character) {
+                _ if escaped => escaped = false,
+                (Some('"'), '\\') => escaped = true,
+                (Some(open), close) if open == close => quote = None,
+                (None, '"' | '\'') => quote = Some(character),
+                (None, '#') => return (self.0.split_at(index).0, depth),
+                (None, '{') => depth += 1,
+                (None, '}') => depth -= 1,
+                _ => {}
+            }
+        }
+        (self.0, depth)
+    }
+}
+
 /// One of the workspace lint tables this test materializes.
 enum LintGroup {
     /// Compiler lints from `[workspace.lints.rust]`.
@@ -193,17 +224,13 @@ fn load_lint_policy() -> Result<LintPolicy, String> {
 fn extract_lint_table(manifest: Manifest<'_>, group: LintGroup) -> Result<String, String> {
     let header = group.header();
     let mut lines = manifest.lines();
-    let Some(first_line) = lines.find(|line| {
-        let declaration = (*line).split_once('#').map_or(*line, |(before, _)| before);
-        declaration.trim() == header
-    }) else {
+    let Some(first_line) = lines.find(|line| Line(line).scan().0.trim() == header) else {
         return Err(format!("the repository manifest has no {header} table"));
     };
     let mut block = String::from(first_line);
     block.push('\n');
     for line in lines {
-        let declaration = line.split_once('#').map_or(line, |(before, _)| before);
-        if declaration.trim().starts_with('[') {
+        if Line(line).scan().0.trim().starts_with('[') {
             break;
         }
         block.push_str(line);
@@ -224,7 +251,10 @@ fn extract_missing_assert_message(manifest: Manifest<'_>) -> Result<String, Stri
     let clippy = extract_lint_table(manifest, LintGroup::Clippy)?;
     let mut lines = clippy.lines();
     let Some(first_line) = lines.find(|line| {
-        line.trim_start()
+        Line(line)
+            .scan()
+            .0
+            .trim_start()
             .strip_prefix("missing_assert_message")
             .is_some_and(|rest| rest.trim_start().starts_with('='))
     }) else {
@@ -235,17 +265,15 @@ fn extract_missing_assert_message(manifest: Manifest<'_>) -> Result<String, Stri
     let mut entry = String::new();
     entry.push_str(first_line.trim());
     entry.push('\n');
-    // The value is a string or an inline table; only the table can span lines.
-    let mut openings = first_line.matches('{').count();
-    let mut closings = first_line.matches('}').count();
-    while openings > closings {
+    // The value is a string or an inline table; only the table spans lines.
+    let mut depth = Line(first_line).scan().1;
+    while depth > 0 {
         let Some(line) = lines.next() else {
             break;
         };
         entry.push_str(line.trim());
         entry.push('\n');
-        openings += line.matches('{').count();
-        closings += line.matches('}').count();
+        depth += Line(line).scan().1;
     }
     Ok(entry)
 }
@@ -393,6 +421,57 @@ fn a_violation_fails_the_stage(
             "{} output must name one of {evidence:?}; stderr was:\n{stderr}",
             stage.name
         ));
+    }
+    Ok(())
+}
+
+/// Verifies that comments and quoted values never change the span of the
+/// `missing_assert_message` entry, and so never pull in a sibling entry.
+#[rstest]
+#[case::trailing_comment_with_opening_brace(
+    concat!(
+        "missing_assert_message = \"deny\" # {\n",
+        "missing_const_for_fn = \"deny\"\n",
+    ),
+    "missing_assert_message = \"deny\" # {\n",
+)]
+#[case::multi_line_inline_table(
+    concat!(
+        "missing_assert_message = { level = \"deny\",\n",
+        "                          priority = 3 }\n",
+        "missing_const_for_fn = \"deny\"\n",
+    ),
+    concat!(
+        "missing_assert_message = { level = \"deny\",\n",
+        "priority = 3 }\n",
+    ),
+)]
+#[case::quoted_hash_and_brace(
+    concat!(
+        "missing_assert_message = \"deny # {\"\n",
+        "missing_const_for_fn = \"deny\"\n",
+    ),
+    "missing_assert_message = \"deny # {\"\n",
+)]
+#[case::trailing_comment_with_closing_brace(
+    concat!(
+        "missing_assert_message = { level = \"deny\", # }\n",
+        "                          priority = 3 }\n",
+        "missing_const_for_fn = \"deny\"\n",
+    ),
+    concat!(
+        "missing_assert_message = { level = \"deny\", # }\n",
+        "priority = 3 }\n",
+    ),
+)]
+fn missing_assert_message_ignores_comments(
+    #[case] clippy: &str,
+    #[case] expected: &str,
+) -> Result<(), String> {
+    let manifest = format!("[workspace.lints.clippy]\n{clippy}");
+    let entry = extract_missing_assert_message(Manifest(manifest.as_str()))?;
+    if entry != expected {
+        return Err(format!("expected {expected:?}, extracted {entry:?}"));
     }
     Ok(())
 }
