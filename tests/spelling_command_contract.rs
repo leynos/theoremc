@@ -79,35 +79,43 @@ fn stub_uv() -> Result<StubUv, String> {
     Ok(StubUv { temp, dir })
 }
 
-/// Runs the `spelling` target in `working_directory` with `uv` as `UV` and
-/// `repository` as the path handed to the builder.
+/// One `make spelling` invocation against the stub `uv`.
+#[derive(Clone, Copy)]
+struct SpellingRun<'a> {
+    /// The directory the recipe runs in, which a relative repository path
+    /// resolves against.
+    working_directory: &'a Path,
+    /// The directory the stub writes its logs to.
+    root: &'a Path,
+    /// The executable the recipe receives as `UV`.
+    uv: &'a Path,
+    /// The status the stub reports.
+    stub_exit: u32,
+    /// The path handed to the builder as `SPELLING_REPOSITORY`.
+    repository: &'a str,
+}
+
+/// Runs the `spelling` target as `run` describes.
 ///
 /// `-f` still names this repository's Makefile, so a fixture checkout only
 /// changes the directory the recipe resolves a relative `SPELLING_REPOSITORY`
 /// against, not the target under test. The stub writes its argument log to
-/// `arguments.log` and its environment log to `environment.log` under `root`;
-/// `stub_exit` selects the status it reports.
-fn run_spelling_in(
-    working_directory: &Path,
-    root: &Path,
-    uv: &Path,
-    stub_exit: u32,
-    repository: &str,
-) -> Result<Output, String> {
+/// `arguments.log` and its environment log to `environment.log` under `root`.
+fn run_spelling_in(run: &SpellingRun<'_>) -> Result<Output, String> {
     let makefile = repository_root().join("Makefile");
     let mut uv_assignment = OsString::from("UV=");
-    uv_assignment.push(uv);
+    uv_assignment.push(run.uv);
     Command::new("make")
         .arg("--no-print-directory")
         .arg("-f")
         .arg(makefile)
         .arg("spelling")
         .arg(uv_assignment)
-        .arg(format!("SPELLING_REPOSITORY={repository}"))
-        .current_dir(working_directory)
-        .env("STUB_UV_ARG_LOG", root.join("arguments.log"))
-        .env("STUB_UV_ENV_LOG", root.join("environment.log"))
-        .env("STUB_UV_EXIT", stub_exit.to_string())
+        .arg(format!("SPELLING_REPOSITORY={}", run.repository))
+        .current_dir(run.working_directory)
+        .env("STUB_UV_ARG_LOG", run.root.join("arguments.log"))
+        .env("STUB_UV_ENV_LOG", run.root.join("environment.log"))
+        .env("STUB_UV_EXIT", run.stub_exit.to_string())
         .output()
         .map_err(|error| format!("run make: {error}"))
 }
@@ -120,7 +128,14 @@ fn run_spelling(
     stub_exit: u32,
     repository: &str,
 ) -> Result<Output, String> {
-    run_spelling_in(&repository_root(), root, uv, stub_exit, repository)
+    let working_directory = repository_root();
+    run_spelling_in(&SpellingRun {
+        working_directory: &working_directory,
+        root,
+        uv,
+        stub_exit,
+        repository,
+    })
 }
 
 /// Runs one git command in `directory` and fails on a non-zero status.
@@ -231,7 +246,13 @@ fn assert_pinned_arguments(recorded: &[String], repository: &str) -> Result<(), 
 fn recipe_passes_the_pinned_arguments_to_uv(stub_uv: Result<StubUv, String>) -> Result<(), String> {
     let stub = stub_uv?;
     let checkout = create_committed_checkout(&stub, "spelling default")?;
-    let output = run_spelling_in(&checkout, stub.path(), &stub.path().join("uv"), 0, ".")?;
+    let output = run_spelling_in(&SpellingRun {
+        working_directory: &checkout,
+        root: stub.path(),
+        uv: &stub.path().join("uv"),
+        stub_exit: 0,
+        repository: ".",
+    })?;
     if !output.status.success() {
         return Err(make_failure(&output));
     }
