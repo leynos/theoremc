@@ -79,13 +79,16 @@ fn stub_uv() -> Result<StubUv, String> {
     Ok(StubUv { temp, dir })
 }
 
-/// Runs the `spelling` target with `uv` as `UV` and `repository` as the path
-/// handed to the builder.
+/// Runs the `spelling` target in `working_directory` with `uv` as `UV` and
+/// `repository` as the path handed to the builder.
 ///
-/// The stub writes its argument log to `arguments.log` and its environment log
-/// to `environment.log` under `root`; `stub_exit` selects the status it
-/// reports.
-fn run_spelling(
+/// `-f` still names this repository's Makefile, so a fixture checkout only
+/// changes the directory the recipe resolves a relative `SPELLING_REPOSITORY`
+/// against, not the target under test. The stub writes its argument log to
+/// `arguments.log` and its environment log to `environment.log` under `root`;
+/// `stub_exit` selects the status it reports.
+fn run_spelling_in(
+    working_directory: &Path,
     root: &Path,
     uv: &Path,
     stub_exit: u32,
@@ -101,12 +104,23 @@ fn run_spelling(
         .arg("spelling")
         .arg(uv_assignment)
         .arg(format!("SPELLING_REPOSITORY={repository}"))
-        .current_dir(repository_root())
+        .current_dir(working_directory)
         .env("STUB_UV_ARG_LOG", root.join("arguments.log"))
         .env("STUB_UV_ENV_LOG", root.join("environment.log"))
         .env("STUB_UV_EXIT", stub_exit.to_string())
         .output()
         .map_err(|error| format!("run make: {error}"))
+}
+
+/// Runs the `spelling` target from this repository, as the recipe's default
+/// working directory does.
+fn run_spelling(
+    root: &Path,
+    uv: &Path,
+    stub_exit: u32,
+    repository: &str,
+) -> Result<Output, String> {
+    run_spelling_in(&repository_root(), root, uv, stub_exit, repository)
 }
 
 /// Runs one git command in `directory` and fails on a non-zero status.
@@ -208,10 +222,16 @@ fn assert_pinned_arguments(recorded: &[String], repository: &str) -> Result<(), 
     ))
 }
 
+/// A relative `SPELLING_REPOSITORY` is resolved against a committed checkout.
+///
+/// The source checkout may hold an uncommitted regenerated `typos.toml`, which
+/// would fail the freshness check before the arguments are compared, so this
+/// case runs from a checkout whose file is committed.
 #[rstest]
 fn recipe_passes_the_pinned_arguments_to_uv(stub_uv: Result<StubUv, String>) -> Result<(), String> {
     let stub = stub_uv?;
-    let output = run_spelling(stub.path(), &stub.path().join("uv"), 0, ".")?;
+    let checkout = create_committed_checkout(&stub, "spelling default")?;
+    let output = run_spelling_in(&checkout, stub.path(), &stub.path().join("uv"), 0, ".")?;
     if !output.status.success() {
         return Err(make_failure(&output));
     }

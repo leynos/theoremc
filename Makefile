@@ -166,8 +166,19 @@ spelling: ## Check spelling and shared phrase corrections
 		echo "git is required to verify that typos.toml is committed." >&2; \
 		exit 1; \
 	fi
-	@if [ "$$(git -C "$(SPELLING_REPOSITORY)" rev-parse --is-inside-work-tree \
-			2>/dev/null)" = "true" ]; then \
+	@probe=$$(git -C "$(SPELLING_REPOSITORY)" rev-parse --is-inside-work-tree \
+			2>&1); \
+	status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		case "$$probe" in \
+			*fatal:\ not\ a\ git\ repository*) ;; \
+			*) \
+				echo "git could not inspect the repository at '$(SPELLING_REPOSITORY)':" >&2; \
+				printf '%s\n' "$$probe" >&2; \
+				exit 1; \
+				;; \
+		esac; \
+	elif [ "$$probe" = "true" ]; then \
 		git -C "$(SPELLING_REPOSITORY)" ls-files --error-unmatch typos.toml \
 			>/dev/null 2>&1; \
 		status=$$?; \

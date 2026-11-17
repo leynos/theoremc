@@ -549,8 +549,10 @@ rather than both being read as a stale file: `git diff --quiet` exiting 1 means
 the file differs from `HEAD`, while a greater exit means Git itself failed, and
 the same distinction applies to `git ls-files`. The comparison uses
 `SPELLING_REPOSITORY`, so it inspects the repository the gate just wrote, and
-it is skipped when that path is not inside a Git work tree, where there is no
-committed version to compare against.
+it is skipped only when Git reports that the path is not inside a Git work
+tree, where there is no committed version to compare against. Any other failure
+to inspect the repository, such as a repository Git cannot read, fails the gate
+and prints Git's message rather than skipping the check.
 
 `typos.local.toml` holds narrow repository-specific exceptions only: exact or
 full-line patterns for identifiers and terms the policy cannot correct, never

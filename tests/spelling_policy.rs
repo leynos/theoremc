@@ -9,7 +9,9 @@
 //! and so rejects a stale file whether it is committed or merely staged. The
 //! third proves the inverse: a stale file that only sits in the index passes,
 //! because the run regenerates the worktree file to match `HEAD`. The fourth
-//! shows the freshness check is skipped outside a Git work tree.
+//! shows the freshness check is skipped outside a Git work tree, and the fifth
+//! (in the `git_probe` submodule) shows that any other failed probe fails the
+//! gate instead of skipping the check.
 //!
 //! The fixture prose lives under `tests/fixtures/spelling/` and is excluded
 //! from the repository gate, because it must contain the spellings the gate
@@ -21,6 +23,9 @@
 //! repo-local uv cache on first use and later runs are offline; CI runs the
 //! spelling gate before the test suite, so the package is already cached
 //! there.
+
+#[path = "spelling_policy/git_probe.rs"]
+mod git_probe;
 
 use cap_std::ambient_authority;
 use cap_std::fs::Dir;
