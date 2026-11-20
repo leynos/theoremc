@@ -59,6 +59,17 @@ ignore = [
   '\.color\b',
   '"color"',
   '\bTHEOREMC_COLOR\b',
+  # The command-line flag and the Rust items that carry the same API spelling:
+  # the renderer policy enum, Clap's colour choice, and the options field path.
+  '--color\b',
+  '\bColor(Policy|Choice)\b',
+  '::color\b',
+  # NO_COLOR and CLICOLOR are cross-tool environment-variable conventions, and
+  # their specification sites keep the US spelling in their host names.
+  '\bNO_COLOR\b',
+  '\bCLICOLOR(_FORCE)?\b',
+  'no-color\.org',
+  'bixense\.com/clicolors',
   # `labeled` is a GitHub event keyword; the API spelling is fixed.
   'types: \[opened, reopened, synchronize, labeled, ready_for_review\]',
   # A commit hash quoted in a historical execplan; the hash is not prose.
