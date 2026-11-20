@@ -60,6 +60,16 @@ jobs:
           globs: '**/*.md'
       - name: Spelling
         run: make spelling
+      - name: Install Nixie
+        # `make nixie` validates every Mermaid block in the documentation, so a
+        # broken diagram has to fail here rather than at the next reader.
+        uses: leynos/shared-actions/.github/actions/install-nixie@0eabb6bc07148981de5da395e30cd78d83f5c7c2
+        with:
+          nixie-version: '1.1.0'
+          merman-version: '0.7.0'
+          python-version: '3.14'
+      - name: Mermaid diagrams
+        run: make nixie
       - name: Install Whitaker
         uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2
       - name: Lint
