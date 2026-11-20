@@ -195,6 +195,9 @@
     - ExecPlan for generated struct-literal synthesis type probes.
   - [Task 4.1.2: Adopt OrthoConfig v0.10.0](execplans/4-1-2-adopt-ortho-config-v0-10-0-for-the-cargo-theorem-cli.md)
     - Living plan for the CLI configuration foundation, validation, and draft PR.
+  - [Task 5.1.1: Introduce the internal backend-neutral `HarnessPlan`](execplans/5-1-1-internal-backend-neutral-harness-plan.md)
+    - Living plan for the harness-plan model, its well-formedness contract,
+      and its verification strategy.
   - [Resolve the 2026-06-14 codebase
     audit](execplans/codebase-audit-2026-06-14.md)
     - ExecPlan for resolving audit findings across diagnostics, validation,
