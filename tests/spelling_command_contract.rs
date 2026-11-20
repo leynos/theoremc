@@ -79,34 +79,116 @@ fn stub_uv() -> Result<StubUv, String> {
     Ok(StubUv { temp, dir })
 }
 
-/// Runs the `spelling` target with `uv` as `UV` and `repository` as the path
-/// handed to the builder.
-///
-/// The stub writes its argument log to `arguments.log` and its environment log
-/// to `environment.log` under `root`; `stub_exit` selects the status it
-/// reports.
-fn run_spelling(
-    root: &Path,
-    uv: &Path,
+/// One `make spelling` invocation against the stub `uv`.
+#[derive(Clone, Copy)]
+struct SpellingRun<'a> {
+    /// The directory the recipe runs in, which a relative repository path
+    /// resolves against.
+    working_directory: &'a Path,
+    /// The directory the stub writes its logs to.
+    root: &'a Path,
+    /// The executable the recipe receives as `UV`.
+    uv: &'a Path,
+    /// The status the stub reports.
     stub_exit: u32,
-    repository: &str,
-) -> Result<Output, String> {
+    /// The path handed to the builder as `SPELLING_REPOSITORY`.
+    repository: &'a str,
+}
+
+/// Runs the `spelling` target as `run` describes.
+///
+/// `-f` still names this repository's Makefile, so a fixture checkout only
+/// changes the directory the recipe resolves a relative `SPELLING_REPOSITORY`
+/// against, not the target under test. The stub writes its argument log to
+/// `arguments.log` and its environment log to `environment.log` under `root`.
+fn run_spelling_in(run: &SpellingRun<'_>) -> Result<Output, String> {
     let makefile = repository_root().join("Makefile");
     let mut uv_assignment = OsString::from("UV=");
-    uv_assignment.push(uv);
+    uv_assignment.push(run.uv);
     Command::new("make")
         .arg("--no-print-directory")
         .arg("-f")
         .arg(makefile)
         .arg("spelling")
         .arg(uv_assignment)
-        .arg(format!("SPELLING_REPOSITORY={repository}"))
-        .current_dir(repository_root())
-        .env("STUB_UV_ARG_LOG", root.join("arguments.log"))
-        .env("STUB_UV_ENV_LOG", root.join("environment.log"))
-        .env("STUB_UV_EXIT", stub_exit.to_string())
+        .arg(format!("SPELLING_REPOSITORY={}", run.repository))
+        .current_dir(run.working_directory)
+        .env("STUB_UV_ARG_LOG", run.root.join("arguments.log"))
+        .env("STUB_UV_ENV_LOG", run.root.join("environment.log"))
+        .env("STUB_UV_EXIT", run.stub_exit.to_string())
         .output()
         .map_err(|error| format!("run make: {error}"))
+}
+
+/// Runs the `spelling` target from this repository, as the recipe's default
+/// working directory does.
+fn run_spelling(
+    root: &Path,
+    uv: &Path,
+    stub_exit: u32,
+    repository: &str,
+) -> Result<Output, String> {
+    let working_directory = repository_root();
+    run_spelling_in(&SpellingRun {
+        working_directory: &working_directory,
+        root,
+        uv,
+        stub_exit,
+        repository,
+    })
+}
+
+/// Runs one git command in `directory` and fails on a non-zero status.
+///
+/// The identity and signing settings are passed per command, so the test does
+/// not depend on, or write, the developer's global Git configuration.
+fn run_git(directory: &Path, arguments: &[&str]) -> Result<(), String> {
+    let output = Command::new("git")
+        .arg("-c")
+        .arg("user.name=Spelling Contract")
+        .arg("-c")
+        .arg("user.email=spelling@example.invalid")
+        .arg("-c")
+        .arg("commit.gpgsign=false")
+        .args(arguments)
+        .current_dir(directory)
+        .output()
+        .map_err(|error| format!("run git: {error}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "git {arguments:?} failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+    ))
+}
+
+/// Creates `name` under the stub root as its own Git work tree with a
+/// committed `typos.toml`, and returns its path.
+///
+/// The recipe resolves the tracked-file question with `git -C` on
+/// `SPELLING_REPOSITORY`, so a directory that is merely part of this work tree
+/// would be judged by this repository's index, where the generated file is not
+/// tracked under the fixture's own path. A gated repository therefore needs a
+/// repository of its own. The stub `uv` writes nothing, so the committed file
+/// is all the freshness check needs.
+fn create_committed_checkout(stub: &StubUv, name: &str) -> Result<PathBuf, String> {
+    stub.dir
+        .create_dir(name)
+        .map_err(|error| format!("create {name}: {error}"))?;
+    let checkout = stub.path().join(name);
+    let fs = Dir::open_ambient_dir(&checkout, ambient_authority())
+        .map_err(|error| format!("open {name}: {error}"))?;
+    fs.write(
+        "typos.toml",
+        "# Committed so the recipe's freshness check passes.\n",
+    )
+    .map_err(|error| format!("write typos.toml: {error}"))?;
+    run_git(&checkout, &["init"])?;
+    run_git(&checkout, &["add", "typos.toml"])?;
+    run_git(&checkout, &["commit", "-m", "checkout", "typos.toml"])?;
+    Ok(checkout)
 }
 
 /// Reads a log written by the stub, one recorded value per line.
@@ -136,7 +218,7 @@ fn assert_pinned_arguments(recorded: &[String], repository: &str) -> Result<(), 
         "--python",
         "3.14",
         "--from",
-        "git+https://github.com/leynos/typos-config-builder.git@v0.1.3",
+        "git+https://github.com/leynos/typos-config-builder.git@c8a4f95d7cf7f6a1b7517f2775d122d47d5721eb",
         "typos-config-builder",
         "gate",
         "--repository",
@@ -155,10 +237,22 @@ fn assert_pinned_arguments(recorded: &[String], repository: &str) -> Result<(), 
     ))
 }
 
+/// A relative `SPELLING_REPOSITORY` is resolved against a committed checkout.
+///
+/// The source checkout may hold an uncommitted regenerated `typos.toml`, which
+/// would fail the freshness check before the arguments are compared, so this
+/// case runs from a checkout whose file is committed.
 #[rstest]
 fn recipe_passes_the_pinned_arguments_to_uv(stub_uv: Result<StubUv, String>) -> Result<(), String> {
     let stub = stub_uv?;
-    let output = run_spelling(stub.path(), &stub.path().join("uv"), 0, ".")?;
+    let checkout = create_committed_checkout(&stub, "spelling default")?;
+    let output = run_spelling_in(&SpellingRun {
+        working_directory: &checkout,
+        root: stub.path(),
+        uv: &stub.path().join("uv"),
+        stub_exit: 0,
+        repository: ".",
+    })?;
     if !output.status.success() {
         return Err(make_failure(&output));
     }
@@ -179,10 +273,7 @@ fn a_repository_path_with_spaces_stays_one_argument(
     stub_uv: Result<StubUv, String>,
 ) -> Result<(), String> {
     let stub = stub_uv?;
-    stub.dir
-        .create_dir("spelling checkout")
-        .map_err(|error| format!("create checkout: {error}"))?;
-    let spaced_repository = stub.path().join("spelling checkout");
+    let spaced_repository = create_committed_checkout(&stub, "spelling checkout")?;
     let repository = spaced_repository
         .to_str()
         .ok_or_else(|| "the temporary path must be valid UTF-8".to_owned())?;

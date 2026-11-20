@@ -147,11 +147,13 @@ markdownlint: ## Lint Markdown files
 nixie: ## Validate Mermaid diagrams
 	$(NIXIE) --no-sandbox
 
-# The spelling gate's pinned builder. The defaults are the adopted baseline;
-# the overrides let a contributor point the same recipe at another builder
+# The spelling gate's pinned builder. The revision is a commit SHA rather than
+# the `v0.1.3` tag that resolved to it: a tag can be moved or deleted, so
+# pinning it would let the shared spelling policy change without a review.
+# The overrides let a contributor point the same recipe at another builder
 # revision, repository, or scope without editing it.
 SPELLING_BUILDER ?= git+https://github.com/leynos/typos-config-builder.git
-SPELLING_BUILDER_REF ?= v0.1.3
+SPELLING_BUILDER_REF ?= c8a4f95d7cf7f6a1b7517f2775d122d47d5721eb
 SPELLING_REPOSITORY ?= .
 SPELLING_SCOPE ?= all
 SPELLING_COMMAND = $(UV_ENV) "$(UV)" tool run --python 3.14 \
@@ -160,6 +162,44 @@ SPELLING_COMMAND = $(UV_ENV) "$(UV)" tool run --python 3.14 \
 
 spelling: ## Check spelling and shared phrase corrections
 	$(SPELLING_COMMAND)
+	@if ! command -v git >/dev/null 2>&1; then \
+		echo "git is required to verify that typos.toml is committed." >&2; \
+		exit 1; \
+	fi
+	@probe=$$(git -C "$(SPELLING_REPOSITORY)" rev-parse --is-inside-work-tree \
+			2>&1); \
+	status=$$?; \
+	if [ $$status -ne 0 ]; then \
+		case "$$probe" in \
+			*fatal:\ not\ a\ git\ repository*) ;; \
+			*) \
+				echo "git could not inspect the repository at '$(SPELLING_REPOSITORY)':" >&2; \
+				printf '%s\n' "$$probe" >&2; \
+				exit 1; \
+				;; \
+		esac; \
+	elif [ "$$probe" = "true" ]; then \
+		git -C "$(SPELLING_REPOSITORY)" ls-files --error-unmatch typos.toml \
+			>/dev/null 2>&1; \
+		status=$$?; \
+		if [ $$status -eq 1 ]; then \
+			echo "typos.toml is not tracked; commit the generated file." >&2; \
+			exit 1; \
+		elif [ $$status -gt 1 ]; then \
+			echo "git ls-files failed while checking typos.toml." >&2; \
+			exit 1; \
+		fi; \
+		git -C "$(SPELLING_REPOSITORY)" diff --quiet HEAD -- typos.toml; \
+		status=$$?; \
+		if [ $$status -eq 1 ]; then \
+			echo "typos.toml differs from HEAD; commit the regenerated file." >&2; \
+			git -C "$(SPELLING_REPOSITORY)" diff --stat HEAD -- typos.toml >&2; \
+			exit 1; \
+		elif [ $$status -gt 1 ]; then \
+			echo "git diff failed while checking typos.toml." >&2; \
+			exit 1; \
+		fi; \
+	fi
 
 check-adr-rfc-names: ## Check ADR/RFC filenames, serials, titles, and local links
 	$(UV_ENV) $(UV) run --python 3.13 --with 'pytest==8.4.2' --with 'hypothesis==6.170.15' -- python -B -m pytest tools/test_check_adr_rfc_names.py tools/test_adr_rfc_properties.py tools/test_adr_rfc_command.py
