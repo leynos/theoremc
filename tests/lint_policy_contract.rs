@@ -1,6 +1,6 @@
 //! Semantic contract for the workspace lint policy.
 //!
-//! Issue #98 makes the `leynos/netsuke` lint tables the minimum TheoremC must
+//! Issue #98 makes the `leynos/netsuke` lint tables the minimum `TheoremC` must
 //! enforce. The behavioural test proves a copied policy is live; this test
 //! proves the manifest still *declares* that minimum. It parses the manifest
 //! and `clippy.toml` rather than scanning text, because a text search cannot
