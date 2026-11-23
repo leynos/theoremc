@@ -189,6 +189,16 @@ Acceptance commands: the full gate list above.
 - `tests/lint_policy_contract.rs` starts `cargo metadata`, so it joins the
   `nested-cargo-builds` group in `.config/nextest.toml` alongside the other
   compiler-spawning tests.
+- Clippy's `allow_attributes` check skips attributes with
+  `span.from_expansion()` or `is_from_proc_macro`, so the generated `allow` is
+  exempt from the restriction that bans hand-written `allow` attributes. The
+  fallback that would have required every consumer to register `cfg(kani)` is
+  therefore unnecessary.
+- Residual risk: no theorem files exist in this workspace, so the generated
+  module is never compiled under the workspace lint tables and
+  `missing_docs_in_private_items` cannot see it. Should a future `theorems/`
+  directory expose a finding there, the fix belongs in `render.rs`, as the
+  plan states, rather than at each call site.
 - `tests/theorem_file_macro_bdd.rs` was already 482 lines on `main`, above the
   400-line ceiling. The two new scenario bindings add 39 lines. A split would
   move existing step wiring in the same change that alters behaviour, so it is
