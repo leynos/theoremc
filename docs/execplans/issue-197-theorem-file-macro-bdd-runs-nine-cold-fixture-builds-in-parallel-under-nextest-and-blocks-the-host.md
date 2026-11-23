@@ -196,6 +196,15 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       anticipates. Raised it to 2 h on the same reasoning and on that
       measurement, and added a contract assertion that the run allowance
       exceeds the group allowance.
+- [x] (2026-11-24T00:40Z) `theorem_file_macro_bdd` with the 2 h run budget and
+      the 1140 s override: 16 passed, 1 failed, 2 not run. The failure is
+      `kani_lists_the_generated_proof_harness`, whose `cargo kani list` was
+      killed at 1140 s with `cargo kani list did not finish within
+      1139.999956599s (ran for 1140.014734274s)`. Kani compiles the fixture's
+      whole graph with its own compiler into its own target directory, so it is
+      a second cold build; forty `kani-compiler` processes were running when the
+      deadline fired. CI's `make test` does not install Kani, so it skips this
+      scenario; the proofs workflow installs Kani and runs `make kani`.
 - [ ] Warm-run timings and the compiler-invocation count recorded here.
 - [ ] #143 re-evaluation recorded here.
 - [ ] Draft PR opened.
