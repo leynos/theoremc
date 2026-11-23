@@ -82,6 +82,25 @@ mod tests {
         (temp, root, dir)
     }
 
+    /// Writes a regular file at `path` in a fresh scratch fixture and returns
+    /// the suite-lookup error it provokes.
+    ///
+    /// A file where the build layout expects a directory is the malformed case
+    /// every caller of this helper is checking.
+    fn suite_error_for_file_at(path: &str) -> String {
+        let (_temp, root, dir) = scratch();
+        if let Some(parent) = camino::Utf8Path::new(path).parent() {
+            if !parent.as_str().is_empty() {
+                dir.create_dir_all(parent.as_str())
+                    .expect("create the file's parent directory");
+            }
+        }
+        dir.write(path, "not a directory")
+            .expect("write a file where a directory is expected");
+        find_suite_in_build_root(&root.join("debug/build"), "fx_ab")
+            .expect_err("a malformed layout must not read as absent")
+    }
+
     #[test]
     fn a_present_path_is_reported_present() {
         let (_temp, _root, dir) = scratch();
@@ -116,14 +135,7 @@ mod tests {
 
     #[test]
     fn a_build_root_that_is_not_a_directory_is_an_error() {
-        let (_temp, root, dir) = scratch();
-        dir.create_dir_all("debug")
-            .expect("create the debug directory");
-        dir.write("debug/build", "not a directory")
-            .expect("write a file where the build root would be");
-
-        let error = find_suite_in_build_root(&root.join("debug/build"), "fx_ab")
-            .expect_err("a build root that is a file must not read as absent");
+        let error = suite_error_for_file_at("debug/build");
 
         assert!(
             error.contains("cannot inspect") && error.contains("debug/build"),
@@ -145,14 +157,7 @@ mod tests {
 
     #[test]
     fn a_package_entry_that_is_a_file_is_an_inspection_error() {
-        let (_temp, root, dir) = scratch();
-        dir.create_dir_all("debug/build")
-            .expect("create the build directory");
-        dir.write("debug/build/fx_ab-111", "not a directory")
-            .expect("write a file where a build directory would be");
-
-        let error = find_suite_in_build_root(&root.join("debug/build"), "fx_ab")
-            .expect_err("a package entry that is a file must not read as absent");
+        let error = suite_error_for_file_at("debug/build/fx_ab-111");
 
         assert!(error.contains("fx_ab-111"), "{error}");
     }
@@ -162,14 +167,7 @@ mod tests {
     /// as an unbuilt fixture.
     #[test]
     fn an_output_path_that_is_a_file_is_an_inspection_error() {
-        let (_temp, root, dir) = scratch();
-        dir.create_dir_all("debug/build/fx_ab-111")
-            .expect("create the package build directory");
-        dir.write("debug/build/fx_ab-111/out", "not a directory")
-            .expect("write a file where the output directory would be");
-
-        let error = find_suite_in_build_root(&root.join("debug/build"), "fx_ab")
-            .expect_err("an output path that is a file must not read as absent");
+        let error = suite_error_for_file_at("debug/build/fx_ab-111/out");
 
         assert!(
             error.contains("fx_ab-111/out/theorem_suite.rs"),

@@ -83,14 +83,42 @@ mod tests {
 
     use super::{package_directories, read_suite};
 
-    /// Writes a suite under `<output_dir>/out` and asserts that exactly one
-    /// directory of the package yields it.
-    fn assert_suite_found(output_dir: &str) {
+    /// Opens a fresh scratch directory as a `build` directory.
+    ///
+    /// The returned temporary directory must stay alive while `build_dir` is
+    /// used, because dropping it removes the scratch tree.
+    fn scratch_build_dir() -> (tempfile::TempDir, Utf8PathBuf, Dir) {
         let scratch = tempfile::tempdir().expect("create a scratch directory");
         let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
             .expect("the scratch directory path should be UTF-8");
         let build_dir =
             Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
+        (scratch, root, build_dir)
+    }
+
+    /// Writes a regular file at `path` in a fresh scratch build directory.
+    ///
+    /// A file where the layout expects a directory is the malformed case every
+    /// caller of this helper is checking.
+    fn build_dir_with_file(path: &str) -> (tempfile::TempDir, Utf8PathBuf, Dir) {
+        let (scratch, root, build_dir) = scratch_build_dir();
+        if let Some(parent) = camino::Utf8Path::new(path).parent() {
+            if !parent.as_str().is_empty() {
+                build_dir
+                    .create_dir_all(parent.as_str())
+                    .expect("create the file's parent directory");
+            }
+        }
+        build_dir
+            .write(path, "not a directory")
+            .expect("write a file where a directory is expected");
+        (scratch, root, build_dir)
+    }
+
+    /// Writes a suite under `<output_dir>/out` and asserts that exactly one
+    /// directory of the package yields it.
+    fn assert_suite_found(output_dir: &str) {
+        let (_scratch, _root, build_dir) = scratch_build_dir();
         let out = format!("{output_dir}/out");
         build_dir
             .create_dir_all(&out)
@@ -124,14 +152,7 @@ mod tests {
     /// package, so listing its children must fail rather than report none.
     #[test]
     fn a_package_directory_that_is_a_file_is_an_error() {
-        let scratch = tempfile::tempdir().expect("create a scratch directory");
-        let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
-            .expect("the scratch directory path should be UTF-8");
-        let build_dir =
-            Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
-        build_dir
-            .write("pkg", "not a directory")
-            .expect("write a file");
+        let (_scratch, _root, build_dir) = build_dir_with_file("pkg");
 
         let error = package_directories(&build_dir, "pkg")
             .expect_err("a package entry that is a file must not read as absent");
@@ -143,14 +164,7 @@ mod tests {
     /// inspection failure rather than an unbuilt fixture.
     #[test]
     fn a_build_directory_that_is_a_file_is_an_error() {
-        let scratch = tempfile::tempdir().expect("create a scratch directory");
-        let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
-            .expect("the scratch directory path should be UTF-8");
-        let build_dir =
-            Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
-        build_dir
-            .write("pkg-0123abcd", "not a directory")
-            .expect("write a file");
+        let (_scratch, _root, build_dir) = build_dir_with_file("pkg-0123abcd");
 
         let error = read_suite(&build_dir, "pkg-0123abcd")
             .expect_err("a build directory that is a file must not read as absent");
@@ -162,17 +176,7 @@ mod tests {
     /// is an inspection failure rather than an unbuilt fixture.
     #[test]
     fn a_package_output_that_is_a_file_is_an_error() {
-        let scratch = tempfile::tempdir().expect("create a scratch directory");
-        let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
-            .expect("the scratch directory path should be UTF-8");
-        let build_dir =
-            Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
-        build_dir
-            .create_dir("pkg-0123abcd")
-            .expect("create the package directory");
-        build_dir
-            .write("pkg-0123abcd/out", "not a directory")
-            .expect("write a file where the output directory would be");
+        let (_scratch, _root, build_dir) = build_dir_with_file("pkg-0123abcd/out");
 
         let error = read_suite(&build_dir, "pkg-0123abcd")
             .expect_err("an output path that is a file must not read as absent");
@@ -186,11 +190,7 @@ mod tests {
     /// A package with no output reads as having no suite.
     #[test]
     fn a_missing_suite_reads_as_none() {
-        let scratch = tempfile::tempdir().expect("create a scratch directory");
-        let root = Utf8PathBuf::from_path_buf(scratch.path().to_path_buf())
-            .expect("the scratch directory path should be UTF-8");
-        let build_dir =
-            Dir::open_ambient_dir(&root, ambient_authority()).expect("open the scratch directory");
+        let (_scratch, _root, build_dir) = scratch_build_dir();
 
         assert_eq!(read_suite(&build_dir, "none-0123abcd").expect("read"), None);
     }
