@@ -3,6 +3,11 @@
 //! Cargo's classic layout keeps a build script's output at
 //! `build/<package>-<hash>/out`; newer nightlies add a directory level,
 //! `build/<package>/<hash>/out`. Both places are searched.
+//!
+//! A sibling fixture, or Cargo itself, may remove a directory between the
+//! moment it is listed and the moment it is read. That race is expected in a
+//! shared target, so an entry that vanished is treated as absent rather than as
+//! a failure; every other I/O error stays fail-closed.
 
 use cap_std::fs_utf8::Dir;
 
@@ -15,10 +20,21 @@ use cap_std::fs_utf8::Dir;
 pub fn package_directories(build_dir: &Dir, package_name: &str) -> Result<Vec<String>, String> {
     let prefix = format!("{package_name}-");
     let mut names = Vec::new();
-    for listing in build_dir.entries().map_err(|error| error.to_string())? {
-        let name = listing
-            .and_then(|found| found.file_name())
-            .map_err(|error| error.to_string())?;
+    let entries = build_dir
+        .entries()
+        .map_err(|error| format!("listing the build directory: {error}"))?;
+    for listing in entries {
+        // An entry that vanished mid-scan is simply not there; the alternative
+        // is failing one fixture because a sibling cleaned up. Every other
+        // error stays fail-closed.
+        let found = match listing {
+            Ok(found) => found,
+            Err(error) if is_missing_path(&error) => continue,
+            Err(error) => return Err(format!("reading a build-directory entry: {error}")),
+        };
+        let name = found
+            .file_name()
+            .map_err(|error| format!("reading a build-directory entry: {error}"))?;
         if name.starts_with(&prefix) {
             names.push(name);
         } else if name == package_name {
@@ -37,14 +53,22 @@ fn hash_directories(build_dir: &Dir, package_dir: &str) -> Result<Vec<String>, S
         Err(error) if is_missing_path(&error) => return Ok(Vec::new()),
         Err(error) => return Err(format!("read {package_dir}: {error}")),
     };
-    children
-        .map(|entry| {
-            let name = entry
-                .and_then(|found| found.file_name())
-                .map_err(|error| error.to_string())?;
-            Ok(format!("{package_dir}/{name}"))
-        })
-        .collect()
+    let mut names = Vec::new();
+    for entry in children {
+        // A per-hash directory can disappear between `read_dir` and the read,
+        // because the directories belong to a shared target. That is absence,
+        // not a failure; any other error stops the scan.
+        let found = match entry {
+            Ok(found) => found,
+            Err(error) if is_missing_path(&error) => continue,
+            Err(error) => return Err(format!("reading {package_dir}: {error}")),
+        };
+        let name = found
+            .file_name()
+            .map_err(|error| format!("reading {package_dir}: {error}"))?;
+        names.push(format!("{package_dir}/{name}"));
+    }
+    Ok(names)
 }
 
 /// Reads a build directory's generated suite, or `None` when it has none.
@@ -53,10 +77,11 @@ fn hash_directories(build_dir: &Dir, package_dir: &str) -> Result<Vec<String>, S
 ///
 /// Returns an error when the suite exists but cannot be read.
 pub fn read_suite(build_dir: &Dir, name: &str) -> Result<Option<String>, String> {
-    match build_dir.read_to_string(format!("{name}/out/theorem_suite.rs")) {
+    let suite = format!("{name}/out/theorem_suite.rs");
+    match build_dir.read_to_string(&suite) {
         Ok(contents) => Ok(Some(contents)),
         Err(error) if is_missing_path(&error) => Ok(None),
-        Err(error) => Err(error.to_string()),
+        Err(error) => Err(format!("reading {suite}: {error}")),
     }
 }
 

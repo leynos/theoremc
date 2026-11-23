@@ -1,11 +1,11 @@
-//! Regression tests for adapting fixture manifests to standalone crates.
+//! Regression tests for adapting fixture manifests to standalone crates and for
+//! the lifetime of a fixture's temporary source root.
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 
-use super::{
-    BUILD_SUPPORT_CARGO_TOML, fixture_build_support_cargo_toml, package_directories, read_suite,
-};
+use super::super::suite_layout::{package_directories, read_suite};
+use super::{BUILD_SUPPORT_CARGO_TOML, FixtureCrate, fixture_build_support_cargo_toml};
 
 /// A shared `target/debug/build` holding two builds of `fx_ab`, one of the
 /// similarly named `fx_abc`, and a generated suite for the first `fx_ab` only.
@@ -90,5 +90,57 @@ fn rejects_a_manifest_without_workspace_lints() {
     assert_eq!(
         result,
         Err("build-support manifest must contain a [lints] table".to_owned())
+    );
+}
+
+/// Two fixtures share a warm target and keep their source roots apart, so
+/// dropping one must not disturb the other or the target.
+///
+/// This is the deterministic half of issue #143: a sibling that cleans up
+/// during a build cannot be the cause if the clean-up is scoped to the fixture
+/// that performed it.
+#[test]
+fn dropping_one_fixture_removes_only_its_own_source_root() {
+    let manifest = "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2024\"\n";
+    let first = FixtureCrate::new(manifest, "//! first\n").expect("create the first fixture");
+    let second = FixtureCrate::new(manifest, "//! second\n").expect("create the second fixture");
+    let first_root = first.manifest_dir().to_path_buf();
+    let second_root = second.manifest_dir().to_path_buf();
+    let shared = first.target_dir().to_path_buf();
+    second
+        .write(Utf8Path::new("theorems/second.theorem"), "Theorem: Two\n")
+        .expect("write the sibling's theorem");
+
+    let probe_root = |path: &Utf8Path| Dir::open_ambient_dir(path, ambient_authority()).is_ok();
+
+    assert!(
+        probe_root(&first_root),
+        "the first fixture root {first_root} must exist before the drop",
+    );
+    assert!(
+        probe_root(&second_root),
+        "the second fixture root {second_root} must exist before the drop",
+    );
+
+    drop(first);
+
+    assert!(
+        !probe_root(&first_root),
+        "dropping a fixture must remove its own root {first_root}",
+    );
+    assert!(
+        probe_root(&second_root),
+        "the sibling root {second_root} must survive the drop",
+    );
+    assert!(
+        Dir::open_ambient_dir(&second_root, ambient_authority())
+            .expect("open the surviving sibling root")
+            .metadata("theorems/second.theorem")
+            .is_ok(),
+        "the sibling's files must survive the drop",
+    );
+    assert!(
+        probe_root(&shared),
+        "the shared target {shared} must survive a fixture drop",
     );
 }

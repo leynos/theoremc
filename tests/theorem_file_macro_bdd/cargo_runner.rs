@@ -97,10 +97,15 @@ pub(crate) fn cargo_run_output(
     subcommand: CargoSubcommand,
     _guard: &CargoGuard<'_>,
 ) -> Result<String, String> {
-    let output = hermetic_cargo(manifest_dir, target_dir)
+    let output = hermetic_cargo(manifest_dir, target_dir)?
         .args(subcommand.args())
         .output()
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| {
+            format!(
+                "running `cargo {}` in {manifest_dir}: {error}",
+                subcommand.args().join(" "),
+            )
+        })?;
     command_result(subcommand, &output)
 }
 

@@ -4,9 +4,12 @@ use derive_more::{From, Into};
 use the_newtype::Newtype;
 mod build_log;
 mod build_support_fixture;
+mod command_run;
+mod fixture_build;
 mod fixture_crate;
 mod fixture_isolation;
 mod hermetic_cargo;
+mod io_context;
 mod schema_fixtures;
 mod suite_layout;
 

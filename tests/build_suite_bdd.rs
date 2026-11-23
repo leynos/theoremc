@@ -188,3 +188,39 @@ fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(),
         "only_first",
     )
 }
+
+/// A sibling build and clean-up must not disturb another fixture's suite.
+///
+/// This is the real-Cargo shape reported in issue #143: two nested builds share
+/// the warm target's build-directory lock, and one fixture's source root
+/// disappears while the other build is still running. The atomic suffix
+/// reservation and the per-fixture temporary root must keep both suites intact.
+#[test]
+fn a_sibling_build_and_clean_up_do_not_disturb_another_fixtures_suite() -> Result<(), String> {
+    // Warm the shared target once before the measured pair. Otherwise the two
+    // concurrent builds below spend the test's whole nextest allowance on the
+    // first compilation of the shared build-support dependencies, and the test
+    // measures the host's compile queue instead of the isolation it targets.
+    let warmup = fixture_with_theorem("sibling_warmup")?;
+    warmup.cargo_build()?;
+    drop(warmup);
+
+    let builder = fixture_with_theorem("sibling_kept")?;
+    let sibling = fixture_with_theorem("sibling_dropped")?;
+    require_shared_target_and_lock([&builder, &sibling])?;
+
+    let builder_thread = std::thread::spawn(move || -> Result<String, String> {
+        builder.cargo_build()?;
+        generated_suite_contents(&builder)
+    });
+
+    sibling.cargo_build()?;
+    let sibling_suite = generated_suite_contents(&sibling)?;
+    require_only_own_theorem(&sibling_suite, "sibling_dropped", "sibling_kept")?;
+    drop(sibling);
+
+    let builder_suite = builder_thread
+        .join()
+        .map_err(|_| "the concurrent builder thread panicked".to_owned())??;
+    require_only_own_theorem(&builder_suite, "sibling_kept", "sibling_dropped")
+}
