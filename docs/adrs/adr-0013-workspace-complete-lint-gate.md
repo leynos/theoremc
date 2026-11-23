@@ -119,9 +119,10 @@ the stub-executable contract test possible.
   turn a cold build into an apparent hang.
 - `dylint.toml` exists, so the exclusion policy has a home. It declares no
   exclusions today, which the contract test holds.
-- The Netsuke lint-table alignment tracked by issue #98 remains separate work.
-  This decision makes the existing `[workspace.lints.*]` tables reach every
-  member; it does not add rules to them.
+- The Netsuke lint-table alignment tracked by issue #98 remained separate work
+  at the time of this decision. This decision makes the existing
+  `[workspace.lints.*]` tables reach every member; it does not add rules to
+  them. ADR-0014 subsequently raised the tables to the Netsuke baseline.
 
 ## Addendum (2026-11-12): renumbering
 
@@ -139,5 +140,7 @@ decision. They are historical context only and do not name a current record.
 - [ADR-0005: Rust build standard](adr-0005-adopt-the-rust-build-standard-for-development-builds.md)
 - [ADR-0010: reusable-library MSRV for serde-saphyr
   2.0](adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md)
+- [ADR-0014: Netsuke lint baseline
+  alignment](adr-0014-netsuke-lint-baseline-alignment.md)
 - [Developer's guide](../developers-guide.md)
 - [Theoremc design](../theoremc-design.md)

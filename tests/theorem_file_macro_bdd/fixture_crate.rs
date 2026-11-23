@@ -9,7 +9,9 @@
 use camino::Utf8Path;
 use theoremc_core::path_format::{normalize_path_separators, toml_basic_string_value};
 
-use super::cargo_runner::{CargoGuard, CargoSubcommand, cargo_run, cargo_run_output};
+use super::cargo_runner::{
+    CargoGuard, CargoSubcommand, cargo_run, cargo_run_denying_warnings, cargo_run_output,
+};
 use test_helpers::FixtureCrate as CommonFixtureCrate;
 
 const ROOT_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
@@ -18,13 +20,34 @@ pub(crate) struct TheoremFixtureSpec<'a> {
     pub(crate) content: &'a str,
 }
 
+/// Selects whether a fixture consumer registers `cfg(kani)`.
+///
+/// A consumer that registers it proves the generated gate stays silent when
+/// the `cfg` is expected. A consumer that does not proves the generated gate
+/// still suppresses the resulting `unexpected_cfgs` warning.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ConsumerCfgRegistration {
+    /// The consumer declares `check-cfg` for `cfg(kani)`.
+    Registered,
+    /// The consumer declares no `cfg(kani)` registration.
+    Unregistered,
+}
+
 pub(crate) struct FixtureCrate {
     inner: CommonFixtureCrate,
 }
 
 impl FixtureCrate {
     pub(crate) fn new(lib_rs: &str) -> Result<Self, String> {
-        let cargo_toml = fixture_cargo_toml();
+        Self::new_for_consumer(lib_rs, ConsumerCfgRegistration::Unregistered)
+    }
+
+    /// Creates a fixture whose manifest matches the requested registration.
+    pub(crate) fn new_for_consumer(
+        lib_rs: &str,
+        registration: ConsumerCfgRegistration,
+    ) -> Result<Self, String> {
+        let cargo_toml = fixture_cargo_toml_for_consumer(ROOT_MANIFEST_DIR, registration);
         Ok(Self {
             inner: CommonFixtureCrate::new(&cargo_toml, lib_rs)?,
         })
@@ -36,6 +59,19 @@ impl FixtureCrate {
 
     pub(crate) fn cargo_build(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
         self.cargo_run(CargoSubcommand::Build, guard)
+    }
+
+    /// Builds the fixture with `-D warnings` in the child Cargo process.
+    pub(crate) fn cargo_build_denying_warnings(
+        &self,
+        guard: &CargoGuard<'_>,
+    ) -> Result<(), String> {
+        cargo_run_denying_warnings(
+            self.inner.manifest_dir(),
+            self.inner.target_dir(),
+            CargoSubcommand::Build,
+            guard,
+        )
     }
 
     pub(crate) fn cargo_kani_list(&self, guard: &CargoGuard<'_>) -> Result<String, String> {
@@ -66,15 +102,26 @@ impl FixtureCrate {
     }
 }
 
-pub(crate) fn fixture_cargo_toml() -> String {
-    fixture_cargo_toml_for(ROOT_MANIFEST_DIR)
+pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
+    fixture_cargo_toml_for_consumer(root_manifest_dir, ConsumerCfgRegistration::Unregistered)
 }
 
-pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
+/// Builds the fixture manifest for the requested `cfg(kani)` registration.
+pub(crate) fn fixture_cargo_toml_for_consumer(
+    root_manifest_dir: &str,
+    registration: ConsumerCfgRegistration,
+) -> String {
     let normalized_root_manifest_dir = normalize_path_separators(root_manifest_dir);
     let escaped_root_manifest_dir = toml_basic_string_value(&normalized_root_manifest_dir);
     let build_support_dir = format!("{normalized_root_manifest_dir}/crates/theoremc-build-support");
     let escaped_build_support_dir = toml_basic_string_value(&build_support_dir);
+    let lint_table = match registration {
+        ConsumerCfgRegistration::Registered => concat!(
+            "[lints.rust]\n",
+            "unexpected_cfgs = { level = \"warn\", check-cfg = [\"cfg(kani)\"] }\n",
+        ),
+        ConsumerCfgRegistration::Unregistered => "",
+    };
     format!(
         concat!(
             "[package]\n",
@@ -86,7 +133,8 @@ pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
             "[dev-dependencies]\n",
             "theoremc = {{ path = \"{root_manifest_dir}\", features = [\"test-support\"] }}\n\n",
             "[build-dependencies]\n",
-            "theoremc-build-support = {{ path = \"{build_support_dir}\" }}\n",
+            "theoremc-build-support = {{ path = \"{build_support_dir}\" }}\n\n",
+            "{lint_table}",
         ),
         root_manifest_dir = escaped_root_manifest_dir,
         build_support_dir = escaped_build_support_dir,
@@ -113,6 +161,23 @@ pub(crate) fn run_fixture_build(lib_rs: &str, spec: &TheoremFixtureSpec<'_>) -> 
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
     fixture.cargo_build(&guard)
 }
+
+/// Builds an independent consumer with warnings denied.
+///
+/// `registration` decides whether the consumer declares `check-cfg` for
+/// `cfg(kani)`. The generated gate must compile under both configurations, so
+/// a strict-warning build is the proof rather than a plain build.
+pub(crate) fn run_fixture_build_denying_warnings(
+    lib_rs: &str,
+    registration: ConsumerCfgRegistration,
+    spec: &TheoremFixtureSpec<'_>,
+) -> Result<(), String> {
+    let guard = CargoGuard::acquire();
+    let fixture = FixtureCrate::new_for_consumer(lib_rs, registration)?;
+    fixture.write(Utf8Path::new(spec.path), spec.content)?;
+    fixture.cargo_build_denying_warnings(&guard)
+}
+
 /// Builds the fixture crate and runs `cargo kani` over every generated harness.
 pub(crate) fn build_fixture_and_verify_kani_harnesses(
     spec: &TheoremFixtureSpec<'_>,
@@ -135,7 +200,7 @@ pub(crate) fn build_fixture_and_list_kani_harnesses(
 mod tests {
     //! Tests for Cargo TOML fixture generation.
 
-    use super::fixture_cargo_toml_for;
+    use super::{ConsumerCfgRegistration, fixture_cargo_toml_for, fixture_cargo_toml_for_consumer};
 
     #[test]
     fn fixture_cargo_toml_normalizes_windows_paths() {
@@ -167,5 +232,33 @@ mod tests {
             "expected escaped TOML basic string path, got:\n{toml}",
         );
         assert!(toml.contains("theoremc-build-support = { path = \"/home/user/project's/\\\"theoremc\\\"/crates/theoremc-build-support\" }"));
+    }
+
+    #[test]
+    fn registered_consumer_declares_cfg_kani_check_cfg() {
+        let toml = fixture_cargo_toml_for_consumer("/repo", ConsumerCfgRegistration::Registered);
+
+        assert!(
+            toml.contains("[lints.rust]"),
+            "registered consumer should open a `[lints.rust]` table, got:\n{toml}",
+        );
+        assert!(
+            toml.contains("check-cfg = [\"cfg(kani)\"]"),
+            "registered consumer should declare `cfg(kani)`, got:\n{toml}",
+        );
+    }
+
+    #[test]
+    fn unregistered_consumer_declares_no_lint_table() {
+        let toml = fixture_cargo_toml_for_consumer("/repo", ConsumerCfgRegistration::Unregistered);
+
+        assert!(
+            !toml.contains("[lints"),
+            "unregistered consumer must carry no lint table, got:\n{toml}",
+        );
+        assert!(
+            !toml.contains("cfg(kani)"),
+            "unregistered consumer must not mention `cfg(kani)`, got:\n{toml}",
+        );
     }
 }

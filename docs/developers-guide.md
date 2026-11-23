@@ -454,14 +454,18 @@ real `cargo doc` and `cargo clippy` invocations, so a finding in the non-root
 member is shown to fail the stage rather than merely being passed the right
 arguments.
 
-The `[workspace.lints]` tables adopt the `leynos/netsuke` baseline as a
-minimum, in layers, and keep any stricter TheoremC rule. This layer adds
-`missing_assert_message`, `unknown_lints`, `renamed_and_removed_lints`, the
+The `[workspace.lints]` tables adopt the `leynos/netsuke` baseline as a minimum
+and keep any stricter TheoremC rule. The alignment landed in layers: the
+zero-finding rules first, then environment injection with `disallowed_methods`
+and `unsafe_code = "forbid"`, then `missing_docs_in_private_items` once every
+private item was documented. The tables now carry the baseline's 45 Clippy
+denials, `unknown_lints`, `renamed_and_removed_lints`, `missing_docs`, and the
 full rustdoc set (`broken_intra_doc_links`, `private_intra_doc_links`,
 `bare_urls`, `invalid_html_tags`, `invalid_codeblock_attributes`,
-`unescaped_backticks`), and `unexpected_cfgs` with `check-cfg` declarations for
-`cfg(kani)` and `cfg(dylint_lib)`, so Kani harnesses and Dylint libraries are
-declared once instead of carrying per-site expectations.
+`unescaped_backticks`). `unexpected_cfgs` stays at `warn` with `check-cfg`
+declarations for `cfg(kani)` and `cfg(dylint_lib)`, so Kani harnesses and
+Dylint libraries are declared once instead of carrying per-site expectations;
+the gates supply `-D warnings`, so an undeclared `cfg` still fails them.
 
 `clippy::missing_docs_in_private_items` was the last baseline rule to arrive:
 it waited on documenting every private item it reports, concentrated in
@@ -477,23 +481,46 @@ experimental `macro_aware_cognitive_complexity` gates complexity at 9,
 CodeScene's ceiling, and `dylint.toml` opts in with
 `[whitaker] experimental = ["macro_aware_cognitive_complexity"]`. Fix a finding
 by extracting named helpers, never by raising the threshold.
+`clippy.toml` also records why
+`shell_quote::QuoteRefExt::quoted` and `std::io::IsTerminal::is_terminal` are
+not disallowed, and the manifest records why `cfg(verus)` is not registered and
+why `cfg(theoremc_has_theorems)` stays with each package's `build.rs`. ADR-0014
+records the baseline, its retrieval date, and these decisions.
 
-Environment access follows the same policy, and this layer is where the last
-two deferred rules land. Production code reads the environment through an
-injected reader rather than mutating or querying the process directly, so a
-test passes a stub value or error instead of changing global state. The only
-sanctioned reads are the boundary seams in the macro, build script, and test
-harnesses that must inherit Cargo's or the host's values, and the `OrthoConfig`
-derive on `GlobalOptions` in `crates/cargo-theorem`, whose expansion reads the
-process environment. Clippy reports that read at the derive, which an
-item-level expectation on the struct does not reach, so the struct alone sits in
-`config/global_options.rs` and `config/mod.rs` declares that module under the
-expectation; the helper the struct uses stays outside it, and a direct read
-added anywhere else in `config` stays denied. Callers that need isolation
-inject sources through `GlobalOptions::load_with_sources`. Each carries
-`#[expect(clippy::disallowed_methods, reason = "...")]`, and `allow` is never
-used. `unsafe_code = "forbid"` is set workspace-wide, so no expectation can
-re-open it.
+`tests/lint_policy_contract.rs` pins the policy semantically. It parses the
+manifest and `clippy.toml`, then asserts every baseline rule, level, and
+priority; `unsafe_code = "forbid"`; the parsed `check-cfg` elements; the seven
+`std::env` disallowed methods with reasons; and that `cargo metadata --no-deps`
+reports every workspace package opting into the workspace lints. Deleting or
+downgrading a rule fails the test even when no source file violates it, which
+is the window a behavioural test cannot close.
+
+Environment access follows the same policy. Production code reads the
+environment through an injected reader rather than mutating or querying the
+process directly, so a test passes a stub value or error instead of changing
+global state. The only sanctioned reads are the boundary seams in the macro,
+build script, and test harnesses that must inherit Cargo's or the host's
+values, and the `OrthoConfig` derive on `GlobalOptions` in
+`crates/cargo-theorem`, whose expansion reads the process environment. Clippy
+reports that read at the derive, which an item-level expectation on the struct
+does not reach, so the struct alone sits in `config/global_options.rs` and
+`config/mod.rs` declares that module under the expectation; the helper the
+struct uses stays outside it, and a direct read added anywhere else in `config`
+stays denied. Callers that need isolation inject sources through
+`GlobalOptions::load_with_sources`. Each carries
+`#[expect(clippy::disallowed_methods, reason = "...")]`. Handwritten code
+never uses `allow`; the one `allow` in the repository is emitted by the proc
+macro, where an expectation cannot be relied on. `unsafe_code = "forbid"` is
+set workspace-wide, so no expectation can re-open it.
+
+`theorem_file!` emits its generated per-file module with a reasoned
+`#[allow(unexpected_cfgs)]`, because the invoking crate may or may not register
+`cfg(kani)` and the macro cannot tell. An `expect` would be left unfulfilled by
+a crate that registers the `cfg`, and `-D warnings` would reject the build.
+Action and referenced-type probes stay outside the gate, so their lints are
+still checked. Two BDD scenarios prove an independent consumer compiles with
+`RUSTFLAGS=-D warnings` both with and without a `cfg(kani)` registration; see
+the design document's generated-cfg passage.
 
 `make lint-whitaker` runs the Whitaker Dylint suite through the `whitaker`
 wrapper. Install it with `whitaker-installer` so that `whitaker` is on `PATH`,

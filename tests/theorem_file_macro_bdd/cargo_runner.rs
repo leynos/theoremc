@@ -104,6 +104,26 @@ pub(crate) fn cargo_run_output(
     command_result(subcommand, &output)
 }
 
+/// Runs a Cargo subcommand in the fixture crate with warnings denied.
+///
+/// The child process owns its flags, so this does not mutate the test
+/// process. `CARGO_ENCODED_RUSTFLAGS` is removed because Cargo prefers it over
+/// `RUSTFLAGS`, and an inherited value would silently defeat the denial.
+pub(crate) fn cargo_run_denying_warnings(
+    manifest_dir: &Utf8Path,
+    target_dir: &Utf8Path,
+    subcommand: CargoSubcommand,
+    _guard: &CargoGuard<'_>,
+) -> Result<(), String> {
+    let output = hermetic_cargo(manifest_dir, target_dir)
+        .args(subcommand.args())
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env("RUSTFLAGS", "-D warnings")
+        .output()
+        .map_err(|error| error.to_string())?;
+    command_result(subcommand, &output).map(|_| ())
+}
+
 pub(crate) fn recover_mutex_guard(mutex: &Mutex<()>) -> MutexGuard<'_, ()> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
