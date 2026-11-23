@@ -90,23 +90,24 @@ the stub-executable contract test possible.
    exclusions, because the suite is clean over every package, target, and
    feature set. A future exemption must use the narrowest key that works,
    `excluded_paths` before `excluded_crates`, with the reason recorded beside
-   it. `tests/lint_ci_contract.rs` rejects an active `excluded_paths` entry
+   it. `tests/lint_dylint_contract.rs` rejects an active `excluded_paths` entry
    with no comment immediately above it, so an exemption cannot arrive
    unexplained.
-5. Five tests hold the wiring, at four levels.
-   `tests/lint_makefile_contract.rs` and `tests/lint_ci_contract.rs` read the
-   Makefile, the workflow, and `dylint.toml` as text and fail if a gate loses
-   workspace coverage, a stage disappears, a failure can be masked, CI stops
-   installing a pinned Whitaker, or the configuration gains a whole-crate
-   exemption. `tests/lint_gate_execution.rs` runs the recipes against stub
-   executables to prove the stage order, the arguments each stage receives, and
-   that a failing stage stops the aggregate.
-   `tests/lint_workspace_execution.rs` goes one level further: it writes a
-   two-package workspace that mirrors the hybrid manifest, runs the real
-   `cargo doc` and `cargo clippy` invocations the recipes use, and shows that a
-   clean workspace passes while a finding in the non-root member fails the
-   stage, naming the lint and the member source path. The stubs prove the
-   wiring; this proves Cargo acts on it.
+5. Six tests hold the wiring, at four levels.
+   `tests/lint_makefile_contract.rs`, `tests/lint_ci_contract.rs`, and
+   `tests/lint_dylint_contract.rs` read the Makefile, the workflow, and
+   `dylint.toml` as text and fail if a gate loses workspace coverage, a stage
+   disappears, a failure can be masked, CI stops installing a pinned Whitaker,
+   a lint step gains a bypass key or an environment override, or the
+   configuration gains an exclusion with no recorded reason.
+   `tests/lint_gate_execution.rs` runs the recipes against stub executables to
+   prove the stage order, the arguments each stage receives, and that a failing
+   stage stops the aggregate. `tests/lint_workspace_execution.rs` goes one
+   level further: it writes a two-package workspace that mirrors the hybrid
+   manifest, runs the real `cargo doc` and `cargo clippy` invocations the
+   recipes use, and shows that a clean workspace passes while a finding in the
+   non-root member fails the stage, naming the lint and the member source path.
+   The stubs prove the wiring; this proves Cargo acts on it.
    `tests/lint_workspace_inheritance_contract.rs` closes the last gap between
    "the gate visits the workspace" and "the policy binds every package": it
    requires `[lints] workspace = true` in the root manifest and in each member,

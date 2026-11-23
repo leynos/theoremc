@@ -26,7 +26,7 @@ pub(crate) struct Line<'a> {
 
 impl<'a> Line<'a> {
     /// Measures one line's leading spaces.
-    fn new(text: &'a str) -> Self {
+    pub(crate) fn new(text: &'a str) -> Self {
         Self {
             text,
             indent: text.len() - text.trim_start_matches(' ').len(),
@@ -122,19 +122,20 @@ fn step_end(job: &[Line<'_>], start: usize, step_indent: usize) -> usize {
 
 /// Returns each step of a job with its start index, in file order.
 ///
-/// Only sequence items at the indentation of the job's first step count: a
-/// nested sequence under `with:` is data, not a second step.
+/// The search starts at the job's own `steps:` key, so a block sequence that
+/// belongs to something else — a `strategy.matrix.os` list, for example —
+/// cannot set the step indentation. Only sequence items exactly two spaces
+/// below `steps:` count: a nested sequence under `with:` is data, not a
+/// second step.
 pub(crate) fn steps<'a, 'b>(job: &'a [Line<'b>]) -> Vec<(usize, &'a [Line<'b>])> {
-    let Some(step_indent) = job
-        .iter()
-        .find(|line| line.opens_step())
-        .map(|line| line.indent())
-    else {
+    let Some(steps_line) = job.iter().position(|line| line.trimmed() == "steps:") else {
         return Vec::new();
     };
+    let step_indent = job.get(steps_line).map_or(0, |line| line.indent()) + 2;
     let starts: Vec<usize> = job
         .iter()
         .enumerate()
+        .skip(steps_line + 1)
         .filter(|(_, line)| line.opens_step() && line.indent() == step_indent)
         .map(|(index, _)| index)
         .collect();

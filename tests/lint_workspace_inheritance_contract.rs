@@ -33,10 +33,50 @@ const WORKSPACE_LINT_TABLES: [&str; 3] = [
     "workspace.lints.rustdoc",
 ];
 
+/// Removes a TOML comment from a line, leaving string contents intact.
+///
+/// A `#` inside a string is data, so the scan tracks the open quote. TOML
+/// accepts both basic and literal strings, so both are tracked.
+fn strip_comment(line: &str) -> &str {
+    let mut quote = None;
+    for (index, character) in line.char_indices() {
+        match character {
+            '"' | '\'' if quote == Some(character) => quote = None,
+            '"' | '\'' if quote.is_none() => quote = Some(character),
+            '#' if quote.is_none() => return line.get(..index).unwrap_or(line),
+            _ => {}
+        }
+    }
+    line
+}
+
+/// Returns every TOML string in `text`, in order.
+///
+/// Reading the strings directly, rather than splitting on a delimiter, keeps a
+/// quoted path inside a comment from being mistaken for an array item.
+fn quoted_items(text: &str) -> Vec<String> {
+    let mut items = Vec::new();
+    let mut current = String::new();
+    let mut quote = None;
+    for character in text.chars() {
+        match quote {
+            Some(active) if character == active => {
+                items.push(std::mem::take(&mut current));
+                quote = None;
+            }
+            Some(_) => current.push(character),
+            None if character == '"' || character == '\'' => quote = Some(character),
+            None => {}
+        }
+    }
+    items
+}
+
 /// Extracts the string items of a top-level TOML array.
 ///
 /// The array is written across several lines in the root manifest, so the
-/// body is joined before the quoted items are read.
+/// body is joined before the quoted items are read. Comments are removed
+/// first, because a commented path is not a member.
 fn array_items(document: &str, key: &str) -> Option<Vec<String>> {
     let header = format!("{key} =");
     let start = document
@@ -44,7 +84,8 @@ fn array_items(document: &str, key: &str) -> Option<Vec<String>> {
         .position(|line| line.starts_with(&header))?;
     let mut body = String::new();
     let mut depth = 0usize;
-    for line in document.lines().skip(start) {
+    for raw in document.lines().skip(start) {
+        let line = strip_comment(raw);
         depth += line.matches('[').count();
         depth = depth.saturating_sub(line.matches(']').count());
         body.push_str(line);
@@ -53,13 +94,7 @@ fn array_items(document: &str, key: &str) -> Option<Vec<String>> {
             break;
         }
     }
-    let items = body
-        .split('"')
-        .skip(1)
-        .step_by(2)
-        .map(str::to_owned)
-        .collect();
-    Some(items)
+    Some(quoted_items(&body))
 }
 
 /// Reports whether a manifest names a table header.
@@ -286,27 +321,36 @@ fn members_are_read_across_line_breaks() {
         None,
         "an absent key must yield None rather than an empty list"
     );
+    let commented = "[workspace]\nmembers = [\n    \"crates/one\",\n    # \"crates/two\",\n]\n";
+    assert_eq!(
+        array_items(commented, "members"),
+        Some(vec!["crates/one".to_owned()]),
+        "a commented path must not count as a member"
+    );
+}
+
+/// A literal-quoted member is registered like a basic-quoted one.
+#[test]
+fn a_literal_quoted_member_is_registered() {
+    let manifest = "[workspace]\nmembers = [\n    'crates/one',\n]\n";
+    assert_eq!(
+        array_items(manifest, "members"),
+        Some(vec!["crates/one".to_owned()]),
+        "a TOML literal string must be read as a member"
+    );
 }
 
 /// A crate directory the workspace does not list is reported.
 #[test]
 fn an_undeclared_crate_is_reported() {
-    let directories = vec!["declared".to_owned(), "forgotten".to_owned()];
     let members = vec!["crates/declared".to_owned()];
     assert_eq!(
-        undeclared_crates(&directories, &members),
+        undeclared_crates(&["declared".to_owned(), "forgotten".to_owned()], &members),
         vec!["crates/forgotten".to_owned()],
         "a crate directory missing from `members` must be reported"
     );
-}
-
-/// A declared crate directory is not reported.
-#[test]
-fn a_declared_crate_is_accepted() {
-    let directories = vec!["declared".to_owned()];
-    let members = vec!["crates/declared".to_owned()];
     assert!(
-        undeclared_crates(&directories, &members).is_empty(),
+        undeclared_crates(&["declared".to_owned()], &members).is_empty(),
         "a declared crate directory must not be reported"
     );
 }
@@ -341,8 +385,8 @@ fn an_empty_workspace_lint_table_is_rejected() {
 #[test]
 fn a_root_without_the_opt_in_is_rejected() {
     let manifest = "[workspace]\nmembers = [\"crates/one\"]\n";
-    let report = verify_root_manifest(manifest)
-        .expect_err("a root package without the opt-in must be rejected");
+    let report =
+        verify_root_manifest(manifest).expect_err("a root without the opt-in must be rejected");
     assert!(
         report.contains("workspace = true"),
         "the report must name the missing opt-in; found {report:?}"

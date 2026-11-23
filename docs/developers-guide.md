@@ -450,8 +450,9 @@ under-check. The stages do not carry identical scope: `cargo doc` rejects
 `--all-features` enables every feature together rather than building each
 feature combination in turn.
 
-Five tests hold this shape. `tests/lint_makefile_contract.rs` reads the recipes
-as text, and `tests/lint_ci_contract.rs` reads the workflow and `dylint.toml`.
+Six tests hold this shape. `tests/lint_makefile_contract.rs` reads the recipes
+as text, `tests/lint_ci_contract.rs` reads the workflow, and
+`tests/lint_dylint_contract.rs` reads `dylint.toml`.
 `tests/lint_gate_execution.rs` runs the recipes against stub executables to
 prove each stage runs in order and propagates its failure.
 `tests/lint_workspace_execution.rs` writes a two-package workspace and runs the
@@ -531,8 +532,8 @@ while the lint suite itself follows Whitaker's rolling release. The root
 package, target, and feature set. If a finding ever proves irreducible, add the
 narrowest key that works — `excluded_paths` before `excluded_crates` — and
 record the reason in a comment immediately above the entry;
-`tests/lint_ci_contract.rs` rejects an active `excluded_paths` entry with no
-such comment, and rejects `excluded_crates` outright. `no_std_fs_operations`
+`tests/lint_dylint_contract.rs` rejects an active `excluded_paths` entry with
+no such comment, and rejects `excluded_crates` outright. `no_std_fs_operations`
 cannot be suppressed in source, so a `dylint.toml` key is its only escape
 hatch. Whitaker does not replace the custom `theoremc_arch_lint` architecture
 rules, which are still planned.
