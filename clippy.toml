@@ -23,5 +23,12 @@ disallowed-methods = [
   { path = "std::env::set_var", reason = "use a stub environment in tests" },
   { path = "std::env::remove_var", reason = "use a stub environment in tests" },
   { path = "std::env::set_current_dir", reason = "inject a base-directory seam; confine CWD changes to Command::current_dir" },
+  { path = "std::io::IsTerminal::is_terminal", reason = "capture terminal facts once at the process boundary" },
 ]
+
+# The `leynos/netsuke` baseline (issue #98) also disallows
+# `shell_quote::QuoteRefExt::quoted`. TheoremC has no `shell-quote` dependency,
+# and `disallowed-methods` matches a resolved path, so an entry for a crate the
+# workspace never links would be inert. Add it if a shell-quoting helper is
+# adopted; clippy.toml records the omission so the divergence stays visible.
 

@@ -187,6 +187,101 @@ fn check_installer_pin(job: &str, reference: &str) -> Result<(), String> {
     }
 }
 
+/// A step that runs the aggregate lint target.
+struct LintStep<'a, 'b> {
+    /// The job that owns the step.
+    job: &'a str,
+    /// Where the step starts, so a reader can find the steps before it.
+    start: usize,
+    /// The step's own lines.
+    lines: &'a [Line<'b>],
+    /// The indentation of the step's own keys.
+    indent: usize,
+    /// The command the step's `run:` key carries.
+    command: &'a str,
+}
+
+/// Collects the steps of `job` that invoke the aggregate lint target.
+fn lint_steps<'a, 'b>(name: &'a str, job: &'a [Line<'b>]) -> Vec<LintStep<'a, 'b>> {
+    steps(job)
+        .into_iter()
+        .filter_map(|(start, step)| {
+            let indent = key_indent(step)?;
+            let command = run_command(step, indent)?;
+            invokes_aggregate(command).then_some(LintStep {
+                job: name,
+                start,
+                lines: step,
+                indent,
+                command,
+            })
+        })
+        .collect()
+}
+
+/// Fails unless the job carrying `lint` is unconditional and unoverridden.
+///
+/// # Errors
+///
+/// Returns the job-level bypass key or coverage override.
+fn verify_lint_job(name: &str, job: &[Line<'_>], job_indent: usize) -> Result<(), String> {
+    if has_bypass_key(job, job_indent) {
+        return Err(format!(
+            "job `{name}` must not make the lint gate conditional or non-fatal"
+        ));
+    }
+    reject_coverage_override(&format!("job `{name}`"), &environment_keys(job, job_indent))
+}
+
+/// Fails unless the installer before `lint` is pinned and unconditional.
+///
+/// # Errors
+///
+/// Returns the missing, out-of-order, unpinned, bypassed, or overridden
+/// installer.
+fn verify_installer(
+    job_steps: &[(usize, &[Line<'_>])],
+    lint: &LintStep<'_, '_>,
+) -> Result<(), String> {
+    let name = lint.job;
+    let (installer, indent) = find_installer(job_steps, lint.start).ok_or_else(|| {
+        format!("job `{name}` must install a pinned Whitaker before its lint step")
+    })?;
+    if has_bypass_key(installer, indent) {
+        return Err(format!(
+            "the Whitaker install in job `{name}` must not be conditional or non-fatal"
+        ));
+    }
+    reject_coverage_override(
+        &format!("the Whitaker install in job `{name}`"),
+        &environment_keys(installer, indent),
+    )?;
+    check_installer_pin(name, uses_reference(installer, indent).unwrap_or_default())
+}
+
+/// Fails unless `job` wires every lint step as the contract requires.
+///
+/// Returns the number of lint steps found, so the caller can report a
+/// workflow that never invokes the aggregate.
+///
+/// # Errors
+///
+/// Returns the first drift found in the job.
+fn verify_lint_job_steps(name: &str, job: &[Line<'_>]) -> Result<usize, String> {
+    let found = lint_steps(name, job);
+    if found.is_empty() {
+        return Ok(0);
+    }
+    let indent = key_indent(job).ok_or_else(|| format!("job `{name}` must have a body"))?;
+    verify_lint_job(name, job, indent)?;
+    let job_steps = steps(job);
+    for lint in &found {
+        verify_lint_step(name, lint.lines, lint.indent, lint.command)?;
+        verify_installer(&job_steps, lint)?;
+    }
+    Ok(found.len())
+}
+
 /// Fails unless `workflow` wires the lint gate as the contract requires.
 ///
 /// # Errors
@@ -199,48 +294,11 @@ fn verify_lint_gate(workflow: &str) -> Result<(), String> {
     if all_jobs.is_empty() {
         return Err("the workflow must define at least one job".to_owned());
     }
-    let mut lint_jobs = 0;
+    let mut lint_job_count = 0;
     for (name, job) in &all_jobs {
-        let job_indent = key_indent(job).ok_or_else(|| format!("job `{name}` must have a body"))?;
-        let job_steps = steps(job);
-        let lint_steps: Vec<_> = job_steps
-            .iter()
-            .filter_map(|(start, step)| {
-                let indent = key_indent(step)?;
-                let command = run_command(step, indent)?;
-                invokes_aggregate(command).then_some((*start, *step, indent, command))
-            })
-            .collect();
-        if lint_steps.is_empty() {
-            continue;
-        }
-        lint_jobs += 1;
-        if has_bypass_key(job, job_indent) {
-            return Err(format!(
-                "job `{name}` must not make the lint gate conditional or non-fatal"
-            ));
-        }
-        reject_coverage_override(&format!("job `{name}`"), &environment_keys(job, job_indent))?;
-        for (lint_start, lint_step, lint_indent, command) in lint_steps {
-            verify_lint_step(name, lint_step, lint_indent, command)?;
-            let (installer, installer_indent) =
-                find_installer(&job_steps, lint_start).ok_or_else(|| {
-                    format!("job `{name}` must install a pinned Whitaker before its lint step")
-                })?;
-            if has_bypass_key(installer, installer_indent) {
-                return Err(format!(
-                    "the Whitaker install in job `{name}` must not be conditional or non-fatal"
-                ));
-            }
-            reject_coverage_override(
-                &format!("the Whitaker install in job `{name}`"),
-                &environment_keys(installer, installer_indent),
-            )?;
-            let reference = uses_reference(installer, installer_indent).unwrap_or_default();
-            check_installer_pin(name, reference)?;
-        }
+        lint_job_count += verify_lint_job_steps(name, job)?;
     }
-    if lint_jobs == 0 {
+    if lint_job_count == 0 {
         return Err(format!(
             "CI must run `{LINT_COMMAND}`, the same aggregate target used locally"
         ));
@@ -311,7 +369,18 @@ fn has_justification(lines: &[&str], index: usize) -> bool {
         .is_some_and(|line| line.trim().starts_with('#'))
 }
 
+/// Reports whether a value line is an `excluded_paths` entry needing a reason.
+///
+/// A quoted entry inside an `excluded_paths` value is the only shape that
+/// needs justification; every other line is policy, structure, or prose.
+fn is_exclusion_entry(value: &str) -> bool {
+    value.starts_with('"') || value.contains('"')
+}
+
 /// Returns the active `excluded_paths` entries that carry no adjacent reason.
+///
+/// Entries are read from the `excluded_paths` value itself and from the list
+/// items below it, down to the closing bracket.
 fn unjustified_exclusions(document: &str) -> Vec<String> {
     let lines: Vec<&str> = document.lines().collect();
     let mut offences = Vec::new();
@@ -321,28 +390,36 @@ fn unjustified_exclusions(document: &str) -> Vec<String> {
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
-        if inside_list {
-            if trimmed.starts_with(']') {
-                inside_list = false;
-            } else if trimmed.starts_with('"') && !has_justification(&lines, index) {
-                offences.push((*line).to_owned());
-            }
+        if inside_list && trimmed.starts_with(']') {
+            inside_list = false;
             continue;
         }
-        let Some(rest) = trimmed.strip_prefix("excluded_paths") else {
-            continue;
+        let value = if inside_list {
+            trimmed
+        } else {
+            let Some(value) = excluded_paths_value(trimmed) else {
+                continue;
+            };
+            if value.starts_with('[') && !value.contains(']') {
+                inside_list = true;
+                continue;
+            }
+            value
         };
-        let Some(value) = rest.trim_start().strip_prefix('=') else {
-            continue;
-        };
-        let literal = value.trim();
-        if literal.starts_with('[') && !literal.contains(']') {
-            inside_list = true;
-        } else if literal.contains('"') && !has_justification(&lines, index) {
+        if is_exclusion_entry(value) && !has_justification(&lines, index) {
             offences.push((*line).to_owned());
         }
     }
     offences
+}
+
+/// Returns the value of an `excluded_paths = …` assignment.
+fn excluded_paths_value(trimmed: &str) -> Option<&str> {
+    trimmed
+        .strip_prefix("excluded_paths")?
+        .trim_start()
+        .strip_prefix('=')
+        .map(str::trim)
 }
 
 /// Wraps job bodies in the workflow skeleton the synthetic cases share.
