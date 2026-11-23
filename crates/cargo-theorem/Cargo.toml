@@ -14,7 +14,7 @@ name = "cargo-theorem"
 path = "src/main.rs"
 
 [dependencies]
-cargo-orthohelp = "0.10.0"
+cargo-orthohelp = "0.11.0"
 clap.workspace = true
 ortho_config.workspace = true
 serde.workspace = true

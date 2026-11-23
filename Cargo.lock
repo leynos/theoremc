@@ -266,16 +266,16 @@ dependencies = [
 
 [[package]]
 name = "cargo-orthohelp"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db2d0905f51c926671566a38659922e7dee845fca5b5636485e86361fb0f589"
+checksum = "8c2b389a57bf67db9efc5f155dab13d1d1f1b37eec081614cd239f7506c5fea6"
 dependencies = [
  "camino",
  "cap-std",
  "cargo_metadata 0.18.1",
  "clap",
  "fs4",
- "ortho_config 0.10.0",
+ "ortho_config",
  "serde",
  "serde_json",
  "sha2",
@@ -312,7 +312,7 @@ dependencies = [
  "cap-std",
  "cargo-orthohelp",
  "clap",
- "ortho_config 0.11.0",
+ "ortho_config",
  "rstest",
  "serde",
  "serde_json",
@@ -1274,31 +1274,6 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ortho_config"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a99e8507095fe15801a01a374e9b981883c98d0a0027c0eaed1f3bd5715590bf"
-dependencies = [
- "camino",
- "cap-std",
- "clap",
- "clap-dispatch",
- "directories",
- "dirs",
- "dunce",
- "figment",
- "ortho_config_macros 0.10.0",
- "ortho_l10n 0.10.0",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
- "toml 1.1.8+spec-1.1.0",
- "tracing",
- "uncased",
- "xdg",
-]
-
-[[package]]
-name = "ortho_config"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f461a88d7d08b164a74d455bf0c9af9c5f282358c3013f132ed02996fdba445"
@@ -1311,8 +1286,8 @@ dependencies = [
  "dirs",
  "dunce",
  "figment",
- "ortho_config_macros 0.11.0",
- "ortho_l10n 0.11.0",
+ "ortho_config_macros",
+ "ortho_l10n",
  "serde",
  "serde_json",
  "thiserror 2.0.21",
@@ -1324,45 +1299,17 @@ dependencies = [
 
 [[package]]
 name = "ortho_config_macros"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42c7a590f77273774f7e1079a02a53acfe5b1252d5be43402cb5a6f0e57b58a6"
-dependencies = [
- "heck",
- "ortho_l10n 0.10.0",
- "proc-macro2",
- "quote",
- "serde",
- "serde_json",
- "syn 3.0.10",
-]
-
-[[package]]
-name = "ortho_config_macros"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c757603b8a90d461af03fff6717ec84bbd4ef5e5f9582f2688d5dfcd6a587850"
 dependencies = [
  "heck",
- "ortho_l10n 0.11.0",
+ "ortho_l10n",
  "proc-macro2",
  "quote",
  "serde",
  "serde_json",
  "syn 3.0.10",
-]
-
-[[package]]
-name = "ortho_l10n"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "134e64af4a8dce3de521b273fa87f6cdef8a3b9a07a918a78b4df19b2ab6e3d8"
-dependencies = [
- "fluent-bundle",
- "fluent-syntax",
- "thiserror 2.0.21",
- "tracing",
- "unic-langid",
 ]
 
 [[package]]
