@@ -157,6 +157,26 @@ mod tests {
         assert!(error.contains("fx_ab-111"), "{error}");
     }
 
+    /// A regular file where the generated suite's `out` directory belongs is a
+    /// malformed layout. It must be reported, naming the path, rather than read
+    /// as an unbuilt fixture.
+    #[test]
+    fn an_output_path_that_is_a_file_is_an_inspection_error() {
+        let (_temp, root, dir) = scratch();
+        dir.create_dir_all("debug/build/fx_ab-111")
+            .expect("create the package build directory");
+        dir.write("debug/build/fx_ab-111/out", "not a directory")
+            .expect("write a file where the output directory would be");
+
+        let error = find_suite_in_build_root(&root.join("debug/build"), "fx_ab")
+            .expect_err("an output path that is a file must not read as absent");
+
+        assert!(
+            error.contains("fx_ab-111/out/theorem_suite.rs"),
+            "the diagnostic should name the unreadable suite path, got: {error}"
+        );
+    }
+
     #[test]
     fn a_built_fixture_yields_its_suite() {
         let (_temp, root, dir) = scratch();

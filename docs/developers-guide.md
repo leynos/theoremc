@@ -647,13 +647,16 @@ suite.
   `is_err()`: an unreadable fixture must not pass as an unbuilt one. The suite
   lookup also fails when a matching `build/` entry is a file rather than a
   directory, because that is a malformed build layout, not an absent suite.
-- The Kani harness-listing test probes `cargo kani --version` and skips
-  whenever that probe fails: a missing `cargo kani`, a launch failure such as
-  an SDK shared-library error, or any non-zero exit. The probe is a skip
-  signal, not a claim that Kani is absent. Once it succeeds, a listing failure
-  is an error: an installed but unusable Kani toolchain must fail the test
-  rather than silently skip it. `cargo_runner::list_when_installed` holds that
-  policy and is unit tested with an injected probe result.
+- The Kani harness-listing test probes `cargo kani --version` and treats any
+  probe failure — a missing `cargo kani`, a launch failure such as an SDK
+  shared-library error, or any non-zero exit — as a skip signal, not a claim
+  that Kani is absent. The skip is silent only without `THEOREMC_REQUIRE_KANI`:
+  `make kani` and the proofs workflow set it to `1`, and then the same
+  condition fails the test. Once the probe succeeds, a listing failure is an
+  error, except that an environment-level Kani failure takes the same
+  required-or-skip policy rather than passing as a successful check.
+  `cargo_runner::list_when_installed` holds the probe policy and is unit tested
+  with an injected probe result.
 - Tests that start a child `cargo` or `rustc` (the fixture suites, the macros
   crate's trybuild suite and the `rustc` compile-fail unit test) run in the
   `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,
