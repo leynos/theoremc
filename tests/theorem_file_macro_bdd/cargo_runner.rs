@@ -190,9 +190,7 @@ fn command_result(
 mod tests {
     //! Unit tests for fixture cargo runner helpers.
 
-use std::sync::Mutex;
-
-    use super::{is_unusable_kani_environment, list_when_installed, recover_mutex_guard};
+    use super::{is_unusable_kani_environment, list_when_installed};
 
     #[test]
     fn a_missing_kani_toolchain_skips_the_listing() {
