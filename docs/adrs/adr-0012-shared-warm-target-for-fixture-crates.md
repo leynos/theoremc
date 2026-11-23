@@ -5,8 +5,8 @@
 Accepted. Fixture crates that integration tests build with `cargo` share one
 warm target directory, start from the workspace lock, and build offline.
 
-Amended by [ADR-0014](adr-0014-serialise-and-bound-fixture-cargo-commands.md)
-(2026-11-23), which serialises every fixture command across processes, bounds
+Amended by [ADR-0014](adr-0014-serialize-and-bound-fixture-cargo-commands.md)
+(2026-11-23), which serializes every fixture command across processes, bounds
 it with a deadline, moves fixture sources under the shared target and stops
 copying the build-support crate into each fixture.
 
@@ -89,11 +89,11 @@ decision. They are historical context only and do not name a current record.
 
 ### Amendment 1 (2026-11-23): ADR-0014
 
-[ADR-0014](adr-0014-serialise-and-bound-fixture-cargo-commands.md) keeps this
+[ADR-0014](adr-0014-serialize-and-bound-fixture-cargo-commands.md) keeps this
 record's decision and corrects three things this record left unsafe or untrue.
 
-1. The nextest group is not by itself a serialisation guarantee. Under nextest
-   every test is a process, so an in-process mutex serialises nothing, and the
+1. The nextest group is not by itself a serialization guarantee. Under nextest
+   every test is a process, so an in-process mutex serializes nothing, and the
    group is configuration that a renamed binary can silently escape. Each
    fixture command now holds a cross-process advisory lock for its whole
    lifetime, and a contract test holds the group.

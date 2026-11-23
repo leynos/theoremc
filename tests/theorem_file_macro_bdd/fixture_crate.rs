@@ -3,7 +3,7 @@
 //! This module is the filesystem side of `theorem_file_macro_bdd.rs`: it
 //! creates isolated Cargo projects that include the real build script and
 //! generated-suite helpers from the root crate. It depends on `cargo_runner`
-//! for serialised Cargo execution, keeping fixture layout separate from
+//! for serialized Cargo execution, keeping fixture layout separate from
 //! process orchestration.
 
 use camino::Utf8Path;

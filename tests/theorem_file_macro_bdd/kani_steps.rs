@@ -157,7 +157,7 @@ fn skip_without_kani(reason: &str, check: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Recognises a Kani build failure that says the environment is unusable.
+/// Recognizes a Kani build failure that says the environment is unusable.
 fn is_unusable_kani_environment(error: &str) -> bool {
     error.contains("error while loading shared libraries")
         || error.contains("cannot open shared object file")

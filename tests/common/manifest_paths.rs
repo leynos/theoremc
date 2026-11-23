@@ -1,7 +1,7 @@
 //! Formats repository paths for generated fixture manifests.
 //!
 //! A fixture manifest names the checkout by path, so the same path has to be
-//! written the same way whatever host produced it. These helpers normalise
+//! written the same way whatever host produced it. These helpers normalize
 //! separators and escape the result for a TOML basic string, so a checkout under
 //! a path with a backslash, a quote or a control character still produces a
 //! manifest Cargo accepts.

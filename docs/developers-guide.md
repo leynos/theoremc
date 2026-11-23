@@ -626,13 +626,13 @@ suite.
   candidate member of the repository workspace, and they name
   `crates/theoremc-build-support` by path rather than copying it, so the shared
   target compiles that crate once. See
-  [ADR-0014](adrs/adr-0014-serialise-and-bound-fixture-cargo-commands.md).
+  [ADR-0014](adrs/adr-0014-serialize-and-bound-fixture-cargo-commands.md).
 - Every fixture `cargo` and `cargo kani` command goes through
   `test_helpers::run_fixture_command`. It holds
   `<shared-target>/fixture-cargo.lock` — a cross-process advisory lock — for
   the command's whole lifetime and applies a deadline. The lock is a file
   rather than a mutex because nextest runs every test in its own process, so an
-  in-process mutex would serialise nothing. A lock timeout names the lock path
+  in-process mutex would serialize nothing. A lock timeout names the lock path
   and the elapsed wait; a command timeout fails the test with the command and
   the output it produced. On Unix the child runs in its own process group and a
   timeout kills the group before reaping the child; on other hosts only the

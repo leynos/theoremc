@@ -48,7 +48,7 @@ fn the_manifest_normalizes_windows_path_separators() {
     );
     assert!(
         manifest.contains("path = \"C:/Users/user/projects/theoremc\""),
-        "the path must be normalised to forward slashes; got:\n{manifest}",
+        "the path must be normalized to forward slashes; got:\n{manifest}",
     );
 }
 

@@ -104,8 +104,8 @@
   gate](adrs/adr-0013-workspace-complete-lint-gate.md)
   - Decision record for workspace-scoped rustdoc, Clippy, and Whitaker stages,
     the sequential `make lint` aggregate, and the exclusion-free `dylint.toml`.
-- [Architectural decision record (ADR) 0014: serialise and bound fixture cargo
-  commands](adrs/adr-0014-serialise-and-bound-fixture-cargo-commands.md)
+- [Architectural decision record (ADR) 0014: serialize and bound fixture cargo
+  commands](adrs/adr-0014-serialize-and-bound-fixture-cargo-commands.md)
   - Decision record for the cross-process fixture lock, the fixture command
     deadline, fixture sources under the shared target, and the amendment to
     ADR-0012.
@@ -206,7 +206,7 @@
       tests, documentation, and dependency policy.
   - [Include provenance in action-signature conflict diagnostics](execplans/issue-51-include-provenance-in-macro-action-signature-conflict-diagnostics.md)
     - ExecPlan for adding theorem provenance to signature-conflict errors.
-  - [Serialise and warm the fixture cargo builds behind the BDD
+  - [Serialize and warm the fixture cargo builds behind the BDD
     suites](execplans/issue-197-theorem-file-macro-bdd-runs-nine-cold-fixture-builds-in-parallel-under-nextest-and-blocks-the-host.md)
     - ExecPlan for the fixture lock, the command deadline, source placement and
       the nextest contract for issue #197.

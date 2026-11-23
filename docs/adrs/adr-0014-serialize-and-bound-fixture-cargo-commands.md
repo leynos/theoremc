@@ -1,4 +1,4 @@
-# Architectural decision record (ADR) 0014: Serialise and bound fixture cargo commands
+# Architectural decision record (ADR) 0014: Serialize and bound fixture cargo commands
 
 ## Status
 
@@ -23,7 +23,7 @@ minutes and had to be killed by hand:
 
 - nextest ran the nine scenarios as nine processes at once, each in its own
   process group, so each had its own copy of the suite's `static Mutex<()>`.
-  The mutex serialised nothing, and the doc comment that claimed it protected
+  The mutex serialized nothing, and the doc comment that claimed it protected
   "in-process test parallelism" described a guarantee the runner never provided.
 - The nine builds between them had 145 compiler invocations in flight or queued
   at once. One fixture held Cargo's host-wide `~/.cargo/.package-cache` lock
@@ -41,7 +41,7 @@ direct `cargo test --test theorem_file_macro_bdd` run such as `make kani` uses.
 
 ## Decision drivers
 
-- The serialisation must hold across processes, because nextest's unit of
+- The serialization must hold across processes, because nextest's unit of
   isolation is the process.
 - A stalled fixture must fail the test that started it, with the command and the
   output, rather than wait for an outer timeout that names nothing.
@@ -51,7 +51,7 @@ direct `cargo test --test theorem_file_macro_bdd` run such as `make kani` uses.
 
 ## Decision
 
-### Serialisation
+### Serialization
 
 Every fixture command takes an advisory whole-file lock on
 `<shared-target>/fixture-cargo.lock` before it starts and holds it until it
@@ -165,7 +165,7 @@ three exact binary filters, or allows less than the exported deadline.
 
 ### Keep the in-process mutex and rely on the nextest group
 
-Rejected. The mutex never serialised anything under nextest; keeping it would
+Rejected. The mutex never serialized anything under nextest; keeping it would
 preserve a comment that states a false guarantee. The group alone does not cover
 `make kani`'s direct `cargo test` run.
 

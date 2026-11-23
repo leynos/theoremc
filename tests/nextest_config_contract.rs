@@ -1,6 +1,6 @@
 //! Contract tests for `.config/nextest.toml`.
 //!
-//! The fixture suites are serialised twice over: by the cross-process lock the
+//! The fixture suites are serialized twice over: by the cross-process lock the
 //! commands take, and by the nextest test group that keeps their tests from
 //! starting together. The lock is code and cannot silently disappear; the group
 //! is configuration, and a renamed binary or a lost override would quietly turn
@@ -122,7 +122,7 @@ fn the_fixture_group_runs_one_test_at_a_time() -> Result<(), String> {
     assert_eq!(
         group_max_threads(&config)?,
         1,
-        "test group `{GROUP}` must serialise the fixture suites",
+        "test group `{GROUP}` must serialize the fixture suites",
     );
     Ok(())
 }

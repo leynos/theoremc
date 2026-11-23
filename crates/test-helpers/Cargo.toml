@@ -14,7 +14,7 @@ the-newtype = "0.1.1"
 theoremc-core = { version = "0.1.0", path = "../theoremc-core" }
 
 [target.'cfg(unix)'.dependencies]
-# `flock` serialises fixture `cargo` commands across processes, and
+# `flock` serializes fixture `cargo` commands across processes, and
 # `kill_process_group` reaps the compiler work a timed-out command started. Both
 # are Unix-only; the non-Unix fallback uses the standard library's advisory lock
 # and kills only the direct child.

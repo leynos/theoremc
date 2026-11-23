@@ -1,7 +1,7 @@
 //! Regression tests for the cross-process fixture lock.
 //!
 //! The lock exists because `nextest` runs every test in its own process, so an
-//! in-process mutex serialises nothing. These tests therefore assert the
+//! in-process mutex serializes nothing. These tests therefore assert the
 //! property that matters across processes: a second holder cannot take the lock
 //! while the first holds it, and the second holder's failure names the lock and
 //! how long it waited.

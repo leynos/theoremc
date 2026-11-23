@@ -6,7 +6,7 @@
 //! deadline and one error-reporting format.
 //!
 //! The lock is a lock *file*, not a mutex: `cargo nextest` runs every test in its
-//! own process, so an in-process mutex would serialise nothing and every fixture
+//! own process, so an in-process mutex would serialize nothing and every fixture
 //! build would start at once. See `test_helpers::FixtureLock`.
 
 use std::process::Command;

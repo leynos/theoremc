@@ -1,7 +1,7 @@
-//! Cross-process serialisation for fixture `cargo` commands.
+//! Cross-process serialization for fixture `cargo` commands.
 //!
 //! The fixture BDD suites start real `cargo` builds. Under `cargo nextest` every
-//! test runs in its own process, so an in-process mutex serialises nothing: all
+//! test runs in its own process, so an in-process mutex serializes nothing: all
 //! the fixture builds start together, contend on Cargo's package-cache lock, and
 //! queue every other Cargo process on the host behind them (issue #197).
 //!
