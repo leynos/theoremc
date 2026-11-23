@@ -445,14 +445,18 @@ whole workspace: `LINT_PACKAGES` defaults to `--workspace`, `CARGO_FLAGS` adds
 `--all-targets --all-features`, and the rustdoc stage adds
 `--all-features --no-deps`. The scope is named once because Cargo selects only
 the root package when no package flag is given, which is how the gates used to
-under-check. Four tests hold this shape. `tests/lint_makefile_contract.rs`
+under-check. Five tests hold this shape. `tests/lint_makefile_contract.rs`
 reads the recipes as text, and `tests/lint_ci_contract.rs` reads the workflow
 and `dylint.toml`. `tests/lint_gate_execution.rs` runs the recipes against stub
 executables to prove each stage runs in order and propagates its failure.
 `tests/lint_workspace_execution.rs` writes a two-package workspace and runs the
 real `cargo doc` and `cargo clippy` invocations, so a finding in the non-root
 member is shown to fail the stage rather than merely being passed the right
-arguments.
+arguments, including an undocumented private item caught by the inherited
+`missing_docs_in_private_items` rule. `tests/lint_manifest_contract.rs` reads
+the root `[workspace.lints.clippy]` table and every manifest that
+`cargo metadata` reports, so a package that stops opting in, or a baseline entry
+that is downgraded, fails before the gate can silently narrow.
 
 The `[workspace.lints]` tables adopt the `leynos/netsuke` baseline as a
 minimum, in layers, and keep any stricter TheoremC rule. This layer adds
@@ -463,12 +467,28 @@ full rustdoc set (`broken_intra_doc_links`, `private_intra_doc_links`,
 `cfg(kani)` and `cfg(dylint_lib)`, so Kani harnesses and Dylint libraries are
 declared once instead of carrying per-site expectations.
 
-`clippy::missing_docs_in_private_items` was the last baseline rule to arrive:
-it waited on documenting every private item it reports, concentrated in
-`crates/theoremc-core` and `crates/theoremc-macros`. That documentation is in
-place and the rule is denied, so a new private item the lint reports, without a
-doc comment, now fails `make lint` rather than passing unnoticed. The lint does
-not check items compiled only into test harnesses.
+`clippy::missing_docs_in_private_items` extends the documentation contract from
+the public API to every private item the lint reports: modules, functions,
+types, named fields, variants, statics, macros, and inherent methods. It was
+the last baseline rule to arrive, because it waited on documenting the private
+implementation surface, concentrated in `crates/theoremc-core` and
+`crates/theoremc-macros`. Those comments state purpose, invariants, ownership,
+source-location behaviour, error semantics, or generated-code constraints; a
+comment that only paraphrases an item's name adds nothing the name did not
+already say. The rule is denied in the root `[workspace.lints.clippy]` table,
+and every package opts in with `[lints] workspace = true`.
+`tests/lint_manifest_contract.rs` fails if either half of that wiring goes
+missing, and `tests/lint_workspace_execution.rs` proves an undocumented private
+item in a non-root member's ordinary library target fails the real Clippy
+invocation. The lint does not check items compiled only into test harnesses,
+because Clippy skips it when the crate is built with `--test`.
+
+Write the comment on the authored item; Clippy already skips items it can
+attribute to a proc macro. If a residual diagnostic survives that rule, use an
+item-scoped `#[expect(clippy::missing_docs_in_private_items, reason = "...")]`
+whose reason names the macro and the concrete limitation. Never use
+`#[allow]`: an expectation becomes unfulfilled, and warns, once the limitation
+disappears, so the exemption removes itself instead of rotting.
 
 Where a rule is adopted but tuned differently, record the reason beside the
 setting: `clippy.toml` keeps `cognitive-complexity-threshold = 9` to match

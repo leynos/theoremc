@@ -21,37 +21,95 @@ use tempfile::TempDir;
 /// The root manifest, which mirrors this repository's hybrid shape: `[workspace]`
 /// and `[package]` in one file, so a bare `cargo` invocation would select the
 /// root package alone.
+///
+/// Like the real manifest, it denies `clippy::missing_docs_in_private_items` in
+/// the workspace table and opts the root package in. The member opts in through
+/// its own manifest, so dropping that opt-in would leave the rule unenforced
+/// there.
 const ROOT_MANIFEST: &str = concat!(
     "[workspace]\n",
     "members = [\"member\"]\n",
     "resolver = \"2\"\n",
     "\n",
+    "[workspace.lints.clippy]\n",
+    "missing_docs_in_private_items = \"deny\"\n",
+    "\n",
     "[package]\n",
     "name = \"lint-root\"\n",
     "version = \"0.1.0\"\n",
     "edition = \"2021\"\n",
+    "\n",
+    "[lints]\n",
+    "workspace = true\n",
 );
 
 /// A root package with nothing to report.
-const ROOT_SOURCE: &str = "pub fn root() -> u8 { 1 }\n";
+///
+/// It carries a documented private helper, so the clean case proves the rule is
+/// active and satisfied rather than simply absent.
+const ROOT_SOURCE: &str = concat!(
+    "//! The synthetic root package.\n",
+    "\n",
+    "/// Returns the root package's answer.\n",
+    "pub fn root() -> u8 { root_value() }\n",
+    "\n",
+    "/// Supplies the value the root package reports.\n",
+    "fn root_value() -> u8 { 1 }\n",
+);
 
-/// The member manifest.
+/// The member manifest, which must opt into the workspace lint baseline.
 const MEMBER_MANIFEST: &str = concat!(
     "[package]\n",
     "name = \"lint-member\"\n",
     "version = \"0.1.0\"\n",
     "edition = \"2021\"\n",
+    "\n",
+    "[lints]\n",
+    "workspace = true\n",
 );
 
 /// A member with nothing to report.
-const MEMBER_SOURCE: &str = "pub fn member() -> u8 { 2 }\n";
+///
+/// Like the root source, it holds a documented private helper, so the clean
+/// case would fail if the inherited rule demanded documentation that is
+/// missing.
+const MEMBER_SOURCE: &str = concat!(
+    "//! The synthetic member package.\n",
+    "\n",
+    "/// Returns the member's answer.\n",
+    "pub fn member() -> u8 { member_value() }\n",
+    "\n",
+    "/// Supplies the value the member reports.\n",
+    "fn member_value() -> u8 { 2 }\n",
+);
 
 /// A member with a private function no caller reaches, which `dead_code` reports
 /// and `-D warnings` turns into a failure.
+///
+/// The helper is documented, so `missing_docs_in_private_items` cannot be what
+/// fails the stage and the case keeps testing the dead-code finding alone.
 const MEMBER_WITH_DEAD_CODE: &str = concat!(
+    "//! The synthetic member package.\n",
+    "\n",
+    "/// Returns the member's answer.\n",
     "pub fn member() -> u8 { 2 }\n",
     "\n",
+    "/// Remains unreachable, so `dead_code` reports it.\n",
     "fn unreachable_helper() -> u8 { 3 }\n",
+);
+
+/// A member whose ordinary library target holds a used, undocumented private
+/// function, which `missing_docs_in_private_items` reports.
+///
+/// The helper is called from the public function, so `dead_code` cannot be what
+/// fails the stage; the only finding is the missing doc comment.
+const MEMBER_WITH_UNDOCUMENTED_PRIVATE_ITEM: &str = concat!(
+    "//! The synthetic member package.\n",
+    "\n",
+    "/// Returns the member's answer.\n",
+    "pub fn member() -> u8 { undocumented_helper() }\n",
+    "\n",
+    "fn undocumented_helper() -> u8 { 2 }\n",
 );
 
 /// A member whose documentation links to an item that does not exist, which
@@ -188,6 +246,34 @@ fn a_finding_in_a_member_crate_fails_the_stage(
             "the {} stage must fail on a finding in the member crate, but it passed",
             stage.name
         ));
+    }
+    Ok(())
+}
+
+/// Verifies that an undocumented private item in a member's library target is
+/// reported by name, with its source location.
+///
+/// The synthetic root denies the lint in `[workspace.lints.clippy]` and both
+/// packages opt in, so this is the end-to-end proof that the rule reaches a
+/// non-root member's ordinary library target rather than only test code or the
+/// root package.
+#[test]
+fn an_undocumented_private_item_in_a_member_fails_clippy() -> Result<(), String> {
+    let workspace = write_workspace(MEMBER_WITH_UNDOCUMENTED_PRIVATE_ITEM)?;
+    let output = run_stage(workspace.path(), &CLIPPY_STAGE)?;
+    if output.status.success() {
+        return Err(
+            "the Clippy stage must fail on an undocumented private item in a member library target, but it passed"
+                .to_owned(),
+        );
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    for fragment in ["missing_docs_in_private_items", "member/src/lib.rs"] {
+        if !stderr.contains(fragment) {
+            return Err(format!(
+                "the Clippy failure must name `{fragment}`; stderr was:\n{stderr}"
+            ));
+        }
     }
     Ok(())
 }

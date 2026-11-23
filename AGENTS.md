@@ -307,6 +307,14 @@ project:
   module's purpose and utility, including test modules and fixture crate roots.
 - Document public APIs using Rustdoc comments (`///`) so documentation can be
   generated with cargo doc.
+- Document private items too. `clippy::missing_docs_in_private_items` is denied
+  workspace-wide, so a private module, function, type, named field, variant,
+  static, macro, or inherent method without a doc comment fails `make lint`.
+  Describe purpose, invariants, ownership, source-location behaviour, error
+  semantics, or code-generation constraints; do not paraphrase the name. Where
+  a macro-generated item cannot carry an authored comment, use an item-scoped
+  `#[expect(clippy::missing_docs_in_private_items, reason = "...")]` naming the
+  macro and the limitation, never `#[allow]`.
 - Prefer immutable data and avoid unnecessary `mut` bindings.
 - Clone to express intentional ownership, sharing, or snapshot semantics;
   prefer borrowing or ownership transfer when a new owned value is unnecessary.
