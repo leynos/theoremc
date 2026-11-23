@@ -129,6 +129,24 @@ fn a_stale_directory_in_the_nested_layout_takes_the_suffix() {
     assert_eq!(suffix_is_taken(root, "ab_2_0001"), Ok(false));
 }
 
+/// The `sources` directory sits beside `debug/build`, so a suffix scan must not
+/// mistake a fixture source directory for a generated build directory and refuse
+/// every name.
+#[test]
+fn a_sources_directory_does_not_make_a_suffix_taken() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let root = Utf8Path::from_path(temp.path()).expect("temp dir path is UTF-8");
+    let dir = Dir::open_ambient_dir(root, ambient_authority()).expect("open temp dir");
+    dir.create_dir_all("sources/fixture-ab_1_0001")
+        .expect("leave a fixture source directory");
+
+    assert_eq!(
+        suffix_is_taken(root, "ab_1_0001"),
+        Ok(false),
+        "a fixture source directory is not a build directory",
+    );
+}
+
 #[test]
 fn a_build_directory_that_cannot_be_listed_is_an_error_not_an_absence() {
     let temp = tempfile::tempdir().expect("temp dir");

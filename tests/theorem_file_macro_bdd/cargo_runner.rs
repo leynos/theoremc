@@ -1,15 +1,28 @@
-//! Cargo command serialization helpers for theorem-file macro fixtures.
+//! Cargo command helpers for theorem-file macro fixtures.
 //!
 //! This module is the process boundary for `theorem_file_macro_bdd.rs`.
 //! `fixture_crate.rs` builds temporary crates, then delegates all Cargo
-//! invocations here so fixture builds and `cargo kani list` runs share one
-//! lock, target-directory policy, and error-reporting format.
+//! invocations here so fixture builds and `cargo kani` runs share one lock, one
+//! deadline and one error-reporting format.
+//!
+//! The lock is a lock *file*, not a mutex: `cargo nextest` runs every test in its
+//! own process, so an in-process mutex would serialise nothing and every fixture
+//! build would start at once. See `test_helpers::FixtureLock`.
 
 use std::process::Command;
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::time::Duration;
 
 use camino::Utf8Path;
-use test_helpers::hermetic_cargo;
+use test_helpers::{
+    FixtureOutcome, hermetic_cargo, run_fixture_command, run_fixture_command_within,
+};
+
+/// How long the Kani probe may take before it is reported as a failure.
+///
+/// `cargo kani --version` starts a toolchain lookup, not a build, so a probe that
+/// outlives a minute is a broken environment rather than a slow one. Bounding it
+/// separately keeps a hung probe from spending the whole fixture deadline.
+const KANI_PROBE_DEADLINE: Duration = Duration::from_secs(60);
 
 #[derive(Clone, Copy)]
 pub(crate) enum CargoSubcommand {
@@ -37,89 +50,102 @@ impl CargoSubcommand {
     }
 }
 
-/// Proof that `FIXTURE_CARGO_LOCK` is held by the current thread.
-///
-/// Pass a `CargoGuard<'_>` to fixture Cargo helpers to enforce at compile time
-/// that no caller bypasses the serialization contract.
-pub(crate) struct CargoGuard<'a> {
-    _guard: std::sync::MutexGuard<'a, ()>,
-}
-
-impl CargoGuard<'_> {
-    pub(crate) fn acquire() -> Self {
-        Self {
-            _guard: recover_mutex_guard(&FIXTURE_CARGO_LOCK),
-        }
-    }
-}
-
-/// Serializes all fixture `cargo` invocations.
-///
-/// `cargo` writes lock files, registry caches, and incremental artefacts to
-/// paths derived from the manifest directory. When multiple fixture crates run
-/// `cargo build` concurrently they race on the shared `~/.cargo` registry
-/// cache and on any workspace-level `Cargo.lock`, producing spurious build
-/// failures even with isolated `CARGO_TARGET_DIR` values. A single global
-/// mutex is the minimal correct serialization mechanism for in-process test
-/// parallelism; the alternative--spawning each fixture in a fully isolated
-/// toolchain environment--would require per-test network access and is
-/// disproportionate for a test suite this size.
-pub(crate) static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
-
 /// Runs a Cargo subcommand in the fixture crate directory.
 ///
 /// `CARGO_TARGET_DIR` is set to the target directory every fixture shares, so
-/// third-party dependencies compile once per run; fixtures keep their own
-/// artefacts apart through unique package names. The caller must supply a [`CargoGuard`] proving that
-/// `FIXTURE_CARGO_LOCK` is held, because registry cache access and
-/// workspace-level lock files are still shared across invocations.
-///
-/// # Timeout
-///
-/// `Command::output()` blocks until the subprocess exits. No explicit timeout
-/// is imposed: `cargo` is a first-party trusted tool, and introducing
-/// cross-platform `wait_timeout` polling would add significant complexity
-/// disproportionate to this test suite's scope. If a runaway `cargo` process
-/// causes a stall in CI, the job-level timeout enforced by the CI runtime
-/// (e.g. GitHub Actions' `timeout-minutes`) provides the outer bound.
+/// third-party dependencies compile once per warm target rather than once per
+/// fixture; a `cargo clean` or a different `CARGO_TARGET_DIR` starts a new one.
+/// Fixtures keep their own artefacts apart through unique package names. The
+/// command holds the fixture lock for its whole lifetime and is bounded by the
+/// fixture deadline, so it cannot start beside another fixture build or outlive
+/// its allowance.
 pub(crate) fn cargo_run(
     manifest_dir: &Utf8Path,
     target_dir: &Utf8Path,
     subcommand: CargoSubcommand,
-    guard: &CargoGuard<'_>,
 ) -> Result<(), String> {
-    cargo_run_output(manifest_dir, target_dir, subcommand, guard).map(|_| ())
+    cargo_run_output(manifest_dir, target_dir, subcommand).map(|_| ())
 }
 
 pub(crate) fn cargo_run_output(
     manifest_dir: &Utf8Path,
     target_dir: &Utf8Path,
     subcommand: CargoSubcommand,
-    _guard: &CargoGuard<'_>,
 ) -> Result<String, String> {
-    let output = hermetic_cargo(manifest_dir, target_dir)
-        .args(subcommand.args())
-        .output()
-        .map_err(|error| error.to_string())?;
-    command_result(subcommand, &output)
+    let mut command = hermetic_cargo(manifest_dir, target_dir);
+    command.args(subcommand.args());
+    match run_fixture_command(command)? {
+        FixtureOutcome::Completed(output) if output.is_success() => Ok(output.combined()),
+        FixtureOutcome::Completed(output) => Err(format!(
+            "cargo {} failed with status {}\nstdout:\n{}\nstderr:\n{}",
+            subcommand.label(),
+            output.status,
+            output.stdout,
+            output.stderr,
+        )),
+        FixtureOutcome::TimedOut {
+            deadline,
+            elapsed,
+            output,
+        } => Err(format!(
+            "cargo {} did not finish within {deadline:?} (ran for {elapsed:?}); \
+             it printed:\n{output}",
+            subcommand.label(),
+        )),
+    }
 }
 
-pub(crate) fn recover_mutex_guard(mutex: &Mutex<()>) -> MutexGuard<'_, ()> {
-    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+/// Whether a usable `cargo kani` is available, and why not when it is not.
+#[derive(Debug)]
+pub(crate) enum KaniAvailability {
+    /// `cargo kani --version` succeeded.
+    Available,
+    /// Kani is not installed, or its toolchain is unusable, for this reason.
+    Unavailable(String),
+    /// The probe itself did not finish in time.
+    TimedOut(Duration),
 }
 
-/// Returns `true` if `cargo kani` is available in the current environment.
+/// Probes for a usable `cargo kani`.
 ///
-/// Probes by running `cargo kani --version`. When `cargo-kani` is not
-/// installed, `cargo` exits with a non-zero status and emits
-/// `error: no such command: 'kani'`; `Command::output()` itself still succeeds
-/// because the `cargo` binary was found. The boolean is derived from the exit
-/// status alone, so no stderr parsing is required.
-pub(crate) fn kani_is_installed() -> bool {
-    Command::new("cargo")
-        .args(["kani", "--version"])
-        .output()
-        .is_ok_and(|o| o.status.success())
+/// The probe runs under the fixture lock and its own short deadline, so a broken
+/// Kani cannot leave a `kani-compiler` build running while the rest of the suite
+/// waits behind the lock. A timeout is distinguished from unavailability: the
+/// first is a failure of the environment this run must report, the second is a
+/// reason to skip.
+pub(crate) fn kani_is_available() -> Result<KaniAvailability, String> {
+    probe_kani("cargo")
+}
+
+/// Probes `program kani --version`, using the production deadline.
+fn probe_kani(program: impl AsRef<std::ffi::OsStr>) -> Result<KaniAvailability, String> {
+    probe_kani_within(program, KANI_PROBE_DEADLINE)
+}
+
+/// Probes `program kani --version` with an explicit deadline.
+fn probe_kani_within(
+    program: impl AsRef<std::ffi::OsStr>,
+    deadline: Duration,
+) -> Result<KaniAvailability, String> {
+    let mut command = Command::new(program);
+    command.args(["kani", "--version"]);
+    match run_fixture_command_within(command, deadline)? {
+        FixtureOutcome::Completed(output) if output.is_success() => Ok(KaniAvailability::Available),
+        FixtureOutcome::Completed(output) => {
+            let detail = output.stderr.trim();
+            Ok(KaniAvailability::Unavailable(if detail.is_empty() {
+                format!(
+                    "`cargo kani --version` exited with status {}",
+                    output.status
+                )
+            } else {
+                detail.to_owned()
+            }))
+        }
+        FixtureOutcome::TimedOut {
+            deadline: overran, ..
+        } => Ok(KaniAvailability::TimedOut(overran)),
+    }
 }
 
 /// Returns `true` when the run must fail rather than skip without Kani.
@@ -135,23 +161,6 @@ pub(crate) fn kani_is_required() -> bool {
     std::env::var_os("THEOREMC_REQUIRE_KANI").is_some_and(|value| value == "1")
 }
 
-fn command_result(
-    subcommand: CargoSubcommand,
-    output: &std::process::Output,
-) -> Result<String, String> {
-    if output.status.success() {
-        return Ok(format!(
-            "{}{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr),
-        ));
-    }
-
-    Err(format!(
-        "cargo {} failed with status {}\nstdout:\n{}\nstderr:\n{}",
-        subcommand.label(),
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr),
-    ))
-}
+#[cfg(test)]
+#[path = "cargo_runner_tests.rs"]
+mod tests;

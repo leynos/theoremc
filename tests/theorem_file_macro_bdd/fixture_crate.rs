@@ -3,16 +3,16 @@
 //! This module is the filesystem side of `theorem_file_macro_bdd.rs`: it
 //! creates isolated Cargo projects that include the real build script and
 //! generated-suite helpers from the root crate. It depends on `cargo_runner`
-//! for serialized Cargo execution, keeping fixture layout separate from
+//! for serialised Cargo execution, keeping fixture layout separate from
 //! process orchestration.
 
 use camino::Utf8Path;
-use theoremc_core::path_format::{normalize_path_separators, toml_basic_string_value};
+use test_helpers::{
+    FixtureCrate as CommonFixtureCrate, build_support_dependency_for, checkout_root, toml_path,
+};
 
-use super::cargo_runner::{CargoGuard, CargoSubcommand, cargo_run, cargo_run_output};
-use test_helpers::FixtureCrate as CommonFixtureCrate;
+use super::cargo_runner::{CargoSubcommand, cargo_run, cargo_run_output};
 
-const ROOT_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 pub(crate) struct TheoremFixtureSpec<'a> {
     pub(crate) path: &'a str,
     pub(crate) content: &'a str,
@@ -34,62 +34,62 @@ impl FixtureCrate {
         self.inner.write(path, contents)
     }
 
-    pub(crate) fn cargo_build(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
-        self.cargo_run(CargoSubcommand::Build, guard)
+    pub(crate) fn cargo_build(&self) -> Result<(), String> {
+        self.cargo_run(CargoSubcommand::Build)
     }
 
-    pub(crate) fn cargo_kani_list(&self, guard: &CargoGuard<'_>) -> Result<String, String> {
+    pub(crate) fn cargo_kani_list(&self) -> Result<String, String> {
         cargo_run_output(
             self.inner.manifest_dir(),
             self.inner.target_dir(),
             CargoSubcommand::KaniList,
-            guard,
         )
     }
 
-    pub(crate) fn cargo_kani_verify(&self, guard: &CargoGuard<'_>) -> Result<String, String> {
+    pub(crate) fn cargo_kani_verify(&self) -> Result<String, String> {
         cargo_run_output(
             self.inner.manifest_dir(),
             self.inner.target_dir(),
             CargoSubcommand::Kani,
-            guard,
         )
     }
 
-    fn cargo_run(&self, subcommand: CargoSubcommand, guard: &CargoGuard<'_>) -> Result<(), String> {
+    fn cargo_run(&self, subcommand: CargoSubcommand) -> Result<(), String> {
         cargo_run(
             self.inner.manifest_dir(),
             self.inner.target_dir(),
             subcommand,
-            guard,
         )
     }
 }
 
+/// Builds the manifest a macro fixture uses.
+///
+/// The fixture is its own workspace root, and it names the checkout's
+/// build-support crate and the root crate by path. Both paths are stable across
+/// fixtures, so the shared target compiles each of those crates once.
 pub(crate) fn fixture_cargo_toml() -> String {
-    fixture_cargo_toml_for(ROOT_MANIFEST_DIR)
+    fixture_cargo_toml_for(&checkout_root())
 }
 
-pub(crate) fn fixture_cargo_toml_for(root_manifest_dir: &str) -> String {
-    let normalized_root_manifest_dir = normalize_path_separators(root_manifest_dir);
-    let escaped_root_manifest_dir = toml_basic_string_value(&normalized_root_manifest_dir);
-    let build_support_dir = format!("{normalized_root_manifest_dir}/crates/theoremc-build-support");
-    let escaped_build_support_dir = toml_basic_string_value(&build_support_dir);
+/// Builds the manifest a macro fixture uses for `checkout_root`.
+pub(crate) fn fixture_cargo_toml_for(checkout_root: &Utf8Path) -> String {
     format!(
         concat!(
             "[package]\n",
             "name = \"theorem_file_macro_fixture\"\n",
             "version = \"0.1.0\"\n",
             "edition = \"2024\"\n\n",
+            "[workspace]\n\n",
             "[dependencies]\n",
-            "theoremc = {{ path = \"{root_manifest_dir}\", features = [\"test-support\"] }}\n\n",
+            "theoremc = {{ path = {root}, features = [\"test-support\"] }}\n\n",
             "[dev-dependencies]\n",
-            "theoremc = {{ path = \"{root_manifest_dir}\", features = [\"test-support\"] }}\n\n",
+            "theoremc = {{ path = {root}, features = [\"test-support\"] }}\n\n",
             "[build-dependencies]\n",
-            "theoremc-build-support = {{ path = \"{build_support_dir}\" }}\n",
+            "{build_support}\n",
         ),
-        root_manifest_dir = escaped_root_manifest_dir,
-        build_support_dir = escaped_build_support_dir,
+        root = toml_path(checkout_root),
+        build_support = build_support_dependency_for(checkout_root),
     )
 }
 
@@ -108,64 +108,28 @@ pub(crate) fn run_valid_fixture_build(spec: &TheoremFixtureSpec<'_>) -> Result<(
 }
 
 pub(crate) fn run_fixture_build(lib_rs: &str, spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
-    let guard = CargoGuard::acquire();
     let fixture = FixtureCrate::new(lib_rs)?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
-    fixture.cargo_build(&guard)
+    fixture.cargo_build()
 }
+
 /// Builds the fixture crate and runs `cargo kani` over every generated harness.
 pub(crate) fn build_fixture_and_verify_kani_harnesses(
     spec: &TheoremFixtureSpec<'_>,
 ) -> Result<String, String> {
-    let guard = CargoGuard::acquire();
     let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
-    fixture.cargo_kani_verify(&guard)
+    fixture.cargo_kani_verify()
 }
 
 pub(crate) fn build_fixture_and_list_kani_harnesses(
     spec: &TheoremFixtureSpec<'_>,
 ) -> Result<String, String> {
-    let guard = CargoGuard::acquire();
     let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
-    fixture.cargo_kani_list(&guard)
+    fixture.cargo_kani_list()
 }
 
-mod tests {
-    //! Tests for Cargo TOML fixture generation.
-
-    use super::fixture_cargo_toml_for;
-
-    #[test]
-    fn fixture_cargo_toml_normalizes_windows_paths() {
-        // Simulate a Windows-style `CARGO_MANIFEST_DIR` with backslash
-        // separators. `fixture_cargo_toml` reads `ROOT_MANIFEST_DIR`, which is
-        // set at compile time, but this test only needs the normalization
-        // logic.
-        let windows_path = r"C:\Users\user\projects\theoremc";
-        let toml = fixture_cargo_toml_for(windows_path);
-
-        assert!(
-            !toml.contains('\\'),
-            "TOML must not contain backslashes after normalization; got:\n{toml}",
-        );
-        assert!(
-            toml.contains("\"C:/Users/user/projects/theoremc\""),
-            "expected normalized forward-slash path in TOML; got:\n{toml}",
-        );
-        assert!(toml.contains("theoremc-build-support = { path = \"C:/Users/user/projects/theoremc/crates/theoremc-build-support\" }"));
-    }
-
-    #[test]
-    fn fixture_cargo_toml_escapes_basic_string_paths() {
-        let checkout_path = "/home/user/project's/\"theoremc\"";
-        let toml = fixture_cargo_toml_for(checkout_path);
-
-        assert!(
-            toml.contains("path = \"/home/user/project's/\\\"theoremc\\\"\""),
-            "expected escaped TOML basic string path, got:\n{toml}",
-        );
-        assert!(toml.contains("theoremc-build-support = { path = \"/home/user/project's/\\\"theoremc\\\"/crates/theoremc-build-support\" }"));
-    }
-}
+#[cfg(test)]
+#[path = "fixture_crate_tests.rs"]
+mod tests;

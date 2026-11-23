@@ -1,9 +1,12 @@
 //! Isolation helpers for fixture crates built by integration tests.
 //!
 //! Fixture crates share one warm target directory so third-party dependencies
-//! compile once per run, and keep their own artefacts apart through unique
-//! package names. These helpers decide the target directory, the package name
-//! and the lock a fixture starts from; `fixture_crate` owns everything else.
+//! compile once per warm target rather than once per fixture, and keep their own
+//! artefacts apart through unique package names. A `cargo clean`, or a different
+//! `CARGO_TARGET_DIR`, starts a new target; that is the unit the reuse is
+//! measured over. These helpers decide the target directory, the sources
+//! directory, the package name and the lock a fixture starts from;
+//! `fixture_crate` owns everything else.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -152,10 +155,35 @@ fn repository_root() -> Utf8PathBuf {
     clippy::disallowed_methods,
     reason = "fixture crates must share the target directory the host Cargo invocation is using, so the helper reads the ambient CARGO_TARGET_DIR"
 )]
-pub(super) fn shared_target_dir() -> Result<Utf8PathBuf, String> {
+pub fn shared_target_dir() -> Result<Utf8PathBuf, String> {
     let base = std::env::var("CARGO_TARGET_DIR")
         .map_or_else(|_| repository_root().join("target"), Utf8PathBuf::from);
     let directory = base.join("theoremc-fixture-builds");
+    Dir::create_ambient_dir_all(&directory, ambient_authority())
+        .map_err(|error| error.to_string())?;
+    directory
+        .canonicalize_utf8()
+        .map_err(|error| error.to_string())
+}
+
+/// The directory name, under the shared target, that holds fixture sources.
+///
+/// `suffix_is_taken` scans exactly this layout's sibling `debug/build`, so the
+/// sources directory cannot be mistaken for a generated build directory.
+const SOURCES_DIR_NAME: &str = "sources";
+
+/// Returns the directory every fixture crate's sources are created in.
+///
+/// The sources live inside the shared target rather than in `$TMPDIR` so that
+/// `cargo clean` removes them with the artefacts they produced, and so that an
+/// interrupted run cannot leave fixture crates behind in a directory the build
+/// tool never cleans.
+///
+/// # Errors
+///
+/// Returns an error when the directory cannot be created or its path resolved.
+pub fn shared_target_sources_dir() -> Result<Utf8PathBuf, String> {
+    let directory = shared_target_dir()?.join(SOURCES_DIR_NAME);
     Dir::create_ambient_dir_all(&directory, ambient_authority())
         .map_err(|error| error.to_string())?;
     directory

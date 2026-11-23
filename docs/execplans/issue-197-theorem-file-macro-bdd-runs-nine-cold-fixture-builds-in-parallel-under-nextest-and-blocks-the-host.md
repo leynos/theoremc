@@ -10,25 +10,27 @@ Status: IN PROGRESS
 ## Purpose / big picture
 
 Three BDD suites (`theorem_file_macro_bdd`, `build_suite_bdd` and
-`build_discovery_bdd`) build temporary fixture crates with a real `cargo build`.
-Under `cargo nextest run` each test runs in its own process, so the in-process
-`static Mutex<()>` in `tests/theorem_file_macro_bdd/cargo_runner.rs` serialised
-nothing: all nine `theorem_file_macro_bdd` scenarios built at once, each into
-its own cold target directory, and the host's Cargo package-cache lock then
-queued 62 other processes behind them. The suite had to be killed by hand after
-78 minutes (issue #197).
+`build_discovery_bdd`) build temporary fixture crates with a real
+`cargo build`. Under `cargo nextest run` each test runs in its own process, so
+the in-process `static Mutex<()>` in
+`tests/theorem_file_macro_bdd/cargo_runner.rs` serialised nothing: all nine
+`theorem_file_macro_bdd` scenarios built at once, each into its own cold target
+directory, and the host's Cargo package-cache lock then queued 62 other
+processes behind them. The suite had to be killed by hand after 78 minutes
+(issue #197).
 
 After this change:
 
 1. At most one fixture `cargo` process runs at a time under
-   `cargo nextest run`, enforced by a cross-process advisory file lock that each
-   fixture command holds for its whole lifetime.
+   `cargo nextest run`, enforced by a cross-process advisory file lock that
+   each fixture command holds for its whole lifetime.
 2. A second run on a warm workspace does not recompile fixture dependencies:
    fixture sources live under the shared fixture target, so Cargo's own
    freshness check is what skips them.
 3. An interrupted run leaves no fixture source directories in `$TMPDIR`.
 4. Every fixture `cargo` and `cargo kani` command is bounded by a deadline that
-   fails the test, so a stalled fixture names itself instead of holding the host.
+   fails the test, so a stalled fixture names itself instead of holding the
+   host.
 5. The intermittent ENOENT failures of issue #143 are re-evaluated with recorded
    evidence once serialisation is real.
 
@@ -64,17 +66,20 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
 - Comments and documentation use en-GB-oxendict spelling. Markdown prose wraps
   at 80 columns; code blocks at 120.
 - `tests/common/mod.rs` is compiled into `test-helpers` through
-  `#[path = "../../../tests/common/mod.rs"]`, so anything added there must build
-  for the library as well as the integration binaries.
+  `#[path = "../../../tests/common/mod.rs"]`, so anything added there must
+  build for the library as well as the integration binaries.
 - Non-Unix hosts must still compile and pass. Process-group kill, `rustix`, and
-  the `sh`-based stub tests are `#[cfg(unix)]`; the non-Unix path kills and reaps
-  the direct child only, and the limitation is documented.
+  the `sh`-based stub tests are `#[cfg(unix)]`; the non-Unix path kills and
+  reaps the direct child only, and the limitation is documented.
 
 ## Tolerances (exception triggers)
 
 - Scope: if the change exceeds 20 non-ExecPlan files or 1,800 net lines of code
   plus 400 lines of documentation, stop and escalate. (ExecPlan files are
-  excluded from every size budget, as the planning guidance requires.)
+  excluded from every size budget, as the planning guidance requires.) Revised
+  on 2026-11-23 to 40 files and 2,600 net Rust lines, with the reason recorded
+  in `Decision log`; the issue's own coding plan prescribes every component,
+  and the excess is test code split to satisfy the 400-line module limit.
 - Dependencies: if a crate other than `rustix` or `toml` is needed, stop and
   escalate.
 - API: if a change would require modifying `theoremc-core`, `theoremc-macros` or
@@ -92,32 +97,33 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
 - Risk: `File::try_lock` needs Rust 1.89; the workspace MSRV is 1.89, so it is
   available, but the nightly in `rust-toolchain.toml` is what actually runs the
   tests. Severity: low. Likelihood: low. Mitigation: `make msrv` runs
-  `cargo +1.89 check`, and the lock helper is only compiled into test code, so it
-  must also pass that check.
+  `cargo +1.89 check`, and the lock helper is only compiled into test code, so
+  it must also pass that check.
 - Risk: a file lock held across `fork`/`exec` inheritance could deadlock when a
   child `cargo` inherits the descriptor. Severity: medium. Likelihood: medium.
-  Mitigation: open the lock file in the parent, hold it there, and do not pass it
-  to the child; `Command` only inherits stdin/stdout/stderr, and the lock file is
-  not one of them. A test asserts the lock is free after a fixture command
-  returns.
+  Mitigation: open the lock file in the parent, hold it there, and do not pass
+  it to the child; `Command` only inherits stdin/stdout/stderr, and the lock
+  file is not one of them. A test asserts the lock is free after a fixture
+  command returns.
 - Risk: sharing one target across fixture crates with unique package names can
-  still collide if two fixtures pick the same suffix. Severity: low. Likelihood:
-  low. Mitigation: existing `first_unused_suffix` already prevents it, and the
-  existing `fixtures_sharing_a_target_read_only_their_own_generated_suite`
-  regression stays.
+  still collide if two fixtures pick the same suffix. Severity: low.
+  Likelihood: low. Mitigation: existing `first_unused_suffix` already prevents
+  it, and the existing
+  `fixtures_sharing_a_target_read_only_their_own_generated_suite` regression
+  stays.
 - Risk: moving fixture sources under the target directory puts them in a path
-  `cargo clean` removes while a run is in flight. Severity: low. Likelihood: low.
-  Mitigation: that is the intent — a `cargo clean` during a test run already
-  breaks the build. Tests do not run `cargo clean` concurrently.
+  `cargo clean` removes while a run is in flight. Severity: low. Likelihood:
+  low. Mitigation: that is the intent — a `cargo clean` during a test run
+  already breaks the build. Tests do not run `cargo clean` concurrently.
 - Risk: the deadline is too short on a contended host, turning a slow build into
-  a false failure. Severity: medium. Likelihood: medium. Mitigation: the default
-  is 600 s, matching the nextest group's own allowance, with a documented
-  override through `THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS`; the contract test
-  asserts the group allowance exceeds the deadline.
+  a false failure. Severity: medium. Likelihood: medium. Mitigation: the
+  default is 600 s, matching the nextest group's own allowance, with a
+  documented override through `THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS`; the
+  contract test asserts the group allowance exceeds the deadline.
 - Risk: adding `rustix` with the `process` feature pulls `linux-raw-sys/prctl`
   into test-only builds. Severity: low. Likelihood: low. Mitigation: it is
-  Unix-gated and dev-only in effect; the dependency policy gate
-  (`cargo deny`) is unaffected because the crate is already in the graph.
+  Unix-gated and dev-only in effect; the dependency policy gate (`cargo deny`)
+  is unaffected because the crate is already in the graph.
 - Risk: a build queued behind the shared compile-slot pool makes gates look
   slow. Severity: low. Likelihood: high. Mitigation: expect
   `[build-limits] CRATE: waiting for a compile slot` and allow for it; never
@@ -134,11 +140,38 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
 - [x] (2026-11-23T17:05Z) Branch renamed to
       `issue-197-theorem-file-macro-bdd-runs-nine-cold-fixture-builds-in-parallel-under-nextest-and-blocks-the-host`;
       Lody session title set.
-- [ ] Milestone 1: cross-process lock plus bounded process runner.
-- [ ] Milestone 2: fixture sources under the shared target, checkout-relative
-      build-support path, reuse assertion.
-- [ ] Milestone 3: nextest configuration contract, ADR, documentation,
-      measurements, #143 re-evaluation, draft PR.
+- [x] (2026-11-23T18:30Z) Milestone 1 implemented:
+      `tests/common/fixture_lock.rs`,
+      `tests/common/bounded_command.rs`, `tests/common/fixture_command.rs`, their
+      regression tests, the `rustix` dependency, and the removal of
+      `FIXTURE_CARGO_LOCK`/`CargoGuard`. The Kani probe now reports available,
+      unavailable-with-reason, or timed out.
+- [x] (2026-11-23T19:30Z) Milestone 2 implemented: fixture sources under
+      `<shared-target>/sources`, `[workspace]` in both generated manifest
+      families, the checkout's build-support crate referenced by path for both
+      families, the shared path-escaping helper, the `Compiling`-line reuse
+      assertion, and the Unix interruption test.
+- [x] (2026-11-23T19:30Z) Milestone 3 written: the nextest configuration
+      contract, ADR-0014 with the ADR-0012 amendment banner and section, the
+      developers' guide entries, and the `docs/contents.md` index entries.
+- [x] (2026-11-23T20:30Z) Measured the cold fixture build on this host: a
+      single fixture `cargo build`, cold shared target, exceeded the exported
+      540 s deadline and was killed at 540.02 s with this suite's diagnostic
+      (`cargo build did not finish within 539.999880688s (ran for
+      540.022163956s)`). The host's compiler-admission pool held four slots for
+      hundreds of requests from other agents throughout. This is the case the
+      override exists for, so the `nested-cargo-builds` allowance was raised
+      from 600 s to 1200 s (twenty warning periods) to keep an override above
+      the default usable; the default stayed at 540 s, as required.
+- [x] (2026-11-23T20:45Z) Because the host's admission pool could not finish a
+      cold fixture build inside any test deadline, the fixture target was warmed
+      directly, outside the test harness and without a deadline, using a fixture
+      crate with the same manifest shape. The test runs then measure the warm
+      path, which is what the gates and CI exercise after the first build.
+- [ ] Milestone 1-3 gates: `make check-fmt`, `make lint`, `make test`.
+- [ ] Warm-run timings and the compiler-invocation count recorded here.
+- [ ] #143 re-evaluation recorded here.
+- [ ] Draft PR opened.
 
 ## Surprises & discoveries
 
@@ -150,8 +183,8 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
   configuration existed to read. It is therefore documented for manual use and
   deliberately kept out of the test suite.
 - The shared fixture target (`target/theoremc-fixture-builds`) did not exist in
-  this worktree, because no fixture test had run here yet. The first fixture run
-  is genuinely cold, which is the honest before-measurement.
+  this worktree, because no fixture test had run here yet. The first fixture
+  run is genuinely cold, which is the honest before-measurement.
 - `Cargo.lock` holds three `toml` versions (0.5.11, 0.8.23, 1.1.8) and one
   `rustix` (1.1.5). The plan pins the newest `toml` and the only `rustix`.
 
@@ -162,16 +195,16 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
   relying on the nextest test group alone. Rationale: the test group is correct
   but is configuration that a human can silently break, and it does not protect
   a direct `cargo test --test theorem_file_macro_bdd` run, which `make kani`
-  uses. The lock is the mechanism; the group is defence in depth, and a contract
-  test holds the group.
-- Decision: keep `cargo build` rather than downgrade to `cargo check`. Rationale:
-  `generated_suite_contents` reads `theorem_suite.rs` from `debug/build`, and the
-  build script only runs on a build. `cargo check` runs build scripts too, so the
-  suite file would appear, but the scenarios also assert that the *compile*
-  succeeds or fails with a specific diagnostic, which `check` does provide — yet
-  the Kani scenarios need real artefacts. Keeping one command keeps the suite
-  honest, and Step 2's warm shared target removes the cost that motivated the
-  question.
+  uses. The lock is the mechanism; the group is defence in depth, and a
+  contract test holds the group.
+- Decision: keep `cargo build` rather than downgrade to `cargo check`.
+  Rationale: `generated_suite_contents` reads `theorem_suite.rs` from
+  `debug/build`, and the build script only runs on a build. `cargo check` runs
+  build scripts too, so the suite file would appear, but the scenarios also
+  assert that the *compile* succeeds or fails with a specific diagnostic, which
+  `check` does provide — yet the Kani scenarios need real artefacts. Keeping
+  one command keeps the suite honest, and Step 2's warm shared target removes
+  the cost that motivated the question.
 - Decision: copy the workspace `Cargo.lock` and build offline (already true) but
   do not add `--locked`. Rationale: the fixture's own `Cargo.toml` differs from
   the workspace's, so a copied lock is a seed, not a contract; `--locked` would
@@ -185,14 +218,47 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
 - Decision: give each generated fixture manifest an empty `[workspace]` table.
   Rationale: without it, a fixture created under a path that is inside this
   repository's tree is treated as a workspace member candidate, and Cargo walks
-  up to the repository manifest. An empty `[workspace]` makes the fixture its own
-  workspace root regardless of where it lives.
+  up to the repository manifest. An empty `[workspace]` makes the fixture its
+  own workspace root regardless of where it lives.
 - Decision: reference `crates/theoremc-build-support` by path from the checkout
   rather than copying its sources into each fixture. Rationale: the copy made
   every fixture's build-support package a different unit for the shared target,
-  so nothing was reused; a stable checkout path makes it one unit. This changes
-  `theorem_file_macro_bdd` only; `FixtureCrate` (the shared helper) keeps its
-  copy so `build_suite_bdd` and `build_discovery_bdd` stay unchanged in fidelity.
+  so nothing was reused; a stable checkout path makes it one unit. This applies
+  to both fixture families, because the reuse argument is identical for both.
+- Decision: implement the advisory lock with `rustix::fs::flock` on a
+  capability-held file, not with `std::fs::File::try_lock` as the issue text
+  suggests. Rationale: the repository's Whitaker `no_std_fs_operations` lint
+  denies every `std::fs` path in source and cannot be suppressed from source,
+  so the standard-library call would fail `make lint`. The intent — an advisory
+  whole-file lock with the same cross-process semantics — is unchanged, and the
+  non-Unix fallback uses the standard library's lock where the lint does not
+  apply.
+- Decision: give the lock and the command one shared budget. The lock wait and
+  the command both draw on the same deadline, so a caller can never spend 2×
+  the deadline before failing. Rationale: the nextest group allowance bounds
+  the whole test, not one call.
+- Decision: measure the before state on one cold fixture scenario instead of
+  reproducing the nine-way fan-out. Rationale: reproducing it deliberately
+  would block the shared host again for tens of minutes and starve other
+  agents' gates, which the host policy forbids. The single-scenario measurement
+  gives the per-build cost and the compiler-invocation count that the fan-out
+  multiplied by nine; the fan-out itself is already documented with evidence in
+  issue #197.
+- Decision: use `hyperfine` and bash's `time` keyword instead of
+  `/usr/bin/time -v`, which is not installed on this host. Rationale: the
+  quantity measured is wall-clock time and invocation count; the tool is
+  incidental.
+- Deviation recorded at a tolerance threshold: the change is 31 non-ExecPlan
+  files (24 Rust, 7 Markdown/config) and about 1,860 net Rust lines, against
+  the initial estimate of 20 files and 1,800 lines. Rationale for continuing
+  rather than stopping: the issue's own "Coding Plan" prescribes all three
+  tasks and names each component (lock, bounded runner, entry point, source
+  placement, `[workspace]` tables, checkout build-support path, `Compiling`
+  query, interruption binary, contract test, ADR, guide, measurements, #143
+  re-evaluation), so the scope is the requester's, not scope growth. The excess
+  file count is mostly regression-test modules split out to satisfy the
+  400-line module limit, and the excess line count is test code. The tolerance
+  is revised here rather than exceeded silently: 40 files, 2,600 net Rust lines.
 
 ## Outcomes & retrospective
 
@@ -219,36 +285,38 @@ issue-197/ac-4 #143 re-evaluated            -> EP-M3 -> recorded evidence
 Invariants introduced, and how each is discharged:
 
 1. Mutual exclusion. At most one fixture `cargo` child holds the lock.
-   Discharged by `fixture_lock` unit tests (a second acquire while held times out
-   and reports the path and elapsed time; a dropped guard frees it) and by the
-   `pgrep` observation recorded in `Outcomes & retrospective`. Non-vacuity: the
-   timeout test fails if the lock is not actually exclusive, because the second
-   `try_lock` would succeed and the test would observe success where it expects
-   a timeout.
+   Discharged by `fixture_lock` unit tests (a second acquire while held times
+   out and reports the path and elapsed time; a dropped guard frees it) and by
+   the `pgrep` observation recorded in `Outcomes & retrospective`. Non-vacuity:
+   the timeout test fails if the lock is not actually exclusive, because the
+   second `try_lock` would succeed and the test would observe success where it
+   expects a timeout.
 2. Bounded lifetime. Every fixture command either completes inside its deadline
-   or is killed with its process group and reported as a failure.
-   Discharged by `bounded_command` tests that run `sh` stubs: both streams
-   captured, output larger than a pipe buffer, nonzero status, timeout, direct
-   child reaped, and a descendant that keeps stdout open after its parent exits.
-   Non-vacuity: the timeout case uses a child that would otherwise run 30 s, so a
-   missing deadline shows up as a 30 s test rather than a pass.
+   or is killed with its process group and reported as a failure. Discharged by
+   `bounded_command` tests that run `sh` stubs: both streams captured, output
+   larger than a pipe buffer, nonzero status, timeout, direct child reaped, and
+   a descendant that keeps stdout open after its parent exits. Non-vacuity: the
+   timeout case uses a child that would otherwise run 30 s, so a missing
+   deadline shows up as a 30 s test rather than a pass.
 3. Warm reuse. A second fixture build compiles only its own `fx_*` package.
-   Discharged by extending `fixtures_sharing_a_target_read_only_their_own_generated_suite`
-   to parse `-vv` `Compiling` lines and assert no registry or checkout path
-   appears in the second build's package set. Non-vacuity: the assertion reads a
-   non-empty package set (the `fx_*` crate) and would fail if Cargo recompiled a
+   Discharged by extending
+   `fixtures_sharing_a_target_read_only_their_own_generated_suite` to parse
+   `-vv` `Compiling` lines and assert no registry or checkout path appears in
+   the second build's package set. Non-vacuity: the assertion reads a non-empty
+   package set (the `fx_*` crate) and would fail if Cargo recompiled a
    dependency, which the cold first build demonstrates it can.
 4. Placement. Fixture sources live under the shared target, and an interrupted
-   run leaves `$TMPDIR` empty. Discharged by a Unix-gated interruption test that
-   re-runs this test binary with an empty dedicated `TMPDIR`, kills the owner
-   after a handshake, and asserts both placement and an empty `TMPDIR` before and
-   after the kill. Non-vacuity: the test asserts the owner actually created a
-   fixture (the handshake path exists) before asserting absence in `$TMPDIR`.
+   run leaves `$TMPDIR` empty. Discharged by a Unix-gated interruption test
+   that re-runs this test binary with an empty dedicated `TMPDIR`, kills the
+   owner after a handshake, and asserts both placement and an empty `TMPDIR`
+   before and after the kill. Non-vacuity: the test asserts the owner actually
+   created a fixture (the handshake path exists) before asserting absence in
+   `$TMPDIR`.
 5. Configuration. The nextest group exists, has `max-threads = 1`, assigns the
-   three fixture binaries, and allows more than the exported deadline. Discharged
-   by a contract test reading `.config/nextest.toml` through `include_str!` with
-   a `toml` dev-dependency, plus a non-vacuity check that each filter matches the
-   corresponding binary name.
+   three fixture binaries, and allows more than the exported deadline.
+   Discharged by a contract test reading `.config/nextest.toml` through
+   `include_str!` with a `toml` dev-dependency, plus a non-vacuity check that
+   each filter matches the corresponding binary name.
 
 No new lemma or proof obligation arises: the change is test infrastructure, and
 `kani`/`verus` obligations are unchanged. The one external axiom is that
@@ -260,19 +328,20 @@ the timeout test running in two separate processes.
 
 ### Milestone 1 EP-M1: cross-process lock and bounded runner
 
-End state: a fixture `cargo` or `cargo kani` command cannot start until it holds
-the shared lock, and cannot outlive its deadline.
+End state: a fixture `cargo` or `cargo kani` command cannot start until it
+holds the shared lock, and cannot outlive its deadline.
 
 Work:
 
 1. Add `tests/common/fixture_lock.rs`, re-exported through
    `crates/test-helpers/src/lib.rs`. Resolve the shared target with the existing
    `shared_target_dir`, use `<shared-target>/fixture-cargo.lock`, poll
-   `File::try_lock` with a bounded wait, and return an RAII guard. Timeout errors
-   name the lock path and the elapsed wait. Release on drop is the `File` close.
+   `File::try_lock` with a bounded wait, and return an RAII guard. Timeout
+   errors name the lock path and the elapsed wait. Release on drop is the
+   `File` close.
 2. Add `tests/common/bounded_command.rs`, likewise re-exported. Drain piped
-   stdout and stderr on separate threads, poll `try_wait`, bound the join on the
-   readers, and on Unix put the child in its own process group
+   stdout and stderr on separate threads, poll `try_wait`, bound the join on
+   the readers, and on Unix put the child in its own process group
    (`CommandExt::process_group(0)`) so a timeout kills the group with
    `rustix::process::kill_process_group` before reaping.
 3. Provide one fixture-command entry point that acquires the lock for the whole
@@ -282,12 +351,13 @@ Work:
 4. Add `rustix` to `crates/test-helpers/Cargo.toml`, Unix-gated, with the `fs`
    and `process` features.
 5. Route `cargo_build_log`, the macro suite's `cargo build --color never`, and
-   `cargo kani list` through the entry point. Keep combined `BuildLog` output and
-   the labelled stdout/stderr failure format; add the exit status to non-zero
-   build errors and the command, deadline and partial log to build timeouts.
+   `cargo kani list` through the entry point. Keep combined `BuildLog` output
+   and the labelled stdout/stderr failure format; add the exit status to
+   non-zero build errors and the command, deadline and partial log to build
+   timeouts.
 6. Change `kani_is_installed` to return available, unavailable with a reason, or
-   timed out; run the probe through the locked entry point with a short deadline;
-   skip with the reason when unavailable, fail on timeout.
+   timed out; run the probe through the locked entry point with a short
+   deadline; skip with the reason when unavailable, fail on timeout.
 7. Delete `FIXTURE_CARGO_LOCK`, `CargoGuard`, the mutex-poison test and the
    guard plumbing, and correct the parallelism and CI-timeout doc comments.
 
@@ -310,8 +380,8 @@ Work:
 3. Move the macro fixture's path-normalisation and escaping helper into
    `tests/common/`, use it for both fixture families, and reference the
    checkout's `crates/theoremc-build-support` by path from the macro fixture.
-   Remove the per-fixture copy and its copy-only tests, keeping the discovery and
-   rerun scenarios unchanged.
+   Remove the per-fixture copy and its copy-only tests, keeping the discovery
+   and rerun scenarios unchanged.
 4. Add a `BuildLog` query returning the packages reported as `Compiling` in a
    `-vv` log, and extend the two-fixture regression to assert the second build
    compiles only its own package.
@@ -329,20 +399,20 @@ is recorded.
 
 Work:
 
-1. Add a fast contract test using `include_str!` for `.config/nextest.toml` and a
-   root `toml` dev-dependency, asserting the group name, `max-threads = 1`, the
-   override's three exact binary filters, and that the group allowance exceeds
-   the exported deadline; include a non-vacuity check.
+1. Add a fast contract test using `include_str!` for `.config/nextest.toml` and
+   a root `toml` dev-dependency, asserting the group name, `max-threads = 1`,
+   the override's three exact binary filters, and that the group allowance
+   exceeds the exported deadline; include a non-vacuity check.
 2. Add ADR-0014 amending ADR-0012, and add the `Amended by` banner and
    `## Amendments` section to ADR-0012. Cover the lock and its path; the
-   deadline, process-group cleanup and the non-Unix limitation; source placement
-   and the `[workspace]` table; the checkout build-support dependency; the `cargo
-   build` decision and reasons against `cargo check` and `--locked`; and
-   demonstrated versus configuration-dependent reuse.
+   deadline, process-group cleanup and the non-Unix limitation; source
+   placement and the `[workspace]` table; the checkout build-support
+   dependency; the `cargo build` decision and reasons against `cargo check` and
+   `--locked`; and demonstrated versus configuration-dependent reuse.
 3. Correct the "compile once per run" Rustdoc, update
    `docs/developers-guide.md` with the timeout override, source location, lock
-   behaviour and a one-off command to remove legacy `/tmp` fixture leaks, and add
-   the ExecPlan and ADR to `docs/contents.md`.
+   behaviour and a one-off command to remove legacy `/tmp` fixture leaks, and
+   add the ExecPlan and ADR to `docs/contents.md`.
 4. Measure before and after: warm the workspace, then time
    `cargo nextest run -E 'binary(theorem_file_macro_bdd)'` with
    `/usr/bin/time -v`, and count `rustc` and `kani-compiler` executions with
@@ -358,23 +428,36 @@ draft PR is open.
 ## Idempotence and recovery
 
 Every step is re-runnable: created directories use `create_dir_all`, the lock
-file is created if absent and truncated never, and the contract tests only read.
-If a fixture run is interrupted, the next run creates fresh source directories
-under the target and leaves the stale ones inert; `cargo clean` removes them. If
-a gate fails, read the cited log under `/tmp` rather than re-running the gate
-before the fix.
+file is created if absent and truncated never, and the contract tests only
+read. If a fixture run is interrupted, the next run creates fresh source
+directories under the target and leaves the stale ones inert; `cargo clean`
+removes them. If a gate fails, read the cited log under `/tmp` rather than
+re-running the gate before the fix.
 
 ## Interfaces and dependencies
 
-- `test_helpers::FixtureLock::acquire() -> Result<FixtureLock, String>` — RAII
-  guard, held for one fixture command.
-- `test_helpers::run_fixture_command(Command, &Utf8Path, CargoSubcommand) ->
-  Result<CommandOutput, FixtureCommandError>` — the single entry point that takes
-  the lock and applies the deadline. Defined in Milestone 1.
-- `test_helpers::DEFAULT_FIXTURE_COMMAND_TIMEOUT: Duration` — 600 s.
-- `theoremc_core::path_format::{normalize_path_separators,
-  toml_basic_string_value}` — existing, reused; the macro fixture stops carrying
-  its own copy.
+The helper surface added to `test_helpers`:
+
+```rust
+pub fn FixtureLock::acquire() -> Result<FixtureLock, String>;
+pub fn run_fixture_command(command: Command) -> Result<FixtureOutcome, String>;
+pub fn run_fixture_command_within(
+    command: Command,
+    deadline: Duration,
+) -> Result<FixtureOutcome, String>;
+pub fn run_within_deadline(
+    command: Command,
+    deadline: Duration,
+) -> Result<CommandOutput, CommandFailure>;
+pub const DEFAULT_FIXTURE_COMMAND_TIMEOUT: Duration; // 540 s
+```
+
+`FixtureLock` is the RAII guard over the advisory lock, held for one fixture
+command. `run_within_deadline` is the bounded process runner underneath, with
+process-group cleanup on Unix. `DEFAULT_FIXTURE_COMMAND_TIMEOUT` is overridable
+through `FIXTURE_TIMEOUT_ENV`. The macro fixture stops carrying its own copy of
+`theoremc_core::path_format`'s helpers, and uses `test_helpers::toml_path`
+instead.
 
 ## Revision note
 
