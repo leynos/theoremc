@@ -89,11 +89,11 @@ mod tests {
     /// every caller of this helper is checking.
     fn suite_error_for_file_at(path: &str) -> String {
         let (_temp, root, dir) = scratch();
-        if let Some(parent) = camino::Utf8Path::new(path).parent() {
-            if !parent.as_str().is_empty() {
-                dir.create_dir_all(parent.as_str())
-                    .expect("create the file's parent directory");
-            }
+        if let Some(parent) = camino::Utf8Path::new(path).parent()
+            && !parent.as_str().is_empty()
+        {
+            dir.create_dir_all(parent.as_str())
+                .expect("create the file's parent directory");
         }
         dir.write(path, "not a directory")
             .expect("write a file where a directory is expected");

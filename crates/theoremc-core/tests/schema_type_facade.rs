@@ -10,14 +10,11 @@ use rstest::{fixture, rstest};
 use theoremc_core::canonical_action_name::CanonicalActionName;
 use theoremc_core::schema;
 
-fn action_name(name: &str) -> CanonicalActionName {
-    CanonicalActionName::new(name).expect("the fixture action name should be canonical")
-}
-
 #[test]
 fn schema_facade_exposes_all_moved_type_shapes() {
     let action_call = schema::ActionCall {
-        action: action_name("counter.increment"),
+        action: CanonicalActionName::new("counter.increment")
+            .expect("the fixture action name should be canonical"),
         args: IndexMap::new(),
         as_binding: None,
     };
@@ -160,7 +157,7 @@ fn moved_types_keep_their_documented_defaults() {
 
 /// Unknown keys inside the raw mirrors are rejected rather than ignored.
 #[test]
-fn moved_types_reject_unknown_raw_fields() {
+fn moved_types_reject_unknown_raw_fields() -> Result<(), String> {
     let signature_error = load_fixture_error(concat!(
         "Theorem: UnknownSignatureKey\n",
         "About: Declares an unknown signature key\n",
@@ -177,11 +174,12 @@ fn moved_types_reject_unknown_raw_fields() {
         "Witness:\n",
         "  - cover: 'true'\n",
         "    because: always reachable\n",
-    ));
-    assert!(
-        signature_error.contains("unknown field"),
-        "the signature fixture should be rejected for its unknown key, got: {signature_error}"
-    );
+    ))?;
+    if !signature_error.contains("unknown field") {
+        return Err(format!(
+            "the signature fixture should be rejected for its unknown key, got: {signature_error}"
+        ));
+    }
 
     let evidence_error = load_fixture_error(concat!(
         "Theorem: UnknownEvidenceKey\n",
@@ -197,17 +195,19 @@ fn moved_types_reject_unknown_raw_fields() {
         "Witness:\n",
         "  - cover: 'true'\n",
         "    because: always reachable\n",
-    ));
-    assert!(
-        evidence_error.contains("unknown field"),
-        "the evidence fixture should be rejected for its unknown key, got: {evidence_error}"
-    );
+    ))?;
+    if !evidence_error.contains("unknown field") {
+        return Err(format!(
+            "the evidence fixture should be rejected for its unknown key, got: {evidence_error}"
+        ));
+    }
+    Ok(())
 }
 
 /// Loads a fixture that must fail and returns the rendered error.
-fn load_fixture_error(yaml: &str) -> String {
-    schema::load_theorem_docs(yaml)
-        .err()
-        .expect("the fixture should be rejected")
-        .to_string()
+fn load_fixture_error(yaml: &str) -> Result<String, String> {
+    match schema::load_theorem_docs(yaml) {
+        Ok(_) => Err("the fixture should have been rejected".to_owned()),
+        Err(error) => Ok(error.to_string()),
+    }
 }

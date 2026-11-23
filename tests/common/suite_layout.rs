@@ -102,12 +102,12 @@ mod tests {
     /// caller of this helper is checking.
     fn build_dir_with_file(path: &str) -> (tempfile::TempDir, Utf8PathBuf, Dir) {
         let (scratch, root, build_dir) = scratch_build_dir();
-        if let Some(parent) = camino::Utf8Path::new(path).parent() {
-            if !parent.as_str().is_empty() {
-                build_dir
-                    .create_dir_all(parent.as_str())
-                    .expect("create the file's parent directory");
-            }
+        if let Some(parent) = camino::Utf8Path::new(path).parent()
+            && !parent.as_str().is_empty()
+        {
+            build_dir
+                .create_dir_all(parent.as_str())
+                .expect("create the file's parent directory");
         }
         build_dir
             .write(path, "not a directory")
