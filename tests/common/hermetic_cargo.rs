@@ -23,9 +23,8 @@ const INHERITED_BUILD_LAYOUT: [&str; 1] = ["CARGO_BUILD_TARGET"];
 /// `CARGO_TARGET_DIR` and `CARGO_BUILD_BUILD_DIR` are both set explicitly, so
 /// an exported or configured value cannot win. Pinning the build directory as
 /// well as the target keeps build-script output at `<target_dir>/debug/build`,
-/// which is exactly where [`super::fixture_build`] looks for the generated
-/// suite; an inherited `build.build-dir` in a `config.toml` would otherwise
-/// move it. `CARGO_BUILD_TARGET_DIR` and `CARGO_BUILD_TARGET` are removed for
+/// which is exactly where `fixture_build` looks for the generated suite; an
+/// inherited `build.build-dir` in a `config.toml` would otherwise move it. `CARGO_BUILD_TARGET_DIR` and `CARGO_BUILD_TARGET` are removed for
 /// the same reason: neither may split, share or retarget the build.
 ///
 /// The command runs offline: a fixture's lock is seeded from the workspace's

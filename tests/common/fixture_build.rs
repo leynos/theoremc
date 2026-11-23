@@ -53,7 +53,7 @@ pub(super) fn build_log(identity: &FixtureIdentity<'_>) -> Result<BuildLog, Stri
     let mut command = hermetic_cargo(identity.root, identity.target_dir)?;
     command.args(["build", "-vv", "--color", "never"]);
     let output = command_run::run(&mut command)
-        .map_err(|error| format!("{error}; {} could not be built", identity.describe(),))?;
+        .map_err(|error| format!("{error}; {} could not be built", identity.describe()))?;
     if !output.status.success() {
         return Err(format!(
             "{}\n{}",
@@ -86,11 +86,11 @@ pub(super) fn generated_suite_contents(identity: &FixtureIdentity<'_>) -> Result
             )
         })?;
     let candidates = package_directories(&build_dir, identity.package_name)
-        .map_err(|error| format!("{error} (under {build_dir_path}; {})", identity.describe(),))?;
+        .map_err(|error| format!("{error} (under {build_dir_path}; {})", identity.describe()))?;
     for name in &candidates {
-        if let Some(contents) = read_suite(&build_dir, name).map_err(|error| {
-            format!("{error} (under {build_dir_path}; {})", identity.describe(),)
-        })? {
+        if let Some(contents) = read_suite(&build_dir, name)
+            .map_err(|error| format!("{error} (under {build_dir_path}; {})", identity.describe()))?
+        {
             return Ok(contents);
         }
     }

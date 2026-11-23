@@ -31,8 +31,7 @@ fn keeps_a_real_filesystem_errors_own_text() {
     .expect("open the scratch directory");
     let error = dir
         .read_to_string("absent")
-        .err()
-        .expect("reading an absent file must fail");
+        .expect_err("reading an absent file must fail");
 
     let message = path_error("reading", &absent, &error);
 

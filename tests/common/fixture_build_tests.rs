@@ -64,7 +64,7 @@ fn a_build_root_without_a_suite_names_the_package_target_and_candidates() {
         "fx_ab_1_0001",
         "fx_ab_1_0001-0123abcd",
         "fx_ab_1_0001/4567cdef",
-        &base.to_string(),
+        base.as_str(),
     ] {
         assert!(
             error.contains(fragment),

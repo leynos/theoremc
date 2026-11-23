@@ -156,6 +156,26 @@ Observable success:
   phrase "inherited `RUSTFLAGS` unchanged" means "leave that behaviour alone".
   Evidence: `tests/common/hermetic_cargo.rs`. Impact: no `RUSTFLAGS` change is
   made.
+- Observation: Cargo documents `build.build-dir` as defaulting to
+  `build.target-dir` and as overridable through `CARGO_BUILD_BUILD_DIR`; build
+  script output lives at `<build-dir>/debug/build/`. Pinning the variable to
+  the shared target therefore reproduces the default layout exactly and defeats
+  a configured `build.build-dir`.
+  Evidence: <https://doc.rust-lang.org/cargo/reference/config.html> and
+  <https://doc.rust-lang.org/cargo/reference/build-cache.html>. Impact: the
+  second isolation gap is closed without inventing a new layout.
+- Observation: the host's shared compile admission pool was continuously full
+  during implementation, with hundreds of queued compiler groups from other
+  agents. A full `build_suite_bdd` run exceeded nextest's fixed 600 s per-test
+  allowance for the pre-existing scenarios as well as the new one, so the
+  timeout measured host contention rather than this change.
+  Evidence: `build-limits-status` showed capacity 4, held 4, healthy, with
+  waits over 150 s per crate; the unchanged
+  `a_single_theorem_file_is_included_automatically` also reported `SLOW` past
+  240 s. Impact: the new real-Cargo test pre-warms the shared target once before
+  the measured concurrent pair, keeping its intrinsic cost close to one cold
+  build plus two warm builds; final gate evidence must be collected when the
+  queue allows.
 
 ## Decision log
 

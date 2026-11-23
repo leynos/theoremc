@@ -23,19 +23,20 @@ fn scratch_target() -> (tempfile::TempDir, camino::Utf8PathBuf) {
 
 /// Runs `count` allocators that all offer the same `offered` names, starting
 /// together on a barrier, and returns the suffixes they reserved.
-fn race_allocators(target: &Utf8Path, count: usize, offered: Vec<String>) -> HashSet<String> {
-    let barrier = Arc::new(Barrier::new(count));
+fn race_allocators(target: &Utf8Path, count: usize, offered: &[String]) -> HashSet<String> {
+    let gate = Arc::new(Barrier::new(count));
     let mut workers = Vec::with_capacity(count);
     for _ in 0..count {
-        let barrier = Arc::clone(&barrier);
-        let target = target.to_path_buf();
-        let offered = offered.clone();
+        let thread_gate = Arc::clone(&gate);
+        let thread_target = target.to_path_buf();
+        let thread_offered = offered.to_vec();
         workers.push(std::thread::spawn(move || {
-            let reservations = Reservations::open(&target).expect("open the reservation root");
-            let mut candidates = offered.into_iter().chain(std::iter::repeat_with(|| {
+            let reservations =
+                Reservations::open(&thread_target).expect("open the reservation root");
+            let mut candidates = thread_offered.into_iter().chain(std::iter::repeat_with(|| {
                 format!("spare-{}", unique_suffix())
             }));
-            barrier.wait();
+            thread_gate.wait();
             first_unused_suffix(
                 || candidates.next().expect("an endless candidate stream"),
                 |candidate| reservations.claim(candidate),
@@ -208,7 +209,7 @@ fn competing_allocators_never_receive_the_same_suffix() {
     // hand the same suffix to more than one of them.
     let contested: Vec<String> = (0..8).map(|index| format!("contested{index}")).collect();
 
-    let reserved = race_allocators(&root, 6, contested);
+    let reserved = race_allocators(&root, 6, &contested);
 
     assert_eq!(
         reserved.len(),
