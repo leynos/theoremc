@@ -2,9 +2,14 @@
 
 ## Status
 
-Accepted. Rustdoc, Clippy, and the Whitaker Dylint suite cover every workspace
-package, target, and feature set, behind one sequential `make lint` aggregate
-that CI invokes unchanged.
+Accepted. Rustdoc, Clippy, and the Whitaker Dylint suite all run over every
+workspace package, and Clippy and Whitaker also cover every target, behind one
+sequential `make lint` aggregate that CI invokes unchanged.
+
+The three stages do not carry identical scope. `cargo doc` rejects
+`--all-targets`, so rustdoc covers the packages and the documentation targets
+only. `--all-features` enables every feature together; it does not build each
+feature combination in turn.
 
 ## Date
 
@@ -85,8 +90,10 @@ the stub-executable contract test possible.
    exclusions, because the suite is clean over every package, target, and
    feature set. A future exemption must use the narrowest key that works,
    `excluded_paths` before `excluded_crates`, with the reason recorded beside
-   it.
-5. Four tests hold the wiring, at three levels.
+   it. `tests/lint_ci_contract.rs` rejects an active `excluded_paths` entry
+   with no comment immediately above it, so an exemption cannot arrive
+   unexplained.
+5. Five tests hold the wiring, at four levels.
    `tests/lint_makefile_contract.rs` and `tests/lint_ci_contract.rs` read the
    Makefile, the workflow, and `dylint.toml` as text and fail if a gate loses
    workspace coverage, a stage disappears, a failure can be masked, CI stops
@@ -98,10 +105,19 @@ the stub-executable contract test possible.
    two-package workspace that mirrors the hybrid manifest, runs the real
    `cargo doc` and `cargo clippy` invocations the recipes use, and shows that a
    clean workspace passes while a finding in the non-root member fails the
-   stage. The stubs prove the wiring; this proves Cargo acts on it.
+   stage, naming the lint and the member source path. The stubs prove the
+   wiring; this proves Cargo acts on it.
+   `tests/lint_workspace_inheritance_contract.rs` closes the last gap between
+   "the gate visits the workspace" and "the policy binds every package": it
+   requires `[lints] workspace = true` in the root manifest and in each member,
+   rejects a member that defines its own `[lints.clippy]`, `[lints.rust]`, or
+   `[lints.rustdoc]` table, and fails for a `crates/*` directory that no
+   `members` entry names.
 6. CI installs Whitaker through the shared `install-whitaker` action pinned to a
    full commit SHA and then runs `make lint`, the same target contributors run
-   locally.
+   locally. The installer-action pin is the revision of the provisioning
+   action; it does not pin the Whitaker suite the action installs, which
+   remains rolling until a suite-pin decision is recorded.
 
 ## Consequences
 
@@ -119,9 +135,19 @@ the stub-executable contract test possible.
   turn a cold build into an apparent hang.
 - `dylint.toml` exists, so the exclusion policy has a home. It declares no
   exclusions today, which the contract test holds.
-- The Netsuke lint-table alignment tracked by issue #98 remains separate work.
-  This decision makes the existing `[workspace.lints.*]` tables reach every
-  member; it does not add rules to them.
+- The Netsuke lint-table alignment tracked by issue #98 landed separately, in
+  pull requests 233, 234, and 235. The `[workspace.lints.*]` tables now carry
+  that baseline, and every one of the six packages inherits it. Inheritance is
+  enforced rather than assumed: `tests/lint_workspace_inheritance_contract.rs`
+  fails if a package stops opting in, if a package defines a local lint table,
+  or if a crate directory is added without a `members` entry.
+- The Whitaker suite pin remains an open decision. CI pins the
+  `install-whitaker` action to a full commit SHA, so the provisioning action is
+  reproducible, but the suite revision that action installs is rolling. Until
+  the owner and QG-002 record a suite-pin decision, a suite update can change
+  which lints `make lint` runs without any change in this repository. Local
+  contributors install through `whitaker-installer`, which carries the same
+  property.
 
 ## Addendum (2026-11-12): renumbering
 

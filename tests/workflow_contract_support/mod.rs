@@ -3,8 +3,8 @@
 //! The spelling and lint contracts are both expressed by GitHub Actions
 //! workflows, so both read the YAML as text and locate a job, a step, or a key
 //! by its structure rather than by a whole-file substring. Keeping the readers
-//! here means the two contracts agree on how a job and a step are recognised
-//! instead of drifting apart in two hand-written copies.
+//! here means the two contracts agree on how a job and a step are recognized
+//! instead of drifting apart in two handwritten copies.
 //!
 //! This module holds only the primitives both contracts use. Composition that
 //! is specific to one contract stays with that contract, so including this

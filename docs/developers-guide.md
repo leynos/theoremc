@@ -445,14 +445,41 @@ whole workspace: `LINT_PACKAGES` defaults to `--workspace`, `CARGO_FLAGS` adds
 `--all-targets --all-features`, and the rustdoc stage adds
 `--all-features --no-deps`. The scope is named once because Cargo selects only
 the root package when no package flag is given, which is how the gates used to
-under-check. Four tests hold this shape. `tests/lint_makefile_contract.rs`
-reads the recipes as text, and `tests/lint_ci_contract.rs` reads the workflow
-and `dylint.toml`. `tests/lint_gate_execution.rs` runs the recipes against stub
-executables to prove each stage runs in order and propagates its failure.
+under-check. The stages do not carry identical scope: `cargo doc` rejects
+`--all-targets`, so rustdoc covers packages and documentation targets only, and
+`--all-features` enables every feature together rather than building each
+feature combination in turn.
+
+Five tests hold this shape. `tests/lint_makefile_contract.rs` reads the recipes
+as text, and `tests/lint_ci_contract.rs` reads the workflow and `dylint.toml`.
+`tests/lint_gate_execution.rs` runs the recipes against stub executables to
+prove each stage runs in order and propagates its failure.
 `tests/lint_workspace_execution.rs` writes a two-package workspace and runs the
 real `cargo doc` and `cargo clippy` invocations, so a finding in the non-root
 member is shown to fail the stage rather than merely being passed the right
-arguments.
+arguments. `tests/lint_workspace_inheritance_contract.rs` reads the manifests
+and holds the inheritance rule below.
+
+#### Adding a crate to the workspace
+
+Every crate directory must be listed in the root `[workspace] members` array,
+and every member manifest must declare:
+
+```toml
+[lints]
+workspace = true
+```
+
+Two omissions are invisible to every other gate. A crate directory that no
+`members` entry names is compiled by no gate and linted by none, and a member
+that keeps its own `[lints.clippy]`, `[lints.rust]`, or `[lints.rustdoc]` table
+replaces the shared policy with whatever it happens to declare.
+`tests/lint_workspace_inheritance_contract.rs` enforces both: it requires the
+opt-in in the root manifest and in every member, rejects a local lint table,
+fails for a `crates/*` directory missing from `members`, and requires each
+`[workspace.lints.*]` table to carry at least one rule. Put all lint
+configuration in the root `Cargo.toml`; a rule that one package must not follow
+is a `#[expect(…, reason = "…")]` at the site, not a local table.
 
 The `[workspace.lints]` tables adopt the `leynos/netsuke` baseline as a
 minimum, in layers, and keep any stricter TheoremC rule. This layer adds
@@ -503,8 +530,11 @@ while the lint suite itself follows Whitaker's rolling release. The root
 `dylint.toml` carries no exclusions, because the suite is clean over every
 package, target, and feature set. If a finding ever proves irreducible, add the
 narrowest key that works — `excluded_paths` before `excluded_crates` — and
-record the reason beside it; `no_std_fs_operations` cannot be suppressed in
-source. Whitaker does not replace the custom `theoremc_arch_lint` architecture
+record the reason in a comment immediately above the entry;
+`tests/lint_ci_contract.rs` rejects an active `excluded_paths` entry with no
+such comment, and rejects `excluded_crates` outright. `no_std_fs_operations`
+cannot be suppressed in source, so a `dylint.toml` key is its only escape
+hatch. Whitaker does not replace the custom `theoremc_arch_lint` architecture
 rules, which are still planned.
 
 `make test` is intentionally nextest-backed for test binaries, followed by a

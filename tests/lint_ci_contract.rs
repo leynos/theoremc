@@ -73,7 +73,7 @@ fn invokes_aggregate(command: &str) -> bool {
 /// Returns the reference a step's own `uses:` key names.
 ///
 /// Both the block form (`uses: owner/repo@ref`) and the sequence-item form
-/// (`- uses: owner/repo@ref`) are recognised, because either can install the
+/// (`- uses: owner/repo@ref`) are recognized, because either can install the
 /// suite.
 fn uses_reference<'a>(step: &'a [Line<'_>], indent: usize) -> Option<&'a str> {
     step.iter().find_map(|line| {
@@ -544,7 +544,7 @@ fn an_unjustified_exclusion_is_rejected() {
     );
 }
 
-/// A documented exclusion, inline or itemised, is accepted.
+/// A documented exclusion, inline or itemized, is accepted.
 #[test]
 fn a_justified_exclusion_is_accepted() {
     let inline = "# The ambient probe cannot be capability-scoped.\nexcluded_paths = [\"crate::legacy_io\"]\n";
