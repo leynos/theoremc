@@ -180,8 +180,9 @@ fn ambient_target_base() -> Option<Utf8PathBuf> {
 ///
 /// Returns an error when the directory cannot be created or canonicalised.
 pub(super) fn fixture_target_dir(base: Option<&Utf8Path>) -> Result<Utf8PathBuf, String> {
-    let base = base.map_or_else(|| repository_root().join("target"), Utf8Path::to_path_buf);
-    let directory = base.join("theoremc-fixture-builds");
+    let resolved_base =
+        base.map_or_else(|| repository_root().join("target"), Utf8Path::to_path_buf);
+    let directory = resolved_base.join("theoremc-fixture-builds");
     Dir::create_ambient_dir_all(&directory, ambient_authority())
         .map_err(|error| error.to_string())?;
     directory

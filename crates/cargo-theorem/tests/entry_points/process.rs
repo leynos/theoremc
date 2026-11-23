@@ -63,7 +63,7 @@ impl HostEnv {
 
     /// Builds a host description from explicit values.
     #[cfg(test)]
-    fn from_parts(
+    const fn from_parts(
         path: Option<OsString>,
         rustup_home: Option<OsString>,
         home: Option<OsString>,

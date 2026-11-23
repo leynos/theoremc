@@ -29,8 +29,19 @@ fn require_equal<T: std::fmt::Debug + PartialEq + ?Sized>(
     }
 }
 
-fn os(value: &str) -> Option<OsString> {
-    Some(OsString::from(value))
+/// Converts a literal into the owned form the host description stores.
+fn os(value: &str) -> OsString {
+    OsString::from(value)
+}
+
+/// Builds a host description whose every field is set.
+fn fully_populated_host() -> HostEnv {
+    HostEnv::from_parts(
+        Some(os("/host/bin")),
+        Some(os("/explicit/rustup")),
+        Some(os("/home/person")),
+        Some(os("C:\\Users\\P")),
+    )
 }
 
 /// Reports whether the command sets `name` to `value` in the child.
@@ -43,18 +54,23 @@ fn has_env(command: &std::process::Command, name: &str, value: &OsString) -> boo
 
 #[test]
 fn rustup_home_prefers_an_explicit_value() {
-    let host = HostEnv::from_parts(os("/bin"), os("/explicit/rustup"), os("/home/person"), None);
+    let host = fully_populated_host();
 
     assert_eq!(
         rustup_home(&host),
-        os("/explicit/rustup"),
+        Some(os("/explicit/rustup")),
         "an explicit RUSTUP_HOME must win over the home directory"
     );
 }
 
 #[test]
 fn rustup_home_falls_back_to_the_home_directory() {
-    let host = HostEnv::from_parts(os("/bin"), None, os("/home/person"), os("C:\\Users\\P"));
+    let host = HostEnv::from_parts(
+        Some(os("/bin")),
+        None,
+        Some(os("/home/person")),
+        Some(os("C:\\Users\\P")),
+    );
 
     assert_eq!(
         rustup_home(&host),
@@ -65,7 +81,7 @@ fn rustup_home_falls_back_to_the_home_directory() {
 
 #[test]
 fn rustup_home_falls_back_to_the_windows_profile() {
-    let host = HostEnv::from_parts(os("/bin"), None, None, os("C:\\Users\\P"));
+    let host = HostEnv::from_parts(Some(os("/bin")), None, None, Some(os("C:\\Users\\P")));
 
     assert_eq!(
         rustup_home(&host),
@@ -80,7 +96,7 @@ fn rustup_home_falls_back_to_the_windows_profile() {
 
 #[test]
 fn rustup_home_is_absent_when_nothing_is_set() {
-    let host = HostEnv::from_parts(os("/bin"), None, None, None);
+    let host = HostEnv::from_parts(Some(os("/bin")), None, None, None);
 
     assert_eq!(
         rustup_home(&host),
@@ -92,12 +108,7 @@ fn rustup_home_is_absent_when_nothing_is_set() {
 #[test]
 fn an_isolated_child_receives_only_the_values_it_is_given() -> Result<(), Box<dyn std::error::Error>>
 {
-    let host = HostEnv::from_parts(
-        os("/host/bin"),
-        os("/explicit/rustup"),
-        os("/home/person"),
-        None,
-    );
+    let host = fully_populated_host();
     let cwd = Path::new("/tmp/work");
     let path = OsString::from("/child/bin:/host/bin");
 
@@ -105,12 +116,12 @@ fn an_isolated_child_receives_only_the_values_it_is_given() -> Result<(), Box<dy
 
     require_equal(&has_env(&command, "PATH", &path), &true, "child PATH")?;
     require_equal(
-        &has_env(&command, "HOME", &OsString::from("/tmp/work")),
+        &has_env(&command, "HOME", &os("/tmp/work")),
         &true,
         "child HOME",
     )?;
     require_equal(
-        &has_env(&command, "RUSTUP_HOME", &OsString::from("/explicit/rustup")),
+        &has_env(&command, "RUSTUP_HOME", &os("/explicit/rustup")),
         &true,
         "child RUSTUP_HOME",
     )?;
@@ -119,7 +130,7 @@ fn an_isolated_child_receives_only_the_values_it_is_given() -> Result<(), Box<dy
 
 #[test]
 fn isolated_path_puts_the_bin_directory_first() -> Result<(), Box<dyn std::error::Error>> {
-    let host = HostEnv::from_parts(os("/host/bin"), None, None, None);
+    let host = HostEnv::from_parts(Some(os("/host/bin")), None, None, None);
     let bin_dir = Path::new("/child/bin");
 
     let path = isolated_path(&host, bin_dir)?;
@@ -199,9 +210,13 @@ fn cargo_binary_reports_an_absent_executable() -> Result<(), Box<dyn std::error:
 
     let error = cargo_binary(&host).expect_err("an empty search path must fail the lookup");
 
-    assert!(
-        error.to_string().contains("Cargo executable was not found"),
-        "error must say Cargo was not found, got {error}"
-    );
-    Ok(())
+    let message = error.to_string();
+    if message.contains("Cargo executable was not found") {
+        Ok(())
+    } else {
+        Err(
+            std::io::Error::other(format!("error must say Cargo was not found, got {message}"))
+                .into(),
+        )
+    }
 }

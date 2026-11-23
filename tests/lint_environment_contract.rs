@@ -51,9 +51,9 @@ fn disallowed_methods(configuration: &str) -> Vec<DisallowedMethod<'_>> {
 
 /// Returns the value of `key "..."` within one line.
 fn quoted_value<'a>(line: &'a str, key: &str) -> Option<&'a str> {
-    let rest = line.split_once(key)?.1.trim_start();
-    let rest = rest.strip_prefix('"')?;
-    rest.split_once('"').map(|(value, _)| value)
+    let after_key = line.split_once(key)?.1.trim_start();
+    let unquoted = after_key.strip_prefix('"')?;
+    unquoted.split_once('"').map(|(value, _)| value)
 }
 
 /// The paragraphs of a manifest section, keyed by table header.
@@ -85,7 +85,7 @@ fn declares(lines: &[&str], key: &str, value: &str) -> bool {
 fn declared_value<'a>(lines: &'a [&'a str], key: &str) -> Option<&'a str> {
     lines.iter().find_map(|line| {
         let (name, rest) = line.split_once('=')?;
-        (name.trim() == key).then(|| rest.trim().trim_matches('"'))
+        (name.trim() == key).then_some(rest.trim().trim_matches('"'))
     })
 }
 
@@ -94,14 +94,13 @@ fn declared_value<'a>(lines: &'a [&'a str], key: &str) -> Option<&'a str> {
 fn clippy_forbids_every_process_environment_function() {
     let entries = disallowed_methods(CLIPPY);
     for (path, reason) in FORBIDDEN {
-        let found = entries.iter().find(|entry| entry.path == path);
-        let Some(found) = found else {
+        let Some(entry) = entries.iter().find(|candidate| candidate.path == path) else {
             panic!("clippy.toml must disallow `{path}`; the entry is missing");
         };
         assert_eq!(
-            found.reason, reason,
+            entry.reason, reason,
             "the `{path}` entry must tell the contributor what to do instead; found `{}`",
-            found.reason
+            entry.reason
         );
     }
 }

@@ -91,12 +91,10 @@ impl StagingFixture {
             .to_path_buf();
         let crate_root = root.join("crate");
         let target = root.join("target");
-        let source =
-            Dir::create_ambient_dir_all(&crate_root.join("tests/expand"), ambient_authority())
-                .and_then(|()| Dir::create_ambient_dir_all(&target, ambient_authority()))
-                .and_then(|()| {
-                    Dir::open_ambient_dir(crate_root.join("tests/expand"), ambient_authority())
-                })?;
+        let source_dir = crate_root.join("tests/expand");
+        let source = Dir::create_ambient_dir_all(&source_dir, ambient_authority())
+            .and_then(|()| Dir::create_ambient_dir_all(&target, ambient_authority()))
+            .and_then(|()| Dir::open_ambient_dir(&source_dir, ambient_authority()))?;
         source.write("valid_theorem.theorem", "theorem: valid\n")?;
         source.write("invalid_theorem.theorem", "theorem: invalid\n")?;
         Ok(Self {
