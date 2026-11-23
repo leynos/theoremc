@@ -508,10 +508,10 @@ does not reach, so the struct alone sits in `config/global_options.rs` and
 struct uses stays outside it, and a direct read added anywhere else in `config`
 stays denied. Callers that need isolation inject sources through
 `GlobalOptions::load_with_sources`. Each carries
-`#[expect(clippy::disallowed_methods, reason = "...")]`. Handwritten code
-never uses `allow`; the one `allow` in the repository is emitted by the proc
-macro, where an expectation cannot be relied on. `unsafe_code = "forbid"` is
-set workspace-wide, so no expectation can re-open it.
+`#[expect(clippy::disallowed_methods, reason = "...")]`. Handwritten code never
+uses `allow`; the one `allow` in the repository is emitted by the proc macro,
+where an expectation cannot be relied on. `unsafe_code = "forbid"` is set
+workspace-wide, so no expectation can re-open it.
 
 `theorem_file!` emits its generated per-file module with a reasoned
 `#[allow(unexpected_cfgs)]`, because the invoking crate may or may not register

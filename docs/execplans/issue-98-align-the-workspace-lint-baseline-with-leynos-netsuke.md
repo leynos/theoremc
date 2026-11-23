@@ -197,8 +197,8 @@ Acceptance commands: the full gate list above.
 - Residual risk: no theorem files exist in this workspace, so the generated
   module is never compiled under the workspace lint tables and
   `missing_docs_in_private_items` cannot see it. Should a future `theorems/`
-  directory expose a finding there, the fix belongs in `render.rs`, as the
-  plan states, rather than at each call site.
+  directory expose a finding there, the fix belongs in `render.rs`, as the plan
+  states, rather than at each call site.
 - `tests/theorem_file_macro_bdd.rs` was already 482 lines on `main`, above the
   400-line ceiling. The two new scenario bindings add 39 lines. A split would
   move existing step wiring in the same change that alters behaviour, so it is
