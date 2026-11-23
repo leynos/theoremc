@@ -1,13 +1,27 @@
 //! Contract tests for the CI and Dylint sides of the workspace-wide lint gate.
 //!
 //! The workflow must install a pinned Whitaker and then run `make lint`, the
-//! same aggregate target contributors run locally, and the root `dylint.toml`
-//! must not exempt a whole crate. These tests read both files as text, so a
-//! gate cannot be provisioned differently from the way it is documented or
-//! quietly widened.
+//! same aggregate target contributors run locally. Every job that runs the
+//! aggregate needs its own pinned install, because a second job would otherwise
+//! run the gate without the suite it is meant to exercise. A lint step must
+//! carry no arguments and no environment override that could narrow the gate,
+//! and no `if:` or `continue-on-error:` may let it skip or fail softly.
+//!
+//! The root `dylint.toml` must not exempt a whole crate, and every
+//! `excluded_paths` entry must carry an adjacent comment saying why.
+//!
+//! The tests read both files as text, so a gate cannot be provisioned
+//! differently from the way it is documented or quietly widened.
 //!
 //! `tests/lint_makefile_contract.rs` holds the same contract for the recipes,
 //! and `tests/lint_gate_execution.rs` proves the recipes really run.
+
+#[path = "workflow_contract_support/mod.rs"]
+mod workflow_contract_support;
+
+use workflow_contract_support::{
+    Line, Workflow, has_bypass_key, jobs, key_indent, step_run_line, steps,
+};
 
 const CI: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -18,141 +32,529 @@ const DYLINT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/dylint.t
 /// The provisioning action CI must use for the Whitaker suite.
 const WHITAKER_INSTALLER: &str = "leynos/shared-actions/.github/actions/install-whitaker@";
 
-/// The workflow step that runs the aggregate lint target.
-const LINT_COMMAND: &str = "run: make lint";
+/// The aggregate target CI must invoke, exactly.
+const LINT_COMMAND: &str = "make lint";
 
-/// One line of a CI workflow, with the shape predicates its readers need.
-struct Line<'a>(&'a str);
+/// Variables that redirect a lint stage away from its workspace default.
+///
+/// A step-level or job-level assignment of any of these would let CI run a
+/// narrower gate than the one `make lint` defines, so the contract rejects
+/// them outright.
+const COVERAGE_VARIABLES: [&str; 8] = [
+    "LINT_PACKAGES",
+    "LINT_TARGET_FLAGS",
+    "CARGO_FLAGS",
+    "CLIPPY_FLAGS",
+    "RUSTDOC_TARGET_FLAGS",
+    "RUST_FLAGS",
+    "RUSTDOC_FLAGS",
+    "WHITAKER",
+];
 
-impl Line<'_> {
-    /// Reports whether the line opens a CI job.
-    ///
-    /// A job is a key indented by exactly two spaces under `jobs:`. Steps are
-    /// indented further, so they never match.
-    fn is_job_header(&self) -> bool {
-        let trimmed = self.0.trim_start();
-        self.0.starts_with("  ")
-            && !self.0.starts_with("   ")
-            && !trimmed.starts_with('#')
-            && trimmed.ends_with(':')
-    }
-
-    /// Reports whether the line is a `uses:` step, as opposed to a comment that
-    /// merely names an action.
-    fn is_uses_step(&self) -> bool {
-        self.0.trim_start().starts_with("uses:")
-    }
+/// Returns a step's own `run:` command, without the key.
+///
+/// Only the step's own key is read, so a nested `env: { run: … }` is data.
+fn run_command<'a>(step: &'a [Line<'_>], indent: usize) -> Option<&'a str> {
+    step_run_line(step, indent)?
+        .trimmed()
+        .strip_prefix("run:")
+        .map(str::trim)
 }
 
-/// A CI workflow, viewed as text.
-struct Workflow<'a>(&'a str);
+/// Reports whether a command invokes the aggregate lint target.
+///
+/// The target name is matched as a whole token, so `make lint-whitaker` is a
+/// different command and does not satisfy the aggregate contract.
+fn invokes_aggregate(command: &str) -> bool {
+    let mut tokens = command.split_whitespace();
+    tokens.next() == Some("make") && tokens.next() == Some("lint")
+}
 
-impl<'a> Workflow<'a> {
-    /// Returns the lines of the job that runs `make lint`.
-    ///
-    /// Comparing the first occurrence of each string across the whole file
-    /// would keep passing if a second job ran the same command without
-    /// installing Whitaker. Scoping both searches to that one job keeps the
-    /// ordering assertion honest.
-    fn lint_job(&self) -> Vec<&'a str> {
-        let lines: Vec<&'a str> = self.0.lines().collect();
-        let Some(step) = lines.iter().position(|line| line.trim() == LINT_COMMAND) else {
-            return Vec::new();
+/// Returns the reference a step's own `uses:` key names.
+///
+/// Both the block form (`uses: owner/repo@ref`) and the sequence-item form
+/// (`- uses: owner/repo@ref`) are recognised, because either can install the
+/// suite.
+fn uses_reference<'a>(step: &'a [Line<'_>], indent: usize) -> Option<&'a str> {
+    step.iter().find_map(|line| {
+        let trimmed = line.trimmed();
+        let candidate = if line.indent() == indent {
+            trimmed.strip_prefix("uses:")
+        } else if line.indent() + 2 == indent {
+            trimmed.strip_prefix("- uses:")
+        } else {
+            None
         };
-        let start = lines
-            .iter()
-            .take(step)
-            .rposition(|line| Line(line).is_job_header())
-            .unwrap_or(0);
-        let end = lines
-            .iter()
-            .skip(step)
-            .position(|line| Line(line).is_job_header())
-            .map_or(lines.len(), |offset| step + offset);
-        lines.into_iter().skip(start).take(end - start).collect()
+        candidate.map(str::trim)
+    })
+}
+
+/// Returns the environment keys a block assigns through its own `env:`.
+///
+/// Both the mapping form and a one-line flow mapping are read. Only the
+/// block's own `env:` at `indent` counts, so a nested `env:` under `with:` in
+/// another step cannot be mistaken for the caller's environment.
+fn environment_keys<'a>(lines: &[Line<'a>], indent: usize) -> Vec<&'a str> {
+    lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line.indent() == indent)
+        .filter_map(|(index, line)| {
+            let rest = line.trimmed().strip_prefix("env:")?.trim();
+            Some((index, rest))
+        })
+        .flat_map(|(index, rest)| env_block_keys(lines, index, rest))
+        .collect()
+}
+
+/// Returns the keys a single `env:` entry declares.
+///
+/// A flow mapping is read from the `env:` line itself; a block mapping is read
+/// from the entries that follow, down to the first line at or above the key's
+/// own indentation. Comments and blank lines never end the block.
+fn env_block_keys<'a>(lines: &[Line<'a>], env_index: usize, rest: &'a str) -> Vec<&'a str> {
+    if let Some(flow) = rest
+        .strip_prefix('{')
+        .and_then(|body| body.strip_suffix('}'))
+    {
+        return flow.split(',').filter_map(entry_key).collect();
+    }
+    if !rest.is_empty() {
+        return Vec::new();
+    }
+    let Some(env_line) = lines.get(env_index) else {
+        return Vec::new();
+    };
+    let block: Vec<&Line<'a>> = lines
+        .iter()
+        .skip(env_index + 1)
+        .take_while(|line| line.indent() > env_line.indent())
+        .filter(|line| {
+            let trimmed = line.trimmed();
+            !trimmed.is_empty() && !trimmed.starts_with('#')
+        })
+        .collect();
+    let Some(entry_indent) = block.first().map(|line| line.indent()) else {
+        return Vec::new();
+    };
+    block
+        .iter()
+        .filter(|line| line.indent() == entry_indent)
+        .filter_map(|line| entry_key(line.trimmed()))
+        .collect()
+}
+
+/// Splits a `NAME: value` entry into its key.
+fn entry_key(entry: &str) -> Option<&str> {
+    entry.split_once(':').map(|(key, _)| key.trim())
+}
+
+/// Fails when `keys` assign a variable that would narrow the lint gate.
+///
+/// # Errors
+///
+/// Returns the offending variable and the block that assigned it.
+fn reject_coverage_override(scope: &str, keys: &[&str]) -> Result<(), String> {
+    keys.iter()
+        .find(|key| COVERAGE_VARIABLES.contains(key))
+        .map_or(Ok(()), |key| {
+            Err(format!(
+                "{scope} must not set `{key}`, because it would redirect the lint stage away from the workspace"
+            ))
+        })
+}
+
+/// Fails unless an installer reference pins a full commit SHA.
+///
+/// # Errors
+///
+/// Returns the reference and pin when the pin is not 40 hexadecimal digits.
+fn check_installer_pin(job: &str, reference: &str) -> Result<(), String> {
+    let pin = reference
+        .strip_prefix(WHITAKER_INSTALLER)
+        .ok_or_else(|| format!("job `{job}` must install Whitaker through the shared action"))?;
+    let sha = pin
+        .split_whitespace()
+        .next()
+        .ok_or_else(|| format!("job `{job}` must pin the Whitaker action to a commit SHA"))?;
+    let is_sha = sha.len() == 40 && sha.chars().all(|character| character.is_ascii_hexdigit());
+    if is_sha {
+        Ok(())
+    } else {
+        Err(format!(
+            "the Whitaker action in job `{job}` must be pinned to a full commit SHA; found `{sha}`"
+        ))
     }
 }
 
-/// The `dylint.toml` configuration, viewed as text.
-struct DylintConfig<'a>(&'a str);
-
-impl<'a> DylintConfig<'a> {
-    /// Reports whether the configuration exists and carries content.
-    fn is_present(&self) -> bool {
-        !self.0.trim().is_empty()
+/// Fails unless `workflow` wires the lint gate as the contract requires.
+///
+/// # Errors
+///
+/// Returns the first drift found: a missing aggregate step, a second job
+/// without its own installer, an installer out of order or unpinned, a bypass
+/// key, or an environment override.
+fn verify_lint_gate(workflow: &str) -> Result<(), String> {
+    let all_jobs = jobs(Workflow(workflow));
+    if all_jobs.is_empty() {
+        return Err("the workflow must define at least one job".to_owned());
     }
-
-    /// Returns the lines that are not comments or blank lines.
-    ///
-    /// `dylint.toml` explains the exclusion policy in prose, and that prose
-    /// names the keys it warns against. Filtering comments keeps the
-    /// description of the policy from reading as the policy itself.
-    fn active_lines(&self) -> Vec<&'a str> {
-        self.0
-            .lines()
-            .map(str::trim)
-            .filter(|line| !line.is_empty() && !line.starts_with('#'))
-            .collect()
+    let mut lint_jobs = 0;
+    for (name, job) in &all_jobs {
+        let job_indent = key_indent(job).ok_or_else(|| format!("job `{name}` must have a body"))?;
+        let job_steps = steps(job);
+        let lint_steps: Vec<_> = job_steps
+            .iter()
+            .filter_map(|(start, step)| {
+                let indent = key_indent(step)?;
+                let command = run_command(step, indent)?;
+                invokes_aggregate(command).then_some((*start, *step, indent, command))
+            })
+            .collect();
+        if lint_steps.is_empty() {
+            continue;
+        }
+        lint_jobs += 1;
+        if has_bypass_key(job, job_indent) {
+            return Err(format!(
+                "job `{name}` must not make the lint gate conditional or non-fatal"
+            ));
+        }
+        reject_coverage_override(&format!("job `{name}`"), &environment_keys(job, job_indent))?;
+        for (lint_start, lint_step, lint_indent, command) in lint_steps {
+            verify_lint_step(name, lint_step, lint_indent, command)?;
+            let (installer, installer_indent) =
+                find_installer(&job_steps, lint_start).ok_or_else(|| {
+                    format!("job `{name}` must install a pinned Whitaker before its lint step")
+                })?;
+            if has_bypass_key(installer, installer_indent) {
+                return Err(format!(
+                    "the Whitaker install in job `{name}` must not be conditional or non-fatal"
+                ));
+            }
+            reject_coverage_override(
+                &format!("the Whitaker install in job `{name}`"),
+                &environment_keys(installer, installer_indent),
+            )?;
+            let reference = uses_reference(installer, installer_indent).unwrap_or_default();
+            check_installer_pin(name, reference)?;
+        }
     }
+    if lint_jobs == 0 {
+        return Err(format!(
+            "CI must run `{LINT_COMMAND}`, the same aggregate target used locally"
+        ));
+    }
+    Ok(())
 }
 
-/// Verifies that the job which runs `make lint` installs a pinned Whitaker.
+/// Fails unless one lint step is the argument-free, unbypassed aggregate.
+///
+/// # Errors
+///
+/// Returns the offending command or bypass key.
+fn verify_lint_step(
+    job: &str,
+    step: &[Line<'_>],
+    indent: usize,
+    command: &str,
+) -> Result<(), String> {
+    if command != LINT_COMMAND {
+        return Err(format!(
+            "the lint step in job `{job}` must run exactly `{LINT_COMMAND}`; found `{command}`"
+        ));
+    }
+    if has_bypass_key(step, indent) {
+        return Err(format!(
+            "the lint step in job `{job}` must not be conditional or non-fatal"
+        ));
+    }
+    reject_coverage_override(
+        &format!("the lint step in job `{job}`"),
+        &environment_keys(step, indent),
+    )
+}
+
+/// Returns the Whitaker installer step that precedes `lint_start`.
+fn find_installer<'a, 'b>(
+    job_steps: &'a [(usize, &'a [Line<'b>])],
+    lint_start: usize,
+) -> Option<(&'a [Line<'b>], usize)> {
+    job_steps
+        .iter()
+        .take_while(|(start, _)| *start < lint_start)
+        .find_map(|(_, step)| {
+            let indent = key_indent(step)?;
+            uses_reference(step, indent)
+                .is_some_and(|reference| reference.starts_with(WHITAKER_INSTALLER))
+                .then_some((*step, indent))
+        })
+}
+
+/// Reports the active lines of a Dylint configuration.
+///
+/// Comment lines are removed so the prose that explains the exclusion policy
+/// cannot read as the policy itself.
+fn active_lines(document: &str) -> Vec<&str> {
+    document
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .collect()
+}
+
+/// Reports whether the line before `index` is a justification comment.
+fn has_justification(lines: &[&str], index: usize) -> bool {
+    index
+        .checked_sub(1)
+        .and_then(|previous| lines.get(previous))
+        .is_some_and(|line| line.trim().starts_with('#'))
+}
+
+/// Returns the active `excluded_paths` entries that carry no adjacent reason.
+fn unjustified_exclusions(document: &str) -> Vec<String> {
+    let lines: Vec<&str> = document.lines().collect();
+    let mut offences = Vec::new();
+    let mut inside_list = false;
+    for (index, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        if inside_list {
+            if trimmed.starts_with(']') {
+                inside_list = false;
+            } else if trimmed.starts_with('"') && !has_justification(&lines, index) {
+                offences.push((*line).to_owned());
+            }
+            continue;
+        }
+        let Some(rest) = trimmed.strip_prefix("excluded_paths") else {
+            continue;
+        };
+        let Some(value) = rest.trim_start().strip_prefix('=') else {
+            continue;
+        };
+        let literal = value.trim();
+        if literal.starts_with('[') && !literal.contains(']') {
+            inside_list = true;
+        } else if literal.contains('"') && !has_justification(&lines, index) {
+            offences.push((*line).to_owned());
+        }
+    }
+    offences
+}
+
+/// Wraps job bodies in the workflow skeleton the synthetic cases share.
+fn workflow_with(job_bodies: &[(&str, &str)]) -> String {
+    job_bodies
+        .iter()
+        .fold(String::from("jobs:\n"), |mut text, (name, body)| {
+            text.push_str("  ");
+            text.push_str(name);
+            text.push_str(":\n    runs-on: ubuntu-latest\n    steps:\n");
+            text.push_str(body);
+            text
+        })
+}
+
+/// A pinned Whitaker install step, as the synthetic jobs spell it.
+const INSTALL_STEP: &str = concat!(
+    "      - name: Install Whitaker\n",
+    "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+    "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+);
+
+/// The aggregate lint step, as the synthetic jobs spell it.
+const LINT_STEP: &str = "      - name: Lint\n        run: make lint\n";
+
+/// Verifies that the committed workflow satisfies the whole contract.
 #[test]
-fn ci_installs_a_pinned_whitaker_before_running_the_aggregate() {
-    let job = Workflow(CI).lint_job();
-    assert!(
-        !job.is_empty(),
-        "CI must run `make lint`, the same aggregate target used locally"
-    );
+fn ci_runs_the_aggregate_lint_with_a_pinned_installer() {
+    if let Err(report) = verify_lint_gate(CI) {
+        panic!("CI must hold the lint-gate contract: {report}");
+    }
+}
 
-    let install_index = job
-        .iter()
-        .position(|line| Line(line).is_uses_step() && line.contains(WHITAKER_INSTALLER))
-        .unwrap_or(usize::MAX);
+/// A job that never installs Whitaker cannot run the aggregate.
+#[test]
+fn a_missing_installer_is_rejected() {
+    let workflow = workflow_with(&[("build-test", LINT_STEP)]);
     assert!(
-        install_index != usize::MAX,
-        "the job that runs `make lint` must install Whitaker through the shared action"
+        verify_lint_gate(&workflow).is_err(),
+        "a lint step without an installer must be rejected"
     );
+}
 
-    let install_line = job.get(install_index).copied().unwrap_or_default();
-    let sha = install_line
-        .split(WHITAKER_INSTALLER)
-        .nth(1)
-        .and_then(|reference| reference.split_whitespace().next())
-        .unwrap_or_default();
-    assert_eq!(
-        sha.len(),
-        40,
-        "the Whitaker action must be pinned to a full commit SHA; found `{sha}`"
-    );
+/// An installer placed after the lint step is not a provisioning step.
+#[test]
+fn an_installer_after_the_lint_step_is_rejected() {
+    let body = format!("{LINT_STEP}{INSTALL_STEP}");
+    let workflow = workflow_with(&[("build-test", &body)]);
     assert!(
-        sha.chars().all(|character| character.is_ascii_hexdigit()),
-        "the Whitaker action pin must be hexadecimal; found `{sha}`"
+        verify_lint_gate(&workflow).is_err(),
+        "an installer after the lint step must be rejected"
     );
+}
 
-    let lint_index = job
-        .iter()
-        .position(|line| line.trim() == LINT_COMMAND)
-        .unwrap_or(usize::MAX);
+/// A conditional lint step is a bypass even when the command is exact.
+#[test]
+fn a_bypass_key_on_the_lint_step_is_rejected() {
+    let body =
+        format!("{INSTALL_STEP}      - name: Lint\n        if: false\n        run: make lint\n");
+    let workflow = workflow_with(&[("build-test", &body)]);
     assert!(
-        install_index < lint_index,
-        "CI must install Whitaker before the lint step in the same job"
+        verify_lint_gate(&workflow).is_err(),
+        "a step-level if: must be rejected"
     );
+}
+
+/// A non-fatal installer could hide a missing suite.
+#[test]
+fn a_bypass_key_on_the_installer_step_is_rejected() {
+    let body = format!(
+        "      - name: Install Whitaker\n        continue-on-error: true\n        uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2\n{LINT_STEP}"
+    );
+    let workflow = workflow_with(&[("build-test", &body)]);
+    assert!(
+        verify_lint_gate(&workflow).is_err(),
+        "a continue-on-error: on the installer must be rejected"
+    );
+}
+
+/// A conditional job could skip the whole gate.
+#[test]
+fn a_bypass_key_on_the_job_is_rejected() {
+    let mut workflow = String::from("jobs:\n  build-test:\n    if: false\n    steps:\n");
+    workflow.push_str(INSTALL_STEP);
+    workflow.push_str(LINT_STEP);
+    assert!(
+        verify_lint_gate(&workflow).is_err(),
+        "a job-level if: must be rejected"
+    );
+}
+
+/// Every job that runs the aggregate needs its own pinned install.
+#[test]
+fn a_second_unprotected_lint_job_is_rejected() {
+    let protected = format!("{INSTALL_STEP}{LINT_STEP}");
+    let workflow = workflow_with(&[("build-test", &protected), ("second", LINT_STEP)]);
+    assert!(
+        verify_lint_gate(&workflow).is_err(),
+        "a second job running make lint without an installer must be rejected"
+    );
+}
+
+/// A command-line variable would override the Makefile default.
+#[test]
+fn a_make_argument_override_is_rejected() {
+    let body = format!(
+        "{INSTALL_STEP}      - name: Lint\n        run: make lint LINT_PACKAGES=--package theoremc\n"
+    );
+    let workflow = workflow_with(&[("build-test", &body)]);
+    assert!(
+        verify_lint_gate(&workflow).is_err(),
+        "a make argument override must be rejected"
+    );
+}
+
+/// A step-level environment override would narrow the gate.
+#[test]
+fn a_step_environment_override_is_rejected() {
+    let body = format!(
+        "{INSTALL_STEP}      - name: Lint\n        env:\n          CARGO_FLAGS: --package theoremc\n        run: make lint\n"
+    );
+    let workflow = workflow_with(&[("build-test", &body)]);
+    assert!(
+        verify_lint_gate(&workflow).is_err(),
+        "a step-level env override must be rejected"
+    );
+}
+
+/// A job-level environment override would narrow every step it covers.
+#[test]
+fn a_job_environment_override_is_rejected() {
+    let workflow = format!(
+        "jobs:\n  build-test:\n    env:\n      RUSTDOC_FLAGS: ''\n    steps:\n{INSTALL_STEP}{LINT_STEP}"
+    );
+    assert!(
+        verify_lint_gate(&workflow).is_err(),
+        "a job-level env override must be rejected"
+    );
+}
+
+/// The installer must name a full commit SHA, not a rolling reference.
+#[test]
+fn a_rolling_installer_reference_is_rejected() {
+    let body = format!(
+        "      - name: Install Whitaker\n        uses: leynos/shared-actions/.github/actions/install-whitaker@main\n{LINT_STEP}"
+    );
+    let workflow = workflow_with(&[("build-test", &body)]);
+    assert!(
+        verify_lint_gate(&workflow).is_err(),
+        "a rolling installer reference must be rejected"
+    );
+}
+
+/// The inline `- uses:` form installs the suite just as the block form does.
+#[test]
+fn an_inline_uses_step_satisfies_the_installer_requirement() {
+    let body = format!(
+        "      - uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2\n{LINT_STEP}"
+    );
+    let workflow = workflow_with(&[("build-test", &body)]);
+    if let Err(report) = verify_lint_gate(&workflow) {
+        panic!("an inline uses step must satisfy the installer requirement: {report}");
+    }
 }
 
 /// Verifies that `dylint.toml` declares no whole-crate exclusion.
 #[test]
 fn the_dylint_configuration_exempts_no_whole_crate() {
-    let configuration = DylintConfig(DYLINT);
     assert!(
-        configuration.is_present(),
-        "dylint.toml must exist at the workspace root so the exclusion policy has a home"
-    );
-    assert!(
-        configuration
-            .active_lines()
+        !active_lines(DYLINT)
             .iter()
-            .all(|line| !line.starts_with("excluded_crates")),
+            .any(|line| line.starts_with("excluded_crates")),
         "dylint.toml must not exempt a whole crate; prefer `excluded_paths` with a recorded reason"
+    );
+}
+
+/// Verifies that every committed exclusion carries an adjacent reason.
+#[test]
+fn every_committed_exclusion_is_justified() {
+    let offences = unjustified_exclusions(DYLINT);
+    assert!(
+        offences.is_empty(),
+        "every excluded_paths entry needs a comment immediately above it; found {offences:?}"
+    );
+}
+
+/// An exclusion without an adjacent comment is rejected.
+#[test]
+fn an_unjustified_exclusion_is_rejected() {
+    let inline = "excluded_paths = [\"crate::legacy_io\"]\n";
+    assert!(
+        !unjustified_exclusions(inline).is_empty(),
+        "an inline entry without a preceding comment must be rejected"
+    );
+    let list = "excluded_paths = [\n  \"crate::legacy_io\",\n]\n";
+    assert!(
+        !unjustified_exclusions(list).is_empty(),
+        "a list item without a preceding comment must be rejected"
+    );
+}
+
+/// A documented exclusion, inline or itemised, is accepted.
+#[test]
+fn a_justified_exclusion_is_accepted() {
+    let inline = "# The ambient probe cannot be capability-scoped.\nexcluded_paths = [\"crate::legacy_io\"]\n";
+    assert!(
+        unjustified_exclusions(inline).is_empty(),
+        "an inline entry with a preceding comment must be accepted"
+    );
+    let list = "excluded_paths = [\n  # The ambient probe cannot be capability-scoped.\n  \"crate::legacy_io\",\n]\n";
+    assert!(
+        unjustified_exclusions(list).is_empty(),
+        "a list item with a preceding comment must be accepted"
     );
 }
