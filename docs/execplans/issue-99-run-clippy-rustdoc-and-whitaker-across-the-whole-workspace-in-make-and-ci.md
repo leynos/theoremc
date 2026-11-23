@@ -172,8 +172,9 @@ the committed file changes in the way the rule forbids.
       `tests/lint_workspace_execution.rs`.
 - [x] (2026-11-23) Contract tests, Clippy, formatting, Markdown lint, Mermaid,
       ADR checks, and spelling pass.
-- [ ] Record the unmodified `make lint` result for the final tree.
-- [ ] Push and open the draft pull request.
+- [x] (2026-11-23) Recorded the unmodified `make lint` result for the final
+      tree: exit 0, zero errors, all three stages in order.
+- [x] (2026-11-23) Pushed the branch and opened draft pull request 279.
 
 ## Surprises & discoveries
 
