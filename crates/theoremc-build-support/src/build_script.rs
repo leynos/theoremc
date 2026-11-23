@@ -142,7 +142,7 @@ impl BuildScriptContext {
     /// assert_eq!(context.manifest_dir().as_str(), "crate");
     /// ```
     #[must_use]
-    pub fn new(manifest_dir: Utf8PathBuf, out_dir: Utf8PathBuf) -> Self {
+    pub const fn new(manifest_dir: Utf8PathBuf, out_dir: Utf8PathBuf) -> Self {
         Self {
             manifest_dir,
             out_dir,
