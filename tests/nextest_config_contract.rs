@@ -156,6 +156,28 @@ fn the_group_allowance_exceeds_the_fixture_deadline() -> Result<(), String> {
     Ok(())
 }
 
+/// The serialised fixture suites run one after another, so the whole run is at
+/// least the sum of their allowances; a global cap at or below one test's
+/// allowance would cancel legitimate work.
+#[test]
+fn the_run_allowance_exceeds_the_group_allowance() -> Result<(), String> {
+    let config = parse(CONFIG)?;
+    let group = allowance_of(group_override(&config)?)?;
+    let run = config
+        .get("profile")
+        .and_then(|profile| profile.get("default"))
+        .and_then(|default| default.get("global-timeout"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| "the default profile must declare a `global-timeout`".to_owned())?;
+    let run = parse_duration(run)?;
+
+    assert!(
+        run > group,
+        "the run allows {run:?}, which must exceed the group's {group:?}",
+    );
+    Ok(())
+}
+
 /// A configuration that lost the group's limit must be detected, so the checks
 /// above cannot pass by reading nothing.
 #[test]

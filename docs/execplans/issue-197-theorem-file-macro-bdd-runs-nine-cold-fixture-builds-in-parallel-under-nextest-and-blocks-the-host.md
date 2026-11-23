@@ -169,6 +169,33 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       crate with the same manifest shape. The test runs then measure the warm
       path, which is what the gates and CI exercise after the first build.
 - [ ] Milestone 1-3 gates: `make check-fmt`, `make lint`, `make test`.
+- [x] (2026-11-23T22:20Z) The committed 540 s deadline fired, as designed, on
+      the first `theorem_file_macro_bdd` scenario: `cargo build did not finish
+      within 539.999804507s (ran for 540.008830284s); it printed:` followed by
+      the build's partial output. That is the diagnostic the change exists to
+      produce, and it is the measurement that justified raising the group
+      allowance to 1200 s.
+- [x] (2026-11-23T23:10Z) Reuse confirmed at the process level: with the warm
+      fixture target, a running macro fixture build had exactly one compiler
+      child, `--crate-name fx_ec4c6_0_d83a` — its own crate. The ten-minute
+      wait for that scenario was entirely compiler-admission queueing, not
+      compilation of the dependency graph.
+- [x] (2026-11-23T23:14Z) `theorem_file_macro_bdd
+      a_missing_forall_type_fails_ordinary_compilation` passes in 655.9 s with
+      `THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS=1140` (it had failed at the 540 s
+      default). 655.9 s is inside the 1200 s group allowance but outside the
+      540 s default, which is exactly the split the design intends: the
+      default fails fast on an ordinary host, the allowance lets a saturated
+      host's override be reported by this code.
+- [x] (2026-11-23T23:55Z) The serialised macro suite exposed a second
+      configuration bound: with the committed 45-minute `global-timeout`, a run
+      reached 2700 s with sixteen tests passed, one still running and two never
+      started, and nextest cancelled the run. Nothing had failed. Because the
+      fixture suites now genuinely run one at a time, the run's length is the
+      sum of their allowances, which is what `global-timeout`'s own comment
+      anticipates. Raised it to 2 h on the same reasoning and on that
+      measurement, and added a contract assertion that the run allowance
+      exceeds the group allowance.
 - [ ] Warm-run timings and the compiler-invocation count recorded here.
 - [ ] #143 re-evaluation recorded here.
 - [ ] Draft PR opened.

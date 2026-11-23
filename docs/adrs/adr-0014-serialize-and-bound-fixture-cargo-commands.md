@@ -142,7 +142,16 @@ persistence, not a guarantee this record makes.
 The `nested-cargo-builds` group keeps `max-threads = 1` and covers the three
 fixture binaries. `tests/nextest_config_contract.rs` reads
 `.config/nextest.toml` and fails if the group loses its limit, loses one of the
-three exact binary filters, or allows less than the exported deadline.
+three exact binary filters, allows less than the exported deadline, or if the
+run-level `global-timeout` does not exceed the group allowance.
+
+Serialising the suites has a consequence for the run budget: a suite whose
+tests used to overlap now takes the sum of its tests' allowances. A contended
+run of `theorem_file_macro_bdd` reached 2700 s with sixteen tests passed and
+none failed, and nextest's 45-minute `global-timeout` cancelled it. The run
+allowance is therefore 2 h, which this record treats as the same kind of bound
+as the per-test one: it terminates a hang, it does not decide whether slow work
+is allowed to finish.
 
 ## Consequences
 

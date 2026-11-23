@@ -14,7 +14,7 @@
 slow-timeout = { period = "60s", terminate-after = 5 }
 # The whole run. Each test is bounded by its own allowance, but a run whose
 # tests each stay inside theirs can still exceed the job. This stays strictly
-# above the largest per-test allowance (600 s, below).
+# above the largest per-test allowance (1200 s, below).
 #
 # Raised from 30 m on 17 November 2026, on measurement. The earlier 420 s
 # figure described 818 tests; the suite now has 1021, and the compiler-spawning
@@ -22,10 +22,15 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # allowances plus everything else. Three consecutive contended runs reached
 # 1800 s with no assertion failure and work still outstanding: one had a test
 # cancelled after 43 s of its own 600 s allowance, and two had seven tests
-# (including the trybuild suite) never started. Each test remains bounded by
-# its own allowance, so a hang is still terminated and named; this cap only
-# decides how long the whole run may take.
-global-timeout = "45m"
+# (including the trybuild suite) never started.
+#
+# Raised from 45 m to 2 h on 23 November 2026, on the same reasoning and on
+# measurement after the fixture suites were genuinely serialised. A contended
+# run of `theorem_file_macro_bdd` alone reached 2700 s with sixteen tests
+# passed, one still running and two never started; nothing had failed. Each
+# test remains bounded by its own allowance, so a hang is still terminated and
+# named; this cap only decides how long the whole run may take.
+global-timeout = "2h"
 
 [test-groups.nested-cargo-builds]
 # These tests start a child `cargo` or `rustc` of their own: temporary fixture
