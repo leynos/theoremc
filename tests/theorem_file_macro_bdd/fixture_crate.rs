@@ -138,6 +138,7 @@ pub(crate) fn fixture_cargo_toml_for_consumer(
         ),
         root_manifest_dir = escaped_root_manifest_dir,
         build_support_dir = escaped_build_support_dir,
+        lint_table = lint_table,
     )
 }
 

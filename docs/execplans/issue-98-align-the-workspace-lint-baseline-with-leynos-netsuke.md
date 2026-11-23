@@ -191,7 +191,7 @@ Acceptance commands: the full gate list above.
   compiler-spawning tests.
 - Clippy's `allow_attributes` check skips attributes with
   `span.from_expansion()` or `is_from_proc_macro`, so the generated `allow` is
-  exempt from the restriction that bans hand-written `allow` attributes. The
+  exempt from the restriction that bans handwritten `allow` attributes. The
   fallback that would have required every consumer to register `cfg(kani)` is
   therefore unnecessary.
 - Residual risk: no theorem files exist in this workspace, so the generated
@@ -213,7 +213,7 @@ Acceptance commands: the full gate list above.
 - `make markdownlint`: pass (after `markdownlint-cli2 --fix` corrected a table
   style in this plan).
 - `mdtablefix --check --git --include-untracked ...`: pass.
-- `make spelling`: pass (after "handwritten" replaced "Hand-written").
+- `make spelling`: pass (after "handwritten" replaced the hyphenated form).
 - `make check-adr-rfc-names`: pass; 15 records and 101 local links checked.
 - `cargo nextest run -p theoremc-macros`: 51 of 52 passed on the first run; the
   trybuild case hit nextest's 600 s allowance under host compile-queue
