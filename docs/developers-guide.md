@@ -455,8 +455,8 @@ member is shown to fail the stage rather than merely being passed the right
 arguments, including an undocumented private item caught by the inherited
 `missing_docs_in_private_items` rule. `tests/lint_manifest_contract.rs` reads
 the root `[workspace.lints.clippy]` table and every manifest that
-`cargo metadata` reports, so a package that stops opting in, or a baseline entry
-that is downgraded, fails before the gate can silently narrow.
+`cargo metadata` reports, so a package that stops opting in, or a baseline
+entry that is downgraded, fails before the gate can silently narrow.
 
 The `[workspace.lints]` tables adopt the `leynos/netsuke` baseline as a
 minimum, in layers, and keep any stricter TheoremC rule. This layer adds
@@ -486,9 +486,9 @@ because Clippy skips it when the crate is built with `--test`.
 Write the comment on the authored item; Clippy already skips items it can
 attribute to a proc macro. If a residual diagnostic survives that rule, use an
 item-scoped `#[expect(clippy::missing_docs_in_private_items, reason = "...")]`
-whose reason names the macro and the concrete limitation. Never use
-`#[allow]`: an expectation becomes unfulfilled, and warns, once the limitation
-disappears, so the exemption removes itself instead of rotting.
+whose reason names the macro and the concrete limitation. Never use `#[allow]`:
+an expectation becomes unfulfilled, and warns, once the limitation disappears,
+so the exemption removes itself instead of rotting.
 
 Where a rule is adopted but tuned differently, record the reason beside the
 setting: `clippy.toml` keeps `cognitive-complexity-threshold = 9` to match
