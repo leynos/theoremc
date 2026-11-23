@@ -91,6 +91,11 @@ pub fn run_fixture_command_within(
 /// This split exists so a unit test can supply a lock over a scratch directory
 /// instead of taking the shared lock, which a concurrently running fixture suite
 /// may hold for minutes.
+///
+/// # Errors
+///
+/// Returns an error when the command cannot be started or when waiting for it
+/// fails. An overrun is reported as [`FixtureOutcome::TimedOut`].
 pub(super) fn run_locked(
     _lock: &FixtureLock,
     command: Command,

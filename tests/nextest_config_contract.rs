@@ -49,12 +49,13 @@ fn group_max_threads(config: &Value) -> Result<i64, String> {
 }
 
 /// Returns the default profile's overrides.
-fn overrides(config: &Value) -> Result<&Vec<Value>, String> {
+fn overrides(config: &Value) -> Result<&[Value], String> {
     config
         .get("profile")
         .and_then(|profile| profile.get("default"))
         .and_then(|default| default.get("overrides"))
         .and_then(Value::as_array)
+        .map(Vec::as_slice)
         .ok_or_else(|| "the default profile must declare an `overrides` array".to_owned())
 }
 
