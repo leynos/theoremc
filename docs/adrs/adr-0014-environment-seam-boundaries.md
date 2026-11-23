@@ -63,8 +63,12 @@ A sanctioned read carries an item-scoped
 Clippy reports an unfulfilled `#[expect]`, so an exception that has outlived
 its site turns into a warning and the backlog removes itself.
 
-The upstream taxonomy document was not reachable while this record was written.
-The taxonomy below follows the description in issue #101, which cites it.
+The source is Netsuke's
+[ADR-008: environment seam taxonomy](https://github.com/leynos/netsuke/blob/main/docs/adr-008-environment-seam-taxonomy.md).
+That document was not reachable while this record was written, so the taxonomy
+below follows the description in issue #101, which cites it. The prohibition
+reproduces the six `disallowed-methods` entries in the `clippy.toml` that
+Netsuke publishes at that repository.
 
 ### The taxonomy
 

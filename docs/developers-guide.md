@@ -61,15 +61,27 @@ normal dependencies for the host toolchain, not the target.
 ### 1.2 Build script entrypoint (`build.rs`)
 
 The minimal build-script entrypoint calls
-`theoremc_build_support::prepare_build_script()`. The support crate:
+`theoremc_build_support::BuildScriptContext::from_cargo_env()` and then
+`theoremc_build_support::prepare_build_script(&context)`. The context holds the
+two paths Cargo supplies; capturing them first is what keeps the rest of the
+crate free of environment reads, as
+[ADR-0014](adrs/adr-0014-environment-seam-boundaries.md) requires. Preparation
+then:
 
-1. reads `CARGO_MANIFEST_DIR` and `OUT_DIR` from Cargo's environment,
-2. delegates to `theoremc_build_support::discover_theorem_inputs()`,
-3. writes `OUT_DIR/theorem_suite.rs` via
+1. delegates to `theoremc_build_support::discover_theorem_inputs()` with the
+   context's manifest directory,
+2. writes `<out_dir>/theorem_suite.rs` via
    `theoremc_build_support::write_theorem_suite()`, containing
    `theorem_file!("path/to/file.theorem");` invocations for each discovered
    theorem,
-4. returns `BuildScriptOutput` with theorem presence and ordered rerun paths.
+3. returns `BuildScriptOutput` with theorem presence and ordered rerun paths.
+
+`from_cargo_env` is the crate's single process-environment read. It reads
+`CARGO_MANIFEST_DIR` before `OUT_DIR` and stops at the first failure, so an
+error names the variable that actually failed. Tests build a context from
+temporary directories with `BuildScriptContext::new`, or through the private
+`from_lookup` with a stub reader; none of them changes the process
+environment.
 
 The root `build.rs` adapter registers the theorem cfg with
 `cargo::rustc-check-cfg`, emits `cargo::rustc-cfg=theoremc_has_theorems` when

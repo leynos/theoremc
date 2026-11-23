@@ -193,10 +193,8 @@ fn a_finding_in_a_member_crate_fails_the_stage(
 }
 
 /// This repository's `clippy.toml`, which the policy workspace copies.
-const CLIPPY_CONFIGURATION: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/clippy.toml"
-));
+const CLIPPY_CONFIGURATION: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/clippy.toml"));
 
 /// A manifest declaring the two workspace lint levels the policy depends on.
 const POLICY_MANIFEST: &str = concat!(

@@ -121,9 +121,16 @@ The ExecPlan file itself is excluded from every size count.
 - [x] (2026-11-23 19:10Z) `EP-M3` Enforcement proof and documentation written:
   `tests/lint_environment_contract.rs`, two Clippy execution cases,
   ADR-0014, developers' guide, `AGENTS.md`, ADR-0012 addendum, indexes.
-- [ ] Focused tests for each changed crate.
-- [ ] Gates: `make check-fmt`, `make lint`, `make test`, `make markdownlint`,
-  `make nixie`, `make spelling`.
+- [x] (2026-11-23 19:25Z) Focused tests: `theoremc-build-support` 38/38,
+  `cargo-theorem --test entry_points` plus
+  `theoremc --test lint_environment_contract` 23/23, and all six
+  `lint_workspace_execution` cases including the two new Clippy execution
+  cases. Trybuild staging verified by the 11 `.theorem` files present under
+  `target/tests/trybuild/theoremc-macros/tests/expand/`.
+- [x] (2026-11-23 19:30Z) `tools/check_adr_rfc_names.py` passes: 15 records and
+  105 local links.
+- [ ] Gates: `make check-fmt`, `make check-adr-rfc-names`, `make lint`,
+  `make test`, `make markdownlint`, `make nixie`, `make spelling`.
 - [ ] CodeRabbit review at each major milestone; concerns cleared.
 - [ ] Push and open the draft PR.
 
