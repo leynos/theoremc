@@ -187,6 +187,18 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
   run is genuinely cold, which is the honest before-measurement.
 - `Cargo.lock` holds three `toml` versions (0.5.11, 0.8.23, 1.1.8) and one
   `rustix` (1.1.5). The plan pins the newest `toml` and the only `rustix`.
+- Cargo on this toolchain stores every unit's artefact and fingerprint under
+  `target/<profile>/build/<package>/<hash>/{out,fingerprint}` rather than in
+  `deps/`. Reuse is unaffected, but a check for `deps/` proves nothing; the
+  `Compiling`-line assertion is the reliable evidence.
+- This host spent the whole session with the compiler-admission pool fully held
+  by other agents' work (hundreds of waiting requests, load average between 35
+  and 85). A cold fixture build measured 27 m 27 s, and a *warm* one still
+  waited more than 15 minutes for slots. The committed 540 s deadline therefore
+  fires on this host by design; the fixture suites were validated here with a
+  temporary permissive nextest configuration and a large
+  `THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS`, leaving the committed configuration
+  as designed.
 
 ## Decision log
 
@@ -262,7 +274,42 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
 
 ## Outcomes & retrospective
 
-Pending. To be completed after Milestone 3.
+### Measurements
+
+All figures are from this host, which spent the session with the shared
+compiler-admission pool saturated (load average 35-85, hundreds of waiting
+compiler requests). They are lower bounds on ordinary hardware and upper bounds
+on what a contended host can do.
+
+| Quantity                                             | Before                          | After                                                      |
+| ---------------------------------------------------- | ------------------------------- | ---------------------------------------------------------- |
+| Cold fixture build, cold shared target               | not measured separately         | 27 m 27 s                                                  |
+| Fixture builds running at once                       | 9 (one per scenario)            | 1                                                          |
+| Fixture sources location                             | `$TMPDIR/.tmp*`                 | `<target>/theoremc-fixture-builds/sources`                 |
+| Fixture command bound                                | none (nextest job timeout only) | 540 s default, overridable                                 |
+| `build_discovery_bdd` scenarios (up to three builds) | cold build per scenario         | 504.9 s, 441.4 s and 295.9 s, warm target, contended queue |
+| `build_suite_bdd` scenarios                          | cold build per scenario         | 234.0 s, 223.0 s, 436.9 s and 242.3 s                      |
+| Second fixture build's compiled packages             | whole graph per fixture         | only its own `fx_*` package (asserted)                     |
+| Focused fixture-suite run (14 tests)                 | n/a                             | 14 passed, 1 skipped, 2378.5 s total                       |
+
+The fixture suites were validated end to end with a temporary permissive
+nextest configuration (`/tmp/nextest-local-i197.toml`, twenty-four 600 s
+periods) and `THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS=86400`, because this host's
+admission queue made individual commands exceed the committed 540 s bound. The
+committed configuration was not modified for the validation. The per-command
+durations are each well inside 540 s once the fixture target is warm; the
+per-test totals exceed 600 s only because several tests run two or three
+commands, which is what the raised group allowance exists for.
+
+The before figure the issue records is 78 minutes wall time, nine concurrent
+processes and 145 compiler invocations in flight or queued, with 62 host Cargo
+processes blocked behind one fixture's package-cache lock. That state was not
+reproduced deliberately: reproducing it would block the shared host again,
+which this host's operating policy forbids.
+
+### Retrospective
+
+To be completed with the final gate results.
 
 ## Conformance basis
 
