@@ -4,7 +4,10 @@ use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use proptest::prelude::*;
 
-use super::{first_unused_suffix, suffix_is_taken, unique_suffix, with_unique_package_name};
+use super::{
+    first_unused_suffix, fixture_target_dir, suffix_is_taken, unique_suffix,
+    with_unique_package_name,
+};
 
 #[test]
 fn renames_only_the_package_name() {
@@ -168,4 +171,58 @@ proptest! {
 
         prop_assert!(!taken.contains(&chosen), "{chosen} is stale");
     }
+}
+
+/// The shared fixture directory inside an absolute injected base.
+#[test]
+fn an_absolute_base_selects_a_canonical_shared_directory() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let base = Utf8Path::from_path(temp.path()).expect("temp dir path is UTF-8");
+
+    let target = fixture_target_dir(Some(base)).expect("an absolute base is usable");
+
+    assert_eq!(
+        target,
+        base.canonicalize_utf8()
+            .expect("the temporary directory canonicalises")
+            .join("theoremc-fixture-builds"),
+        "the shared directory must sit inside the injected base and be canonical"
+    );
+    assert!(target.is_dir(), "{target} must be created");
+}
+
+/// A base spelled with `.` and `..` segments is canonicalised before it is
+/// returned, so child Cargo invocations receive one absolute path however the
+/// caller spelled it. A relative base travels the same canonicalisation step.
+#[test]
+fn a_non_canonical_base_is_canonicalised_before_it_is_returned() {
+    let temp = tempfile::tempdir().expect("temp dir");
+    let base = Utf8Path::from_path(temp.path()).expect("temp dir path is UTF-8");
+    let spelled = base.join("nested").join("..");
+
+    let target = fixture_target_dir(Some(&spelled)).expect("a non-canonical base is usable");
+
+    assert_eq!(
+        target,
+        base.canonicalize_utf8()
+            .expect("the temporary directory canonicalises")
+            .join("theoremc-fixture-builds"),
+        "canonicalisation must remove the `..` segment before the path is returned"
+    );
+}
+
+/// With no injected base, the fixture target falls inside the repository's
+/// `target`, which is what keeps it warm and removable by `cargo clean`.
+#[test]
+fn an_absent_base_falls_back_to_the_repository_target() {
+    let target = fixture_target_dir(None).expect("the repository target is usable");
+
+    assert!(
+        target.ends_with("theoremc-fixture-builds"),
+        "{target} must end with the shared directory name"
+    );
+    assert!(
+        target.is_absolute(),
+        "{target} must be absolute so child commands agree on one location"
+    );
 }

@@ -104,6 +104,11 @@
   gate](adrs/adr-0013-workspace-complete-lint-gate.md)
   - Decision record for workspace-scoped rustdoc, Clippy, and Whitaker stages,
     the sequential `make lint` aggregate, and the exclusion-free `dylint.toml`.
+- [Architectural decision record (ADR) 0014: environment seam
+  boundaries](adrs/adr-0014-environment-seam-boundaries.md)
+  - Decision record for capturing process-environment values once at named
+    composition roots, injecting them into pure logic, and forbidding
+    in-process mutation and ambient reads through Clippy.
 
 ## Requests for comments
 

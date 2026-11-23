@@ -191,3 +191,128 @@ fn a_finding_in_a_member_crate_fails_the_stage(
     }
     Ok(())
 }
+
+/// This repository's `clippy.toml`, which the policy workspace copies.
+const CLIPPY_CONFIGURATION: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/clippy.toml"
+));
+
+/// A manifest declaring the two workspace lint levels the policy depends on.
+const POLICY_MANIFEST: &str = concat!(
+    "[package]\n",
+    "name = \"lint-policy\"\n",
+    "version = \"0.1.0\"\n",
+    "edition = \"2021\"\n",
+    "\n",
+    "[lints.clippy]\n",
+    "disallowed_methods = \"deny\"\n",
+    "\n",
+    "[lints.rust]\n",
+    "unsafe_code = \"forbid\"\n",
+);
+
+/// A direct environment read, which the policy must refuse.
+const AMBIENT_READ: &str = concat!(
+    "pub fn read() -> Option<String> {\n",
+    "    std::env::var(\"THEOREMC_EXAMPLE\").ok()\n",
+    "}\n",
+);
+
+/// The same read behind a reasoned expectation, which the policy must accept.
+const EXPECTED_READ: &str = concat!(
+    "#[expect(\n",
+    "    clippy::disallowed_methods,\n",
+    "    reason = \"the policy workspace proves a reasoned expectation is accepted\"\n",
+    ")]\n",
+    "pub fn read() -> Option<String> {\n",
+    "    std::env::var(\"THEOREMC_EXAMPLE\").ok()\n",
+    "}\n",
+);
+
+/// Writes a single-package workspace carrying the environment policy.
+///
+/// # Errors
+///
+/// Returns the reason when a directory or file cannot be created.
+fn write_policy_workspace(source: &str) -> Result<TempDir, String> {
+    let directory =
+        TempDir::new().map_err(|error| format!("creating a temporary directory: {error}"))?;
+    let fs = Dir::open_ambient_dir(directory.path(), ambient_authority())
+        .map_err(|error| format!("opening the temporary directory: {error}"))?;
+    for (relative_path, contents) in [
+        ("Cargo.toml", POLICY_MANIFEST),
+        ("clippy.toml", CLIPPY_CONFIGURATION),
+        ("src/lib.rs", source),
+    ] {
+        write_file(&fs, relative_path, contents)?;
+    }
+    Ok(directory)
+}
+
+/// Runs Clippy over the policy workspace with the host's configuration removed.
+///
+/// `CLIPPY_CONF_DIR` can redirect Clippy to a different configuration
+/// directory, so it is removed; otherwise the copied `clippy.toml` might not be
+/// the one Clippy read, and the test would prove nothing.
+///
+/// # Errors
+///
+/// Returns the reason when Cargo cannot be started.
+fn run_policy_clippy(workspace: &Path) -> Result<Output, String> {
+    Command::new("cargo")
+        .args(CLIPPY_STAGE.arguments)
+        .current_dir(workspace)
+        .env_remove("RUSTFLAGS")
+        .env_remove("RUSTDOCFLAGS")
+        .env_remove("CLIPPY_CONF_DIR")
+        .env("CARGO_TARGET_DIR", workspace.join("target"))
+        .env("CARGO_NET_OFFLINE", "true")
+        .output()
+        .map_err(|error| format!("running Clippy over the policy workspace: {error}"))
+}
+
+/// Verifies that the configured prohibition really fails a build.
+///
+/// A `clippy.toml` entry is inert without `disallowed_methods = "deny"`. This
+/// case proves the two halves meet: the diagnostic must name the lint and the
+/// advice the contributor is meant to follow.
+#[test]
+fn a_direct_environment_read_fails_the_configured_lint() -> Result<(), String> {
+    let workspace = write_policy_workspace(AMBIENT_READ)?;
+    let output = run_policy_clippy(workspace.path())?;
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    if output.status.success() {
+        return Err(format!(
+            "a direct `std::env::var` must fail the configured lint, but Clippy passed; \
+             stderr was:\n{stderr}"
+        ));
+    }
+    for fragment in ["disallowed_methods", "inject an environment reader"] {
+        if !stderr.contains(fragment) {
+            return Err(format!(
+                "the diagnostic must contain {fragment:?}; stderr was:\n{stderr}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Verifies that a reasoned expectation is the sanctioned escape hatch.
+///
+/// Clippy reports an unfulfilled `#[expect]`, so this case also proves the lint
+/// fires at all: if the configuration were inert, the expectation would be
+/// unfulfilled and the build would fail instead of passing.
+#[test]
+fn a_reasoned_expectation_passes_the_configured_lint() -> Result<(), String> {
+    let workspace = write_policy_workspace(EXPECTED_READ)?;
+    let output = run_policy_clippy(workspace.path())?;
+    if !output.status.success() {
+        return Err(format!(
+            "a reasoned `#[expect(clippy::disallowed_methods)]` must pass, but Clippy failed; \
+             stderr was:\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(())
+}

@@ -147,14 +147,40 @@ fn repository_root() -> Utf8PathBuf {
 ///
 /// It sits inside the caller's `CARGO_TARGET_DIR` when one is exported, else
 /// inside the repository's `target`, so it is warm on a second run and `cargo
-/// clean` removes it.
+/// clean` removes it. This is the composition of the one ambient read with the
+/// pure selector, so a test can exercise the selector from an explicit base.
+pub(super) fn shared_target_dir() -> Result<Utf8PathBuf, String> {
+    fixture_target_dir(ambient_target_base().as_deref())
+}
+
+/// Reads the host's `CARGO_TARGET_DIR`, if the caller exported one.
+///
+/// Fixture crates must build into the target directory the host Cargo
+/// invocation is using, or the warm artefacts they rely on sit somewhere the
+/// build never looks. This is the test suite's one environment read for that
+/// value; everything downstream receives the base explicitly.
 #[expect(
     clippy::disallowed_methods,
-    reason = "fixture crates must share the target directory the host Cargo invocation is using, so the helper reads the ambient CARGO_TARGET_DIR"
+    reason = "fixture crates must share the target directory the host Cargo invocation is using, so the helper reads the ambient CARGO_TARGET_DIR at this boundary"
 )]
-pub(super) fn shared_target_dir() -> Result<Utf8PathBuf, String> {
-    let base = std::env::var("CARGO_TARGET_DIR")
-        .map_or_else(|_| repository_root().join("target"), Utf8PathBuf::from);
+fn ambient_target_base() -> Option<Utf8PathBuf> {
+    std::env::var("CARGO_TARGET_DIR")
+        .ok()
+        .map(Utf8PathBuf::from)
+}
+
+/// Returns the shared fixture target inside `base`, or inside the repository
+/// `target` when no base was supplied.
+///
+/// A relative base is resolved against the current directory and the result is
+/// canonicalised, so child Cargo invocations receive one absolute path however
+/// the caller spelled it.
+///
+/// # Errors
+///
+/// Returns an error when the directory cannot be created or canonicalised.
+pub(super) fn fixture_target_dir(base: Option<&Utf8Path>) -> Result<Utf8PathBuf, String> {
+    let base = base.map_or_else(|| repository_root().join("target"), Utf8Path::to_path_buf);
     let directory = base.join("theoremc-fixture-builds");
     Dir::create_ambient_dir_all(&directory, ambient_authority())
         .map_err(|error| error.to_string())?;

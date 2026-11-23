@@ -380,6 +380,16 @@ project:
   must not reach for `std::env::var`/`var_os` outside that composition root.
   The CLI's existing injected OrthoConfig environment sources, tested with
   `MapEnv`, are an accepted form of the same seam.
+  [ADR-0014](docs/adrs/adr-0014-environment-seam-boundaries.md) records the
+  seam shapes in increasing order of machinery, and names the approved
+  composition roots. Adding a root is an ADR-level change.
+- **Never mutate the parent process environment.** No test, helper, or fixture
+  calls `std::env::set_var` or `std::env::remove_var`, and no test changes the
+  process current directory. Arrange an environment-derived input with a stub
+  reader, an explicit value, or a child process environment instead.
+  `clippy.toml` denies all six process-environment functions and
+  `[workspace.lints.clippy]` denies `disallowed_methods`, so an ambient read
+  that is not an approved composition root fails `make lint`.
 - **Process-wide locks are not an escape hatch.** Serializing environment
   mutation behind a shared `Mutex`, `OnceLock`, or `serial_test` attribute is
   not an accepted fallback. It serializes the suite, defeats property-based
@@ -391,7 +401,9 @@ project:
   helpers that run a child process such as Cargo, may configure the child's
   environment via `Command::env`/`Command::env_clear`, because the mutation is
   confined to the child process. A test manipulating the environment in-process
-  does not qualify, whatever layer it claims to occupy.
+  does not qualify, whatever layer it claims to occupy. Capturing the host
+  values such a child needs belongs in one annotated boundary, such as
+  `HostEnv::capture`.
 
 ### Dependency management
 

@@ -40,6 +40,7 @@ fn invoke_json(environment: &CargoSubcommandEnvironment, path: &[String]) -> Res
         .split_first()
         .ok_or_else(|| anyhow::anyhow!("context invocation path is empty"))?;
     Ok(isolated_command(
+        &environment.host,
         OsStr::new(binary),
         environment.directory.path(),
         &environment.path,

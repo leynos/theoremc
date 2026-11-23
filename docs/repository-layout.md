@@ -65,6 +65,10 @@ core schema or macro expansion logic owned by the workspace crates.
 | `docs/cargo-theorem-cli-users-guide.md`                                        | User guide for the implemented `context` foundation and planned commands |
 | `docs/adrs/adr-0009-orthoconfig-cli-configuration.md`                          | Application-only OrthoConfig configuration boundary                      |
 | `docs/adrs/adr-0010-reusable-library-msrv-for-serde-saphyr-2-0.md`             | Workspace-wide Rust 1.89 MSRV decision for serde-saphyr 2.0              |
+| `docs/adrs/adr-0011-vertical-slice-first-roadmap-sequencing.md`                | Real Kani proof and counterexample as the next release gate              |
+| `docs/adrs/adr-0012-shared-warm-target-for-fixture-crates.md`                  | Shared warm target, unique package names, seeded lock, offline builds    |
+| `docs/adrs/adr-0013-workspace-complete-lint-gate.md`                           | Workspace-scoped rustdoc, Clippy, and Whitaker stages behind `make lint` |
+| `docs/adrs/adr-0014-environment-seam-boundaries.md`                            | Environment composition roots, injected seams, and the Clippy ban        |
 | `docs/ortho-config/`                                                           | Imported OrthoConfig guides and local redirects to pinned upstream docs  |
 | `docs/ortho-config/users-guide.md`                                             | Imported OrthoConfig v0.10.0 users' guide                                |
 | `docs/ortho-config/v0-10-0-migration-guide.md`                                 | Imported v0.10.0 migration reference                                     |
