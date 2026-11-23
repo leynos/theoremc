@@ -51,26 +51,37 @@ fn fail(
 /// Validates a deserialized theorem document against semantic constraints that
 /// `serde` attributes cannot express.
 ///
-/// Checks applied in order:
+/// Passes run in the order the body lists them, and the first violation wins,
+/// so a document with two faults reports the earlier one. Earlier passes check
+/// the plain text fields, because a later parse of the same field would report
+/// a syntax error for what is really a blank value.
 ///
-/// - `About` is non-empty after trimming.
-/// - `Prove` contains at least one assertion.
-/// - All `Assertion` fields are non-empty after trimming.
-/// - All `Assumption` fields are non-empty after trimming.
-/// - All `WitnessCheck` fields are non-empty after trimming.
-/// - All expression fields (`Assume.expr`, `Prove.assert`, `Witness.cover`)
-///   parse as `syn::Expr` and are not statement-like forms.
-/// - All `Forall` type strings parse as `syn::Type` and avoid free named
-///   lifetime parameters.
-/// - All `Let` binding and `Do` step `ActionCall` values remain structurally
-///   valid after raw-to-domain conversion.
-/// - All `MaybeBlock.because` fields are non-empty after trimming and
-///   `MaybeBlock.do` lists are non-empty.
-/// - At least one evidence backend is specified.
-/// - Kani `unwind` is positive.
-/// - Kani `vacuity_because` is non-empty after trimming when present.
-/// - Kani `allow_vacuous: true` requires `vacuity_because`.
-/// - Kani `allow_vacuous: false` requires non-empty `Witness`.
+/// 1. `About` is non-empty after trimming.
+/// 2. `Prove` contains at least one assertion.
+/// 3. Every `Assertion`, `Assumption`, and `WitnessCheck` field is non-empty
+///    after trimming.
+/// 4. Every expression field (`Assume.expr`, `Prove.assert`, `Witness.cover`)
+///    parses as a `syn::Expr` and is not a statement-like form.
+/// 5. Every `Actions` signature has valid parameter identifiers, and every
+///    parameter and return type string parses as a `syn::Type` without a free
+///    named lifetime.
+/// 6. Every `Forall` type string parses as a `syn::Type` without a free named
+///    lifetime.
+/// 7. Every `Do` step is structurally valid: a `maybe` step needs a non-empty
+///    `because` and a non-empty `do`, and its nested steps are checked
+///    recursively. `call` and `must` steps are already validated by
+///    raw-to-domain conversion.
+/// 8. Every action referenced by a step or `Let` binding has an `Actions`
+///    signature entry.
+/// 9. At least one evidence backend is named; Kani `unwind` is positive,
+///    `vacuity_because` is non-empty when present, `allow_vacuous: true`
+///    requires `vacuity_because`, and `allow_vacuous: false` requires a
+///    non-empty `Witness`.
+///
+/// Validation reads the domain model, so it never re-parses YAML and never
+/// consults the filesystem: a failure names the theorem, a deterministic
+/// reason, and a typed diagnostic reason, which lets callers render a
+/// source-located diagnostic without re-deriving the cause.
 ///
 /// # Errors
 ///
