@@ -298,8 +298,8 @@ fn kill_process_group(child: &mut Child) {
     // A process id that does not fit an `i32`, or is not a usable `Pid`, simply
     // means there is no group to signal; the direct child is still killed below.
     let group = i32::try_from(child.id()).ok().and_then(Pid::from_raw);
-    if let Some(group) = group {
-        let _signal_result = kill_group(group, Signal::KILL);
+    if let Some(target) = group {
+        let _signal_result = kill_group(target, Signal::KILL);
     }
     let _kill_result = child.kill();
     let _reap_result = child.wait();
