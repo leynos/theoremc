@@ -6,14 +6,13 @@
 //! the target directory, the Cargo home, the package name and the lock a
 //! fixture starts from; `fixture_crate` owns everything else.
 
-use std::fmt::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 
-use super::lock_file::assigned_string;
+use super::lock_file::with_renamed_root;
 
 /// Counts fixtures in this process, so package names stay unique within it.
 static FIXTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -102,84 +101,6 @@ const THEOREM_FILE_MACRO_TEMPLATE: FixtureTemplate = FixtureTemplate {
 pub fn seeded_lock(lock: FixtureLock, package_name: &str) -> Result<String, String> {
     let template = lock.template();
     with_renamed_root(template.lock, template.root, package_name)
-}
-
-/// Returns `lock` with the path entry naming `root` renamed to `name`.
-///
-/// A registry package always records a `source`; a template's root does not.
-/// Requiring exactly one source-less entry named `root` is what keeps the
-/// rename from rewriting a dependency of the same name.
-///
-/// # Errors
-///
-/// Returns an error when no entry names `root`, when more than one does, or
-/// when the only candidate records a source.
-fn with_renamed_root(lock: &str, root: &str, name: &str) -> Result<String, String> {
-    let lines: Vec<&str> = lock.lines().collect();
-    let target = root_name_line(&lines, root)?;
-    let mut rendered = String::with_capacity(lock.len());
-    for (index, line) in lines.iter().enumerate() {
-        match index {
-            _ if index == target => {
-                write!(rendered, "name = \"{name}\"")
-                    .map_err(|error| format!("rendering the renamed root: {error}"))?;
-            }
-            _ => rendered.push_str(line),
-        }
-        rendered.push('\n');
-    }
-    Ok(rendered)
-}
-
-/// Returns the line index of the source-less entry naming `root`.
-///
-/// # Errors
-///
-/// Returns an error when no entry names `root`, or when more than one does.
-fn root_name_line(lines: &[&str], root: &str) -> Result<usize, String> {
-    let mut found = None;
-    for (start, end) in package_blocks(lines) {
-        let block = lines
-            .get(start..end)
-            .ok_or_else(|| format!("fixture lock block {start}..{end} is out of range"))?;
-        if block
-            .iter()
-            .any(|line| assigned_string(line.trim(), "source").is_some())
-        {
-            continue;
-        }
-        let Some(offset) = block
-            .iter()
-            .position(|line| assigned_string(line.trim(), "name") == Some(root))
-        else {
-            continue;
-        };
-        if found.is_some() {
-            return Err(format!(
-                "fixture lock names {root:?} as a root package more than once"
-            ));
-        }
-        found = Some(start + offset);
-    }
-    found.ok_or_else(|| format!("fixture lock names no root package {root:?}"))
-}
-
-/// Returns the `[[package]]` blocks of a lock as `[start, end)` line ranges.
-fn package_blocks(lines: &[&str]) -> Vec<(usize, usize)> {
-    let starts: Vec<usize> = lines
-        .iter()
-        .enumerate()
-        .filter(|(_, line)| line.trim() == "[[package]]")
-        .map(|(index, _)| index)
-        .collect();
-    starts
-        .iter()
-        .enumerate()
-        .map(|(position, start)| {
-            let end = starts.get(position + 1).copied().unwrap_or(lines.len());
-            (*start, end)
-        })
-        .collect()
 }
 
 /// Returns a short suffix that is unlikely to clash with any other fixture's.
@@ -344,7 +265,11 @@ pub(super) fn shared_target_dir() -> Result<Utf8PathBuf, String> {
     reason = "the fixture Cargo home is chosen by the host build (`make fetch` exports it), so the helper reads the ambient THEOREMC_FIXTURE_CARGO_HOME and otherwise falls back to the repository's target"
 )]
 pub fn fixture_cargo_home() -> Result<Utf8PathBuf, String> {
-    prepared_cargo_home(std::env::var(FIXTURE_CARGO_HOME_VARIABLE).ok().as_deref())
+    prepared_cargo_home(
+        std::env::var(FIXTURE_CARGO_HOME_VARIABLE)
+            .ok()
+            .map(Utf8PathBuf::from),
+    )
 }
 
 /// Creates the Cargo home `configured` names and returns its absolute path.
@@ -357,7 +282,7 @@ pub fn fixture_cargo_home() -> Result<Utf8PathBuf, String> {
 ///
 /// Returns an error when the directory cannot be created or its absolute path
 /// cannot be resolved.
-fn prepared_cargo_home(configured: Option<&str>) -> Result<Utf8PathBuf, String> {
+fn prepared_cargo_home(configured: Option<Utf8PathBuf>) -> Result<Utf8PathBuf, String> {
     let directory = resolved_cargo_home(configured);
     Dir::create_ambient_dir_all(&directory, ambient_authority())
         .map_err(|error| error.to_string())?;
@@ -372,11 +297,8 @@ fn prepared_cargo_home(configured: Option<&str>) -> Result<Utf8PathBuf, String> 
 /// on a second run and `cargo clean` removes it with the rest of the build
 /// output. A configured value is taken as given; [`fixture_cargo_home`] makes
 /// the result absolute.
-fn resolved_cargo_home(configured: Option<&str>) -> Utf8PathBuf {
-    configured.map_or_else(
-        || repository_root().join("target/theoremc-fixture-cargo-home"),
-        Utf8PathBuf::from,
-    )
+fn resolved_cargo_home(configured: Option<Utf8PathBuf>) -> Utf8PathBuf {
+    configured.unwrap_or_else(|| repository_root().join("target/theoremc-fixture-cargo-home"))
 }
 
 #[cfg(test)]

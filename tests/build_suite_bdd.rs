@@ -122,22 +122,28 @@ fn fixture_with_theorem(name: &str) -> Result<FixtureCrate, String> {
     Ok(fixture)
 }
 
-/// Requires both fixtures to build into the warm target, resolve from the
-/// fixture Cargo home, and start from the build-support template's lock.
-fn require_shared_target_and_isolation(fixtures: [&FixtureCrate; 2]) -> Result<(), String> {
-    let [first, second] = fixtures;
+/// Requires both fixtures to build into the warm target.
+fn require_shared_target([first, second]: [&FixtureCrate; 2]) -> Result<(), String> {
     let shared = first.target_dir() == second.target_dir()
         && first
             .target_dir()
             .as_str()
             .ends_with("theoremc-fixture-builds");
-    if !shared {
-        return Err(format!(
+    if shared {
+        Ok(())
+    } else {
+        Err(format!(
             "fixtures must share the warm target, got {} and {}",
             first.target_dir(),
             second.target_dir()
-        ));
+        ))
     }
+}
+
+/// Requires both fixtures to resolve from one Cargo home, outside their own
+/// temporary directories.
+fn require_shared_cargo_home(fixtures: [&FixtureCrate; 2]) -> Result<(), String> {
+    let [first, second] = fixtures;
     if first.cargo_home() != second.cargo_home() {
         return Err(format!(
             "fixtures must resolve from one shared Cargo home, got {} and {}",
@@ -145,30 +151,32 @@ fn require_shared_target_and_isolation(fixtures: [&FixtureCrate; 2]) -> Result<(
             second.cargo_home()
         ));
     }
-    for fixture in fixtures {
-        // A home inside the fixture's own temporary directory would be cold
-        // for every fixture, which is the cost this home exists to avoid.
-        if fixture.cargo_home().starts_with(fixture.manifest_dir()) {
-            return Err(format!(
+    // A home inside the fixture's own temporary directory would be cold for
+    // every fixture, which is the cost this home exists to avoid.
+    fixtures
+        .into_iter()
+        .find(|fixture| fixture.cargo_home().starts_with(fixture.manifest_dir()))
+        .map_or(Ok(()), |fixture| {
+            Err(format!(
                 "{} must not keep its Cargo home in its own temporary directory",
                 fixture.package_name()
-            ));
-        }
+            ))
+        })
+}
+
+/// Requires `fixture` to start from the build-support template's lock, with
+/// only the template's root entry renamed.
+fn require_seeded_lock(fixture: &FixtureCrate) -> Result<(), String> {
+    let lock = fixture.read_to_string(Utf8Path::new("Cargo.lock"))?;
+    let expected = seeded_lock(FixtureLock::BuildSupport, fixture.package_name())?;
+    if lock != expected {
+        return Err(format!(
+            "{} must start from the build-support template lock with only its root renamed",
+            fixture.package_name()
+        ));
     }
-    for fixture in fixtures {
-        let lock = fixture.read_to_string(Utf8Path::new("Cargo.lock"))?;
-        let expected = seeded_lock(FixtureLock::BuildSupport, fixture.package_name())?;
-        if lock != expected {
-            return Err(format!(
-                "{} must start from the build-support template lock with only its root renamed",
-                fixture.package_name()
-            ));
-        }
-        if lock.contains("name = \"build_support_fixture\"") {
-            return Err(
-                "the template's own root name must not survive in a fixture lock".to_owned(),
-            );
-        }
+    if lock.contains("name = \"build_support_fixture\"") {
+        return Err("the template's own root name must not survive in a fixture lock".to_owned());
     }
     Ok(())
 }
@@ -188,7 +196,12 @@ fn require_only_own_theorem(suite: &str, own: &str, other: &str) -> Result<(), S
 fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(), String> {
     let first = fixture_with_theorem("only_first")?;
     let second = fixture_with_theorem("only_second")?;
-    require_shared_target_and_isolation([&first, &second])?;
+    let fixtures = [&first, &second];
+    require_shared_target(fixtures)?;
+    require_shared_cargo_home(fixtures)?;
+    for fixture in fixtures {
+        require_seeded_lock(fixture)?;
+    }
 
     first.cargo_build()?;
     second.cargo_build()?;

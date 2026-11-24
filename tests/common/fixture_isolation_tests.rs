@@ -1,6 +1,6 @@
 //! Regression tests for fixture package naming.
 
-use camino::Utf8Path;
+use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 use proptest::prelude::*;
 
@@ -290,7 +290,7 @@ fn the_fixture_home_falls_back_beside_the_shared_target() {
 
 #[test]
 fn an_exported_fixture_home_wins() {
-    let home = resolved_cargo_home(Some("/elsewhere/fixture-home"));
+    let home = resolved_cargo_home(Some(Utf8PathBuf::from("/elsewhere/fixture-home")));
 
     assert_eq!(
         home,
@@ -322,7 +322,7 @@ fn a_relative_fixture_home_is_resolved_to_an_absolute_path() -> Result<(), Strin
         .ok_or_else(|| "temp dir name is not valid UTF-8".to_owned())?
         .to_owned();
 
-    let home = super::prepared_cargo_home(Some(&name))?;
+    let home = super::prepared_cargo_home(Some(Utf8PathBuf::from(&name)))?;
     let expected_name = Utf8Path::new(&name);
 
     if home.is_absolute() && home.file_name() == Some(expected_name.as_str()) {
@@ -347,7 +347,7 @@ fn an_absolute_fixture_home_is_unchanged() -> Result<(), String> {
         .map_err(|error| error.to_string())?;
     let configured = root.join("fixture-home");
 
-    let home = super::prepared_cargo_home(Some(configured.as_str()))?;
+    let home = super::prepared_cargo_home(Some(configured.clone()))?;
 
     if home == configured {
         Ok(())

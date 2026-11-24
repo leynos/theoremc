@@ -82,8 +82,12 @@ install-kani: ## Install the pinned Kani release (front-end in CARGO_HOME/bin, b
 # The two scenarios are named exactly, and the recipe requires that both ran: a
 # renamed scenario would otherwise match nothing and pass with zero tests.
 override KANI_SCENARIOS := kani_lists_the_generated_proof_harness kani_verifies_every_generated_harness
-kani: ## Verify the generated theorem harnesses with cargo kani (requires an installed Kani)
-	@out=$$(THEOREMC_REQUIRE_KANI=1 RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS)" $(CARGO) test --test theorem_file_macro_bdd $(BUILD_JOBS) -- --exact --test-threads=1 $(KANI_SCENARIOS) 2>&1); \
+# The scenarios build the macro fixture `--frozen`, so they need the fixture
+# Cargo home populated exactly as `make test` does; `fetch` is its prerequisite
+# for that reason. The home is exported so the fixture build and the fetch step
+# cannot disagree about which directory holds the crates.
+kani: fetch ## Verify the generated theorem harnesses with cargo kani (requires an installed Kani)
+	@out=$$(THEOREMC_REQUIRE_KANI=1 THEOREMC_FIXTURE_CARGO_HOME="$(FIXTURE_CARGO_HOME)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS)" $(CARGO) test --test theorem_file_macro_bdd $(BUILD_JOBS) -- --exact --test-threads=1 $(KANI_SCENARIOS) 2>&1); \
 	status=$$?; printf '%s\n' "$$out"; \
 	[ "$$status" -eq 0 ] || exit "$$status"; \
 	for scenario in $(KANI_SCENARIOS); do \

@@ -1,9 +1,11 @@
-//! A minimal reader for the `[[package]]` entries of a Cargo lock file.
+//! A minimal reader and rewriter for the `[[package]]` entries of a Cargo lock file.
 //!
 //! The fixture lock contract compares three fields of each entry and nothing
 //! else, so the reader stays small and dependency-free: the workspace has no
 //! direct TOML parser, and adding one to read a file Cargo writes in a fixed
 //! shape would be disproportionate.
+
+use std::fmt::Write;
 
 /// One `[[package]]` entry of a Cargo lock file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,6 +111,85 @@ pub(super) fn assigned_string<'a>(line: &'a str, key: &str) -> Option<&'a str> {
         .strip_prefix('=')?
         .trim();
     value.strip_prefix('"')?.strip_suffix('"')
+}
+
+/// Returns `lock` with the path entry named `from` renamed to `to`.
+///
+/// A template's root entry records no `source`, which is what distinguishes it
+/// from a registry package of the same name. Requiring exactly one such entry
+/// keeps the rename from rewriting a dependency.
+///
+/// # Errors
+///
+/// Returns an error when no entry names `from`, when more than one does, or
+/// when the only candidate records a source.
+pub(super) fn with_renamed_root(lock: &str, from: &str, to: &str) -> Result<String, String> {
+    let lines: Vec<&str> = lock.lines().collect();
+    let target = root_name_line(&lines, from)?;
+    let mut rendered = String::with_capacity(lock.len());
+    for (index, line) in lines.iter().enumerate() {
+        match index {
+            _ if index == target => {
+                write!(rendered, "name = \"{to}\"")
+                    .map_err(|error| format!("rendering the renamed root: {error}"))?;
+            }
+            _ => rendered.push_str(line),
+        }
+        rendered.push('\n');
+    }
+    Ok(rendered)
+}
+
+/// Returns the line index of the source-less entry naming `root`.
+///
+/// # Errors
+///
+/// Returns an error when no entry names the template root, or when more than
+/// one does.
+fn root_name_line(lines: &[&str], root: &str) -> Result<usize, String> {
+    let mut found = None;
+    for (start, end) in package_blocks(lines) {
+        let block = lines
+            .get(start..end)
+            .ok_or_else(|| format!("fixture lock block {start}..{end} is out of range"))?;
+        if block
+            .iter()
+            .any(|line| assigned_string(line.trim(), "source").is_some())
+        {
+            continue;
+        }
+        let Some(offset) = block
+            .iter()
+            .position(|line| assigned_string(line.trim(), "name") == Some(root))
+        else {
+            continue;
+        };
+        if found.is_some() {
+            return Err(format!(
+                "fixture lock names {root:?} as a root package more than once"
+            ));
+        }
+        found = Some(start + offset);
+    }
+    found.ok_or_else(|| format!("fixture lock names no root package {root:?}"))
+}
+
+/// Returns the `[[package]]` blocks of a lock as `[start, end)` line ranges.
+fn package_blocks(lines: &[&str]) -> Vec<(usize, usize)> {
+    let starts: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line.trim() == "[[package]]")
+        .map(|(index, _)| index)
+        .collect();
+    starts
+        .iter()
+        .enumerate()
+        .map(|(position, start)| {
+            let end = starts.get(position + 1).copied().unwrap_or(lines.len());
+            (*start, end)
+        })
+        .collect()
 }
 
 #[cfg(test)]

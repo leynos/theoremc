@@ -103,9 +103,12 @@ crates.io index again. Issue #199 records the stall.
   both locks offline, and `tests/fixture_lock_contract.rs` holds every
   template's registry packages to the root lock by name, version and source
   (concordat NC-001).
-- **`make fetch` before the tests.** The target runs `cargo fetch --locked`
-  for the workspace and, with `CARGO_HOME=$(FIXTURE_CARGO_HOME)`, once per
-  fixture manifest. `make test` depends on it, and `ci.yml` and
+- **`make fetch` before anything that builds a frozen fixture.** Both
+  `make test` and `make kani` depend on it. The proofs workflow runs
+  `make kani` and never ran a fetch of its own, so without the dependency its
+  fixture build failed with a missing-package error naming `cap-std`. The
+  target runs `cargo fetch --locked` for the workspace and, with
+  `CARGO_HOME=$(FIXTURE_CARGO_HOME)`, once per fixture manifest. `ci.yml` and
   `coverage-main.yml` run it where they previously ran a bare `cargo fetch`. CI
   gains a step: the fixture home is not under `~/.cargo`, so the runner's cargo
   cache does not cover it and each CI run fetches it. That cost buys the
