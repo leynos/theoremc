@@ -255,9 +255,12 @@ mod tests {
     /// Every failure after a successful probe is reported, whatever it says.
     ///
     /// The loader error is the case that previously passed as a skip, so it
-    /// must fail even when Kani is optional.
+    /// must fail even when Kani is optional. The plain listing failure and the
+    /// fixture build failure sit on the same post-probe path and must reach
+    /// the caller too.
     #[rstest]
     #[case::loader_error("listing", LOADER_ERROR)]
+    #[case::listing_failure("listing", "cargo kani list failed with status exit status: 1")]
     #[case::run_failure("verification", "cargo kani failed with status exit status: 1")]
     #[case::fixture_build_failure("listing", "could not compile fixture crate")]
     fn a_failure_after_a_successful_probe_fails_the_check(

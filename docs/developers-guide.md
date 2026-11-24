@@ -650,12 +650,13 @@ suite.
 - The Kani scenarios probe `cargo kani --version` and treat any probe failure —
   a missing `cargo kani`, a launch failure such as an SDK shared-library error,
   or any non-zero exit — as a skip signal, not a claim that Kani is absent. The
-  skip is silent only without `THEOREMC_REQUIRE_KANI`: `make kani` and the
-  proofs workflow set it to `1`, and then the same condition fails the test.
-  Once the probe succeeds, every later failure is an error, including a loader
-  error or a fixture build failure, so a broken installation cannot pass as an
-  optional skip. `cargo_runner::classify_kani_run` holds that policy and is
-  unit tested with injected probe and run results.
+  skip is permitted only when `THEOREMC_REQUIRE_KANI` is not exactly `1`:
+  `make kani` and the proofs workflow set it to `1`, and then the same
+  condition fails the test. Once the probe succeeds, every later failure is an
+  error, including a loader error or a fixture build failure, so a broken
+  installation cannot pass as an optional skip.
+  `cargo_runner::classify_kani_run` holds that policy and is unit tested with
+  injected probe and run results.
 - Tests that start a child `cargo` or `rustc` (the fixture suites, the macros
   crate's trybuild suite and the `rustc` compile-fail unit test) run in the
   `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,
