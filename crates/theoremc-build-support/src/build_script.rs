@@ -129,6 +129,17 @@ pub struct BuildScriptContext {
 impl BuildScriptContext {
     /// Creates a context from explicit manifest and output directories.
     ///
+    /// # Parameters
+    ///
+    /// - `manifest_dir`: The manifest directory of the crate whose theorem
+    ///   tree is discovered.
+    /// - `out_dir`: The output directory Cargo expects the generated suite to
+    ///   be written into.
+    ///
+    /// # Returns
+    ///
+    /// A context carrying the two paths unchanged.
+    ///
     /// # Examples
     ///
     /// ```
@@ -151,6 +162,10 @@ impl BuildScriptContext {
 
     /// Returns the manifest directory used for theorem discovery.
     ///
+    /// # Returns
+    ///
+    /// The manifest directory supplied when the context was created.
+    ///
     /// # Examples
     ///
     /// ```
@@ -169,6 +184,10 @@ impl BuildScriptContext {
     }
 
     /// Returns the output directory the generated suite is written into.
+    ///
+    /// # Returns
+    ///
+    /// The output directory supplied when the context was created.
     ///
     /// # Examples
     ///
@@ -192,6 +211,10 @@ impl BuildScriptContext {
     /// This is the only place in the crate that reads the process environment,
     /// so it is the crate's composition root. Everything downstream receives
     /// the captured paths explicitly.
+    ///
+    /// # Returns
+    ///
+    /// A context built from Cargo's manifest and output directories.
     ///
     /// # Examples
     ///
@@ -246,6 +269,15 @@ const MANIFEST_DIR_VARIABLE: &str = "CARGO_MANIFEST_DIR";
 const OUT_DIR_VARIABLE: &str = "OUT_DIR";
 
 /// Prepares theorem discovery, generated-suite output, and Cargo rerun metadata.
+///
+/// # Parameters
+///
+/// - `context`: The manifest and output directories to prepare with. The
+///   function reads no environment of its own.
+///
+/// # Returns
+///
+/// The theorem presence and the ordered rerun paths Cargo should watch.
 ///
 /// # Examples
 ///
