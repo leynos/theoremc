@@ -227,7 +227,7 @@ fn a_timed_out_command_terminates_its_descendants() {
 
     // The direct child waits on the descendant, so the deadline fires while
     // both are alive, and the descendant is the only thing recording a pid.
-    let mut command = shell("sh -c 'echo $$ > \"$1\"; exec sleep 30' sh \"$2\" & wait");
+    let mut command = shell("sh -c 'echo $$ > \"$1\"; exec sleep 30' sh \"$1\" & wait");
     command.arg("sh").arg(&pid_file);
     let outcome = run_within_deadline(command, Duration::from_millis(400));
     assert!(

@@ -217,6 +217,18 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       (`KANI_COMMAND_DEADLINE`, 1140 s) instead of the 540 s fixture default,
       because `cargo kani` compiles the whole graph with its own compiler into
       its own target directory. The ordinary fixture deadline is unchanged.
+- [x] (2026-11-24T05:10Z) CodeRabbit reported ten findings; all were verified
+      against the code and all were valid, and all are fixed. The most important
+      were that a timeout could be misread as an unusable Kani environment, that
+      a busy fixture lock could be reported as Kani being unavailable, and that
+      the reader thread's spawn could panic after the child started. The Kani
+      deadlines were reduced to 60 s (probe) + 1080 s (command) so one test's
+      combined allowance fits the group's 1200 s per-test budget.
+- [x] (2026-11-24T05:25Z) The new descendant-termination test was validated by
+      mutation: with the process-group kill removed and only the direct child
+      killed, it fails with `descendant … must have been killed with its group`,
+      and it passes with the real implementation restored. All 48 `test-helpers`
+      tests pass.
 - [ ] Warm-run timings and the compiler-invocation count recorded here.
 - [ ] #143 re-evaluation recorded here.
 - [ ] Draft PR opened.
