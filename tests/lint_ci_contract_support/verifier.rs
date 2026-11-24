@@ -5,7 +5,6 @@
 //! contract, and names the first drift it can prove.
 
 use super::environment::environment_keys;
-use super::workflow_contract_support::has_sequence_entry;
 use super::{
     COVERAGE_VARIABLES, LINT_COMMAND, Line, MAKEFLAGS_VARIABLES, WHITAKER_INSTALLER, Workflow,
     has_bypass_key, invokes_aggregate, jobs, key_indent, run_command, steps, uses_reference,
@@ -99,28 +98,22 @@ fn lint_steps<'a, 'b>(name: &'a str, job: &'a [Line<'b>]) -> Result<Vec<LintStep
 ///
 /// Returns the job-level bypass key or coverage override.
 fn verify_lint_job(name: &str, job: &[Line<'_>], job_indent: usize) -> Result<(), String> {
-    // A `- if:` at the job's own indentation belongs to an indentless step
-    // list, and the step checks cover it, so the job scan skips it.
-    if has_sequence_entry(job, job_indent) {
-        let job_keys: Vec<Line<'_>> = job
-            .iter()
-            .filter(|line| line.indent() == job_indent && !line.trimmed().starts_with("- "))
-            .copied()
-            .collect();
-        if has_bypass_key(&job_keys, job_indent) {
-            return Err(format!(
-                "job `{name}` must not make the lint gate conditional or non-fatal"
-            ));
-        }
-    } else if has_bypass_key(job, job_indent) {
+    // A `- if:` or `- env:` at the job's own indentation belongs to an
+    // indentless step list, and the step checks cover it, so the job scans
+    // skip sequence entries.
+    let job_keys: Vec<Line<'_>> = job
+        .iter()
+        .filter(|line| line.indent() != job_indent || !line.trimmed().starts_with("- "))
+        .copied()
+        .collect();
+    if has_bypass_key(&job_keys, job_indent) {
         return Err(format!(
             "job `{name}` must not make the lint gate conditional or non-fatal"
         ));
     }
-    reject_coverage_override(
-        &format!("job `{name}`"),
-        &environment_keys(job, job_indent).map_err(|error| format!("job `{name}`: {error}"))?,
-    )
+    let keys = environment_keys(&job_keys, job_indent)
+        .map_err(|error| format!("job `{name}`: {error}"))?;
+    reject_coverage_override(&format!("job `{name}`"), &keys)
 }
 
 /// Fails unless the installer before `lint` is pinned and unconditional.
@@ -312,14 +305,12 @@ mod reader_contracts {
     /// A shell separator starts a new command, so a later aggregate is read.
     #[test]
     fn a_later_command_is_read() {
-        let workflow = job_running("true && make lint");
-        let decision = verify_lint_gate(&workflow);
-        if let Err(report) = decision {
-            assert!(
-                report.contains("must run exactly"),
-                "`true && make lint` must be read as the aggregate; found {report:?}"
-            );
-        }
+        let report = verify_lint_gate(&job_running("true && make lint"))
+            .expect_err("a compound command must be rejected as inexact");
+        assert!(
+            report.contains("must run exactly"),
+            "`true && make lint` must be read as the aggregate; found {report:?}"
+        );
     }
 
     /// A quoted bypass key and a tab after the colon are both honoured.
@@ -369,6 +360,31 @@ mod reader_contracts {
             report.contains("conditional or non-fatal"),
             "`if :` must be read as a bypass key; found {report:?}"
         );
+    }
+
+    /// `make -j lint` means unlimited jobs, so `lint` is the goal.
+    #[test]
+    fn an_optional_option_argument_does_not_swallow_the_goal() {
+        let report = verify_lint_gate(&job_running("make -j lint"))
+            .expect_err("`make -j lint` must be read as the aggregate and rejected as inexact");
+        assert!(
+            report.contains("must run exactly"),
+            "`-j` must not consume the goal; found {report:?}"
+        );
+    }
+
+    /// An indentless step's `- env:` is not a job environment.
+    #[test]
+    fn an_indentless_step_env_is_not_a_job_env() {
+        let job = concat!(
+            "jobs:\n  build-test:\n    runs-on: ubuntu-latest\n    steps:\n",
+            "    - env: { FOO: bar }\n      name: Optional\n      uses: actions/checkout@v4\n",
+            "    - name: Install Whitaker\n      uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+            "    - name: Lint\n      run: make lint\n",
+        );
+        if let Err(report) = verify_lint_gate(job) {
+            panic!("an unrelated step environment must not fail the job check: {report}");
+        }
     }
 
     /// A line reader sees a continuation `run:` at the step's key indent.

@@ -279,16 +279,6 @@ fn owns_key(entry: &str, key: &str) -> bool {
     })
 }
 
-/// Reports whether a block's own lines include a sequence entry.
-///
-/// A job's own keys sit at its key indentation; a sequence entry there belongs
-/// to an indentless step list, so a job-level check must skip it.
-pub(crate) fn has_sequence_entry(lines: &[Line<'_>], indent: usize) -> bool {
-    lines
-        .iter()
-        .any(|line| line.indent() == indent && line.opens_step())
-}
-
 /// Returns the step's own `run:` line, ignoring nested keys such as `env:`.
 ///
 /// The `run:` key must sit at the step's key indentation, so a nested

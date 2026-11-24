@@ -196,7 +196,11 @@ fn segment_goals(segment: &str) -> Vec<&str> {
         if !options_done && token == "--" {
             options_done = true;
         } else if !options_done && token.starts_with('-') {
-            if takes_argument(token) {
+            let next_is_value = tokens
+                .clone()
+                .next()
+                .is_some_and(|value| value.chars().all(|c| c.is_ascii_digit()));
+            if takes_argument(token) || (takes_numeric_argument(token) && next_is_value) {
                 tokens.next();
             }
         } else {
@@ -208,8 +212,18 @@ fn segment_goals(segment: &str) -> Vec<&str> {
 }
 
 /// Reports whether a Make option consumes the following token.
+///
+/// `-j` and `-l` take an *optional* numeric argument, so `make -j lint` means
+/// "unlimited jobs, build lint" and must not swallow the goal. The fixed-arity
+/// options always consume the next token.
 fn takes_argument(option: &str) -> bool {
-    matches!(option, "-f" | "-C" | "-I" | "-o" | "-W" | "-j" | "-l")
+    matches!(option, "-f" | "-C" | "-I" | "-o" | "-W")
+}
+
+/// Reports whether a Make option consumes the following token when it is
+/// numeric.
+fn takes_numeric_argument(option: &str) -> bool {
+    matches!(option, "-j" | "-l")
 }
 
 /// Returns the reference a step's own `uses:` key names.

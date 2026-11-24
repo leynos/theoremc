@@ -12,16 +12,7 @@ use super::Repository;
 /// A package's `src`, `tests`, `benches`, `examples`, and build output never
 /// contain a workspace member, so descending into them would only slow the
 /// walk and risk a depth error on an ordinary crate.
-const NON_PACKAGE_DIRECTORIES: [&str; 8] = [
-    "src",
-    "tests",
-    "benches",
-    "examples",
-    "target",
-    "node_modules",
-    ".git",
-    ".cargo",
-];
+const NON_PACKAGE_DIRECTORIES: [&str; 5] = ["src", "target", "node_modules", ".git", ".cargo"];
 
 /// How far the package walk descends below a member root.
 ///

@@ -27,16 +27,24 @@ pub(super) fn environment_keys<'a>(
             continue;
         }
         let trimmed = line.trimmed();
-        let declared = trimmed
-            .strip_prefix("- ")
-            .unwrap_or(trimmed)
-            .trim_start_matches(['"', '\'']);
-        let Some(rest) = declared.strip_prefix("env:").map(str::trim) else {
+        let Some(rest) = env_header_value(trimmed) else {
             continue;
         };
         keys.extend(env_block_keys(lines, index, rest)?);
     }
     Ok(keys)
+}
+
+/// Returns the value an `env:` header introduces, quoted key or not.
+///
+/// The key may be written `env:`, `"env":`, or `'env':`, and the value may
+/// follow the colon directly or on the next line.
+fn env_header_value(trimmed: &str) -> Option<&str> {
+    let entry = trimmed.strip_prefix("- ").unwrap_or(trimmed);
+    let after_quotes = entry.trim_start_matches(['"', '\'']);
+    let after_key = after_quotes.strip_prefix("env")?;
+    let closing = after_key.trim_start_matches(['"', '\'']).trim_start();
+    closing.strip_prefix(':').map(str::trim)
 }
 
 /// Returns the keys a single `env:` entry declares.
@@ -134,13 +142,10 @@ fn multiline_flow_keys<'a>(lines: &[Line<'a>], env_index: usize) -> Result<Vec<&
     let Some(header) = lines.get(env_index) else {
         return Ok(Vec::new());
     };
-    let trimmed = header.trimmed();
-    let after_key = trimmed
-        .strip_prefix("- ")
-        .unwrap_or(trimmed)
-        .strip_prefix("env:")
-        .map(str::trim);
-    let Some(body) = after_key.and_then(|value| value.strip_prefix('{')) else {
+    let Some(declared) = env_header_value(header.trimmed()) else {
+        return Ok(Vec::new());
+    };
+    let Some(body) = declared.strip_prefix('{') else {
         return Ok(Vec::new());
     };
     // A mapping that closes on its own line is already read by the flow path.
