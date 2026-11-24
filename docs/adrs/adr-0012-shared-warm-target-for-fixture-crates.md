@@ -84,12 +84,12 @@ crates.io index again. Issue #199 records the stall.
   `THEOREMC_FIXTURE_CARGO_HOME` when it is set, and otherwise from
   `<repository>/target/theoremc-fixture-cargo-home`, canonicalized so a
   relative configuration cannot be resolved against a fixture's own working
-  directory. `make fetch` populates that home and `make test` exports its path,
-  so the fetch and the build agree on one directory. The home has its own
-  `.package-cache`, so a fixture build never contends for the caller's lock,
-  and the caller's target stays warm. This is the only way to satisfy the
-  contention criterion: no Cargo flag avoids the lock, so the lock has to be a
-  different file.
+  directory. `make fetch` populates that home and `make test` and `make kani`
+  each export its path, so the fetch and the builds agree on one directory. The
+  home has its own `.package-cache`, so a fixture build never contends for the
+  caller's lock, and the caller's target stays warm. This is the only way to
+  satisfy the contention criterion: no Cargo flag avoids the lock, so the lock
+  has to be a different file.
 - **`--frozen` on every fixture build.** A build or a `cargo build -vv` in the
   fixture suites passes `--frozen`, which implies `--locked` and `--offline`.
   `cargo kani` is deliberately left without it, because the Kani driver manages
