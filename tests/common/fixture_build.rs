@@ -54,6 +54,18 @@ impl FixtureIdentity {
     }
 }
 
+/// Names of the files a fixture build redirects its output streams to.
+///
+/// The streams go to files rather than pipes: a piped stream that nobody drains
+/// can fill and block Cargo, and a build that blocks never reaches a test's
+/// readiness barrier. Files also survive the wait, so a readiness failure can
+/// still report what Cargo said.
+/// Suffix of the file a fixture build redirects its standard output to.
+const BUILD_STDOUT_FILE: &str = "build-stdout.log";
+
+/// Suffix of the file a fixture build redirects its standard error to.
+const BUILD_STDERR_FILE: &str = "build-stderr.log";
+
 /// A fixture build that has started but has not been waited for.
 ///
 /// Keeping the child accessible lets a concurrency test prove that a sibling's
@@ -62,7 +74,7 @@ impl FixtureIdentity {
 pub struct RunningBuild {
     /// The prepared command, retained so a failure can name it.
     command: Command,
-    /// The child process that is running it, until `wait` collects it.
+    /// The child process that is running it, until it is collected.
     child: Option<Child>,
     /// The fixture the build belongs to.
     identity: FixtureIdentity,
@@ -74,14 +86,9 @@ impl RunningBuild {
     /// # Errors
     ///
     /// Returns the exit status with labelled streams when Cargo fails, and the
-    /// underlying error when its output cannot be collected.
+    /// underlying error when its output cannot be read.
     pub fn wait(mut self) -> Result<BuildLog, String> {
-        let Some(child) = self.child.take() else {
-            return Err(format!(
-                "{} was already collected",
-                self.identity.describe(),
-            ));
-        };
+        let child = self.take_child()?;
         let output = child.wait_with_output().map_err(|error| {
             format!(
                 "waiting for {}: {error}; {} could not be built",
@@ -89,18 +96,87 @@ impl RunningBuild {
                 self.identity.describe(),
             )
         })?;
-        if !output.status.success() {
-            return Err(format!(
-                "{}\n{}",
-                command_run::completed_failure(&self.command, &output),
-                self.identity.describe(),
-            ));
+        self.finish(&output)
+    }
+
+    /// Kills the build, reaps it and reports its output as a failure.
+    ///
+    /// A concurrency test calls this when the build never reached its barrier:
+    /// the exit status and streams explain why, where a bare timeout would not.
+    ///
+    /// # Errors
+    ///
+    /// Always returns an error; it carries the status and labelled streams when
+    /// they can be read, and otherwise the reason they could not be.
+    #[must_use]
+    pub fn abort(mut self, reason: &str) -> String {
+        let Some(mut child) = self.child.take() else {
+            return format!(
+                "{reason}; {} was already collected",
+                self.identity.describe()
+            );
+        };
+        drop(child.kill());
+        match child.wait() {
+            Ok(status) => {
+                let output = std::process::Output {
+                    status,
+                    stdout: read_log(&self.stdout_path()),
+                    stderr: read_log(&self.stderr_path()),
+                };
+                format!(
+                    "{reason}\n{}",
+                    command_run::completed_failure(&self.command, &output),
+                )
+            }
+            Err(error) => format!("{reason}; also could not reap the child: {error}"),
         }
-        Ok(BuildLog(format!(
+    }
+
+    /// Takes the child, or explains that it was already collected.
+    fn take_child(&mut self) -> Result<Child, String> {
+        self.child
+            .take()
+            .ok_or_else(|| format!("{} was already collected", self.identity.describe()))
+    }
+
+    /// Turns a successful or failed run into a log or a labelled error.
+    fn finish(&self, output: &std::process::Output) -> Result<BuildLog, String> {
+        let log = format!(
             "{}{}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr),
-        )))
+        );
+        if output.status.success() {
+            Ok(BuildLog(log))
+        } else {
+            Err(format!(
+                "{}\n{}",
+                command_run::completed_failure(&self.command, output),
+                self.identity.describe(),
+            ))
+        }
+    }
+
+    /// Returns the file this build redirects its standard output to.
+    ///
+    /// The logs live in the shared target rather than the fixture root: the
+    /// target always exists, so redirecting output cannot mask the spawn failure
+    /// a test is trying to observe, and the root may be removed by the time a
+    /// failed build is reported.
+    fn stdout_path(&self) -> Utf8PathBuf {
+        self.identity.target_dir.join(format!(
+            "{}-{BUILD_STDOUT_FILE}",
+            self.identity.package_name
+        ))
+    }
+
+    /// Returns the file this build redirects its standard error to.
+    fn stderr_path(&self) -> Utf8PathBuf {
+        self.identity.target_dir.join(format!(
+            "{}-{BUILD_STDERR_FILE}",
+            self.identity.package_name
+        ))
     }
 }
 
@@ -118,18 +194,65 @@ impl Drop for RunningBuild {
     }
 }
 
+/// Reads a build log, treating an unreadable one as empty.
+///
+/// This exists to report a failure, so a missing log must not replace the error
+/// being reported with a second one.
+fn read_log(path: &Utf8Path) -> Vec<u8> {
+    let Some(parent) = path.parent() else {
+        return Vec::new();
+    };
+    let Some(name) = path.file_name() else {
+        return Vec::new();
+    };
+    Dir::open_ambient_dir(parent, ambient_authority())
+        .and_then(|dir| dir.read(name))
+        .unwrap_or_default()
+}
+
+/// Creates the file a build stream is redirected to, or reports the failure.
+///
+/// # Errors
+///
+/// Returns the operation, the path and the underlying error when the file
+/// cannot be created. The caller converts the handle for `Stdio`, so this
+/// module never names `std::fs` directly.
+fn create_log(path: &Utf8Path) -> Result<cap_std::fs_utf8::File, String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("the build log {path} has no parent directory"))?;
+    let name = path
+        .file_name()
+        .ok_or_else(|| format!("the build log {path} has no file name"))?;
+    Dir::open_ambient_dir(parent, ambient_authority())
+        .and_then(|dir| dir.create(name))
+        .map_err(|error| path_error("creating the build log", path, &error))
+}
+
 /// Starts `cargo build -vv --color never` in the fixture without waiting for it.
+///
+/// The child's streams are redirected to files in the fixture root, so nothing
+/// has to drain them while the build runs and their content outlives a failed
+/// readiness check.
 ///
 /// # Errors
 ///
 /// Returns a message naming the command and directory when Cargo cannot start,
-/// or when the child's output streams cannot be configured.
+/// or the log paths when they cannot be created.
 pub(super) fn spawn_build(identity: &FixtureIdentity) -> Result<RunningBuild, String> {
+    let stdout_path = identity
+        .target_dir
+        .join(format!("{}-{BUILD_STDOUT_FILE}", identity.package_name));
+    let stderr_path = identity
+        .target_dir
+        .join(format!("{}-{BUILD_STDERR_FILE}", identity.package_name));
+    let stdout = create_log(&stdout_path)?.into_std();
+    let stderr = create_log(&stderr_path)?.into_std();
     let mut command = hermetic_cargo(&identity.root, &identity.target_dir)?;
     command
         .args(["build", "-vv", "--color", "never"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stdout(Stdio::from(stdout))
+        .stderr(Stdio::from(stderr));
     let child = command.spawn().map_err(|error| {
         format!(
             "{}; {} could not be built",

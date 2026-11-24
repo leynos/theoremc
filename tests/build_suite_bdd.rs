@@ -256,11 +256,11 @@ fn a_sibling_build_and_clean_up_do_not_disturb_another_fixtures_suite() -> Resul
     )?;
 
     let builder_build = builder.spawn_cargo_build()?;
-    require_barrier_ready(&builder)?;
+    if let Err(reason) = require_barrier_ready(&builder) {
+        return Err(builder_build.abort(&reason));
+    }
     drop(sibling);
     builder.write(Utf8Path::new(BARRIER_RELEASE_FILE), "release")?;
-
-    // `wait` drains both pipes while it waits, so a verbose build cannot block.
     builder_build.wait()?;
     require_only_own_theorem(
         &generated_suite_contents(&builder)?,

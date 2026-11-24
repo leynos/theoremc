@@ -278,6 +278,16 @@ Observable success:
   present, and the measured build is forced to rerun by touching a
   `rerun-if-changed` input. The test passed end to end in 823 s. Date/Author:
   2026-11-24, implementing agent, from CodeRabbit review.
+- D13. Decision (review-driven): redirect a fixture build's streams to files
+  in the shared target and report them through `RunningBuild::abort`.
+  Rationale: piped streams that nobody drains can fill and block Cargo, and a
+  build that blocks never reaches a readiness barrier; files also survive a
+  failed readiness check, so the exit status and both streams are reported
+  instead of a bare timeout. The logs live in the shared target because that
+  directory always exists, so creating them cannot mask the spawn failure the
+  missing-working-directory test exists to observe. The barrier test passed in
+  947 s with this shape. Date/Author: 2026-11-24, implementing agent, from
+  CodeRabbit review.
 
 ## Outcomes & retrospective
 
