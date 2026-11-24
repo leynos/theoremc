@@ -171,6 +171,32 @@ fn bypass_keys_are_detected_in_a_step() {
     );
 }
 
+/// Step-shaped text in a later block scalar is not a step.
+///
+/// A job-level `name: |` or `env:` scalar contains text, not workflow keys, so
+/// a scenario written there must not satisfy the gate. Neither the ordering
+/// predicate nor the exact-command check may be fooled by it.
+#[test]
+fn a_scalar_after_the_steps_does_not_supply_steps() {
+    let workflow = concat!(
+        "jobs:\n  build-test:\n    steps:\n",
+        "      - name: Markdown lint\n        run: make markdownlint\n",
+        "    name: |\n",
+        "      - name: Spelling\n        run: make spelling\n",
+        "      - name: Install Whitaker\n        run: echo install\n",
+    );
+    let job =
+        build_test_job(Workflow(workflow)).expect("the synthetic workflow must define the job");
+    assert!(
+        !spelling_runs_between_markdown_lint_and_whitaker(&job),
+        "a spelling scenario inside a scalar must not satisfy the ordering"
+    );
+    assert!(
+        build_test_step(Workflow(workflow), StepName("Spelling")).is_none(),
+        "a scalar entry must not be read as a step"
+    );
+}
+
 /// A job-level bypass key is found even when it follows the `steps:` mapping.
 #[test]
 fn job_bypass_keys_are_found_at_any_position() {

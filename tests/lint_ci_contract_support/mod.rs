@@ -49,7 +49,11 @@ const COVERAGE_VARIABLES: [&str; 8] = [
 /// the command a step actually runs is the body, not the marker.
 fn run_command(step: &[Line<'_>], indent: usize) -> Option<String> {
     let run_line = step_run_line(step, indent)?;
-    let value = run_line.trimmed().strip_prefix("run:")?.trim();
+    let trimmed = run_line.trimmed();
+    let value = trimmed
+        .strip_prefix("- run:")
+        .or_else(|| trimmed.strip_prefix("run:"))?
+        .trim();
     if !value.starts_with(['|', '>']) {
         return Some(value.to_owned());
     }

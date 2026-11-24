@@ -137,21 +137,43 @@ fn steps_key_index(job: &[Line<'_>]) -> Option<(usize, usize)> {
     })
 }
 
+/// Returns the indentation of the job's next key after `steps_line`.
+///
+/// A job-level key that follows the step list ends it: `name: |` or `env:` at
+/// the job's key indentation is a sibling of `steps:`, so anything after it is
+/// data. Returning the job's length when no sibling follows keeps the step
+/// list open to the end of the job.
+fn next_sibling(job: &[Line<'_>], steps_line: usize, key_indent: usize) -> usize {
+    job.iter()
+        .enumerate()
+        .skip(steps_line + 1)
+        .find(|(_, line)| {
+            !line.is_blank()
+                && !line.is_comment()
+                && line.indent() <= key_indent
+                && !line.opens_step()
+        })
+        .map_or(job.len(), |(index, _)| index)
+}
+
 /// Returns each step of a job with its start index, in file order.
 ///
-/// The search starts at the job's own `steps:` key, so a block sequence that
-/// belongs to something else — a `strategy.matrix.os` list, for example —
-/// cannot set the step indentation. The sequence indentation is read from the
-/// first item after the key, because YAML allows a step list to start at the
-/// key's own indentation as well as two spaces deeper. Only items at that
-/// indentation count: a nested sequence under `with:` is data, not a step.
+/// The search starts at the job's own `steps:` key and ends at the next
+/// sibling key, so a block sequence belonging to something else — a
+/// `strategy.matrix.os` list before the key, or a `name: |` scalar after it —
+/// cannot supply steps. The sequence indentation is read from the first item
+/// after the key, because YAML allows a step list to start at the key's own
+/// indentation as well as two spaces deeper. Only items at that indentation
+/// count: a nested sequence under `with:` is data, not a step.
 pub(crate) fn steps<'a, 'b>(job: &'a [Line<'b>]) -> Vec<(usize, &'a [Line<'b>])> {
     let Some((steps_line, key_indent)) = steps_key_index(job) else {
         return Vec::new();
     };
+    let end = next_sibling(job, steps_line, key_indent);
     let Some((first, step_indent)) = job
         .iter()
         .enumerate()
+        .take(end)
         .skip(steps_line + 1)
         .find(|(_, line)| line.opens_step() && line.indent() >= key_indent)
         .map(|(index, line)| (index, line.indent()))
@@ -161,6 +183,7 @@ pub(crate) fn steps<'a, 'b>(job: &'a [Line<'b>]) -> Vec<(usize, &'a [Line<'b>])>
     let starts: Vec<usize> = job
         .iter()
         .enumerate()
+        .take(end)
         .skip(first)
         .filter(|(_, line)| line.opens_step() && line.indent() == step_indent)
         .map(|(index, _)| index)
@@ -184,17 +207,21 @@ pub(crate) fn key_indent(block: &[Line<'_>]) -> Option<usize> {
 /// key indentation.
 ///
 /// Only the block's own keys are inspected: a nested `if:` under `env:` or
-/// `with:` is data, not a workflow condition.
+/// `with:` is data, not a workflow condition. Both the sequence-opening form
+/// (`- if: false`) and the continuation form (`  if: false`) count, and so
+/// does a key whose value begins on the next line (`if:` alone), because
+/// GitHub evaluates the expression either way.
 pub(crate) fn has_bypass_key(lines: &[Line<'_>], indent: usize) -> bool {
     lines
         .iter()
-        .filter(|line| line.indent() == indent)
+        .filter(|line| line.indent() == indent || line.indent() + 2 == indent)
         .any(|line| {
             let trimmed = line.trimmed();
+            let entry = trimmed.strip_prefix("- ").unwrap_or(trimmed);
             ["if:", "continue-on-error:"].iter().any(|key| {
-                trimmed
+                entry
                     .strip_prefix(*key)
-                    .is_some_and(|rest| rest.starts_with(' '))
+                    .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
             })
         })
 }
@@ -203,8 +230,12 @@ pub(crate) fn has_bypass_key(lines: &[Line<'_>], indent: usize) -> bool {
 ///
 /// The `run:` key must sit at the step's key indentation, so a nested
 /// `env: { run: make spelling }` cannot satisfy the contract while the step
-/// actually runs something else.
+/// actually runs something else. The sequence-opening form (`- run: …`) is
+/// read too, because a one-key step is valid YAML.
 pub(crate) fn step_run_line<'a, 'b>(step: &'a [Line<'b>], indent: usize) -> Option<&'a Line<'b>> {
-    step.iter()
-        .find(|line| line.indent() == indent && line.trimmed().starts_with("run:"))
+    step.iter().find(|line| {
+        let trimmed = line.trimmed();
+        (line.indent() == indent && trimmed.starts_with("run:"))
+            || (line.indent() + 2 == indent && trimmed.starts_with("- run:"))
+    })
 }

@@ -154,7 +154,10 @@ pub(crate) fn build_test_step<'a>(
 /// # run: make spelling            -> false
 /// ```
 pub(crate) fn runs_exact_command(step: &[Line<'_>], indent: usize) -> bool {
-    step_run_line(step, indent).is_some_and(|line| line.trimmed() == SPELLING_COMMAND)
+    step_run_line(step, indent).is_some_and(|line| {
+        let trimmed = line.trimmed();
+        trimmed.strip_prefix("- ").unwrap_or(trimmed) == SPELLING_COMMAND
+    })
 }
 
 /// Reports whether a job orders Markdown lint, Spelling, and the Whitaker

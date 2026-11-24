@@ -40,12 +40,12 @@ fn starts_with_string(value: &str) -> bool {
 }
 
 /// Returns the value of an `excluded_paths = …` assignment.
+///
+/// The key is compared through [`assignment_key`], so a quoted key is read as
+/// the same declaration as an unquoted one.
 fn excluded_paths_value(trimmed: &str) -> Option<&str> {
-    trimmed
-        .strip_prefix("excluded_paths")?
-        .trim_start()
-        .strip_prefix('=')
-        .map(str::trim)
+    let (key, value) = trimmed.split_once('=')?;
+    (key.trim().trim_matches(['"', '\'']) == "excluded_paths").then(|| value.trim())
 }
 
 /// Returns the active `excluded_paths` entries that carry no adjacent reason.
@@ -154,6 +154,8 @@ fn an_unjustified_exclusion_is_rejected() {
         "excluded_paths = [\n  \"crate::legacy_io\",\n]\n",
         "excluded_paths = [\n  'crate::legacy_io',\n]\n",
         "excluded_paths = [\"crate::legacy_io\",\n]\n",
+        "\"excluded_paths\" = [\"crate::legacy_io\"]\n",
+        "'excluded_paths' = ['crate::legacy_io']\n",
     ] {
         assert!(
             !unjustified_exclusions(entry).is_empty(),

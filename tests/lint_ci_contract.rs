@@ -225,6 +225,57 @@ fn an_inline_uses_step_satisfies_the_installer_requirement() {
     }
 }
 
+/// The one-key step form carries the command and the bypass key alike.
+///
+/// A second job may write `- run: make lint` and `- if: false` as single keys,
+/// so both must be read where they are written, not only as continuation keys.
+#[rstest]
+#[case::sequence_opening_bypass(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - if: false\n        run: make lint\n",
+    )
+)]
+#[case::installer_opening_bypass(
+    concat!(
+        "      - if: false\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        run: make lint\n",
+    )
+)]
+#[case::next_line_bypass(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        if:\n          ${{ false }}\n        run: make lint\n",
+    )
+)]
+fn a_single_key_step_form_is_read(#[case] body: &str) {
+    let workflow = single_job(body);
+    assert!(
+        verify_lint_gate(&workflow).is_err(),
+        "this job must be rejected:\n{body}"
+    );
+}
+
+/// A one-key `- run: make lint` step satisfies the aggregate contract.
+#[test]
+fn a_sequence_opening_run_step_is_read() {
+    let body = concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - run: make lint\n",
+    );
+    if let Err(report) = verify_lint_gate(&single_job(body)) {
+        panic!("a `- run: make lint` step must be accepted: {report}");
+    }
+}
+
 /// A job's own `steps:` mapping is found after a matrix list, and a step list
 /// at the key's own indentation is read as readily as an indented one.
 #[rstest]
