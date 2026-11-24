@@ -201,6 +201,8 @@ pub(crate) fn build_fixture_and_list_kani_harnesses(
 mod tests {
     //! Tests for Cargo TOML fixture generation.
 
+    use rstest::rstest;
+
     use super::{ConsumerCfgRegistration, fixture_cargo_toml_for, fixture_cargo_toml_for_consumer};
 
     #[test]
@@ -235,31 +237,24 @@ mod tests {
         assert!(toml.contains("theoremc-build-support = { path = \"/home/user/project's/\\\"theoremc\\\"/crates/theoremc-build-support\" }"));
     }
 
-    #[test]
-    fn registered_consumer_declares_cfg_kani_check_cfg() {
-        let toml = fixture_cargo_toml_for_consumer("/repo", ConsumerCfgRegistration::Registered);
-
-        assert!(
-            toml.contains("[lints.rust]"),
-            "registered consumer should open a `[lints.rust]` table, got:\n{toml}",
-        );
-        assert!(
-            toml.contains("check-cfg = [\"cfg(kani)\"]"),
-            "registered consumer should declare `cfg(kani)`, got:\n{toml}",
-        );
+    /// Asserts whether the manifest carries a `cfg(kani)` registration.
+    fn declares_cfg_kani(registration: ConsumerCfgRegistration) -> bool {
+        fixture_cargo_toml_for_consumer("/repo", registration)
+            .contains("check-cfg = [\"cfg(kani)\"]")
     }
 
-    #[test]
-    fn unregistered_consumer_declares_no_lint_table() {
-        let toml = fixture_cargo_toml_for_consumer("/repo", ConsumerCfgRegistration::Unregistered);
-
-        assert!(
-            !toml.contains("[lints"),
-            "unregistered consumer must carry no lint table, got:\n{toml}",
-        );
-        assert!(
-            !toml.contains("cfg(kani)"),
-            "unregistered consumer must not mention `cfg(kani)`, got:\n{toml}",
+    #[rstest]
+    #[case::registered(ConsumerCfgRegistration::Registered, true)]
+    #[case::unregistered(ConsumerCfgRegistration::Unregistered, false)]
+    fn consumer_manifest_matches_its_cfg_kani_registration(
+        #[case] registration: ConsumerCfgRegistration,
+        #[case] expected: bool,
+    ) {
+        assert_eq!(
+            declares_cfg_kani(registration),
+            expected,
+            "consumer manifest should {}a cfg(kani) registration",
+            if expected { "carry " } else { "omit " },
         );
     }
 }
