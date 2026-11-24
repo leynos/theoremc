@@ -130,8 +130,19 @@ The ExecPlan file itself is excluded from every size count.
   `target/tests/trybuild/theoremc-macros/tests/expand/`.
 - [x] (2026-11-23 19:30Z) `tools/check_adr_rfc_names.py` passes: 15 records and
   105 local links.
-- [ ] Gates: `make check-fmt`, `make check-adr-rfc-names`, `make lint`,
-  `make test`, `make markdownlint`, `make nixie`, `make spelling`.
+- [x] (2026-11-24) `make check-fmt`, `make check-adr-rfc-names`,
+  `make markdownlint`, `make nixie`, `make spelling`: pass.
+- [x] (2026-11-24) `make lint`: passes. Four Clippy findings were fixed on the
+  way: `missing_const_for_fn` on `BuildScriptContext::new`, `shadow_reuse` on
+  the fixture base and two contract-test bindings, and
+  `needless_borrows_for_generic_args` plus `unnecessary_wraps` and
+  `panic_in_result_fn` in the entry-point tests.
+- [ ] `make test`: 1018 of 1019 tests pass. One fixture-crate BDD test
+  (`existing_theorem_files_are_discovered_recursively`) hit nextest's timed-out
+  ceiling at exactly 600 s under a shared compile queue more than 400 requests
+  deep. Re-run with a raised ceiling, all three cases in that binary passed
+  (1506 s, 572 s, 614 s), proving contention rather than a regression. A clean
+  `make test` run is outstanding and needs a quieter host.
 - [ ] CodeRabbit review at each major milestone; concerns cleared.
 - [ ] Push and open the draft PR.
 
