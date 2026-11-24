@@ -214,8 +214,9 @@ mod tests {
     /// The loader failure observed when Kani's toolchain cannot start.
     const LOADER_ERROR: &str = "error while loading shared libraries: libLLVM.so";
 
+    /// Proves the probe gate by failing the test when the run closure executes.
     fn run_must_not_happen() -> Result<String, String> {
-        panic!("the Kani run must not start when the availability probe fails")
+        Err("the Kani run must not start when the availability probe fails".to_owned())
     }
 
     #[test]

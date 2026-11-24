@@ -173,7 +173,10 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
         })
     })? {
         KaniOutcome::Ran(output) => output,
-        KaniOutcome::Skipped(reason) => return skip_without_kani(&reason, "listing"),
+        KaniOutcome::Skipped(reason) => {
+            announce_kani_skip(&reason, "listing");
+            return Ok(());
+        }
     };
     let expected_mangled_harness = mangle_theorem_harness("theorems/single.theorem", "SmokeMacro");
     let expected_harness_identifier = expected_mangled_harness.identifier();
@@ -204,15 +207,14 @@ where
     )
 }
 
-/// Reports a skip for an unavailable Kani, which the classifier only permits
+/// Announces a skip for an unavailable Kani, which the classifier only permits
 /// when the probe failed and Kani is optional.
 #[expect(
     clippy::print_stderr,
     reason = "BDD skip diagnostics should remain non-fallible"
 )]
-fn skip_without_kani(reason: &str, check: &str) -> Result<(), String> {
+fn announce_kani_skip(reason: &str, check: &str) {
     eprintln!("{reason}; skipping Kani harness {check} check");
-    Ok(())
 }
 
 #[then("cargo-kani verifies every generated proof harness")]
@@ -224,7 +226,10 @@ fn then_kani_verifies_every_generated_proof_harness() -> Result<(), String> {
         })
     })? {
         KaniOutcome::Ran(output) => output,
-        KaniOutcome::Skipped(reason) => return skip_without_kani(&reason, "verification"),
+        KaniOutcome::Skipped(reason) => {
+            announce_kani_skip(&reason, "verification");
+            return Ok(());
+        }
     };
 
     // Two theorem documents, so two harnesses, each of which must verify. The
