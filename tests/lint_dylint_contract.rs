@@ -50,25 +50,24 @@ fn excluded_paths_value(trimmed: &str) -> Option<&str> {
 
 /// Returns the active `excluded_paths` entries that carry no adjacent reason.
 ///
-/// Entries are read from the opening line of the assignment, from list items
-/// below it, and from an entry that shares the opening line with the bracket.
+/// A bracket inside a comment or a string is data, so the array's extent is
+/// tracked on comment-free text rather than on the raw line.
 fn unjustified_exclusions(document: &str) -> Vec<String> {
     let lines: Vec<&str> = document.lines().collect();
     let mut offences = Vec::new();
     let mut inside_list = false;
     for (index, line) in lines.iter().enumerate() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
+        let Some(code) = comment_free(line.trim()) else {
             continue;
-        }
-        if inside_list && trimmed.starts_with(']') {
+        };
+        if inside_list && code.starts_with(']') {
             inside_list = false;
             continue;
         }
         let value = if inside_list {
-            trimmed
+            code
         } else {
-            let Some(value) = excluded_paths_value(trimmed) else {
+            let Some(value) = excluded_paths_value(code) else {
                 continue;
             };
             if value.starts_with('[') && !value.contains(']') {
@@ -81,6 +80,28 @@ fn unjustified_exclusions(document: &str) -> Vec<String> {
         record_entry(value, &lines, index, &mut offences);
     }
     offences
+}
+
+/// Returns a TOML line without its trailing comment.
+///
+/// A `#` inside a string is data, so the scan tracks the open quote. A line
+/// that is only a comment yields `None`, which the caller treats as no code.
+fn comment_free(trimmed: &str) -> Option<&str> {
+    let mut quote = None;
+    for (index, character) in trimmed.char_indices() {
+        match character {
+            '"' | '\'' if quote == Some(character) => quote = None,
+            '"' | '\'' if quote.is_none() => quote = Some(character),
+            '#' if quote.is_none() => {
+                return trimmed
+                    .get(..index)
+                    .map(str::trim)
+                    .filter(|code| !code.is_empty());
+            }
+            _ => {}
+        }
+    }
+    Some(trimmed).filter(|code| !code.is_empty())
 }
 
 /// Records an entry that shares the line opening a multi-line array.
@@ -156,6 +177,7 @@ fn an_unjustified_exclusion_is_rejected() {
         "excluded_paths = [\"crate::legacy_io\",\n]\n",
         "\"excluded_paths\" = [\"crate::legacy_io\"]\n",
         "'excluded_paths' = ['crate::legacy_io']\n",
+        "excluded_paths = [ # temporary [legacy]\n  \"crate::legacy_io\",\n]\n",
     ] {
         assert!(
             !unjustified_exclusions(entry).is_empty(),

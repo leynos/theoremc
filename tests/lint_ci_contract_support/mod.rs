@@ -9,6 +9,11 @@
 #[path = "../workflow_contract_support/mod.rs"]
 mod workflow_contract_support;
 
+#[path = "environment.rs"]
+mod environment;
+
+use environment::environment_keys;
+
 pub(crate) use workflow_contract_support::{
     Line, Workflow, has_bypass_key, jobs, key_indent, step_run_line, steps,
 };
@@ -95,10 +100,35 @@ fn unquote(value: &str) -> &str {
 /// command. The target name is matched as a whole token, so `make
 /// lint-whitaker` is a different command.
 fn invokes_aggregate(command: &str) -> bool {
-    command.lines().any(|line| {
-        let mut tokens = line.split_whitespace();
-        tokens.next() == Some("make") && tokens.next() == Some("lint")
-    })
+    command
+        .lines()
+        .any(|line| make_target(line) == Some("lint"))
+}
+
+/// Returns the target Make is asked to build, ignoring option arguments.
+///
+/// Make accepts options before the target, and several of them take the next
+/// token as their argument. Skipping both keeps `make -s lint` and
+/// `make -f Makefile lint` classified by the word `lint`.
+fn make_target(line: &str) -> Option<&str> {
+    let mut tokens = line.split_whitespace();
+    if tokens.next() != Some("make") {
+        return None;
+    }
+    loop {
+        let token = tokens.next()?;
+        if !token.starts_with('-') {
+            return Some(token);
+        }
+        if takes_argument(token) {
+            tokens.next();
+        }
+    }
+}
+
+/// Reports whether a Make option consumes the following token.
+fn takes_argument(option: &str) -> bool {
+    matches!(option, "-f" | "-C" | "-I" | "-o" | "-W" | "-j" | "-l")
 }
 
 /// Returns the reference a step's own `uses:` key names.
@@ -118,86 +148,6 @@ fn uses_reference<'a>(step: &'a [Line<'_>], indent: usize) -> Option<&'a str> {
         };
         candidate.map(str::trim)
     })
-}
-
-/// Returns the environment keys a block assigns through its own `env:`.
-///
-/// Both the mapping form and a one-line flow mapping are read. Only the
-/// block's own `env:` at `indent` counts, so a nested `env:` under `with:` in
-/// another step cannot be mistaken for the caller's environment.
-fn environment_keys<'a>(lines: &[Line<'a>], indent: usize) -> Vec<&'a str> {
-    lines
-        .iter()
-        .enumerate()
-        .filter(|(_, line)| line.indent() == indent || line.indent() + 2 == indent)
-        .filter_map(|(index, line)| {
-            let trimmed = line.trimmed();
-            let entry = trimmed.strip_prefix("- ").unwrap_or(trimmed);
-            let rest = entry.strip_prefix("env:")?.trim();
-            Some((index, rest))
-        })
-        .flat_map(|(index, rest)| env_block_keys(lines, index, rest))
-        .collect()
-}
-
-/// Returns the keys a single `env:` entry declares.
-///
-/// A flow mapping is read from the `env:` line itself; a block mapping is read
-/// from the entries that follow, down to the first content line at or above
-/// the key's own indentation. Blank lines and comments never end the block.
-fn env_block_keys<'a>(lines: &[Line<'a>], env_index: usize, rest: &'a str) -> Vec<&'a str> {
-    if let Some(flow) = flow_mapping(rest) {
-        return flow.split(',').filter_map(entry_key).collect();
-    }
-    let header = rest
-        .split_once('#')
-        .map_or(rest, |(before, _)| before)
-        .trim();
-    if !header.is_empty() {
-        return Vec::new();
-    }
-    let Some(env_line) = lines.get(env_index) else {
-        return Vec::new();
-    };
-    let block: Vec<&Line<'a>> = lines
-        .iter()
-        .skip(env_index + 1)
-        .take_while(|line| {
-            let trimmed = line.trimmed();
-            trimmed.is_empty() || trimmed.starts_with('#') || line.indent() > env_line.indent()
-        })
-        .filter(|line| {
-            let trimmed = line.trimmed();
-            !trimmed.is_empty() && !trimmed.starts_with('#')
-        })
-        .collect();
-    let Some(entry_indent) = block.first().map(|line| line.indent()) else {
-        return Vec::new();
-    };
-    block
-        .iter()
-        .filter(|line| line.indent() == entry_indent)
-        .filter_map(|line| entry_key(line.trimmed()))
-        .collect()
-}
-
-/// Returns the body of a flow mapping, ignoring a trailing comment.
-///
-/// A flow mapping is `{ … }`; anything after the closing brace is a comment or
-/// trailing whitespace.
-fn flow_mapping(rest: &str) -> Option<&str> {
-    let body = rest.trim().strip_prefix('{')?;
-    body.get(..body.find('}')?)
-}
-
-/// Splits a `NAME: value` entry into its key, without quotes.
-///
-/// YAML permits a quoted key, and the quotes are syntax rather than part of the
-/// name, so they are removed before the key is compared with the policy list.
-fn entry_key(entry: &str) -> Option<&str> {
-    entry
-        .split_once(':')
-        .map(|(key, _)| key.trim().trim_matches(['"', '\'']))
 }
 
 /// Fails when `keys` assign a variable that would narrow the lint gate.
@@ -276,7 +226,14 @@ fn lint_steps<'a, 'b>(name: &'a str, job: &'a [Line<'b>]) -> Vec<LintStep<'a, 'b
 ///
 /// Returns the job-level bypass key or coverage override.
 fn verify_lint_job(name: &str, job: &[Line<'_>], job_indent: usize) -> Result<(), String> {
-    if has_bypass_key(job, job_indent) {
+    // A job's own keys sit at `job_indent`; a `- if:` at that indentation in
+    // an indentless step list belongs to a step, and the step checks cover it.
+    let job_keys: Vec<Line<'_>> = job
+        .iter()
+        .filter(|line| line.indent() == job_indent && !line.trimmed().starts_with("- "))
+        .copied()
+        .collect();
+    if has_bypass_key(&job_keys, job_indent) {
         return Err(format!(
             "job `{name}` must not make the lint gate conditional or non-fatal"
         ));

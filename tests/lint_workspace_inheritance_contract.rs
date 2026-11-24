@@ -113,6 +113,12 @@ fn members_are_read_across_line_breaks() {
         Some(vec!["crates/one".to_owned()]),
         "TOML ignores whitespace around the assignment"
     );
+    let quoted_key = "[workspace]\n\"members\" = [\"crates/one\"]\n";
+    assert_eq!(
+        array_items(quoted_key, "members"),
+        Some(vec!["crates/one".to_owned()]),
+        "a quoted key is the same declaration, and its name is not an item"
+    );
 }
 
 /// A literal-quoted member is registered like a basic-quoted one.
@@ -199,6 +205,36 @@ fn a_glob_member_covers_its_matches() {
         undeclared_crates(&directories, &prefix),
         vec!["crates/one".to_owned()],
         "a segment glob must match a prefix, as Cargo's matching does"
+    );
+    // `*w*` must require the literal `w`, so `crates/two` matches and
+    // `crates/one` does not.
+    let middle = vec!["crates/*w*".to_owned(), "tools/*".to_owned()];
+    assert_eq!(
+        undeclared_crates(&directories, &middle),
+        vec!["crates/one".to_owned()],
+        "a literal between wildcards must still have to appear"
+    );
+    // A nested package is only covered by a nested pattern, so `two` and
+    // `group/member` must both be reported as undeclared.
+    let grouped = vec![
+        "crates/one".to_owned(),
+        "crates/two".to_owned(),
+        "tools/*".to_owned(),
+    ];
+    let nested = vec![
+        "crates/one".to_owned(),
+        "crates/group/member".to_owned(),
+        "tools/helper".to_owned(),
+    ];
+    assert_eq!(
+        undeclared_crates(&nested, &grouped),
+        vec!["crates/group/member".to_owned()],
+        "a nested package must not be covered by a shallow member"
+    );
+    let deep_glob = vec!["crates/group/*".to_owned()];
+    assert!(
+        undeclared_crates(&["crates/group/member".to_owned()], &deep_glob).is_empty(),
+        "a nested pattern must cover a nested package"
     );
 }
 

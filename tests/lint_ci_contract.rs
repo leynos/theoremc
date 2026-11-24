@@ -156,6 +156,32 @@ fn ci_runs_the_aggregate_lint_with_a_pinned_installer() {
         "      - name: Lint\n        run: 'make lint'\n        continue-on-error: true\n",
     )
 )]
+#[case::make_options_before_target(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        run: make -s lint LINT_PACKAGES=--package theoremc\n",
+    )
+)]
+#[case::make_option_with_argument(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        run: make -f Makefile lint LINT_PACKAGES=--package theoremc\n",
+    )
+)]
+#[case::multiline_flow_env(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        env: {\n",
+        "          LINT_PACKAGES: \"--package theoremc\"\n        }\n",
+        "        run: make lint\n",
+    )
+)]
 fn an_invalid_lint_job_is_rejected(#[case] body: &str) {
     let workflow = single_job(body);
     assert!(
@@ -275,6 +301,48 @@ fn a_single_key_step_form_is_read(#[case] body: &str) {
     assert!(
         verify_lint_gate(&workflow).is_err(),
         "this job must be rejected:\n{body}"
+    );
+}
+
+/// Make options before the target still name the aggregate.
+///
+/// The failure must be the exact-command rule, not "no aggregate was found",
+/// because a second job that runs `make -s lint` must still be inspected. Only
+/// recognition distinguishes those outcomes.
+#[rstest]
+#[case::short_option("make -s lint")]
+#[case::option_with_argument("make -f Makefile lint")]
+#[case::job_option("make -j 4 lint")]
+fn make_options_do_not_hide_the_aggregate(#[case] command: &str) {
+    let second = format!("      - name: Lint\n        run: {command}\n");
+    let protected = format!("{INSTALL_STEP}{LINT_STEP}");
+    let workflow = workflow_with(&[("build-test", &protected), ("second", &second)]);
+    let report = verify_lint_gate(&workflow)
+        .expect_err("a second job running the aggregate must be rejected");
+    assert!(
+        report.contains("must run exactly"),
+        "`{command}` must be recognized as the aggregate and rejected as an inexact command; found {report:?}"
+    );
+}
+
+/// A step-level bypass at the job's key indentation is not a job condition.
+///
+/// In an indentless step list a step's `- if:` shares the job's key
+/// indentation, so the job check must ignore sequence entries and leave them
+/// to the step checks.
+#[test]
+fn an_indentless_step_bypass_is_not_a_job_bypass() {
+    let workflow = concat!(
+        "jobs:\n  build-test:\n    runs-on: ubuntu-latest\n    steps:\n",
+        "    - if: false\n      name: Optional checkout\n      uses: actions/checkout@v4\n",
+        "    - name: Install Whitaker\n",
+        "      uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "    - name: Lint\n      run: make lint\n",
+    );
+    assert!(
+        verify_lint_gate(workflow).is_ok(),
+        "a conditional unrelated step must not be read as a job condition"
     );
 }
 

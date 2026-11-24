@@ -17,6 +17,13 @@ pub(crate) const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 /// The lint tables a member must inherit rather than define for itself.
 const LINT_TABLES: [&str; 3] = ["lints.clippy", "lints.rust", "lints.rustdoc"];
 
+/// How far the package walk descends below `crates` and `tools`.
+///
+/// A workspace that nests packages deeper than this would not be reachable by
+/// a sane member pattern, and bounding the walk keeps a stray tree from
+/// stalling the contract test.
+const MAX_WALK_DEPTH: usize = 4;
+
 /// The lint tables the root manifest must populate.
 const WORKSPACE_LINT_TABLES: [&str; 3] = [
     "workspace.lints.clippy",
@@ -75,11 +82,18 @@ pub(crate) fn array_items(document: &str, key: &str) -> Option<Vec<String>> {
     })?;
     let mut body = String::new();
     let mut depth = 0usize;
-    for raw in document.lines().skip(start) {
+    for (offset, raw) in document.lines().skip(start).enumerate() {
         let line = strip_comment(raw);
-        depth += line.matches('[').count();
-        depth = depth.saturating_sub(line.matches(']').count());
-        body.push_str(line);
+        // The key itself is not a value: a quoted key would otherwise be read
+        // as the array's first item.
+        let value = if offset == 0 {
+            line.split_once('=').map_or("", |(_, value)| value)
+        } else {
+            line
+        };
+        depth += value.matches('[').count();
+        depth = depth.saturating_sub(value.matches(']').count());
+        body.push_str(value);
         body.push(' ');
         if depth == 0 {
             break;
@@ -263,19 +277,33 @@ fn member_covers(pattern: &str, path: &str) -> bool {
 
 /// Reports whether one path segment matches a pattern segment.
 ///
-/// Each `*` stands for any run of characters within the segment, and the
-/// segments before and after it must match literally.
+/// Each `*` stands for any run of characters within the segment. Every literal
+/// run between two wildcards must appear in order, and the segment must begin
+/// with the first run and end with the last, so `*core*` matches `theorem-core`
+/// but not `forgotten`.
 fn segment_glob_matches(pattern: &str, value: &str) -> bool {
-    let Some((prefix, rest)) = pattern.split_once('*') else {
-        return pattern == value;
-    };
-    let Some(remainder) = value.strip_prefix(prefix) else {
+    let parts: Vec<&str> = pattern.split('*').collect();
+    let Some((first, rest)) = parts.split_first() else {
         return false;
     };
-    match rest.rsplit_once('*') {
-        Some((_, suffix)) => remainder.ends_with(suffix),
-        None => rest.is_empty() || remainder.ends_with(rest),
+    let Some((last, middle)) = rest.split_last() else {
+        return *first == value;
+    };
+    let Some(mut remainder) = value.strip_prefix(first) else {
+        return false;
+    };
+    for literal in middle {
+        let Some(after) = remainder.find(literal) else {
+            return false;
+        };
+        remainder = remainder.get(after + literal.len()..).unwrap_or_default();
     }
+    let Some(without_suffix) = remainder.strip_suffix(last) else {
+        return false;
+    };
+    // A middle literal is consumed greedily from the left, so a suffix that
+    // overlaps it must still be present in what is left.
+    !first.is_empty() || !last.is_empty() || without_suffix.len() <= remainder.len()
 }
 
 /// Reports whether every segment of a pattern matches its path segment.
@@ -292,20 +320,40 @@ fn segments_match(pattern: &str, path: &str) -> bool {
 /// Returns every package directory the repository holds.
 ///
 /// A package directory holds a `Cargo.toml`. The workspace's members live
-/// under `crates/` and `tools/`, so both trees are scanned; a literal member
-/// outside them is still read, because it needs no scan to be resolved. A tree
-/// that cannot be listed contributes no packages, which the member checks then
-/// report rather than silently accepting.
+/// under `crates/` and `tools/`, so both trees are walked; a literal member
+/// outside them is still read, because it needs no scan to be resolved. The
+/// walk descends through directories without a manifest, so a member pattern
+/// such as `crates/group/*` is reachable. A tree that cannot be listed
+/// contributes no packages, which the member checks then report rather than
+/// silently accepting.
 pub(crate) fn package_directories(repository: &Repository) -> Vec<String> {
     let mut packages = Vec::new();
     for root in ["crates", "tools"] {
-        for directory in repository.subdirectories(root).unwrap_or_default() {
-            if repository.read(&format!("{directory}/Cargo.toml")).is_ok() {
-                packages.push(directory);
-            }
-        }
+        collect_packages(repository, root, &mut packages, 0);
     }
     packages
+}
+
+/// Walks `directory`, recording packages and descending through groups.
+///
+/// `depth` bounds the walk so a deep tree cannot stall the test, and a package
+/// is not descended into because its own members are its business.
+fn collect_packages(
+    repository: &Repository,
+    directory: &str,
+    packages: &mut Vec<String>,
+    depth: usize,
+) {
+    if depth > MAX_WALK_DEPTH {
+        return;
+    }
+    for child in repository.subdirectories(directory).unwrap_or_default() {
+        if repository.read(&format!("{child}/Cargo.toml")).is_ok() {
+            packages.push(child);
+        } else {
+            collect_packages(repository, &child, packages, depth + 1);
+        }
+    }
 }
 
 /// Returns the package directories the workspace does not list.
