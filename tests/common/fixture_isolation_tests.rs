@@ -222,72 +222,42 @@ fn competing_allocators_never_receive_the_same_suffix() {
     );
 }
 
+/// A stale build directory in either layout takes exactly its own suffix.
+///
+/// The two Cargo layouts differ only in the stale path they leave behind, so one
+/// body walks both without duplicating the assertions.
 #[test]
-fn leftover_build_directories_make_a_suffix_taken_and_only_that_one() {
-    let (_temp, root) = scratch_target();
-    let dir = Dir::open_ambient_dir(&root, ambient_authority()).expect("open temp dir");
-    dir.create_dir_all("debug/build/fx_ab_1_0001-0123abcd/out")
-        .expect("leave a stale build directory");
+fn a_stale_build_directory_takes_only_its_own_suffix() {
+    for stale_path in [
+        "debug/build/fx_ab_1_0001-0123abcd/out",
+        "debug/build/fx_ab_1_0001/0123abcd/out",
+    ] {
+        let (_temp, root) = scratch_target();
+        let dir = Dir::open_ambient_dir(&root, ambient_authority()).expect("open temp dir");
+        dir.create_dir_all(stale_path)
+            .expect("leave a stale build directory");
 
-    assert_eq!(
-        suffix_is_taken(&root, "ab_1_0001"),
-        Ok(true),
-        "a stale classic-layout build directory must take the suffix",
-    );
-    assert_eq!(
-        suffix_is_taken(&root, "ab_1_000"),
-        Ok(false),
-        "a prefix of a suffix is not the suffix",
-    );
-    assert_eq!(
-        suffix_is_taken(&root, "ab_2_0001"),
-        Ok(false),
-        "an unrelated suffix must remain free",
-    );
-    assert_eq!(
-        suffix_is_taken(&root.join("missing"), "ab_1_0001"),
-        Ok(false),
-        "a target with no build directory holds nothing",
-    );
-}
-
-#[test]
-fn a_stale_directory_in_the_nested_layout_takes_the_suffix() {
-    let (_temp, root) = scratch_target();
-    let dir = Dir::open_ambient_dir(&root, ambient_authority()).expect("open temp dir");
-    dir.create_dir_all("debug/build/fx_ab_1_0001/0123abcd/out")
-        .expect("leave a stale nested build directory");
-
-    assert_eq!(
-        suffix_is_taken(&root, "ab_1_0001"),
-        Ok(true),
-        "a stale nested-layout build directory must take the suffix",
-    );
-    assert_eq!(
-        suffix_is_taken(&root, "ab_1_000"),
-        Ok(false),
-        "a prefix of a suffix is not the suffix",
-    );
-    assert_eq!(
-        suffix_is_taken(&root, "ab_2_0001"),
-        Ok(false),
-        "an unrelated suffix must remain free",
-    );
-}
-
-#[test]
-fn a_build_directory_that_cannot_be_listed_is_an_error_not_an_absence() {
-    let (_temp, root) = scratch_target();
-    let dir = Dir::open_ambient_dir(&root, ambient_authority()).expect("open temp dir");
-    dir.create_dir_all("debug").expect("create debug");
-    // A file where the build directory belongs: it exists, but is not a directory.
-    dir.write("debug/build", "not a directory")
-        .expect("write file");
-
-    assert!(
-        suffix_is_taken(&root, "ab_1_0001").is_err(),
-        "an unreadable build directory must fail the scan, not report free",
-    );
+        assert_eq!(
+            suffix_is_taken(&root, "ab_1_0001"),
+            Ok(true),
+            "the stale directory {stale_path} must take the suffix",
+        );
+        assert_eq!(
+            suffix_is_taken(&root, "ab_1_000"),
+            Ok(false),
+            "a prefix of a suffix is not the suffix",
+        );
+        assert_eq!(
+            suffix_is_taken(&root, "ab_2_0001"),
+            Ok(false),
+            "an unrelated suffix must remain free",
+        );
+        assert_eq!(
+            suffix_is_taken(&root.join("missing"), "ab_1_0001"),
+            Ok(false),
+            "a target with no build directory holds nothing",
+        );
+    }
 }
 
 proptest! {

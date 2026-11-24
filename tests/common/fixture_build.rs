@@ -223,6 +223,27 @@ fn read_log_or_record(path: &Utf8Path, unreadable: &mut Vec<String>) -> Vec<u8> 
     })
 }
 
+/// Opens the directory holding `path` and returns it with the file name.
+///
+/// Log operations differ only in whether they create or read that file, so the
+/// path splitting and directory opening live here once.
+///
+/// # Errors
+///
+/// Returns the path and the underlying error when the parent cannot be opened,
+/// or the path when it has no parent or no file name.
+fn open_log_parent(path: &Utf8Path) -> Result<(Dir, String), String> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| format!("the build log {path} has no parent directory"))?;
+    let name = path
+        .file_name()
+        .ok_or_else(|| format!("the build log {path} has no file name"))?;
+    let dir = Dir::open_ambient_dir(parent, ambient_authority())
+        .map_err(|error| path_error("opening the build log directory", parent, &error))?;
+    Ok((dir, name.to_owned()))
+}
+
 /// Reads a build log written by the redirected child streams.
 ///
 /// # Errors
@@ -231,14 +252,8 @@ fn read_log_or_record(path: &Utf8Path, unreadable: &mut Vec<String>) -> Vec<u8> 
 /// be read, so a normal completion never reports an empty log as if the build
 /// had produced no output.
 fn read_log(path: &Utf8Path) -> Result<Vec<u8>, String> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| format!("the build log {path} has no parent directory"))?;
-    let name = path
-        .file_name()
-        .ok_or_else(|| format!("the build log {path} has no file name"))?;
-    Dir::open_ambient_dir(parent, ambient_authority())
-        .and_then(|dir| dir.read(name))
+    let (dir, name) = open_log_parent(path)?;
+    dir.read(name)
         .map_err(|error| path_error("reading the build log", path, &error))
 }
 
@@ -250,14 +265,8 @@ fn read_log(path: &Utf8Path) -> Result<Vec<u8>, String> {
 /// cannot be created. The caller converts the handle for `Stdio`, so this
 /// module never names `std::fs` directly.
 fn create_log(path: &Utf8Path) -> Result<cap_std::fs_utf8::File, String> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| format!("the build log {path} has no parent directory"))?;
-    let name = path
-        .file_name()
-        .ok_or_else(|| format!("the build log {path} has no file name"))?;
-    Dir::open_ambient_dir(parent, ambient_authority())
-        .and_then(|dir| dir.create(name))
+    let (dir, name) = open_log_parent(path)?;
+    dir.create(name)
         .map_err(|error| path_error("creating the build log", path, &error))
 }
 
