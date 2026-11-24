@@ -3,7 +3,7 @@
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 
-use super::{FixtureIdentity, build_log, generated_suite_contents};
+use super::{FixtureIdentity, build_log, generated_suite_contents, spawn_redirected};
 
 /// Describes a fixture rooted in `root` that builds into `target`, so the tests
 /// can point the helpers at a scratch directory tree.
@@ -63,6 +63,37 @@ fn a_build_root_without_a_suite_names_the_package_target_and_candidates() {
             "the error must name {fragment}: {error}",
         );
     }
+}
+
+/// A successful build's log must carry what the redirected streams wrote.
+///
+/// The streams go to files, so `wait_with_output` would return nothing. This
+/// pins that regression: a stubbed child writes both streams, and the returned
+/// log must contain both.
+#[cfg(unix)]
+#[test]
+fn a_completed_build_returns_the_output_it_redirected_to_files() {
+    let scratch = tempfile::tempdir().expect("create a scratch directory");
+    let base = utf8_path(&scratch);
+    let fixture = identity("fx_ab_1_0001", &base, &base);
+    let mut command = std::process::Command::new("sh");
+    command.args(["-c", "printf 'out-text'; printf 'err-text' >&2"]);
+
+    let log = spawn_redirected(&fixture, command)
+        .expect("the stub command should start")
+        .wait()
+        .expect("the stub command should succeed and both logs should be readable");
+
+    assert!(
+        log.as_str().contains("out-text"),
+        "the log must carry the redirected stdout, got:\n{}",
+        log.as_str(),
+    );
+    assert!(
+        log.as_str().contains("err-text"),
+        "the log must carry the redirected stderr, got:\n{}",
+        log.as_str(),
+    );
 }
 
 #[test]

@@ -288,6 +288,16 @@ Observable success:
   missing-working-directory test exists to observe. The barrier test passed in
   947 s with this shape. Date/Author: 2026-11-24, implementing agent, from
   CodeRabbit review.
+- D14. Decision (review-driven): read the redirected logs on the normal
+  completion path and fail if they cannot be read. Rationale:
+  `Child::wait_with_output` captures only piped streams, so file redirection
+  made every successful `cargo_build_log` return an empty log, which silently
+  broke `BuildLog::ran` and the discovery assertions. `wait` now waits for the
+  status and reads both files, propagating a read failure rather than reporting
+  silence. `spawn_redirected` is the seam a unit test uses to prove a stub
+  child's both streams reach the returned log; `build_discovery_bdd` then
+  passed 3/3 with real Cargo in 1363 s. Date/Author: 2026-11-24, implementing
+  agent, from CodeRabbit review.
 
 ## Outcomes & retrospective
 
