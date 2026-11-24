@@ -95,10 +95,12 @@ stricter level, and TheoremC adds none. The rule set is pinned by
    A crate that registers `cfg(kani)` itself leaves an `expect` unfulfilled, and
    `-D warnings` turns that into an error; a crate that does not register it
    needs the `cfg` suppressed. Only `allow` is correct under both. It is scoped
-   to the generated per-file module, carries a reason, and leaves the action
-   and referenced-type probes outside it so their lints are still checked. Two
-   BDD scenarios build independent consumers with `RUSTFLAGS=-D warnings`, one
-   registering `cfg(kani)` and one not, and both must pass.
+   to the generated per-file module, names one lint, and carries a reason. The
+   action and referenced-type probes are emitted inside that module, so they
+   share the scope; narrowing it further would mean emitting them elsewhere,
+   which the current emission does not do. Two BDD scenarios build independent
+   consumers with `RUSTFLAGS=-D warnings`, one registering `cfg(kani)` and one
+   not, and both must pass.
 
 ## Consequences
 

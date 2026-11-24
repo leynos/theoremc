@@ -61,13 +61,19 @@ fn lint_group<'a>(lints: &'a Table, group: &str) -> Result<&'a Table, String> {
         .ok_or_else(|| format!("[workspace.lints.{group}] is missing"))
 }
 
-/// Returns a lint's declared level, failing when the entry is absent or is not
-/// a plain level string.
+/// Returns a lint's declared level.
+///
+/// Cargo accepts a bare level string or a table with a `level` key, and both
+/// mean the same thing, so a policy that spells a rule the long way must not
+/// read as missing.
 fn lint_level<'a>(group: &'a Table, name: &str) -> Result<&'a str, String> {
-    group
+    let entry = group
         .get(name)
-        .and_then(Value::as_str)
-        .ok_or_else(|| format!("lint `{name}` must be declared as a level string"))
+        .ok_or_else(|| format!("lint `{name}` is not declared"))?;
+    entry
+        .as_str()
+        .or_else(|| entry.get("level").and_then(Value::as_str))
+        .ok_or_else(|| format!("lint `{name}` must declare a level"))
 }
 
 /// Returns every lint in `group` that is missing or weaker than required.
@@ -204,7 +210,23 @@ fn the_minimum_predicate_accepts_stricter_and_rejects_weaker_levels() {
     ] {
         table.insert(name.to_owned(), Value::String(level.to_owned()));
     }
-    let names = ["denied", "forbidden", "warned", "allowed", "absent"];
+    // Cargo's table spelling must read the same as the bare string, or a rule
+    // rewritten the long way would look deleted.
+    for (name, level) in [("table_denied", "deny"), ("table_forbidden", "forbid")] {
+        let mut entry = Table::new();
+        entry.insert("level".to_owned(), Value::String(level.to_owned()));
+        entry.insert("priority".to_owned(), Value::Integer(0));
+        table.insert(name.to_owned(), Value::Table(entry));
+    }
+    let names = [
+        "denied",
+        "forbidden",
+        "table_denied",
+        "table_forbidden",
+        "warned",
+        "allowed",
+        "absent",
+    ];
 
     let offending = rules_not_denied(&table, &names);
 

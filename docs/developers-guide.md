@@ -516,11 +516,12 @@ workspace-wide, so no expectation can re-open it.
 `theorem_file!` emits its generated per-file module with a reasoned
 `#[allow(unexpected_cfgs)]`, because the invoking crate may or may not register
 `cfg(kani)` and the macro cannot tell. An `expect` would be left unfulfilled by
-a crate that registers the `cfg`, and `-D warnings` would reject the build.
-Action and referenced-type probes stay outside the gate, so their lints are
-still checked. Two BDD scenarios prove an independent consumer compiles with
-`RUSTFLAGS=-D warnings` both with and without a `cfg(kani)` registration; see
-the design document's generated-cfg passage.
+a crate that registers the `cfg`, and `-D warnings` would reject the build. The
+attribute is scoped to that one module and suppresses only `unexpected_cfgs`;
+the action and referenced-type probes are generated inside the same module, so
+they share the scope. Two BDD scenarios prove an independent consumer compiles
+with `RUSTFLAGS=-D warnings` both with and without a `cfg(kani)` registration;
+see the design document's generated-cfg passage.
 
 `make lint-whitaker` runs the Whitaker Dylint suite through the `whitaker`
 wrapper. Install it with `whitaker-installer` so that `whitaker` is on `PATH`,

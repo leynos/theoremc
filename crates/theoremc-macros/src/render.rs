@@ -31,8 +31,10 @@ pub(super) fn render_expansion(plan: &ExpansionPlan) -> TokenStream2 {
     // Generated code compiles inside a crate whose configuration the macro
     // cannot know. A crate that registers `cfg(kani)` itself would leave an
     // `expect` unfulfilled, which `-D warnings` turns into an error, so the
-    // gate is an `allow` scoped to this module. Probes stay outside it, so
-    // their own lints are still checked.
+    // gate is an `allow` scoped to this module. The action and type probes are
+    // generated inside the same module, so they are covered by this `allow`
+    // too: it is the narrowest scope the current emission supports, and it
+    // suppresses only `unexpected_cfgs`.
     quote! {
         #[allow(
             unexpected_cfgs,

@@ -104,14 +104,23 @@ pub(crate) fn cargo_run_output(
     command_result(subcommand, &output)
 }
 
+/// The development build standard: the parallel `rustc` frontend and, on
+/// Linux, the `mold` linker, matching `.cargo/config.toml` and the Makefile.
+const STANDARD_RUSTFLAGS: &str = if cfg!(target_os = "linux") {
+    "-Zthreads=8 -Clink-arg=-fuse-ld=mold"
+} else {
+    "-Zthreads=8"
+};
+
 /// Runs a Cargo subcommand in the fixture crate with warnings denied.
 ///
 /// The child process owns its flags, so this does not mutate the test
-/// process. An assigned `RUSTFLAGS` replaces the repository's
-/// `.cargo/config.toml` build standard, so the inherited value is composed in
-/// first, exactly as the Makefile recipes do, and the denial is appended
-/// rather than substituted. `CARGO_ENCODED_RUSTFLAGS` is removed because Cargo
-/// prefers it over `RUSTFLAGS`, and a stale value would silently defeat both.
+/// process. Assigning `RUSTFLAGS` makes Cargo ignore the `rustflags` in
+/// `.cargo/config.toml`, so the development build standard is composed in
+/// explicitly, then any inherited value, then the denial: the same precedence
+/// the Makefile recipes use. `CARGO_ENCODED_RUSTFLAGS` is removed because Cargo
+/// prefers it over `RUSTFLAGS`, and a stale value would silently defeat the
+/// denial and the standard alike.
 pub(crate) fn cargo_run_denying_warnings(
     manifest_dir: &Utf8Path,
     target_dir: &Utf8Path,
@@ -127,20 +136,30 @@ pub(crate) fn cargo_run_denying_warnings(
     command_result(subcommand, &output).map(|_| ())
 }
 
-/// Composes the warning denial onto any inherited `RUSTFLAGS`.
+/// Composes the build standard, an inherited value, and the denial.
 ///
 /// An inherited value is preserved rather than replaced, mirroring
-/// `${RUSTFLAGS:+$RUSTFLAGS }` in the Makefile. Cargo supplies
-/// `.cargo/config.toml` flags itself when `RUSTFLAGS` is unset, so a bare
-/// environment gives the build standard plus the denial.
+/// `${RUSTFLAGS:+$RUSTFLAGS }` in the Makefile. A blank inherited value adds
+/// nothing, so the result never carries a stray space.
+fn compose_rustflags(standard: &str, inherited: Option<&str>) -> String {
+    inherited
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map_or_else(
+            || format!("{standard} -D warnings"),
+            |flags| format!("{standard} {flags} -D warnings"),
+        )
+}
+
+/// Returns the child build's `RUSTFLAGS`.
 #[expect(
     clippy::disallowed_methods,
     reason = "the fixture build must inherit the host Cargo invocation's rustflags, so it composes them exactly as the Makefile recipes do"
 )]
 fn denying_warnings_rustflags() -> String {
-    std::env::var("RUSTFLAGS").map_or_else(
-        |_| "-D warnings".to_owned(),
-        |inherited| format!("{inherited} -D warnings"),
+    compose_rustflags(
+        STANDARD_RUSTFLAGS,
+        std::env::var("RUSTFLAGS").ok().as_deref(),
     )
 }
 
@@ -194,4 +213,40 @@ fn command_result(
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr),
     ))
+}
+
+mod tests {
+    //! Tests for the child-build flag composition.
+
+    use super::compose_rustflags;
+
+    #[test]
+    fn compose_rustflags_without_inherited_flags_keeps_the_standard() {
+        let composed = compose_rustflags("-Zthreads=8", None);
+
+        assert_eq!(
+            composed, "-Zthreads=8 -D warnings",
+            "the standard and the denial should both be present"
+        );
+    }
+
+    #[test]
+    fn compose_rustflags_places_inherited_flags_before_the_denial() {
+        let composed = compose_rustflags("-Zthreads=8", Some("-Cdebuginfo=1"));
+
+        assert_eq!(
+            composed, "-Zthreads=8 -Cdebuginfo=1 -D warnings",
+            "inherited flags should sit between the standard and the denial"
+        );
+    }
+
+    #[test]
+    fn compose_rustflags_ignores_a_blank_inherited_value() {
+        let composed = compose_rustflags("-Zthreads=8", Some("   "));
+
+        assert_eq!(
+            composed, "-Zthreads=8 -D warnings",
+            "a blank inherited value should not leave a stray space"
+        );
+    }
 }
