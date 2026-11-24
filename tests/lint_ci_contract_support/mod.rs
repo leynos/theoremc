@@ -67,7 +67,7 @@ pub(crate) const LINT_COMMAND: &str = "make lint";
 /// A workflow-level, job-level, or step-level assignment of any of these would
 /// let CI run a narrower gate than the one `make lint` defines, so the contract
 /// rejects them outright.
-pub(super) const MAKEFLAGS_VARIABLES: [&str; 2] = ["MAKEFLAGS", "GNUMAKEFLAGS"];
+pub(super) const MAKEFLAGS_VARIABLES: [&str; 3] = ["MAKEFLAGS", "GNUMAKEFLAGS", "CARGO"];
 
 /// Variables that redirect a lint stage away from its workspace default.
 pub(super) const COVERAGE_VARIABLES: [&str; 8] = [
@@ -184,7 +184,10 @@ fn segment_goals(segment: &str) -> Vec<&str> {
     // `FOO=1 make lint` still invokes the aggregate; the assignment is an
     // execution-control input, so the command is read and then rejected as
     // inexact rather than skipped.
-    let Some(command) = tokens.find(|word| !word.contains('=')) else {
+    // `env make lint` runs the same command, so the wrapper is skipped and
+    // the wrapped form is then rejected as inexact by the exact-command rule.
+    let Some(command) = tokens.find(|word| !word.contains('=') && *word != "env" && *word != "--")
+    else {
         return Vec::new();
     };
     if command != "make" {

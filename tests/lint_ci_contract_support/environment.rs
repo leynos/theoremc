@@ -115,22 +115,50 @@ fn flow_mapping(rest: &str) -> Option<&str> {
 /// A `}` inside a quoted value does not close the mapping, so the scan tracks
 /// the open quote before accepting a brace.
 fn closing_brace(body: &str) -> Option<usize> {
-    let mut quote = None;
-    let mut escaped = false;
+    let mut state = Scan::default();
     for (index, character) in body.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        match character {
-            '\\' if quote == Some('"') => escaped = true,
-            '"' | '\'' if quote == Some(character) => quote = None,
-            '"' | '\'' if quote.is_none() => quote = Some(character),
-            '}' if quote.is_none() => return Some(index),
-            _ => {}
+        if state.step(character) {
+            return Some(index);
         }
     }
     None
+}
+
+/// The lexical state while scanning a flow mapping for its closing brace.
+///
+/// The scan tracks quotes, escapes, and comments, because a `}` inside any of
+/// them is data rather than the end of the mapping.
+#[derive(Default)]
+struct Scan {
+    /// The open quote character, when inside a string.
+    quote: Option<char>,
+    /// Whether the previous character escaped the next one.
+    escaped: bool,
+    /// Whether the rest of the line is a comment.
+    comment: bool,
+}
+
+impl Scan {
+    /// Advances the scan by one character, reporting a closing brace.
+    fn step(&mut self, character: char) -> bool {
+        if self.escaped {
+            self.escaped = false;
+            return false;
+        }
+        if self.comment {
+            self.comment = character != '\n';
+            return false;
+        }
+        match character {
+            '#' if self.quote.is_none() => self.comment = true,
+            '\\' if self.quote == Some('"') => self.escaped = true,
+            '"' | '\'' if self.quote == Some(character) => self.quote = None,
+            '"' | '\'' if self.quote.is_none() => self.quote = Some(character),
+            '}' if self.quote.is_none() => return true,
+            _ => {}
+        }
+        false
+    }
 }
 
 /// Returns the keys of a flow mapping that spans several lines.

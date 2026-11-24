@@ -387,6 +387,55 @@ mod reader_contracts {
         }
     }
 
+    /// `env make lint` reaches the aggregate check through its wrapper.
+    #[test]
+    fn an_env_wrapper_is_read() {
+        let report = verify_lint_gate(&job_running("env make lint"))
+            .expect_err("a wrapped aggregate must be rejected as inexact");
+        assert!(
+            report.contains("must run exactly"),
+            "`env make lint` must be read as the aggregate; found {report:?}"
+        );
+    }
+
+    /// `CARGO` is a stage runner, so overriding it is a coverage override.
+    #[test]
+    fn cargo_is_rejected() {
+        let body = format!(
+            "{INSTALL}      - name: Lint\n        env:\n          CARGO: 'true'\n        run: make lint\n"
+        );
+        assert!(
+            verify_lint_gate(&single_job(&body)).is_err(),
+            "CARGO must be rejected like a coverage variable"
+        );
+    }
+
+    /// A comment brace does not close a multi-line flow mapping.
+    #[test]
+    fn a_comment_brace_does_not_close_the_mapping() {
+        let body = format!(
+            "{INSTALL}      - name: Lint\n        env: {{\n          # settings }}\n          LINT_PACKAGES: x\n        }}\n        run: make lint\n"
+        );
+        assert!(
+            verify_lint_gate(&single_job(&body)).is_err(),
+            "an override after a commented brace must still be rejected"
+        );
+    }
+
+    /// An escaped quoted key is reported as a bypass, not trusted.
+    #[test]
+    fn an_escaped_quoted_key_is_a_bypass() {
+        let body = format!(
+            "{INSTALL}      - name: Lint\n        \"\\u0069f\": false\n        run: make lint\n"
+        );
+        let report = verify_lint_gate(&single_job(&body))
+            .expect_err("an escaped quoted key must be treated as a bypass");
+        assert!(
+            report.contains("conditional or non-fatal"),
+            "an escaped quoted key must be named as a bypass; found {report:?}"
+        );
+    }
+
     /// A line reader sees a continuation `run:` at the step's key indent.
     #[test]
     fn line_indentation_is_measured() {

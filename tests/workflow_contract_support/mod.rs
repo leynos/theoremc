@@ -268,6 +268,13 @@ pub(crate) fn has_bypass_key(lines: &[Line<'_>], indent: usize) -> bool {
 /// if:                  -> true
 /// ```
 fn owns_key(entry: &str, key: &str) -> bool {
+    // A quoted key can spell the name with an escape (`"\u0069f"`), which
+    // YAML decodes to `if`. This reader does not decode escapes, so a quoted
+    // key containing one is reported as a bypass rather than trusted.
+    let is_quoted = entry.starts_with(['"', '\'']);
+    if is_quoted && entry.contains('\\') {
+        return true;
+    }
     let unquoted = entry.trim_start_matches(['"', '\'']);
     ["", "\"", "'"].iter().any(|quote| {
         unquoted

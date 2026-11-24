@@ -278,6 +278,11 @@ fn is_supported_member_pattern(pattern: &str) -> bool {
     let wanted = pattern.trim_end_matches('/');
     let segments: Vec<&str> = wanted.split('/').collect();
     segments.iter().enumerate().all(|(index, segment)| {
+        if segment.contains(['?', '[']) {
+            // Cargo accepts these glob characters; this checker does not, so
+            // the pattern is reported rather than matched differently.
+            return false;
+        }
         !segment.contains('*') || (*segment == "*" && index + 1 == segments.len())
     })
 }
