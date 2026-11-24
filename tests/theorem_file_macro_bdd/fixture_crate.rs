@@ -10,7 +10,7 @@ use camino::Utf8Path;
 use theoremc_core::path_format::{normalize_path_separators, toml_basic_string_value};
 
 use super::cargo_runner::{
-    CargoGuard, CargoSubcommand, cargo_run, cargo_run_denying_warnings, cargo_run_output,
+    CargoGuard, CargoSubcommand, cargo_run_denying_warnings, cargo_run_output,
 };
 use test_helpers::FixtureCrate as CommonFixtureCrate;
 
@@ -31,6 +31,15 @@ pub(crate) enum ConsumerCfgRegistration {
     Registered,
     /// The consumer declares no `cfg(kani)` registration.
     Unregistered,
+}
+
+/// Selects whether a fixture Cargo invocation denies warnings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DenyWarnings {
+    /// Keep the invocation's own lint levels.
+    No,
+    /// Deny warnings in the child build.
+    Yes,
 }
 
 pub(crate) struct FixtureCrate {
@@ -57,48 +66,45 @@ impl FixtureCrate {
         self.inner.write(path, contents)
     }
 
-    pub(crate) fn cargo_build(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
-        self.cargo_run(CargoSubcommand::Build, guard)
-    }
-
     /// Builds the fixture with `-D warnings` in the child Cargo process.
     pub(crate) fn cargo_build_denying_warnings(
         &self,
         guard: &CargoGuard<'_>,
     ) -> Result<(), String> {
-        cargo_run_denying_warnings(
-            self.inner.manifest_dir(),
-            self.inner.target_dir(),
-            CargoSubcommand::Build,
-            guard,
-        )
+        self.run(CargoSubcommand::Build, DenyWarnings::Yes, guard)
+            .map(|_| ())
     }
 
     pub(crate) fn cargo_kani_list(&self, guard: &CargoGuard<'_>) -> Result<String, String> {
-        cargo_run_output(
-            self.inner.manifest_dir(),
-            self.inner.target_dir(),
-            CargoSubcommand::KaniList,
-            guard,
-        )
+        self.run(CargoSubcommand::KaniList, DenyWarnings::No, guard)
     }
 
     pub(crate) fn cargo_kani_verify(&self, guard: &CargoGuard<'_>) -> Result<String, String> {
-        cargo_run_output(
-            self.inner.manifest_dir(),
-            self.inner.target_dir(),
-            CargoSubcommand::Kani,
-            guard,
-        )
+        self.run(CargoSubcommand::Kani, DenyWarnings::No, guard)
     }
 
-    fn cargo_run(&self, subcommand: CargoSubcommand, guard: &CargoGuard<'_>) -> Result<(), String> {
-        cargo_run(
-            self.inner.manifest_dir(),
-            self.inner.target_dir(),
-            subcommand,
-            guard,
-        )
+    pub(crate) fn cargo_build(&self, guard: &CargoGuard<'_>) -> Result<(), String> {
+        self.run(CargoSubcommand::Build, DenyWarnings::No, guard)
+            .map(|_| ())
+    }
+
+    /// Runs one subcommand against this fixture, so every call site shares one
+    /// statement of the manifest directory, target directory, and guard.
+    fn run(
+        &self,
+        subcommand: CargoSubcommand,
+        denial: DenyWarnings,
+        guard: &CargoGuard<'_>,
+    ) -> Result<String, String> {
+        let manifest_dir = self.inner.manifest_dir();
+        let target_dir = self.inner.target_dir();
+        match denial {
+            DenyWarnings::Yes => {
+                cargo_run_denying_warnings(manifest_dir, target_dir, subcommand, guard)
+                    .map(|()| String::new())
+            }
+            DenyWarnings::No => cargo_run_output(manifest_dir, target_dir, subcommand, guard),
+        }
     }
 }
 
