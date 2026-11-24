@@ -154,6 +154,21 @@ comparison.
   took 7 m 39 s of wall time but 1.1 s of user time, the difference being the
   compile-slot queue. The dedicated home holds about 295 MB.
 
+A whole-gate `make test` run on this host did not finish green, for a reason
+outside the change: 1017 of 1043 nextest tests passed and
+`build_discovery_bdd::existing_theorem_files_are_discovered_recursively` was
+killed at its 600 s allowance while its child `cargo build --frozen` sat in the
+compile-admission queue (558 to 659 crates from other repositories were
+waiting, and the fixture target took no file writes while the queue entry
+aged). The test is first in the serialized `nested-cargo-builds` group, so the
+group's other 25 tests never ran in that invocation. Run directly against the
+same commit, outside nextest's per-test allowance, all three suites pass — 3/3,
+5/5 and 13/13 — and a repeat fixture build is a true no-op (0 crates compiled,
+0.22 s), so the queue is the only cost. `make lint` (rustdoc, Clippy and
+Whitaker), `make typecheck` and the doctests all pass on the same commit. A
+cold-host measurement of `make test` and the group allowance on a quiet host
+remain open, tracked with DF12-109.
+
 ## Consequences
 
 - A run on a warm target takes seconds; the first run pays for the dependencies
