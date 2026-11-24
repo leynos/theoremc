@@ -24,8 +24,17 @@ const INHERITED_BUILD_LAYOUT: [&str; 1] = ["CARGO_BUILD_TARGET"];
 /// an exported or configured value cannot win. Pinning the build directory as
 /// well as the target keeps build-script output at `<target_dir>/debug/build`,
 /// which is exactly where `fixture_build` looks for the generated suite; an
-/// inherited `build.build-dir` in a `config.toml` would otherwise move it. `CARGO_BUILD_TARGET_DIR` and `CARGO_BUILD_TARGET` are removed for
-/// the same reason: neither may split, share or retarget the build.
+/// inherited or configured `build.build-dir` would otherwise move it.
+/// `CARGO_BUILD_TARGET_DIR` and `CARGO_BUILD_TARGET` are removed so neither an
+/// exported target directory nor an exported `build.target` can split, share or
+/// retarget the build.
+///
+/// That removal covers the environment, not Cargo's configuration files: a
+/// `build.target` set in an ancestor or `CARGO_HOME` `config.toml` still applies,
+/// and it moves build-script output below `<target_dir>/<triple>/debug/build`,
+/// where `fixture_build` does not look. Cargo offers no way to unset a
+/// configured target, so this is a documented limitation rather than an
+/// enforced guarantee. It is recorded in ADR 0012.
 ///
 /// The command runs offline: a fixture's lock is seeded from the workspace's
 /// and its dependencies are already in the registry cache, so it needs no
@@ -39,16 +48,15 @@ const INHERITED_BUILD_LAYOUT: [&str; 1] = ["CARGO_BUILD_TARGET"];
 ///
 /// # Examples
 ///
+/// The paths come from a real temporary directory, so the example is absolute
+/// on every platform:
+///
 /// ```
-/// let command = test_helpers::hermetic_cargo(
-///     camino::Utf8Path::new("/fixture"),
-///     camino::Utf8Path::new("/fixture/target"),
-/// )
-/// .expect("an absolute target is accepted");
-/// assert_eq!(
-///     command.get_current_dir(),
-///     Some(std::path::Path::new("/fixture")),
-/// );
+/// let fixture = tempfile::tempdir().expect("create a fixture directory");
+/// let root = camino::Utf8Path::from_path(fixture.path()).expect("the path is UTF-8");
+/// let command = test_helpers::hermetic_cargo(root, &root.join("target"))
+///     .expect("an absolute target is accepted");
+/// assert_eq!(command.get_current_dir(), Some(root.as_std_path()));
 /// ```
 pub fn hermetic_cargo(manifest_dir: &Utf8Path, target_dir: &Utf8Path) -> Result<Command, String> {
     if target_dir.is_relative() {

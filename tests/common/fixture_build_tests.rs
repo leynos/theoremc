@@ -7,16 +7,8 @@ use super::{FixtureIdentity, build_log, generated_suite_contents};
 
 /// Describes a fixture rooted in `root` that builds into `target`, so the tests
 /// can point the helpers at a scratch directory tree.
-fn identity<'a>(
-    package_name: &'a str,
-    root: &'a Utf8Path,
-    target: &'a Utf8Path,
-) -> FixtureIdentity<'a> {
-    FixtureIdentity {
-        package_name,
-        root,
-        target_dir: target,
-    }
+fn identity(package_name: &str, root: &Utf8Path, target: &Utf8Path) -> FixtureIdentity {
+    FixtureIdentity::new(package_name, root, target)
 }
 
 fn utf8_path(temp: &tempfile::TempDir) -> camino::Utf8PathBuf {

@@ -5,7 +5,7 @@
 
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{FixtureCrate, TRIVIAL_THEOREM, build_support_fixture_manifest};
+use test_helpers::{FixtureCrate, RunningBuild, TRIVIAL_THEOREM, build_support_fixture_manifest};
 
 /// Fixture lib.rs that includes the generated suite wiring.
 const FIXTURE_LIB_RS: &str = concat!(
@@ -189,6 +189,19 @@ fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(),
     )
 }
 
+/// Requires the spawned build's child process to still be alive.
+///
+/// A build that has already finished cannot overlap the sibling's clean-up, so
+/// the test would pass without exercising what it claims. Failing here says the
+/// overlap was not established rather than that isolation held.
+fn require_child_running(build: &mut RunningBuild) -> Result<(), String> {
+    if build.is_running()? {
+        Ok(())
+    } else {
+        Err("the builder build finished before the sibling could be dropped, so the test did not exercise the overlap".to_owned())
+    }
+}
+
 /// A sibling build and clean-up must not disturb another fixture's suite.
 ///
 /// This is the real-Cargo shape reported in issue #143: two nested builds share
@@ -205,22 +218,33 @@ fn a_sibling_build_and_clean_up_do_not_disturb_another_fixtures_suite() -> Resul
     warmup.cargo_build()?;
     drop(warmup);
 
-    let builder = fixture_with_theorem("sibling_kept")?;
     let sibling = fixture_with_theorem("sibling_dropped")?;
+    let builder = fixture_with_theorem("sibling_kept")?;
     require_shared_target_and_lock([&builder, &sibling])?;
 
-    let builder_thread = std::thread::spawn(move || -> Result<String, String> {
-        builder.cargo_build()?;
-        generated_suite_contents(&builder)
-    });
-
+    // Read the sibling's suite while its root still exists, so the drop below
+    // can happen at the moment that matters.
     sibling.cargo_build()?;
-    let sibling_suite = generated_suite_contents(&sibling)?;
-    require_only_own_theorem(&sibling_suite, "sibling_dropped", "sibling_kept")?;
+    require_only_own_theorem(
+        &generated_suite_contents(&sibling)?,
+        "sibling_dropped",
+        "sibling_kept",
+    )?;
+
+    // Start the builder's build and confirm the child is running *before*
+    // dropping the sibling. A flag set before `cargo_build` would prove nothing;
+    // a live child proves the build is genuinely in progress when the sibling's
+    // root disappears. Only the confirmation sits between the two.
+    let mut builder_build = builder.spawn_cargo_build()?;
+    require_child_running(&mut builder_build)?;
     drop(sibling);
 
-    let builder_suite = builder_thread
-        .join()
-        .map_err(|_| "the concurrent builder thread panicked".to_owned())??;
-    require_only_own_theorem(&builder_suite, "sibling_kept", "sibling_dropped")
+    // `wait` drains both pipes while it waits, so a verbose build cannot block
+    // on a full pipe. The test's own nextest allowance bounds the whole run.
+    builder_build.wait()?;
+    require_only_own_theorem(
+        &generated_suite_contents(&builder)?,
+        "sibling_kept",
+        "sibling_dropped",
+    )
 }

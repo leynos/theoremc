@@ -620,11 +620,16 @@ suite.
   versions the workspace already built, and the fixture's `cargo` runs with
   `CARGO_NET_OFFLINE=true`, with `CARGO_BUILD_TARGET_DIR` and
   `CARGO_BUILD_TARGET` removed and `CARGO_TARGET_DIR` and
-  `CARGO_BUILD_BUILD_DIR` both pinned to the shared target, so neither an
-  exported value nor a configured `build.build-dir` or `build.target` can move
-  the artefacts, retarget the build, or share a lock. Inherited `RUSTFLAGS` are
-  left in place so a fixture compiles with the gate's flags. A fixture that
-  needs a private target must say so here and in its helper.
+  `CARGO_BUILD_BUILD_DIR` both pinned to the shared target, so an exported
+  value or a configured `build.build-dir` cannot move the artefacts, and an
+  exported build target cannot retarget the build. A `build.target` set in a
+  Cargo configuration file is *not* cleared by removing the environment
+  variable, and it moves build-script output to
+  `<shared-target>/<triple>/debug/build`, which the lookup does not read. That
+  is a known limitation recorded in ADR 0012: a host with such a configuration
+  cannot run the fixture suites. Inherited `RUSTFLAGS` are left in place so a
+  fixture compiles with the gate's flags. A fixture that needs a private target
+  must say so here and in its helper.
 - Fixture failures have three shapes and must say which one happened.
   `tests/common/io_context.rs` formats filesystem failures as
   `<operation> <path>: <io error>` and appends the fixture package, root and

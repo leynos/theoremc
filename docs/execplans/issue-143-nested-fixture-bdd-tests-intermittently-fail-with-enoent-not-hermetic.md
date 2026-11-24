@@ -46,9 +46,11 @@ Observable success:
    suffix; the reservation is a `create_dir` marker under
    `<shared-target>/fixture-reservations`.
 5. The child `cargo` receives `CARGO_BUILD_BUILD_DIR` equal to its
-   `CARGO_TARGET_DIR`, and `CARGO_BUILD_TARGET` is removed, so an inherited
-   `build.build-dir` or `build.target` cannot move build-script output away from
-   `<target>/debug/build`.
+   `CARGO_TARGET_DIR`, and the `CARGO_BUILD_TARGET` environment variable is
+   removed, so an exported `build.target` cannot retarget the build. A
+   `build.target` set in a Cargo configuration file is not cleared by this and
+   remains a documented limitation: Cargo offers no supported way to unset a
+   configured target, and output then moves to `<target>/<triple>/debug/build`.
 6. The existing four named tests remain selected in CI; no name-based local
    exemption is mirrored into repository configuration.
 
@@ -222,6 +224,31 @@ Observable success:
   gives the same atomic `AlreadyExists` signal, needs no extra dependency, and
   matches the build-directory shape the marker stands for. Date/Author:
   2026-11-23, implementing agent.
+- D7. Decision (review-driven): document that a configured `build.target` is a
+  limitation rather than claiming that removing `CARGO_BUILD_TARGET` prevents
+  it. Rationale: removing the environment variable cannot override a
+  `build.target` in an ancestor or `CARGO_HOME` `config.toml`; Cargo rejects
+  `--config 'build.target=[]'` with a type error and
+  `--config 'build.target=""'` with "target was empty", so no supported
+  command-line override exists. The ADR, developers' guide, exec plan and
+  `hermetic_cargo` docs now say so. Date/Author: 2026-11-24, implementing
+  agent, from CodeRabbit review.
+- D8. Decision (review-driven): prove the sibling-drop overlap by spawning the
+  builder's child and requiring `is_running()` before the drop, instead of
+  relying on two threads intersecting by chance. Rationale: a child that has
+  already exited cannot overlap the clean-up, and a signal sent before
+  `cargo_build` proves nothing. `spawn_cargo_build` plus a live-child check
+  ties the synchronisation point to the active build; `wait` drains both pipes
+  so a verbose build cannot block. Date/Author: 2026-11-24, implementing agent,
+  from CodeRabbit review.
+- D9. Decision (review-driven): make the fixture-path tests Unix-only and derive
+  the `hermetic_cargo` doctest paths from a real temporary directory. Rationale:
+  `/fixture/target` is not absolute on Windows, so the guard rejected it and
+  the fixture panicked; the repository's other path-shape suites are already
+  Unix-only, and a temporary directory is platform-correct in the doctest. The
+  `race_allocators` barrier moved before any fallible setup so one worker's
+  failure cannot strand the others. Date/Author: 2026-11-24, implementing
+  agent, from CodeRabbit review.
 
 ## Outcomes & retrospective
 
@@ -312,16 +339,18 @@ Invariants:
 5. A child Cargo command always sees `CARGO_TARGET_DIR == CARGO_BUILD_BUILD_DIR`
    and no `CARGO_BUILD_TARGET`, `CARGO_BUILD_TARGET_DIR`. Verified by
    inspecting the prepared `Command` in `hermetic_cargo_tests.rs`, and by a
-   real concurrent build that still finds its own suite.
+   real concurrent build that still finds its own suite. The guarantee covers
+   environment variables only; a configured `build.target` is a stated
+   limitation, not a verified prevention.
 6. The four named tests remain in the shipped selection.
    Verified by reading `.config/nextest.toml` in the final diff; it is
    unchanged.
 
 External axioms: `tempfile` creates a unique directory atomically; Cargo writes
 build-script output under `<target>/debug/build` when `build-dir` equals the
-target; `cap-std` `create_dir` is atomic with respect to a concurrent creator.
-These are documented third-party interfaces and are exercised at the boundary
-by the real-Cargo test.
+target and no build target is configured; `cap-std` `create_dir` is atomic with
+respect to a concurrent creator. These are documented third-party interfaces
+and are exercised at the boundary by the real-Cargo test.
 
 The ENOENT root cause remains unverified by design; the diagnostics are the
 instrument that will identify it on the next occurrence. No formal proof

@@ -94,11 +94,19 @@ now an atomic one.
   `CARGO_BUILD_BUILD_DIR` equal to its `CARGO_TARGET_DIR`, so an inherited or
   configured `build.build-dir` cannot move build-script output away from
   `<target>/debug/build`, and `CARGO_BUILD_TARGET` is removed alongside
-  `CARGO_BUILD_TARGET_DIR`, so a configured build target cannot retarget the
+  `CARGO_BUILD_TARGET_DIR`, so an exported build target cannot retarget the
   build. `hermetic_cargo` rejects a relative target directory rather than
   letting it mean something different in the child's working directory.
   Inherited `RUSTFLAGS` are deliberately left in place: the fixture must
   compile with the same flags as the gate that started it.
+- Removing `CARGO_BUILD_TARGET` clears the environment override only. A
+  `build.target` set in an ancestor or `CARGO_HOME` `config.toml` still
+  applies, and it moves build-script output below
+  `<target>/<triple>/debug/build`, which the lookup does not read. Cargo offers
+  no supported way to unset a configured target from the command line, so this
+  remains a known limitation: a host whose Cargo configuration sets
+  `build.target` cannot run the fixture suites until that configuration is
+  removed or the lookup learns the target layout.
 - Cleaning the shared target while builds are active is unsupported.
   `cargo clean`, or any external removal of `theoremc-fixture-builds`, can
   delete a build directory a live fixture is reading. The helpers report the

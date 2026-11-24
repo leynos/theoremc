@@ -31,12 +31,16 @@ fn race_allocators(target: &Utf8Path, count: usize, offered: &[String]) -> HashS
         let thread_target = target.to_path_buf();
         let thread_offered = offered.to_vec();
         workers.push(std::thread::spawn(move || {
+            // Reach the barrier before any fallible setup. A worker that
+            // panicked in `Reservations::open` would otherwise never arrive,
+            // and the remaining workers would block forever in `wait` while
+            // the parent joins them.
+            thread_gate.wait();
             let reservations =
                 Reservations::open(&thread_target).expect("open the reservation root");
             let mut candidates = thread_offered.into_iter().chain(std::iter::repeat_with(|| {
                 format!("spare-{}", unique_suffix())
             }));
-            thread_gate.wait();
             first_unused_suffix(
                 || candidates.next().expect("an endless candidate stream"),
                 |candidate| reservations.claim(candidate),

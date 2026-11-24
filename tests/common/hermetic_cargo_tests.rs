@@ -1,4 +1,12 @@
 //! Regression tests for the fixture `cargo` environment.
+//!
+//! The fixtures below name literal POSIX paths such as `/fixture/target`. On
+//! Windows that path has a root but no drive prefix, so it is not absolute and
+//! `hermetic_cargo` rejects it; the module is therefore Unix-only, as the other
+//! path-shape suites already are. They also run Cargo through `sh` in a stub
+//! case in `command_run_tests`.
+
+#![cfg(unix)]
 
 use std::ffi::OsStr;
 
