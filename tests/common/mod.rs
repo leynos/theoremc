@@ -4,6 +4,7 @@ use derive_more::{From, Into};
 use the_newtype::Newtype;
 mod build_log;
 mod build_support_fixture;
+mod build_support_manifest;
 mod command_run;
 mod fixture_build;
 mod fixture_crate;

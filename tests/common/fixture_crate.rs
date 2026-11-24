@@ -8,6 +8,7 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 use filetime::FileTime;
 
 use super::BuildLog;
+use super::build_support_manifest::fixture_build_support_cargo_toml;
 use super::fixture_build::{self, BARRIER_BUILD_SCRIPT, FixtureIdentity, RunningBuild};
 use super::fixture_isolation::{
     Reservations, WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, unique_suffix,
@@ -388,35 +389,6 @@ impl FixtureCrate {
             .map_err(|error| {
                 self.io_error("advancing the modification time of", &absolute_path, &error)
             })
-    }
-}
-
-/// Builds a fixture manifest with lints disabled for build-script tests.
-fn fixture_build_support_cargo_toml(manifest: &str) -> Result<String, String> {
-    let mut removed_lints = false;
-    let mut inside_lints = false;
-    let mut retained_lines = Vec::new();
-
-    for line in manifest.lines() {
-        let trimmed_line = line.trim();
-        let is_section_header = trimmed_line.starts_with('[') && trimmed_line.ends_with(']');
-        if is_section_header {
-            inside_lints = false;
-            if trimmed_line == "[lints]" {
-                removed_lints = true;
-                inside_lints = true;
-                continue;
-            }
-        }
-        if !inside_lints {
-            retained_lines.push(line);
-        }
-    }
-
-    if removed_lints {
-        Ok(format!("{}\n", retained_lines.join("\n")))
-    } else {
-        Err("build-support manifest must contain a [lints] table".to_owned())
     }
 }
 
