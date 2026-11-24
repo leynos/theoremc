@@ -535,8 +535,8 @@ parent-process environment mutation and point to the ADR. Index ADR-0014 in
 Working directory: the worktree root.
 
 ```plaintext
-Red:  cargo nextest run -p theoremc-build-support \
-        --test build_script  # (unit tests compile with the crate)
+Red:  cargo nextest run -p theoremc-build-support --lib \
+        # the build-script unit tests live in src/build_script_tests.rs
 Green: cargo nextest run -p theoremc-build-support
 Focused macro: cargo nextest run -p theoremc-macros --test expand
 Focused CLI: cargo nextest run -p cargo-theorem --test entry_points
