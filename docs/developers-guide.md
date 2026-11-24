@@ -471,8 +471,12 @@ doc comment, now fails `make lint` rather than passing unnoticed. The lint does
 not check items compiled only into test harnesses.
 
 Where a rule is adopted but tuned differently, record the reason beside the
-setting: `clippy.toml` keeps `cognitive-complexity-threshold = 9` to match
-CodeScene's ceiling, where Netsuke raises it to 32.
+setting: Clippy's `cognitive_complexity` is not enabled, because it scores
+after macro expansion and so counts branching a macro generated. Whitaker's
+experimental `macro_aware_cognitive_complexity` gates complexity at 9,
+CodeScene's ceiling, and `dylint.toml` opts in with
+`[whitaker] experimental = ["macro_aware_cognitive_complexity"]`. Fix a finding
+by extracting named helpers, never by raising the threshold.
 
 Environment access follows the same policy, and this layer is where the last
 two deferred rules land. Production code reads the environment through an

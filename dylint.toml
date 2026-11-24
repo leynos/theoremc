@@ -12,3 +12,12 @@
 #   abandons the policy for the whole crate; and
 # - note that `no_std_fs_operations` cannot be suppressed in source, so a
 #   `dylint.toml` key is its only escape hatch.
+
+# `macro_aware_cognitive_complexity` replaces Clippy's `cognitive_complexity`.
+# It skips branching a macro generated and holds CodeScene's ceiling of 9. It
+# is experimental, so the suite loads it only on request.
+[whitaker]
+experimental = ["macro_aware_cognitive_complexity"]
+
+[macro_aware_cognitive_complexity]
+max_complexity = 9
