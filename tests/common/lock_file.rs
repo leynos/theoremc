@@ -73,11 +73,21 @@ impl<'a> Entry<'a> {
             ("source", &mut self.source),
         ] {
             if slot.is_none()
-                && let Some(value) = assigned_string(line, key)
+                && let Some(value) = Self::assigned_string(line, key)
             {
                 *slot = Some(value);
             }
         }
+    }
+
+    /// Returns the value of a `key = "value"` line.
+    fn assigned_string(line: &'a str, key: &str) -> Option<&'a str> {
+        let value = line
+            .strip_prefix(key)?
+            .trim_start()
+            .strip_prefix('=')?
+            .trim();
+        value.strip_prefix('"')?.strip_suffix('"')
     }
 
     /// Returns the finished entry.
@@ -100,19 +110,6 @@ impl<'a> Entry<'a> {
     }
 }
 
-/// Returns the value of a `key = "value"` line.
-///
-/// The fixture rename reads a template's `name` and `source` lines with it, so
-/// it is shared rather than repeated.
-pub(super) fn assigned_string<'a>(line: &'a str, key: &str) -> Option<&'a str> {
-    let value = line
-        .strip_prefix(key)?
-        .trim_start()
-        .strip_prefix('=')?
-        .trim();
-    value.strip_prefix('"')?.strip_suffix('"')
-}
-
 /// Returns `lock` with the path entry named `from` renamed to `to`.
 ///
 /// A template's root entry records no `source`, which is what distinguishes it
@@ -124,54 +121,63 @@ pub(super) fn assigned_string<'a>(line: &'a str, key: &str) -> Option<&'a str> {
 /// Returns an error when no entry names `from`, when more than one does, or
 /// when the only candidate records a source.
 pub(super) fn with_renamed_root(lock: &str, from: &str, to: &str) -> Result<String, String> {
+    let packages = lock_packages(lock)?;
+    let roots = packages
+        .iter()
+        .filter(|package| package.source.is_none() && package.name == from)
+        .count();
+    match roots {
+        1 => {}
+        0 => return Err(format!("fixture lock names no root package {from:?}")),
+        _ => {
+            return Err(format!(
+                "fixture lock names {from:?} as a root package more than once"
+            ));
+        }
+    }
+    let target = root_line(lock, from)?;
+    render_renamed(lock, target, to)
+}
+
+/// Returns the line index of the source-less entry that names `from`.
+///
+/// The entry is located by its block, so a registry package of the same name
+/// elsewhere in the file is never chosen.
+///
+/// # Errors
+///
+/// Returns an error when no source-less entry names `from`.
+fn root_line(lock: &str, from: &str) -> Result<usize, String> {
+    let marker = format!("name = \"{from}\"");
     let lines: Vec<&str> = lock.lines().collect();
-    let target = root_name_line(&lines, from)?;
+    let found = package_blocks(&lines).into_iter().find_map(|(start, end)| {
+        let block = lines.get(start..end)?;
+        let is_registry = block
+            .iter()
+            .any(|line| line.trim().starts_with("source = "));
+        let offset = block.iter().position(|line| line.trim() == marker)?;
+        (!is_registry).then_some(start + offset)
+    });
+    found.ok_or_else(|| format!("fixture lock names no root package {from:?}"))
+}
+
+/// Returns `lock` with line `target` replaced by a `name` assignment for `to`.
+///
+/// # Errors
+///
+/// Returns an error when the replacement cannot be rendered.
+fn render_renamed(lock: &str, target: usize, to: &str) -> Result<String, String> {
     let mut rendered = String::with_capacity(lock.len());
-    for (index, line) in lines.iter().enumerate() {
-        match index {
-            _ if index == target => {
-                write!(rendered, "name = \"{to}\"")
-                    .map_err(|error| format!("rendering the renamed root: {error}"))?;
-            }
-            _ => rendered.push_str(line),
+    for (index, line) in lock.lines().enumerate() {
+        if index == target {
+            write!(rendered, "name = \"{to}\"")
+                .map_err(|error| format!("rendering the renamed root: {error}"))?;
+        } else {
+            rendered.push_str(line);
         }
         rendered.push('\n');
     }
     Ok(rendered)
-}
-
-/// Returns the line index of the source-less entry naming `root`.
-///
-/// # Errors
-///
-/// Returns an error when no entry names the template root, or when more than
-/// one does.
-fn root_name_line(lines: &[&str], root: &str) -> Result<usize, String> {
-    let mut found = None;
-    for (start, end) in package_blocks(lines) {
-        let block = lines
-            .get(start..end)
-            .ok_or_else(|| format!("fixture lock block {start}..{end} is out of range"))?;
-        if block
-            .iter()
-            .any(|line| assigned_string(line.trim(), "source").is_some())
-        {
-            continue;
-        }
-        let Some(offset) = block
-            .iter()
-            .position(|line| assigned_string(line.trim(), "name") == Some(root))
-        else {
-            continue;
-        };
-        if found.is_some() {
-            return Err(format!(
-                "fixture lock names {root:?} as a root package more than once"
-            ));
-        }
-        found = Some(start + offset);
-    }
-    found.ok_or_else(|| format!("fixture lock names no root package {root:?}"))
 }
 
 /// Returns the `[[package]]` blocks of a lock as `[start, end)` line ranges.
