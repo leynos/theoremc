@@ -187,7 +187,7 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       540 s default, which is exactly the split the design intends: the
       default fails fast on an ordinary host, the allowance lets a saturated
       host's override be reported by this code.
-- [x] (2026-11-23T23:55Z) The serialised macro suite exposed a second
+- [x] (2026-11-23T23:55Z) The serialized macro suite exposed a second
       configuration bound: with the committed 45-minute `global-timeout`, a run
       reached 2700 s with sixteen tests passed, one still running and two never
       started, and nextest cancelled the run. Nothing had failed. Because the

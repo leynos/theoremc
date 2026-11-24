@@ -65,7 +65,7 @@ fn owner_creates_a_fixture_and_holds_the_lock() -> Result<(), String> {
     )?;
     let lock = FixtureLock::acquire_for(Duration::from_secs(30))?;
     // Serial libtest prints its running-test prefix without a newline, so the
-    // handshake starts on a line of its own and stays recognisable.
+    // handshake starts on a line of its own and stays recognizable.
     println!("\n{READY_PREFIX}{}", fixture.manifest_dir());
     std::io::stdout()
         .flush()

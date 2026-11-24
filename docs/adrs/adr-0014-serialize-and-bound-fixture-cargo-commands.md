@@ -145,7 +145,7 @@ fixture binaries. `tests/nextest_config_contract.rs` reads
 three exact binary filters, allows less than the exported deadline, or if the
 run-level `global-timeout` does not exceed the group allowance.
 
-Serialising the suites has a consequence for the run budget: a suite whose
+Serializing the suites has a consequence for the run budget: a suite whose
 tests used to overlap now takes the sum of its tests' allowances. A contended
 run of `theorem_file_macro_bdd` reached 2700 s with sixteen tests passed and
 none failed, and nextest's 45-minute `global-timeout` cancelled it. The run
