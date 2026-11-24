@@ -14,18 +14,21 @@
 slow-timeout = { period = "60s", terminate-after = 5 }
 # The whole run. Each test is bounded by its own allowance, but a run whose
 # tests each stay inside theirs can still exceed the job. This stays strictly
-# above the largest per-test allowance (600 s, below).
+# above the largest per-test allowance (7200 s, below).
 #
 # Raised from 30 m on 17 November 2026, on measurement. The earlier 420 s
 # figure described 818 tests; the suite now has 1021, and the compiler-spawning
 # tests run one at a time (below), so the run's length is the sum of their
 # allowances plus everything else. Three consecutive contended runs reached
-# 1800 s with no assertion failure and work still outstanding: one had a test
-# cancelled after 43 s of its own 600 s allowance, and two had seven tests
-# (including the trybuild suite) never started. Each test remains bounded by
-# its own allowance, so a hang is still terminated and named; this cap only
-# decides how long the whole run may take.
-global-timeout = "45m"
+# 1800 s with no assertion failure and work still outstanding. On 24 November,
+# a run with 900 s bounds for nested builds reached the former 90 m cap after
+# 1013 of 1021 tests passed, with a nested build active and seven tests not
+# started.
+# On 24 November, the 180 m run reached its global timeout with 1020 of 1021
+# tests passed; the final trybuild case was still compiling its first fixture
+# after 3464 s, with compiler requests queued. The 270 m cap covers the suite's
+# observed duration plus the two-hour nested-build allowance and a margin.
+global-timeout = "270m"
 
 [test-groups.nested-cargo-builds]
 # These tests start a child `cargo` or `rustc` of their own: temporary fixture
@@ -42,9 +45,18 @@ max-threads = 1
 # the macros crate's trybuild suite, the rustc compile-fail unit test, and the
 # two-package workspace the lint stages are proved against.
 # Measured on a cold, contended local run (31 October): fixture suites took up
-# to 290 s and the trybuild suite 417 s, both against the 300 s default, so the
-# group gets ten warning periods (600 s). That is twice the default and the
-# largest allowance in this file.
+# to 290 s and the trybuild suite 417 s, both against the 300 s default. On
+# 23 November, the healthy shared compiler queue delayed a nested fixture build
+# beyond 600 s while the workspace gates also waited for compiler slots. On
+# 24 November, a shared-target fixture reached 900 s before nextest terminated
+# it. A later Kani-listing fixture remained in cargo-kani compilation when its
+# 1200 s bound expired. On 24 November, the trybuild compile-errors case hit
+# 1800 s while Cargo was still compiling fixture dependencies, with up to 389
+# compiler requests ahead in the healthy shared queue. A later full run hit its
+# 180 m global cap after 3464 s in this test; trybuild had built its target and
+# begun compiling the first fixture. Give this serial group 120 warning periods
+# (7200 s), retaining a finite bound while allowing time for shared admission
+# and the complete fixture suite.
 filter = 'binary(=build_discovery_bdd) | binary(=build_suite_bdd) | binary(=theorem_file_macro_bdd) | binary(=lint_workspace_execution) | binary_id(=theoremc-macros::expand) | (package(=theoremc) & test(/^arg_lowering::compile_fail_tests::/))'
 test-group = "nested-cargo-builds"
-slow-timeout = { period = "60s", terminate-after = 10 }
+slow-timeout = { period = "60s", terminate-after = 120 }
