@@ -152,6 +152,33 @@ fn staging_reports_a_missing_source_fixture() -> Result<(), Box<dyn std::error::
     }
 }
 
+/// A caller can pass a target directory the outer build has not created. The
+/// nested `cargo metadata` may then report the workspace default, so staging
+/// must not depend on the directory already existing.
+#[test]
+fn staging_creates_the_target_directory_when_absent() -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = StagingFixture::new()?;
+    let absent_target = fixture
+        .crate_root
+        .parent()
+        .ok_or_else(|| std::io::Error::other("temporary root has no parent"))?
+        .join("absent-target");
+
+    stage_fixtures(
+        &fixture.crate_root,
+        &absent_target,
+        &["valid_theorem.theorem"],
+    )?;
+
+    let staged =
+        absent_target.join("tests/trybuild/theoremc-macros/tests/expand/valid_theorem.theorem");
+    if staged.is_file() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!("staging should create {staged}")).into())
+    }
+}
+
 #[test]
 fn staging_creates_the_project_directory_when_absent() -> Result<(), Box<dyn std::error::Error>> {
     let fixture = StagingFixture::new()?;

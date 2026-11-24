@@ -86,6 +86,13 @@ pub fn stage_fixtures(
     let source_root =
         Utf8Dir::open_ambient_dir(crate_root.join(PROJECT_FIXTURE_DIR), ambient_authority())
             .map_err(|error| format!("opening the fixture source directory: {error}"))?;
+    // The target directory may not exist yet: a caller can pass an explicit
+    // `--target-dir` the outer build has not created, and `cargo metadata`
+    // then reports the workspace default instead. Creating it first keeps
+    // staging independent of whether the outer build has written there, and
+    // `create_dir_all` succeeds on a directory that already exists.
+    Utf8Dir::create_ambient_dir_all(target, ambient_authority())
+        .map_err(|error| format!("creating the target directory {target}: {error}"))?;
     let target_root = Utf8Dir::open_ambient_dir(target, ambient_authority())
         .map_err(|error| format!("opening the target directory {target}: {error}"))?;
     target_root

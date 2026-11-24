@@ -11,7 +11,7 @@ use std::{
 
 use cap_std::{ambient_authority, fs::Dir};
 
-use super::{HostEnv, cargo_binary, isolated_command, isolated_path, rustup_home};
+use super::{HostEnv, binary_name, cargo_binary, isolated_command, isolated_path, rustup_home};
 
 /// Reports mismatched values without panicking inside a fallible test.
 fn require_equal<T: std::fmt::Debug + PartialEq + ?Sized>(
@@ -74,7 +74,11 @@ fn rustup_home_falls_back_to_the_home_directory() {
 
     assert_eq!(
         rustup_home(&host),
-        Some(PathBuf::from("/home/person/.rustup").into_os_string()),
+        Some(
+            PathBuf::from("/home/person")
+                .join(".rustup")
+                .into_os_string()
+        ),
         "HOME must be used when RUSTUP_HOME is absent"
     );
 }
@@ -185,7 +189,9 @@ fn cargo_binary_is_found_in_the_first_directory_that_holds_one()
     let capability = Dir::open_ambient_dir(temp.path(), ambient_authority())?;
     capability.create_dir_all("empty")?;
     capability.create_dir_all("with-cargo")?;
-    capability.write("with-cargo/cargo", b"#!/bin/sh\n")?;
+    let executable = binary_name("cargo");
+    let executable_name = executable.to_string_lossy();
+    capability.write(&format!("with-cargo/{executable_name}"), b"#!/bin/sh\n")?;
     let host = HostEnv::from_parts(
         Some(std::env::join_paths([&empty, &with_cargo])?),
         None,
@@ -197,7 +203,7 @@ fn cargo_binary_is_found_in_the_first_directory_that_holds_one()
 
     require_equal(
         &found,
-        &with_cargo.join("cargo"),
+        &with_cargo.join(executable_name.as_ref()),
         "Cargo executable selected from the search path",
     )?;
     Ok(())

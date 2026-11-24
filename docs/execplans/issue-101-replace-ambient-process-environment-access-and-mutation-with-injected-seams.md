@@ -549,9 +549,14 @@ Capture long gate output with `tee` under `/tmp` and review it afterwards.
 - `make markdownlint`, `make nixie`, and `make spelling` pass.
 - `tests/lint_workspace_execution.rs` proves a direct `std::env::var` fails
   under the copied `clippy.toml` and a reasoned `#[expect]` passes.
-- `grep -rn 'env::set_var\|env::remove_var' --include=*.rs .` returns nothing.
-- `grep -rn 'env::var' --include=*.rs .` returns only the annotated composition
-  roots named in ADR-0014.
+- `make lint` (and therefore CI's `make lint`) is the acceptance check for the
+  prohibition. `clippy::disallowed_methods` is denied workspace-wide against the
+  six configured paths, so a new direct read outside an approved root fails the
+  gate, and a stale `#[expect]` fails it too. A text search is not an acceptance
+  check here: the forbidden paths also appear as string literals in
+  `tests/lint_environment_contract.rs`, and the generated-source strings in
+  `tests/lint_workspace_execution.rs`, so a grep would report those and would
+  also conflate `env::var` with `env::var_os`.
 
 ## Idempotence and recovery
 
