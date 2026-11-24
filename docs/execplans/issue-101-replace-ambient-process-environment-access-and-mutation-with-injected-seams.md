@@ -137,6 +137,11 @@ The ExecPlan file itself is excluded from every size count.
   the fixture base and two contract-test bindings, and
   `needless_borrows_for_generic_args` plus `unnecessary_wraps` and
   `panic_in_result_fn` in the entry-point tests.
+- [x] (2026-11-24) Rebased onto `origin/main` `32ab0d9`, which bumped
+  `ortho_config` and `cargo-orthohelp` to 0.11.0 and **trybuild** to 1.0.125.
+  trybuild 1.0.125 keeps the `<target>/tests/trybuild/<crate>/` project
+  layout, so the metadata-resolved staging is unchanged. The macros suite
+  re-ran green on 1.0.125 (9/9), including the eight new staging tests.
 - [ ] `make test`: 1018 of 1019 tests pass. One fixture-crate BDD test
   (`existing_theorem_files_are_discovered_recursively`) hit nextest's timed-out
   ceiling at exactly 600 s under a shared compile queue more than 400 requests
