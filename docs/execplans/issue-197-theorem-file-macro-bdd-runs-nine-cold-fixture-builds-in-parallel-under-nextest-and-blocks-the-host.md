@@ -231,7 +231,12 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       tests pass.
 - [ ] Warm-run timings and the compiler-invocation count recorded here.
 - [ ] #143 re-evaluation recorded here.
-- [ ] Draft PR opened.
+- [x] (2026-11-24T07:40Z) Draft PR opened:
+      <https://github.com/leynos/theoremc/pull/281>, titled with `(#197)` and
+      stating `Closes #197`, with a `## References` section linking the issue,
+      #143, the ExecPlan, ADR-0014 and the Lody session.
+- [ ] Re-evaluate #143 and post the summary there.
+- [ ] Mark the plan COMPLETE once the draft PR's checks are green.
 
 ## Surprises & discoveries
 
