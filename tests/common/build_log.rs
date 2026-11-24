@@ -39,6 +39,23 @@ impl BuildLog {
         &self.0
     }
 
+    /// Returns the packages Cargo reported as `Compiling` in a `-vv` log.
+    ///
+    /// A warm shared target prints no `Compiling` line for a unit it reuses, so
+    /// this is the query that proves reuse: a second fixture build should report
+    /// only its own package. The names are returned in log order, with
+    /// repetitions kept, because a repeated name means Cargo built more than one
+    /// unit of that package.
+    #[must_use]
+    pub fn compiled_packages(&self) -> Vec<String> {
+        self.0
+            .lines()
+            .filter_map(|line| line.trim_start().strip_prefix("Compiling "))
+            .filter_map(|rest| rest.split_whitespace().next())
+            .map(str::to_owned)
+            .collect()
+    }
+
     /// Asserts whether the log contains or omits `needle`.
     fn check(&self, expect_present: bool, needle: ExpectedFragment<'_>) -> Result<(), String> {
         let found = self.0.contains(needle.as_str());

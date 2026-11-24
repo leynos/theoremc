@@ -14,7 +14,7 @@
 slow-timeout = { period = "60s", terminate-after = 5 }
 # The whole run. Each test is bounded by its own allowance, but a run whose
 # tests each stay inside theirs can still exceed the job. This stays strictly
-# above the largest per-test allowance (600 s, below).
+# above the largest per-test allowance (1200 s, below).
 #
 # Raised from 30 m on 17 November 2026, on measurement. The earlier 420 s
 # figure described 818 tests; the suite now has 1021, and the compiler-spawning
@@ -22,10 +22,15 @@ slow-timeout = { period = "60s", terminate-after = 5 }
 # allowances plus everything else. Three consecutive contended runs reached
 # 1800 s with no assertion failure and work still outstanding: one had a test
 # cancelled after 43 s of its own 600 s allowance, and two had seven tests
-# (including the trybuild suite) never started. Each test remains bounded by
-# its own allowance, so a hang is still terminated and named; this cap only
-# decides how long the whole run may take.
-global-timeout = "45m"
+# (including the trybuild suite) never started.
+#
+# Raised from 45 m to 2 h on 23 November 2026, on the same reasoning and on
+# measurement after the fixture suites were genuinely serialized. A contended
+# run of `theorem_file_macro_bdd` alone reached 2700 s with sixteen tests
+# passed, one still running and two never started; nothing had failed. Each
+# test remains bounded by its own allowance, so a hang is still terminated and
+# named; this cap only decides how long the whole run may take.
+global-timeout = "2h"
 
 [test-groups.nested-cargo-builds]
 # These tests start a child `cargo` or `rustc` of their own: temporary fixture
@@ -41,10 +46,22 @@ max-threads = 1
 # Every test that does compiler work inside its body: the fixture-crate suites,
 # the macros crate's trybuild suite, the rustc compile-fail unit test, and the
 # two-package workspace the lint stages are proved against.
+#
 # Measured on a cold, contended local run (31 October): fixture suites took up
 # to 290 s and the trybuild suite 417 s, both against the 300 s default, so the
-# group gets ten warning periods (600 s). That is twice the default and the
-# largest allowance in this file.
+# group was given ten warning periods (600 s).
+#
+# Raised to twenty periods (1200 s) on 23 November 2026, on measurement. A cold
+# fixture build — the dependency graph compiled once into a shared target that
+# had just been removed — was still running at 540 s on a host whose compiler
+# admission pool was serving hundreds of requests from other agents, and the
+# fixture command's own default deadline (540 s, see
+# `test_helpers::DEFAULT_FIXTURE_COMMAND_TIMEOUT`) then failed it with a
+# diagnostic. The default stays below 600 s so it fires first on an ordinary
+# host; this allowance exists so a slow host can raise the deadline through
+# `THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS` and still be reported by the fixture
+# code rather than killed by nextest. `tests/nextest_config_contract.rs` holds
+# the relation: the allowance must exceed the exported deadline.
 filter = 'binary(=build_discovery_bdd) | binary(=build_suite_bdd) | binary(=theorem_file_macro_bdd) | binary(=lint_workspace_execution) | binary_id(=theoremc-macros::expand) | (package(=theoremc) & test(/^arg_lowering::compile_fail_tests::/))'
 test-group = "nested-cargo-builds"
-slow-timeout = { period = "60s", terminate-after = 10 }
+slow-timeout = { period = "60s", terminate-after = 20 }

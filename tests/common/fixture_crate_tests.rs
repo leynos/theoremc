@@ -1,11 +1,9 @@
-//! Regression tests for adapting fixture manifests to standalone crates.
+//! Regression tests for shared fixture crate layout.
 
 use camino::Utf8Path;
 use cap_std::{ambient_authority, fs_utf8::Dir};
 
-use super::{
-    BUILD_SUPPORT_CARGO_TOML, fixture_build_support_cargo_toml, package_directories, read_suite,
-};
+use super::{package_directories, read_suite};
 
 /// A shared `target/debug/build` holding two builds of `fx_ab`, one of the
 /// similarly named `fx_abc`, and a generated suite for the first `fx_ab` only.
@@ -57,38 +55,4 @@ fn a_build_directory_without_a_suite_reads_as_none() {
 
     assert_eq!(read_suite(&dir, "fx_ab-333"), Ok(None));
     assert_eq!(read_suite(&dir, "fx_abc-222"), Ok(None));
-}
-
-#[test]
-fn removes_the_repository_workspace_lints_table() {
-    let fixture_manifest = fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)
-        .expect("repository build-support manifest should have workspace lints");
-
-    assert!(!fixture_manifest.contains("[lints]"));
-    assert!(fixture_manifest.contains("[dev-dependencies]"));
-}
-
-#[test]
-fn preserves_sections_after_workspace_lints() {
-    let manifest = concat!(
-        "[package]\nname = \"fixture\"\n\n",
-        "[lints]\nworkspace = true\n\n",
-        "[dependencies]\nexample = \"1.0.0\"\n",
-    );
-
-    let fixture_manifest = fixture_build_support_cargo_toml(manifest)
-        .expect("fixture manifest should have workspace lints");
-
-    assert!(!fixture_manifest.contains("[lints]"));
-    assert!(fixture_manifest.contains("[dependencies]\nexample = \"1.0.0\""));
-}
-
-#[test]
-fn rejects_a_manifest_without_workspace_lints() {
-    let result = fixture_build_support_cargo_toml("[package]\nname = \"fixture\"\n");
-
-    assert_eq!(
-        result,
-        Err("build-support manifest must contain a [lints] table".to_owned())
-    );
 }

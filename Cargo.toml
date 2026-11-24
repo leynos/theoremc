@@ -49,6 +49,7 @@ quote = "1.0.45"
 syn = { version = "3.0.3", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
 test-helpers = { path = "crates/test-helpers" }
 thiserror = "2.0.18"
+toml = "1.1.8"
 
 [[test]]
 name = "action_mangle_bdd"

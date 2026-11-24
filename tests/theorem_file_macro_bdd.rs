@@ -1,7 +1,6 @@
 //! Behavioural tests for real `theorem_file!` proc-macro expansion.
 
 use rstest_bdd_macros::{given, scenario, then};
-use theoremc::mangle::mangle_theorem_harness;
 
 /// Cargo process helpers used by the fixture crate module and BDD steps.
 #[path = "theorem_file_macro_bdd/cargo_runner.rs"]
@@ -9,14 +8,15 @@ mod cargo_runner;
 /// Temporary crate builder that lets these BDD scenarios compile real macros.
 #[path = "theorem_file_macro_bdd/fixture_crate.rs"]
 mod fixture_crate;
+/// Kani-dependent steps and their skip policy.
+#[path = "theorem_file_macro_bdd/kani_steps.rs"]
+mod kani_steps;
 /// Fixture inputs for referenced-type macro scenarios.
 #[path = "theorem_file_macro_bdd/referenced_type_fixtures.rs"]
 mod referenced_type_fixtures;
 
-use cargo_runner::CargoGuard;
 use fixture_crate::{
-    FIXTURE_LIB_RS, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses,
-    build_fixture_and_verify_kani_harnesses, run_fixture_build, run_valid_fixture_build,
+    FIXTURE_LIB_RS, TheoremFixtureSpec, run_fixture_build, run_valid_fixture_build,
 };
 use referenced_type_fixtures::{
     EMPTY_TYPES_LIB_RS, ExpectedBuildFailure, MISSING_FORALL_TYPE_THEOREM,
@@ -55,36 +55,6 @@ const VALID_MULTI_THEOREM: &str = concat!(
     "---\n",
     "Theorem: SecondMacroDoc\n",
     "About: Second theorem macro coverage\n",
-    "Witness:\n",
-    "  - cover: \"true\"\n",
-    "    because: \"reachable\"\n",
-    "Prove:\n",
-    "  - assert: \"true\"\n",
-    "    because: \"trivial\"\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 1\n",
-    "    expect: SUCCESS\n",
-);
-
-/// Two theorems in one file with different unwind bounds, so the verified
-/// crate carries a multi-harness module and two distinct `unwind` literals.
-const KANI_VERIFY_THEOREM: &str = concat!(
-    "Theorem: VerifyFirst\n",
-    "About: First theorem verified by cargo kani\n",
-    "Witness:\n",
-    "  - cover: \"true\"\n",
-    "    because: \"reachable\"\n",
-    "Prove:\n",
-    "  - assert: \"true\"\n",
-    "    because: \"trivial\"\n",
-    "Evidence:\n",
-    "  kani:\n",
-    "    unwind: 3\n",
-    "    expect: SUCCESS\n",
-    "---\n",
-    "Theorem: VerifySecond\n",
-    "About: Second theorem verified by cargo kani\n",
     "Witness:\n",
     "  - cover: \"true\"\n",
     "    because: \"reachable\"\n",
@@ -160,114 +130,6 @@ fn then_the_fixture_crate_builds_without_a_kani_dependency() -> Result<(), Strin
         path: "theorems/single.theorem",
         content: VALID_SINGLE_THEOREM,
     })
-}
-
-#[then("cargo-kani lists the generated proof harness when installed")]
-fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
-    if !cargo_runner::kani_is_installed() {
-        return skip_without_kani("cargo-kani not installed", "listing");
-    }
-
-    let output = match build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
-        path: "theorems/single.theorem",
-        content: VALID_SINGLE_THEOREM,
-    }) {
-        Ok(output) => output,
-        Err(error) if is_unusable_kani_environment(&error) => {
-            return skip_without_kani(
-                &format!("cargo-kani is installed but unusable: {error}"),
-                "listing",
-            );
-        }
-        Err(error) => return Err(error),
-    };
-    let expected_mangled_harness = mangle_theorem_harness("theorems/single.theorem", "SmokeMacro");
-    let expected_harness_identifier = expected_mangled_harness.identifier();
-
-    if !is_expected_single_harness_listing(&output, expected_harness_identifier) {
-        return Err(format!(
-            "expected Kani list output to contain exactly the SmokeMacro harness, got:\n{output}"
-        ));
-    }
-
-    Ok(())
-}
-
-/// Skips a Kani check, or fails it when `THEOREMC_REQUIRE_KANI=1`.
-///
-/// A skip hides a missing verifier, so the proofs job sets the variable and
-/// turns every would-be skip into a failure.
-#[expect(
-    clippy::print_stderr,
-    reason = "BDD skip diagnostics should remain non-fallible"
-)]
-fn skip_without_kani(reason: &str, check: &str) -> Result<(), String> {
-    if cargo_runner::kani_is_required() {
-        return Err(format!(
-            "THEOREMC_REQUIRE_KANI=1 forbids skipping the Kani {check} check: {reason}"
-        ));
-    }
-    eprintln!("{reason}; skipping Kani harness {check} check");
-    Ok(())
-}
-
-#[then("cargo-kani verifies every generated proof harness")]
-fn then_kani_verifies_every_generated_proof_harness() -> Result<(), String> {
-    if !cargo_runner::kani_is_installed() {
-        return skip_without_kani("cargo-kani not installed", "verification");
-    }
-
-    let output = match build_fixture_and_verify_kani_harnesses(&TheoremFixtureSpec {
-        path: "theorems/verify.theorem",
-        content: KANI_VERIFY_THEOREM,
-    }) {
-        Ok(output) => output,
-        Err(error) if is_unusable_kani_environment(&error) => {
-            return skip_without_kani(
-                &format!("cargo-kani is installed but unusable: {error}"),
-                "verification",
-            );
-        }
-        Err(error) => return Err(error),
-    };
-
-    // Two theorem documents, so two harnesses, each of which must verify. The
-    // summary line is Kani's own; a rejected harness reports a failure count.
-    // Kani also names each harness it checks, so the two generated identifiers
-    // must appear, not just a count.
-    let expected_harnesses = [
-        mangle_theorem_harness("theorems/verify.theorem", "VerifyFirst"),
-        mangle_theorem_harness("theorems/verify.theorem", "VerifySecond"),
-    ];
-    let summary = "Complete - 2 successfully verified harnesses, 0 failures, 2 total.";
-    let names_both = expected_harnesses.iter().all(|harness| {
-        output.lines().any(|line| {
-            line.starts_with("Checking harness ") && line.contains(harness.identifier())
-        })
-    });
-    if !output.contains(summary) || !names_both {
-        return Err(format!(
-            "expected Kani to verify both generated harnesses, got:\n{output}"
-        ));
-    }
-
-    Ok(())
-}
-
-fn is_unusable_kani_environment(error: &str) -> bool {
-    error.contains("error while loading shared libraries")
-        || error.contains("cannot open shared object file")
-        || error.contains("Broken pipe")
-        || error.contains("unexpected output from `rustc --version`: \"\"")
-}
-
-fn is_expected_single_harness_listing(output: &str, expected_harness_identifier: &str) -> bool {
-    output.contains("Standard Harnesses (#[kani::proof]):")
-        && output.contains("No contracts or contract harnesses found.")
-        && output.contains(expected_harness_identifier)
-        && output.matches("theorem__").count() == 1
-        && output.contains("| Total |")
-        && output.contains("| 1")
 }
 
 #[given("a fixture crate with one valid multi-document theorem file")]
@@ -474,9 +336,3 @@ fn a_theorem_file_without_kani_evidence_fails_macro_expansion() {}
     name = "A multi-document theorem file with partial Kani evidence fails macro expansion"
 )]
 fn a_multi_document_theorem_file_with_partial_kani_evidence_fails_macro_expansion() {}
-
-#[test]
-fn fixture_cargo_lock_acquires_without_poisoning() {
-    let guard = CargoGuard::acquire();
-    drop(guard);
-}

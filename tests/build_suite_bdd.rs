@@ -166,16 +166,53 @@ fn require_only_own_theorem(suite: &str, own: &str, other: &str) -> Result<(), S
     }
 }
 
+/// Requires the second build to have compiled nothing but its own package.
+///
+/// A warm shared target reports `Compiling` only for the units it had to build.
+/// The fixture's dependencies — the registry crates and the checkout's
+/// build-support crate — must already be fresh, so the only package named is the
+/// fixture's own `fx_` crate. A registry package in this list means the shared
+/// target was not reused; a different `fx_` package means two fixtures shared a
+/// name.
+fn require_only_own_package(
+    log: &test_helpers::BuildLog,
+    own: &str,
+    other: &str,
+) -> Result<(), String> {
+    let compiled = log.compiled_packages();
+    if compiled.is_empty() {
+        return Err(format!(
+            "the build log reports no `Compiling` line, so reuse is unproven:\n{}",
+            log.as_str()
+        ));
+    }
+    let foreign: Vec<&str> = compiled
+        .iter()
+        .map(String::as_str)
+        .filter(|name| *name != own)
+        .collect();
+    if foreign.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "the second fixture build recompiled {foreign:?}; it may report only {own} \
+         (the other fixture is {other}), got:\n{}",
+        log.as_str()
+    ))
+}
+
 /// Fixtures that declare the same package name still keep their artefacts
-/// apart in the shared target directory: each reads only its own suite.
+/// apart in the shared target directory: each reads only its own suite, and the
+/// second build compiles only its own package.
 #[test]
 fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(), String> {
     let first = fixture_with_theorem("only_first")?;
     let second = fixture_with_theorem("only_second")?;
     require_shared_target_and_lock([&first, &second])?;
 
-    first.cargo_build()?;
-    second.cargo_build()?;
+    first.cargo_build_log()?;
+    let second_log = second.cargo_build_log()?;
+    require_only_own_package(&second_log, second.package_name(), first.package_name())?;
 
     require_only_own_theorem(
         &generated_suite_contents(&first)?,

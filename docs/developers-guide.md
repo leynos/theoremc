@@ -611,22 +611,88 @@ suite.
   than sleeping for a filesystem timestamp tick.
 - Fixture crates that tests build with `cargo` share one warm target directory,
   `theoremc-fixture-builds` inside `$CARGO_TARGET_DIR` (or the repository's
-  `target`), so third-party dependencies compile once per run instead of once
-  per fixture. Each fixture's package gets a short unique name (`fx_` and a
-  run-and-sequence suffix; short because Kani derives a file name from the
-  crate name), which keeps its build artefacts apart in that directory;
-  `generated_suite_contents` reads only the directories named after the
-  fixture. The workspace `Cargo.lock` is copied into each fixture so every
-  fixture resolves the versions the workspace already built, and the fixture's
-  `cargo` runs with `CARGO_NET_OFFLINE=true`, with `CARGO_BUILD_TARGET_DIR` and
-  `CARGO_BUILD_BUILD_DIR` removed so a caller's environment cannot move the
-  artefacts or share a lock. A fixture that needs a private target must say so
-  here and in its helper.
+  `target`), so third-party dependencies compile once per warm target instead
+  of once per fixture. "Warm target" is the unit: `cargo clean` and a different
+  `CARGO_TARGET_DIR` each start a new one. Each fixture's package gets a short
+  unique name (`fx_` and a run-and-sequence suffix; short because Kani derives
+  a file name from the crate name), which keeps its build artefacts apart in
+  that directory; `generated_suite_contents` reads only the directories named
+  after the fixture. The workspace `Cargo.lock` is copied into each fixture so
+  every fixture resolves the versions the workspace already built, and the
+  fixture's `cargo` runs with `CARGO_NET_OFFLINE=true`, with
+  `CARGO_BUILD_TARGET_DIR` and `CARGO_BUILD_BUILD_DIR` removed so a caller's
+  environment cannot move the artefacts or share a lock. A fixture that needs a
+  private target must say so here and in its helper.
+- Fixture *sources* are created under `theoremc-fixture-builds/sources`, not in
+  `$TMPDIR`, so `cargo clean` removes them and an interrupted run leaves
+  nothing behind. Generated manifests carry an empty `[workspace]` table,
+  because a fixture created inside the repository tree would otherwise be a
+  candidate member of the repository workspace, and they name
+  `crates/theoremc-build-support` by path rather than copying it, so the shared
+  target compiles that crate once. See
+  [ADR-0014](adrs/adr-0014-serialize-and-bound-fixture-cargo-commands.md).
+- Every fixture `cargo` and `cargo kani` command goes through
+  `test_helpers::run_fixture_command`. It holds
+  `<shared-target>/fixture-cargo.lock` — a cross-process advisory lock — for
+  the command's whole lifetime and applies a deadline. The lock is a file
+  rather than a mutex because nextest runs every test in its own process, so an
+  in-process mutex would serialize nothing. A lock timeout names the lock path
+  and the elapsed wait; a command timeout fails the test with the command and
+  the output it produced. On Unix the child runs in its own process group and a
+  timeout kills the group before reaping the child; on other hosts only the
+  direct child is killed.
+- The fixture deadline is `DEFAULT_FIXTURE_COMMAND_TIMEOUT` (540 seconds).
+  Override it for a slower host without editing code:
+
+  ```sh
+  THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS=900 cargo nextest run -E 'binary(theorem_file_macro_bdd)'
+  ```
+
+  An override above 1140 seconds has no effect on its own: to let one test's
+  commands run longer than that, raise the group's `slow-timeout` in
+  `.config/nextest.toml` as well, because the group is what nextest enforces.
+  The `nested-cargo-builds` group allows 1200 seconds **per test**, not per
+  command, so `run_fixture_command` also clamps each command to what remains of
+  a 1140-second per-test fixture budget. A test that runs several commands
+  therefore still fails from inside the fixture code, with the command and its
+  output, before nextest terminates the test. The budget is thread-scoped
+  because that is the scope of a test under both runners in use: nextest gives
+  each test a process, and libtest — which `make kani` invokes directly — gives
+  each test a freshly spawned thread. The Kani scenarios use fixed deadlines
+  rather than the build override — 60 seconds for the availability probe and
+  1080 seconds for the Kani command — and clamp them to the same budget. The
+  contract test in `tests/nextest_config_contract.rs` fails if the group allows
+  less than the exported default or if the run allowance does not exceed the
+  group's. A cold fixture build — the dependency graph compiled once into a
+  target that was just removed — was measured at more than the 540-second
+  default while other processes held every compiler slot, so raise the deadline
+  on a saturated host rather than treating the failure as a fixture defect.
 - Tests that start a child `cargo` or `rustc` (the fixture suites, the macros
   crate's trybuild suite and the `rustc` compile-fail unit test) run in the
   `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,
   with an explicit `slow-timeout` and a `global-timeout` for the run. Add a new
-  test of that kind to the group's filter.
+  test of that kind to the group's filter. The group is defence in depth beside
+  the lock, not a substitute for it: it does not cover a direct
+  `cargo test --test theorem_file_macro_bdd` run, which `make kani` uses.
+- To inspect the resolved group membership by hand, run
+  `cargo nextest show-config test-groups`. It rebuilds the workspace metadata,
+  so it is not run from a test.
+- A host that ran the suites before this change may still hold fixture crates in
+  `/tmp` from runs that were killed before the `TempDir` destructor ran. This
+  command lists **candidates**, not directories known to be safe to remove:
+
+  ```sh
+  find /tmp -maxdepth 1 -type d -name '.tmp*' -exec test -d '{}/theorems' ';' -print
+  ```
+
+  Before removing anything, stop every test run that could be using those
+  paths, and confirm each candidate. A theoremc fixture's `Cargo.toml` names a
+  package beginning `fx_` (the fixture renames its package for the shared
+  target) and its `build.rs` calls
+  `theoremc_build_support::prepare_build_script`. Do not use `Cargo.lock`
+  equality as part of the test: the copied lock is only a seed, and a fixture's
+  lock can differ from the workspace's after a build. Another application's
+  temporary directory can satisfy the listing without being a fixture.
 - Integration tests under `tests/` are separate crates and inherit
   package lint policy. Note that `expect_used = "deny"` fires in integration
   tests but not in `#[cfg(test)]` modules.

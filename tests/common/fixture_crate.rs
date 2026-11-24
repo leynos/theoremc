@@ -7,35 +7,16 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 use filetime::FileTime;
 
 use super::BuildLog;
+use super::fixture_command::{FixtureOutcome, run_fixture_command};
 use super::fixture_isolation::{
-    WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, suffix_is_taken, unique_suffix,
-    with_unique_package_name,
+    WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, shared_target_sources_dir,
+    suffix_is_taken, unique_suffix, with_unique_package_name,
 };
 use super::hermetic_cargo::hermetic_cargo;
 use super::suite_layout::{package_directories, read_suite};
 
 /// Source for the repository build script copied into fixture crates.
 pub const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
-
-/// Manifest for the internal build-support crate copied into fixture crates.
-pub const BUILD_SUPPORT_CARGO_TOML: &str =
-    include_str!("../../crates/theoremc-build-support/Cargo.toml");
-
-/// Root source for the internal build-support crate copied into fixture crates.
-pub const BUILD_SUPPORT_LIB_SOURCE: &str =
-    include_str!("../../crates/theoremc-build-support/src/lib.rs");
-
-/// Build-script source for the internal build-support crate copied into fixtures.
-pub const BUILD_SUPPORT_BUILD_SCRIPT_SOURCE: &str =
-    include_str!("../../crates/theoremc-build-support/src/build_script.rs");
-
-/// Discovery source for the internal build-support crate copied into fixtures.
-pub const BUILD_DISCOVERY_SOURCE: &str =
-    include_str!("../../crates/theoremc-build-support/src/discovery.rs");
-
-/// Suite source for the internal build-support crate copied into fixtures.
-pub const BUILD_SUITE_SOURCE: &str =
-    include_str!("../../crates/theoremc-build-support/src/suite.rs");
 
 /// Minimal valid theorem document used by build-script fixture crates.
 pub const TRIVIAL_THEOREM: &str = concat!(
@@ -71,10 +52,13 @@ impl FixtureCrate {
     /// Creates a fixture crate with the supplied manifest and library source.
     ///
     /// The crate builds into a target directory shared by every fixture, so
-    /// third-party dependencies compile once per run rather than once per
-    /// fixture. Its package gets a short unique name, which keeps each
-    /// fixture's build artefacts apart inside that directory, and the
-    /// workspace lock is copied in so every fixture resolves the same versions.
+    /// third-party dependencies compile once per warm target rather than once
+    /// per fixture; a `cargo clean` or a different `CARGO_TARGET_DIR` starts a
+    /// new one. Its package gets a short unique name, which keeps each fixture's
+    /// build artefacts apart inside that directory, and the workspace lock is
+    /// copied in so every fixture resolves the same versions. The sources live
+    /// under that target too, so an interrupted run cannot leave them in
+    /// `$TMPDIR`.
     ///
     /// # Errors
     ///
@@ -85,7 +69,11 @@ impl FixtureCrate {
         let suffix =
             first_unused_suffix(unique_suffix, |taken| suffix_is_taken(&target_dir, taken))?;
         let (manifest, package_name) = with_unique_package_name(cargo_toml, &suffix)?;
-        let temp_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
+        let sources_dir = shared_target_sources_dir()?;
+        let temp_dir = tempfile::Builder::new()
+            .prefix("fixture-")
+            .tempdir_in(&sources_dir)
+            .map_err(|error| error.to_string())?;
         let manifest_dir = Utf8Path::from_path(temp_dir.path())
             .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
             .to_path_buf();
@@ -104,23 +92,18 @@ impl FixtureCrate {
         Ok(fixture)
     }
 
-    /// Writes the manifest, lock, build script, library source and the
-    /// build-support crate into the fixture directory.
+    /// Writes the manifest, lock, build script and library source into the
+    /// fixture directory.
+    ///
+    /// The build-support crate is not copied: the manifest names the checkout's
+    /// copy by path, so every fixture resolves it to the same unit in the shared
+    /// target and reuses the compiled artefact.
     fn write_scaffold(&self, manifest: &str, lib_rs: &str) -> Result<(), String> {
-        let build_support_manifest = fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?;
         let files = [
             ("Cargo.toml", manifest),
             ("Cargo.lock", WORKSPACE_LOCK),
             ("build.rs", BUILD_SCRIPT_SOURCE),
             ("src/lib.rs", lib_rs),
-            ("build-support/Cargo.toml", build_support_manifest.as_str()),
-            ("build-support/src/lib.rs", BUILD_SUPPORT_LIB_SOURCE),
-            (
-                "build-support/src/build_script.rs",
-                BUILD_SUPPORT_BUILD_SCRIPT_SOURCE,
-            ),
-            ("build-support/src/discovery.rs", BUILD_DISCOVERY_SOURCE),
-            ("build-support/src/suite.rs", BUILD_SUITE_SOURCE),
         ];
         for (path, contents) in files {
             self.write(Utf8Path::new(path), contents)?;
@@ -246,6 +229,12 @@ impl FixtureCrate {
         &self.target_dir
     }
 
+    /// Returns the unique package name this fixture builds under.
+    #[must_use]
+    pub fn package_name(&self) -> &str {
+        &self.package_name
+    }
+
     /// Runs `cargo build` in the fixture crate.
     ///
     /// # Errors
@@ -258,25 +247,36 @@ impl FixtureCrate {
 
     /// Runs `cargo build -vv --color never` and returns the combined log.
     ///
+    /// The command runs under the fixture lock and a deadline: it is a real
+    /// Cargo invocation that shares the fixture target and Cargo's package cache
+    /// with every other fixture, and it can stall on either. An overrun fails the
+    /// test with the command, the deadline and whatever the build printed,
+    /// instead of waiting for nextest to kill the whole run.
+    ///
     /// # Errors
     ///
-    /// Returns the combined Cargo output when the command fails or cannot be
-    /// executed.
+    /// Returns the combined Cargo output when the command fails, overruns, or
+    /// cannot be executed.
     pub fn cargo_build_log(&self) -> Result<BuildLog, String> {
-        let output = hermetic_cargo(&self.manifest_dir, &self.target_dir)
-            .args(["build", "-vv", "--color", "never"])
-            .output()
-            .map_err(|error| error.to_string())?;
-        let log = format!(
-            "{}{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr),
-        );
-
-        if output.status.success() {
-            Ok(BuildLog(log))
-        } else {
-            Err(log)
+        let mut command = hermetic_cargo(&self.manifest_dir, &self.target_dir);
+        command.args(["build", "-vv", "--color", "never"]);
+        let outcome = run_fixture_command(command).map_err(|error| error.to_string())?;
+        match outcome {
+            FixtureOutcome::Completed(output) if output.is_success() => {
+                Ok(BuildLog(output.combined()))
+            }
+            FixtureOutcome::Completed(output) => Err(format!(
+                "cargo build failed with status {}\n{}",
+                output.status,
+                output.combined()
+            )),
+            FixtureOutcome::TimedOut {
+                deadline,
+                elapsed,
+                output,
+            } => Err(format!(
+                "cargo build did not finish within {deadline:?} (ran for {elapsed:?})\n{output}"
+            )),
         }
     }
 
@@ -316,35 +316,6 @@ impl FixtureCrate {
             .ok_or_else(|| "advanced modification time overflowed".to_owned())?;
         filetime::set_file_mtime(&absolute_path, FileTime::from_system_time(advanced_mtime))
             .map_err(|error| error.to_string())
-    }
-}
-
-/// Builds a fixture manifest with lints disabled for build-script tests.
-fn fixture_build_support_cargo_toml(manifest: &str) -> Result<String, String> {
-    let mut removed_lints = false;
-    let mut inside_lints = false;
-    let mut retained_lines = Vec::new();
-
-    for line in manifest.lines() {
-        let trimmed_line = line.trim();
-        let is_section_header = trimmed_line.starts_with('[') && trimmed_line.ends_with(']');
-        if is_section_header {
-            inside_lints = false;
-            if trimmed_line == "[lints]" {
-                removed_lints = true;
-                inside_lints = true;
-                continue;
-            }
-        }
-        if !inside_lints {
-            retained_lines.push(line);
-        }
-    }
-
-    if removed_lints {
-        Ok(format!("{}\n", retained_lines.join("\n")))
-    } else {
-        Err("build-support manifest must contain a [lints] table".to_owned())
     }
 }
 

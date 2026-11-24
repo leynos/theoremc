@@ -2085,6 +2085,7 @@ dependencies = [
  "derive_more",
  "filetime",
  "proptest",
+ "rustix",
  "tempfile",
  "the-newtype",
  "theoremc-core",
@@ -2153,6 +2154,7 @@ dependencies = [
  "theoremc-core",
  "theoremc-macros",
  "thiserror 2.0.21",
+ "toml 1.1.8+spec-1.1.0",
 ]
 
 [[package]]

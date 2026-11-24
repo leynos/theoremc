@@ -5,6 +5,11 @@
 Accepted. Fixture crates that integration tests build with `cargo` share one
 warm target directory, start from the workspace lock, and build offline.
 
+Amended by [ADR-0014](adr-0014-serialize-and-bound-fixture-cargo-commands.md)
+(2026-11-23), which serializes every fixture command across processes, bounds
+it with a deadline, moves fixture sources under the shared target and stops
+copying the build-support crate into each fixture.
+
 ## Date
 
 2026-11-06
@@ -79,3 +84,28 @@ decision. They are historical context only and do not name a current record.
   accumulate until `cargo clean`. They are inert: no fixture reads a name it
   did not generate.
 - A fixture that needs a private target must say so in its helper and here.
+
+## Amendments
+
+### Amendment 1 (2026-11-23): ADR-0014
+
+[ADR-0014](adr-0014-serialize-and-bound-fixture-cargo-commands.md) keeps this
+record's decision and corrects three things this record left unsafe or untrue.
+
+1. The nextest group is not by itself a serialization guarantee. Under nextest
+   every test is a process, so an in-process mutex serializes nothing, and the
+   group is configuration that a renamed binary can silently escape. Each
+   fixture command now holds a cross-process advisory lock for its whole
+   lifetime, and a contract test holds the group.
+2. Fixture sources no longer live in `$TMPDIR`. They are created under
+   `theoremc-fixture-builds/sources`, so `cargo clean` removes them and an
+   interrupted run cannot leave them behind. Each generated manifest is its own
+   `[workspace]` root.
+3. The build-support crate is no longer copied into each fixture. The copy gave
+   each fixture its own package identity, so the shared target recompiled it
+   per fixture; a manifest that names the checkout's crate by path compiles it
+   once.
+
+The original decision above is preserved as history. Where it says third-party
+dependencies "compile once per run", read: they compile once per warm target,
+and a `cargo clean` or a different `CARGO_TARGET_DIR` starts a new one.
