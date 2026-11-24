@@ -138,17 +138,22 @@ fn require_shared_target_and_isolation(fixtures: [&FixtureCrate; 2]) -> Result<(
             second.target_dir()
         ));
     }
-    if first.cargo_home() != second.cargo_home()
-        || !first
-            .cargo_home()
-            .as_str()
-            .ends_with("theoremc-fixture-cargo-home")
-    {
+    if first.cargo_home() != second.cargo_home() {
         return Err(format!(
-            "fixtures must resolve from the dedicated Cargo home, got {} and {}",
+            "fixtures must resolve from one shared Cargo home, got {} and {}",
             first.cargo_home(),
             second.cargo_home()
         ));
+    }
+    for fixture in fixtures {
+        // A home inside the fixture's own temporary directory would be cold
+        // for every fixture, which is the cost this home exists to avoid.
+        if fixture.cargo_home().starts_with(fixture.manifest_dir()) {
+            return Err(format!(
+                "{} must not keep its Cargo home in its own temporary directory",
+                fixture.package_name()
+            ));
+        }
     }
     for fixture in fixtures {
         let lock = fixture.read_to_string(Utf8Path::new("Cargo.lock"))?;
