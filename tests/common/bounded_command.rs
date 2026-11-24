@@ -187,30 +187,16 @@ struct Reader {
 }
 
 impl Reader {
-    /// Starts a thread that forwards `pipe`'s chunks until the pipe closes.
-    fn start(pipe: Option<impl Read + Send + 'static>, name: &str) -> Result<Self, CommandFailure> {
-        let mut pipe = pipe.ok_or_else(|| {
+    /// Starts a thread that forwards `stream`'s chunks until the pipe closes.
+    fn start(
+        stream: Option<impl Read + Send + 'static>,
+        name: &str,
+    ) -> Result<Self, CommandFailure> {
+        let source = stream.ok_or_else(|| {
             CommandFailure::Spawn(io::Error::other(format!("{name} was not captured")))
         })?;
         let (sender, chunks) = mpsc::channel();
-        std::thread::spawn(move || {
-            let mut buffer = [0_u8; 8_192];
-            loop {
-                match pipe.read(&mut buffer) {
-                    Ok(0) => break,
-                    Ok(read) => {
-                        let Some(chunk) = buffer.get(..read) else {
-                            break;
-                        };
-                        if sender.send(chunk.to_vec()).is_err() {
-                            break;
-                        }
-                    }
-                    Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
-                    Err(_) => break,
-                }
-            }
-        });
+        std::thread::spawn(move || forward_chunks(source, &sender));
         Ok(Self {
             chunks,
             collected: Vec::new(),
@@ -228,6 +214,36 @@ impl Reader {
             }
         }
         String::from_utf8_lossy(&self.collected).into_owned()
+    }
+}
+
+/// Reads `source` to its end, forwarding each chunk to `sender`.
+///
+/// The loop ends when the pipe closes, when the reader is abandoned (the send
+/// fails), or on a read error; an interrupted read is retried, because a signal
+/// is not the end of the stream.
+fn forward_chunks(mut source: impl Read, sender: &mpsc::Sender<Vec<u8>>) {
+    let mut buffer = [0_u8; 8_192];
+    while let Some(chunk) = read_chunk(&mut source, &mut buffer) {
+        if sender.send(chunk).is_err() {
+            return;
+        }
+    }
+}
+
+/// Reads the next non-empty chunk, retrying an interrupted read.
+///
+/// Returns `None` at end of stream or on a read error: the caller is reporting a
+/// build outcome, and a diagnostic about the pipe would displace the compiler's
+/// own message.
+fn read_chunk(source: &mut impl Read, buffer: &mut [u8; 8_192]) -> Option<Vec<u8>> {
+    loop {
+        match source.read(buffer) {
+            Ok(0) => return None,
+            Ok(read) => return buffer.get(..read).map(<[u8]>::to_vec),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            Err(_) => return None,
+        }
     }
 }
 
@@ -279,13 +295,14 @@ fn place_in_own_process_group(_command: &mut Command) {}
 fn kill_process_group(child: &mut Child) {
     use rustix::process::{Pid, Signal, kill_process_group as kill_group};
 
-    if let Ok(pid) = i32::try_from(child.id())
-        && let Some(pid) = Pid::from_raw(pid)
-    {
-        let _ = kill_group(pid, Signal::KILL);
+    // A process id that does not fit an `i32`, or is not a usable `Pid`, simply
+    // means there is no group to signal; the direct child is still killed below.
+    let group = i32::try_from(child.id()).ok().and_then(Pid::from_raw);
+    if let Some(group) = group {
+        let _signal_result = kill_group(group, Signal::KILL);
     }
-    let _ = child.kill();
-    let _ = child.wait();
+    let _kill_result = child.kill();
+    let _reap_result = child.wait();
 }
 
 /// Kills the child, then reaps it.
@@ -295,8 +312,8 @@ fn kill_process_group(child: &mut Child) {
 /// finishes on its own; the Unix path above is what this repository's gates run.
 #[cfg(not(unix))]
 fn kill_process_group(child: &mut Child) {
-    let _ = child.kill();
-    let _ = child.wait();
+    let _kill_result = child.kill();
+    let _reap_result = child.wait();
 }
 
 #[cfg(test)]

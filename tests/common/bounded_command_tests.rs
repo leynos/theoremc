@@ -108,8 +108,8 @@ fn a_timed_out_child_reports_what_it_printed_first() -> Result<(), String> {
 }
 
 #[test]
-fn a_timed_out_direct_child_is_killed_and_reaped() -> Result<(), String> {
-    let temp = tempfile::tempdir().map_err(|error| error.to_string())?;
+fn a_timed_out_direct_child_is_killed_and_reaped() {
+    let temp = tempfile::tempdir().expect("create a scratch directory");
     let pid_file = temp.path().join("pid");
 
     let mut command = shell("echo $$ > \"$1\"; exec sleep 30");
@@ -120,18 +120,12 @@ fn a_timed_out_direct_child_is_killed_and_reaped() -> Result<(), String> {
         "the child must time out, got {outcome:?}",
     );
 
-    let root = camino::Utf8Path::from_path(temp.path())
-        .ok_or_else(|| "the scratch path is not UTF-8".to_owned())?;
-    let dir = Dir::open_ambient_dir(root, ambient_authority()).map_err(|e| e.to_string())?;
-    let pid = dir
-        .read_to_string("pid")
-        .map_err(|error| format!("the child should have recorded its pid: {error}"))?;
+    let pid = read_pid_file(&pid_file);
     assert!(
         !process_is_alive(pid.trim()),
         "process {} must have been killed and reaped",
         pid.trim(),
     );
-    Ok(())
 }
 
 /// A descendant that keeps the pipe open after its parent exits must not make
@@ -140,8 +134,8 @@ fn a_timed_out_direct_child_is_killed_and_reaped() -> Result<(), String> {
 /// success. The test kills the descendant itself, because the runner deliberately
 /// leaves a successfully completed command's descendants alone.
 #[test]
-fn a_descendant_holding_the_pipe_open_does_not_block_the_runner() -> Result<(), String> {
-    let temp = tempfile::tempdir().map_err(|error| error.to_string())?;
+fn a_descendant_holding_the_pipe_open_does_not_block_the_runner() {
+    let temp = tempfile::tempdir().expect("create a scratch directory");
     let descendant_pid_file = temp.path().join("descendant.pid");
     let started = Instant::now();
 
@@ -149,7 +143,7 @@ fn a_descendant_holding_the_pipe_open_does_not_block_the_runner() -> Result<(), 
     command.arg("sh").arg(&descendant_pid_file);
     let outcome = run_within_deadline(command, Duration::from_secs(3));
 
-    let output = outcome.map_err(|error| error.to_string())?;
+    let output = outcome.expect("the direct child exits at once");
     assert!(
         output.is_success(),
         "the direct child's status must be reported",
@@ -164,29 +158,29 @@ fn a_descendant_holding_the_pipe_open_does_not_block_the_runner() -> Result<(), 
         "the output the child wrote before exiting must be kept, got: {:?}",
         output.stdout,
     );
-    kill_recorded_process(&descendant_pid_file)
+    kill_recorded_process(&descendant_pid_file);
 }
 
-/// Kills the process whose id `path` holds, so a test leaves nothing behind.
-fn kill_recorded_process(path: &std::path::Path) -> Result<(), String> {
-    let root = camino::Utf8Path::from_path(
-        path.parent()
-            .ok_or_else(|| format!("{} has no parent", path.display()))?,
-    )
-    .ok_or_else(|| "the scratch path is not UTF-8".to_owned())?;
+/// Reads the pid a child recorded in `path`.
+fn read_pid_file(path: &std::path::Path) -> String {
+    let root = camino::Utf8Path::from_path(path.parent().expect("the pid file has a parent"))
+        .expect("the scratch path is UTF-8");
     let name = path
         .file_name()
         .and_then(std::ffi::OsStr::to_str)
-        .ok_or_else(|| "the pid file name is not UTF-8".to_owned())?;
-    let dir = Dir::open_ambient_dir(root, ambient_authority()).map_err(|e| e.to_string())?;
-    let pid = dir
-        .read_to_string(name)
-        .map_err(|error| format!("the descendant should have recorded its pid: {error}"))?;
-    let _ = Command::new("kill")
+        .expect("the pid file name is UTF-8");
+    let dir = Dir::open_ambient_dir(root, ambient_authority()).expect("open the scratch directory");
+    dir.read_to_string(name)
+        .expect("the child recorded its pid")
+}
+
+/// Kills the process whose id `path` holds, so a test leaves nothing behind.
+fn kill_recorded_process(path: &std::path::Path) {
+    let pid = read_pid_file(path);
+    let _kill_result = Command::new("kill")
         .args(["-9", pid.trim()])
         .stderr(Stdio::null())
         .status();
-    Ok(())
 }
 
 #[test]
