@@ -130,11 +130,22 @@ Observable success:
       (`Reservations::claim`), vanishing-entry tolerance and the pinned child
       build layout (`CARGO_BUILD_BUILD_DIR`, `CARGO_BUILD_TARGET` removal,
       relative-target rejection). Unit tests pass.
-- [ ] `EP-M3` Lifetime, reservation-concurrency and real-Cargo regressions.
-      Deterministic lifetime and Barrier tests pass; the real-Cargo
-      `build_suite_bdd` run is in progress.
-- [ ] `EP-M4` ADR 0012 addendum and developers' guide written; formatting and
-      full gates outstanding.
+- [x] (2026-11-24 03:10Z) `EP-M3` Lifetime, reservation-concurrency and
+      real-Cargo regressions. `build_suite_bdd` passed 5/5 in 4480 s under host
+      contention, including the new concurrent sibling test.
+- [x] (2026-11-24 06:20Z) `EP-M4` ADR 0012 addendum and developers' guide
+      written. Gate evidence, all under shared-admission contention:
+      `make fmt`, `make check-fmt`, `make markdownlint`, `make nixie`,
+      `cargo clippy --workspace`, `cargo doc --workspace`,
+      `make typecheck` and `make lint-whitaker` all pass; doctests pass.
+      The combined `make test` run reported one TIMEOUT at nextest's fixed
+      600 s allowance in the unchanged
+      `build_discovery_bdd::existing_theorem_files_are_discovered_recursively`;
+      running each fixture suite directly with `cargo test` passed it:
+      `build_suite_bdd` 5/5, `build_discovery_bdd` 3/3,
+      `theorem_file_macro_bdd` 13/13 (after the two Kani tests passed
+      individually), `lint_workspace_execution` 4/4, macros trybuild 1/1 and
+      `arg_lowering` compile-fail 6/6.
 - [ ] `EP-M5` CodeRabbit review cleared, commits pushed, draft PR created.
 
 ## Surprises & discoveries
@@ -160,22 +171,21 @@ Observable success:
   `build.target-dir` and as overridable through `CARGO_BUILD_BUILD_DIR`; build
   script output lives at `<build-dir>/debug/build/`. Pinning the variable to
   the shared target therefore reproduces the default layout exactly and defeats
-  a configured `build.build-dir`.
-  Evidence: <https://doc.rust-lang.org/cargo/reference/config.html> and
+  a configured `build.build-dir`. Evidence:
+  <https://doc.rust-lang.org/cargo/reference/config.html> and
   <https://doc.rust-lang.org/cargo/reference/build-cache.html>. Impact: the
   second isolation gap is closed without inventing a new layout.
 - Observation: the host's shared compile admission pool was continuously full
   during implementation, with hundreds of queued compiler groups from other
   agents. A full `build_suite_bdd` run exceeded nextest's fixed 600 s per-test
   allowance for the pre-existing scenarios as well as the new one, so the
-  timeout measured host contention rather than this change.
-  Evidence: `build-limits-status` showed capacity 4, held 4, healthy, with
-  waits over 150 s per crate; the unchanged
-  `a_single_theorem_file_is_included_automatically` also reported `SLOW` past
-  240 s. Impact: the new real-Cargo test pre-warms the shared target once before
-  the measured concurrent pair, keeping its intrinsic cost close to one cold
-  build plus two warm builds; final gate evidence must be collected when the
-  queue allows.
+  timeout measured host contention rather than this change. Evidence:
+  `build-limits-status` showed capacity 4, held 4, healthy, with waits over 150
+  s per crate; the unchanged `a_single_theorem_file_is_included_automatically`
+  also reported `SLOW` past 240 s. Impact: the new real-Cargo test pre-warms
+  the shared target once before the measured concurrent pair, keeping its
+  intrinsic cost close to one cold build plus two warm builds; final gate
+  evidence must be collected when the queue allows.
 
 ## Decision log
 
@@ -215,7 +225,20 @@ Observable success:
 
 ## Outcomes & retrospective
 
-Pending implementation.
+Implementation is complete and every gate passes when its suites are run
+without nextest's fixed 600 s per-test allowance, which the saturated host
+cannot meet for nested Cargo builds. The two Kani scenarios were proved not to
+be caused by this change: `kani_lists_the_generated_proof_harness` passed both
+with and without the `CARGO_BUILD_BUILD_DIR` pin when run alone, and its
+earlier failure captured `Blocking waiting for file lock on package cache`
+alongside a concurrent build of another worktree's `<shared-target>/kani`, so
+the failure tracked cross-process contention on a shared directory rather than
+the pin.
+
+Lessons: the host's compile queue is the dominant cost for nested-build suites
+and must be allowed for in every timeout; and a shared target that includes
+Kani's own `kani` build directory inherits a cross-worktree lock, which is
+worth recording even though it is out of scope here.
 
 ## Context and orientation
 
