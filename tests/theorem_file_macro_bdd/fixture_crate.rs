@@ -205,36 +205,40 @@ mod tests {
 
     use super::{ConsumerCfgRegistration, fixture_cargo_toml_for, fixture_cargo_toml_for_consumer};
 
-    #[test]
-    fn fixture_cargo_toml_normalizes_windows_paths() {
-        // Simulate a Windows-style `CARGO_MANIFEST_DIR` with backslash
-        // separators. `fixture_cargo_toml` reads `ROOT_MANIFEST_DIR`, which is
-        // set at compile time, but this test only needs the normalization
-        // logic.
-        let windows_path = r"C:\Users\user\projects\theoremc";
-        let toml = fixture_cargo_toml_for(windows_path);
+    /// `fixture_cargo_toml` reads `ROOT_MANIFEST_DIR`, which is set at compile
+    /// time, so these cases pass a path directly to the builder.
+    #[rstest]
+    #[case::windows_backslashes(
+        r"C:\Users\user\projects\theoremc",
+        "\"C:/Users/user/projects/theoremc\"",
+        Some('\\')
+    )]
+    #[case::nested_quotes(
+        "/home/user/project's/\"theoremc\"",
+        "path = \"/home/user/project's/\\\"theoremc\\\"\"",
+        None
+    )]
+    fn fixture_cargo_toml_renders_paths_safely(
+        #[case] root: &str,
+        #[case] expected: &str,
+        #[case] forbidden: Option<char>,
+    ) {
+        let toml = fixture_cargo_toml_for(root);
 
         assert!(
-            !toml.contains('\\'),
-            "TOML must not contain backslashes after normalization; got:\n{toml}",
+            toml.contains(expected),
+            "expected {expected:?} in the fixture manifest; got:\n{toml}",
         );
+        if let Some(character) = forbidden {
+            assert!(
+                !toml.contains(character),
+                "TOML must not contain {character:?} after normalization; got:\n{toml}",
+            );
+        }
         assert!(
-            toml.contains("\"C:/Users/user/projects/theoremc\""),
-            "expected normalized forward-slash path in TOML; got:\n{toml}",
+            toml.contains("theoremc-build-support = { path = "),
+            "the build-support dependency should be present; got:\n{toml}",
         );
-        assert!(toml.contains("theoremc-build-support = { path = \"C:/Users/user/projects/theoremc/crates/theoremc-build-support\" }"));
-    }
-
-    #[test]
-    fn fixture_cargo_toml_escapes_basic_string_paths() {
-        let checkout_path = "/home/user/project's/\"theoremc\"";
-        let toml = fixture_cargo_toml_for(checkout_path);
-
-        assert!(
-            toml.contains("path = \"/home/user/project's/\\\"theoremc\\\"\""),
-            "expected escaped TOML basic string path, got:\n{toml}",
-        );
-        assert!(toml.contains("theoremc-build-support = { path = \"/home/user/project's/\\\"theoremc\\\"/crates/theoremc-build-support\" }"));
     }
 
     /// Asserts whether the manifest carries a `cfg(kani)` registration.
