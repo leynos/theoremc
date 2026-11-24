@@ -7,8 +7,8 @@
 use super::environment::environment_keys;
 use super::workflow_contract_support::has_sequence_entry;
 use super::{
-    COVERAGE_VARIABLES, LINT_COMMAND, Line, WHITAKER_INSTALLER, Workflow, has_bypass_key,
-    invokes_aggregate, jobs, key_indent, run_command, steps, uses_reference,
+    COVERAGE_VARIABLES, LINT_COMMAND, Line, MAKEFLAGS_VARIABLES, WHITAKER_INSTALLER, Workflow,
+    has_bypass_key, invokes_aggregate, jobs, key_indent, run_command, steps, uses_reference,
 };
 
 /// Fails when `keys` assign a variable that would narrow the lint gate.
@@ -18,7 +18,9 @@ use super::{
 /// Returns the offending variable and the block that assigned it.
 fn reject_coverage_override(scope: &str, keys: &[&str]) -> Result<(), String> {
     keys.iter()
-        .find(|key| COVERAGE_VARIABLES.contains(key))
+        .find(|key| {
+            COVERAGE_VARIABLES.contains(key) || MAKEFLAGS_VARIABLES.contains(key)
+        })
         .map_or(Ok(()), |key| {
             Err(format!(
                 "{scope} must not set `{key}`, because it would redirect the lint stage away from the workspace"
@@ -331,6 +333,42 @@ mod reader_contracts {
                 "a bypass written as `{key}` must be rejected"
             );
         }
+    }
+
+    /// A leading assignment still reaches the aggregate checks.
+    #[test]
+    fn a_leading_assignment_is_read() {
+        let report = verify_lint_gate(&job_running("FOO=1 make lint"))
+            .expect_err("an assignment-prefixed aggregate must be rejected as inexact");
+        assert!(
+            report.contains("must run exactly"),
+            "the command must be read as the aggregate; found {report:?}"
+        );
+    }
+
+    /// `MAKEFLAGS` is an execution-control variable and is rejected.
+    #[test]
+    fn makeflags_is_rejected() {
+        let body = format!(
+            "{INSTALL}      - name: Lint\n        env:\n          MAKEFLAGS: -s\n        run: make lint\n"
+        );
+        assert!(
+            verify_lint_gate(&single_job(&body)).is_err(),
+            "MAKEFLAGS must be rejected like a coverage variable"
+        );
+    }
+
+    /// A whitespace-separated colon is still a bypass key.
+    #[test]
+    fn a_spaced_colon_is_read() {
+        let body =
+            format!("{INSTALL}      - name: Lint\n        if : false\n        run: make lint\n");
+        let report = verify_lint_gate(&single_job(&body))
+            .expect_err("a conditional lint step must be rejected");
+        assert!(
+            report.contains("conditional or non-fatal"),
+            "`if :` must be read as a bypass key; found {report:?}"
+        );
     }
 
     /// A line reader sees a continuation `run:` at the step's key indent.

@@ -127,7 +127,7 @@ fn record_entry(line: &str, lines: &[&str], index: usize, offences: &mut Vec<Str
 /// name and are removed before the key is compared with the policy.
 fn assignment_key(line: &str) -> Option<&str> {
     line.split_once('=')
-        .map(|(key, _)| key.trim().trim_matches(['"', '\'']))
+        .map(|(key, _)| key.trim().trim_matches(['"', '\'']).trim())
 }
 
 /// Verifies that `dylint.toml` declares no whole-crate exclusion.

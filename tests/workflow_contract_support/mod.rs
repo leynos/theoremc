@@ -273,6 +273,7 @@ fn owns_key(entry: &str, key: &str) -> bool {
         unquoted
             .strip_prefix(key)
             .and_then(|rest| rest.strip_prefix(quote))
+            .map(str::trim_start)
             .and_then(|rest| rest.strip_prefix(':'))
             .is_some_and(|rest| rest.is_empty() || rest.starts_with([' ', '\t']))
     })

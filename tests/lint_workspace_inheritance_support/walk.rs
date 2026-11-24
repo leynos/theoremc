@@ -7,29 +7,46 @@
 
 use super::Repository;
 
-/// How far the package walk descends below `crates` and `tools`.
+/// Directory names that hold a crate's own sources, not further packages.
 ///
-/// A workspace that nests packages deeper than this would not be reachable by
-/// a sane member pattern, and bounding the walk keeps a stray tree from
-/// stalling the contract test.
+/// A package's `src`, `tests`, `benches`, `examples`, and build output never
+/// contain a workspace member, so descending into them would only slow the
+/// walk and risk a depth error on an ordinary crate.
+const NON_PACKAGE_DIRECTORIES: [&str; 8] = [
+    "src",
+    "tests",
+    "benches",
+    "examples",
+    "target",
+    "node_modules",
+    ".git",
+    ".cargo",
+];
+
+/// How far the package walk descends below a member root.
+///
+/// A package nested deeper than this would be unusual, and the bound keeps a
+/// stray tree from stalling the contract. The caller reports a walk that
+/// reaches it, rather than silently returning a short inventory.
 const MAX_WALK_DEPTH: usize = 4;
 
-/// Returns every package directory the repository holds.
+/// Returns every package directory reachable from `roots`.
 ///
-/// A package directory holds a `Cargo.toml`. The workspace's members live
-/// under `crates/` and `tools/`, so both trees are walked; a literal member
-/// outside them is still read, because it needs no scan to be resolved. The
-/// walk descends through directories without a manifest, so a member pattern
-/// such as `crates/group/*` is reachable. A tree that cannot be listed
-/// contributes no packages, which the member checks then report rather than
-/// silently accepting.
+/// A package directory holds a `Cargo.toml`. The roots are the first segments
+/// of the `members` patterns, so a workspace that names `tools/*` or `libs/*`
+/// is scanned where its members actually live. A literal member outside every
+/// root is still read, because it needs no scan to be resolved.
+///
 /// # Errors
 ///
-/// Returns the reason when a tree cannot be listed, because a silent empty
+/// Returns the reason when a root cannot be listed, because a silent empty
 /// result would let every member check pass.
-pub(crate) fn package_directories(repository: &Repository) -> Result<Vec<String>, String> {
+pub(crate) fn package_directories(
+    repository: &Repository,
+    roots: &[String],
+) -> Result<Vec<String>, String> {
     let mut packages = Vec::new();
-    for root in ["crates", "tools"] {
+    for root in roots {
         collect_packages(repository, root, &mut packages, 0)?;
     }
     Ok(packages)
@@ -38,12 +55,12 @@ pub(crate) fn package_directories(repository: &Repository) -> Result<Vec<String>
 /// Walks `directory`, recording packages and descending through its children.
 ///
 /// The walk continues below a package, because Cargo's `members` may name a
-/// nested package and the parent's own manifest does not cover it. `depth`
-/// bounds the walk so a deep tree cannot stall the test.
+/// nested package and the parent's own manifest does not cover it.
 ///
 /// # Errors
 ///
-/// Returns the reason when a directory cannot be listed.
+/// Returns the reason when a directory cannot be listed, or when the walk
+/// reaches its depth limit.
 fn collect_packages(
     repository: &Repository,
     directory: &str,
@@ -56,6 +73,9 @@ fn collect_packages(
         ));
     }
     for child in repository.subdirectories(directory)? {
+        if is_crate_source(&child) {
+            continue;
+        }
         match repository.read(&format!("{child}/Cargo.toml")) {
             Ok(_) => packages.push(child.clone()),
             // A child without a manifest is a group directory, not an error.
@@ -65,4 +85,32 @@ fn collect_packages(
         collect_packages(repository, &child, packages, depth + 1)?;
     }
     Ok(())
+}
+
+/// Reports whether a path names a directory that holds crate sources.
+fn is_crate_source(path: &str) -> bool {
+    path.rsplit('/')
+        .next()
+        .is_some_and(|name| NON_PACKAGE_DIRECTORIES.contains(&name))
+}
+
+/// Returns the first path segment of each `members` pattern.
+///
+/// `crates/*` and `crates/group/*` both root at `crates`, so scanning the
+/// first segment covers every pattern below it. Duplicates are removed so a
+/// tree is walked once.
+pub(crate) fn member_roots(members: &[String]) -> Vec<String> {
+    let mut roots: Vec<String> = Vec::new();
+    for member in members {
+        let Some(root) = member.split('/').next() else {
+            continue;
+        };
+        if root.is_empty() || root.contains('*') {
+            continue;
+        }
+        if !roots.iter().any(|known| known == root) {
+            roots.push(root.to_owned());
+        }
+    }
+    roots
 }

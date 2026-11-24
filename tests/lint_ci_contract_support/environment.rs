@@ -27,8 +27,11 @@ pub(super) fn environment_keys<'a>(
             continue;
         }
         let trimmed = line.trimmed();
-        let entry = trimmed.strip_prefix("- ").unwrap_or(trimmed);
-        let Some(rest) = entry.strip_prefix("env:").map(str::trim) else {
+        let declared = trimmed
+            .strip_prefix("- ")
+            .unwrap_or(trimmed)
+            .trim_start_matches(['"', '\'']);
+        let Some(rest) = declared.strip_prefix("env:").map(str::trim) else {
             continue;
         };
         keys.extend(env_block_keys(lines, index, rest)?);

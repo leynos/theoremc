@@ -20,9 +20,9 @@
 mod lint_workspace_inheritance_support;
 
 use lint_workspace_inheritance_support::{
-    Repository, array_items, is_workspace_opt_in, member_manifest_path, package_directories,
-    resolved_members, undeclared_crates, unsupported_member_patterns, verify_member_manifest,
-    verify_root_manifest, workspace_members,
+    Repository, array_items, is_workspace_opt_in, member_manifest_path, member_roots,
+    package_directories, resolved_members, undeclared_crates, unsupported_member_patterns,
+    verify_member_manifest, verify_root_manifest, workspace_members,
 };
 
 /// Verifies the whole inheritance contract over the committed manifests.
@@ -41,7 +41,8 @@ fn every_workspace_package_inherits_the_workspace_lint_tables() {
         unsupported.is_empty(),
         "these member patterns are not Cargo's whole-segment globs, so this check cannot interpret them: {unsupported:?}"
     );
-    let packages = package_directories(&repository).unwrap_or_else(|error| panic!("{error}"));
+    let packages = package_directories(&repository, &member_roots(&members))
+        .unwrap_or_else(|error| panic!("{error}"));
     let undeclared = undeclared_crates(&packages, &members);
     assert!(
         undeclared.is_empty(),

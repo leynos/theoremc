@@ -10,7 +10,7 @@
 #[path = "walk.rs"]
 mod walk;
 
-pub(crate) use walk::package_directories;
+pub(crate) use walk::{member_roots, package_directories};
 
 use camino::Utf8Path;
 use cap_std::ambient_authority;
@@ -203,7 +203,13 @@ pub(crate) fn is_workspace_opt_in(body: &str) -> bool {
         .map(|line| {
             line.split_once('=').map_or_else(
                 || line.to_owned(),
-                |(key, value)| format!("{} = {}", key.trim(), value.trim()),
+                |(key, value)| {
+                    format!(
+                        "{} = {}",
+                        key.trim().trim_matches(['"', '\'']),
+                        value.trim()
+                    )
+                },
             )
         })
         .collect();
