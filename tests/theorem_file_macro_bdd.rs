@@ -194,15 +194,21 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
 ///
 /// `check` names the operation in the required-Kani diagnostic. The run closure
 /// only executes once the probe has succeeded, so its failures reach the caller
-/// unchanged.
+/// unchanged. The host's `THEOREMC_REQUIRE_KANI` value is read here, at the
+/// process boundary; `cargo_runner::run_kani_check` owns everything after it.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the CI proofs workflow and `make kani` export THEOREMC_REQUIRE_KANI to the test process, so the scenario reads the host's value at this boundary"
+)]
 fn kani_outcome<F>(check: &str, run: F) -> Result<KaniOutcome, String>
 where
     F: FnOnce() -> Result<String, String>,
 {
-    cargo_runner::classify_kani_run(
+    let require_kani = std::env::var_os(cargo_runner::REQUIRE_KANI_VARIABLE);
+    cargo_runner::run_kani_check(
         check,
         cargo_runner::kani_is_installed(),
-        cargo_runner::kani_is_required(),
+        require_kani.as_deref(),
         run,
     )
 }

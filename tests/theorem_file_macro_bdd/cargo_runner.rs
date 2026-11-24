@@ -121,28 +121,17 @@ pub(crate) fn kani_is_installed() -> bool {
         .is_ok_and(|o| o.status.success())
 }
 
+/// The name of the variable that makes a missing Kani a failure.
+pub(crate) const REQUIRE_KANI_VARIABLE: &str = "THEOREMC_REQUIRE_KANI";
+
 /// Maps the `THEOREMC_REQUIRE_KANI` value to the required-Kani policy.
 ///
 /// Only the exact value `1` requires Kani. The comparison is deliberate: an
 /// `is_some()` rule would turn any stray value, including `0` or `false`, into
 /// a required run, and treating "unset" as the required state would make every
-/// developer machine red. Taking the value as an argument keeps the mapping
-/// testable without touching the process environment.
+/// developer machine red.
 pub(crate) fn kani_required_from(value: Option<&std::ffi::OsStr>) -> bool {
     value.is_some_and(|declared| declared == "1")
-}
-
-/// Returns `true` when the run must fail rather than skip without Kani.
-///
-/// `make kani` and the proofs workflow set `THEOREMC_REQUIRE_KANI=1`, so a
-/// runner without a usable Kani is a red job instead of a silent pass. A
-/// developer without Kani leaves it unset and the Kani scenarios skip.
-#[expect(
-    clippy::disallowed_methods,
-    reason = "the CI proofs workflow and `make kani` export THEOREMC_REQUIRE_KANI to the test process, so the harness reads the host's value at this boundary"
-)]
-pub(crate) fn kani_is_required() -> bool {
-    kani_required_from(std::env::var_os("THEOREMC_REQUIRE_KANI").as_deref())
 }
 
 /// What the Kani scenarios should do with one probe-plus-run outcome.
@@ -195,6 +184,31 @@ where
     run().map(KaniOutcome::Ran)
 }
 
+/// Runs one Kani check exactly as the BDD scenarios do.
+///
+/// This is the whole gate the scenarios execute: it reads the availability
+/// probe and the raw `THEOREMC_REQUIRE_KANI` value, maps that value through
+/// [`kani_required_from`], and classifies the outcome. Taking both inputs as
+/// arguments means a test can drive the composition the scenarios rely on,
+/// without mutating the process environment, and would fail if the mapping
+/// were bypassed or replaced by an `is_some()` rule.
+///
+/// # Errors
+///
+/// Returns the required-Kani refusal when the probe failed and Kani is
+/// required, and the run's error unchanged when the probe succeeded.
+pub(crate) fn run_kani_check<F>(
+    check: &str,
+    is_installed: bool,
+    require_kani: Option<&std::ffi::OsStr>,
+    run: F,
+) -> Result<KaniOutcome, String>
+where
+    F: FnOnce() -> Result<String, String>,
+{
+    classify_kani_run(check, is_installed, kani_required_from(require_kani), run)
+}
+
 fn command_result(
     subcommand: CargoSubcommand,
     output: &std::process::Output,
@@ -224,15 +238,17 @@ mod tests {
 
     use rstest::rstest;
 
-    use super::{KaniOutcome, classify_kani_run, kani_required_from};
+    use super::{KaniOutcome, classify_kani_run, run_kani_check};
 
     /// The loader failure observed when Kani's toolchain cannot start.
     const LOADER_ERROR: &str = "error while loading shared libraries: libLLVM.so";
 
     /// Only the exact value `1` requires Kani.
     ///
-    /// The other values are the ones an `is_some()` rule, or an "unset means
-    /// required" rule, would misclassify.
+    /// This drives the whole gate the scenarios use, so it fails if the
+    /// composition bypasses [`kani_required_from`] or replaces it with an
+    /// `is_some()` rule. Every case uses a failed availability probe, so the
+    /// run closure must never execute.
     #[rstest]
     #[case::unset(None, false)]
     #[case::one(Some("1"), true)]
@@ -240,17 +256,29 @@ mod tests {
     #[case::empty(Some(""), false)]
     #[case::true_word(Some("true"), false)]
     #[case::leading_zero(Some("01"), false)]
-    fn kani_is_required_only_for_the_exact_value_one(
+    fn only_the_exact_value_one_makes_the_failed_probe_fatal(
         #[case] value: Option<&str>,
-        #[case] expected: bool,
+        #[case] expected_failure: bool,
     ) {
         let os_value = value.map(OsStr::new);
 
-        assert_eq!(
-            kani_required_from(os_value),
-            expected,
-            "THEOREMC_REQUIRE_KANI={value:?} should map to {expected}"
-        );
+        let outcome = run_kani_check("listing", false, os_value, run_must_not_happen);
+
+        if expected_failure {
+            let error = outcome.expect_err("THEOREMC_REQUIRE_KANI=1 must fail a failed probe");
+            assert!(
+                error.contains("THEOREMC_REQUIRE_KANI=1"),
+                "the failure should name the requirement, got: {error}"
+            );
+        } else {
+            assert_eq!(
+                outcome,
+                Ok(KaniOutcome::Skipped(
+                    "the cargo kani --version probe failed".to_owned()
+                )),
+                "THEOREMC_REQUIRE_KANI={value:?} should leave Kani optional"
+            );
+        }
     }
 
     /// Proves the probe gate by failing the test when the run closure executes.
