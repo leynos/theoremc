@@ -29,9 +29,9 @@ pub struct LockPackage<'a> {
 pub fn lock_packages(lock: &str) -> Result<Vec<LockPackage<'_>>, String> {
     let mut packages = Vec::new();
     let mut entry: Option<Entry<'_>> = None;
-    for line in lock.lines() {
-        let line = line.trim();
-        if line == "[[package]]" {
+    for raw in lock.lines() {
+        let trimmed = raw.trim();
+        if trimmed == "[[package]]" {
             if let Some(complete) = entry.take() {
                 packages.push(complete.finish()?);
             }
@@ -39,7 +39,7 @@ pub fn lock_packages(lock: &str) -> Result<Vec<LockPackage<'_>>, String> {
             continue;
         }
         if let Some(open) = entry.as_mut() {
-            open.read(line);
+            open.read(trimmed);
         }
     }
     if let Some(complete) = entry {

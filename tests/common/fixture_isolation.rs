@@ -6,6 +6,7 @@
 //! the target directory, the Cargo home, the package name and the lock a
 //! fixture starts from; `fixture_crate` owns everything else.
 
+use std::fmt::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -115,8 +116,29 @@ pub fn seeded_lock(lock: FixtureLock, package_name: &str) -> Result<String, Stri
 /// when the only candidate records a source.
 fn with_renamed_root(lock: &str, root: &str, name: &str) -> Result<String, String> {
     let lines: Vec<&str> = lock.lines().collect();
-    let mut root_line = None;
-    for (start, end) in package_blocks(&lines) {
+    let target = root_name_line(&lines, root)?;
+    let mut rendered = String::with_capacity(lock.len());
+    for (index, line) in lines.iter().enumerate() {
+        match index {
+            _ if index == target => {
+                write!(rendered, "name = \"{name}\"")
+                    .map_err(|error| format!("rendering the renamed root: {error}"))?;
+            }
+            _ => rendered.push_str(line),
+        }
+        rendered.push('\n');
+    }
+    Ok(rendered)
+}
+
+/// Returns the line index of the source-less entry naming `root`.
+///
+/// # Errors
+///
+/// Returns an error when no entry names `root`, or when more than one does.
+fn root_name_line(lines: &[&str], root: &str) -> Result<usize, String> {
+    let mut found = None;
+    for (start, end) in package_blocks(lines) {
         let block = lines
             .get(start..end)
             .ok_or_else(|| format!("fixture lock block {start}..{end} is out of range"))?;
@@ -132,25 +154,14 @@ fn with_renamed_root(lock: &str, root: &str, name: &str) -> Result<String, Strin
         else {
             continue;
         };
-        if root_line.replace(start + offset).is_some() {
+        if found.is_some() {
             return Err(format!(
                 "fixture lock names {root:?} as a root package more than once"
             ));
         }
+        found = Some(start + offset);
     }
-    let Some(root_line) = root_line else {
-        return Err(format!("fixture lock names no root package {root:?}"));
-    };
-    let mut rendered = String::with_capacity(lock.len());
-    for (index, line) in lines.iter().enumerate() {
-        if index == root_line {
-            rendered.push_str(&format!("name = \"{name}\""));
-        } else {
-            rendered.push_str(line);
-        }
-        rendered.push('\n');
-    }
-    Ok(rendered)
+    found.ok_or_else(|| format!("fixture lock names no root package {root:?}"))
 }
 
 /// Returns the `[[package]]` blocks of a lock as `[start, end)` line ranges.
