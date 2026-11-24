@@ -308,12 +308,24 @@ fn an_exported_fixture_home_wins() {
 /// exported, so the test mutates no process state.
 #[test]
 fn a_relative_fixture_home_is_resolved_to_an_absolute_path() -> Result<(), String> {
-    let home = super::prepared_cargo_home(Some("relative-fixture-home"))?;
-    let absolute = home.is_absolute();
-    let named = home.as_str().ends_with("relative-fixture-home");
-    std::fs::remove_dir_all(home.as_std_path()).map_err(|error| error.to_string())?;
+    // A unique directory in the working directory, so a relative name can be
+    // handed over without two runs sharing one path. Keeping the `TempDir` in
+    // scope removes the directory when the test ends.
+    let temp = tempfile::Builder::new()
+        .prefix("relative-fixture-home-")
+        .tempdir_in(".")
+        .map_err(|error| error.to_string())?;
+    let name = temp
+        .path()
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "temp dir name is not valid UTF-8".to_owned())?
+        .to_owned();
 
-    if absolute && named {
+    let home = super::prepared_cargo_home(Some(&name))?;
+    let expected_name = Utf8Path::new(&name);
+
+    if home.is_absolute() && home.file_name() == Some(expected_name.as_str()) {
         Ok(())
     } else {
         Err(format!(
@@ -327,9 +339,13 @@ fn a_relative_fixture_home_is_resolved_to_an_absolute_path() -> Result<(), Strin
 #[test]
 fn an_absolute_fixture_home_is_unchanged() -> Result<(), String> {
     let temp = tempfile::tempdir().map_err(|error| error.to_string())?;
-    let configured = Utf8Path::from_path(temp.path())
+    // Compare against the canonical spelling: the helper canonicalises, and a
+    // temporary root containing a symlink would otherwise compare unequal.
+    let root = Utf8Path::from_path(temp.path())
         .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
-        .join("fixture-home");
+        .canonicalize_utf8()
+        .map_err(|error| error.to_string())?;
+    let configured = root.join("fixture-home");
 
     let home = super::prepared_cargo_home(Some(configured.as_str()))?;
 
@@ -337,7 +353,7 @@ fn an_absolute_fixture_home_is_unchanged() -> Result<(), String> {
         Ok(())
     } else {
         Err(format!(
-            "an absolute configuration must survive unchanged, got {home}"
+            "an absolute configuration must survive unchanged, expected {configured}, got {home}"
         ))
     }
 }

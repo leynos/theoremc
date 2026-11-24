@@ -116,19 +116,26 @@ pub(crate) fn recover_mutex_guard(mutex: &Mutex<()>) -> MutexGuard<'_, ()> {
 /// because the `cargo` binary was found. The boolean is derived from the exit
 /// status alone, so no stderr parsing is required.
 ///
-/// The probe deliberately inherits the caller's environment and does not use
-/// the fixture Cargo home. Two measurements settle that. A version probe never
-/// opens the package cache — with the caller's lock held exclusively,
-/// `cargo kani --version` still returned in 165 ms — so it cannot contend for
-/// the lock the fixture builds avoid. And Cargo searches `$CARGO_HOME/bin`
-/// before `PATH` for an external subcommand, so pointing `CARGO_HOME` at the
-/// fixture home would hide a `cargo-kani` installed only in the caller's
-/// `$CARGO_HOME/bin` and make both Kani scenarios skip.
+/// The probe uses the fixture Cargo home, the same one the fixture's own
+/// `cargo kani` run uses, so both find an external subcommand by one rule.
+/// Cargo searches `$CARGO_HOME/bin` before `PATH`, so a probe inheriting the
+/// caller's home could succeed where the fixture run then fails: it would see
+/// a `cargo-kani` in the caller's `$CARGO_HOME/bin` that the fixture build,
+/// searching the fixture home and then `PATH`, cannot reach. A `cargo-kani`
+/// that is only in a `$CARGO_HOME/bin` absent from `PATH` is therefore not
+/// found by either, and the Kani scenarios skip together rather than one
+/// passing on another's behalf.
+///
+/// Using the fixture home costs nothing here: a version probe never opens the
+/// package cache, so it cannot contend for the lock the fixture builds avoid.
 pub(crate) fn kani_is_installed() -> bool {
-    Command::new("cargo")
-        .args(["kani", "--version"])
-        .output()
-        .is_ok_and(|output| output.status.success())
+    fixture_cargo_home().is_ok_and(|home| {
+        Command::new("cargo")
+            .args(["kani", "--version"])
+            .env("CARGO_HOME", home.as_str())
+            .output()
+            .is_ok_and(|output| output.status.success())
+    })
 }
 
 /// Returns `true` when the run must fail rather than skip without Kani.
