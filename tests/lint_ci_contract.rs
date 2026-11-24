@@ -18,36 +18,10 @@
 #[path = "lint_ci_contract_support/mod.rs"]
 mod lint_ci_contract_support;
 
-use lint_ci_contract_support::{CI, verify_lint_gate};
+use lint_ci_contract_support::{
+    CI, INSTALL_STEP, LINT_STEP, single_job, verify_lint_gate, workflow_with,
+};
 use rstest::rstest;
-
-/// A pinned Whitaker install step, as the synthetic jobs spell it.
-const INSTALL_STEP: &str = concat!(
-    "      - name: Install Whitaker\n",
-    "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
-    "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
-);
-
-/// The aggregate lint step, as the synthetic jobs spell it.
-const LINT_STEP: &str = "      - name: Lint\n        run: make lint\n";
-
-/// Wraps job bodies in the workflow skeleton the synthetic cases share.
-fn workflow_with(job_bodies: &[(&str, &str)]) -> String {
-    job_bodies
-        .iter()
-        .fold(String::from("jobs:\n"), |mut text, (name, body)| {
-            text.push_str("  ");
-            text.push_str(name);
-            text.push_str(":\n    runs-on: ubuntu-latest\n    steps:\n");
-            text.push_str(body);
-            text
-        })
-}
-
-/// A single-job workflow whose body is `body`.
-fn single_job(body: &str) -> String {
-    workflow_with(&[("build-test", body)])
-}
 
 /// Verifies that the committed workflow satisfies the whole contract.
 #[test]
@@ -180,6 +154,33 @@ fn ci_runs_the_aggregate_lint_with_a_pinned_installer() {
         "      - name: Lint\n        env: {\n",
         "          LINT_PACKAGES: \"--package theoremc\"\n        }\n",
         "        run: make lint\n",
+    )
+)]
+#[case::multiline_flow_env_closing_brace_on_entry(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        env: {\n",
+        "          LINT_PACKAGES: \"--package theoremc\" }\n",
+        "        run: make lint\n",
+    )
+)]
+#[case::flow_env_quoted_brace(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        env: { CARGO_FLAGS: \"a}b\", LINT_PACKAGES: x }\n",
+        "        run: make lint\n",
+    )
+)]
+#[case::make_two_goals(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        run: make clean lint LINT_PACKAGES=--package theoremc\n",
     )
 )]
 fn an_invalid_lint_job_is_rejected(#[case] body: &str) {

@@ -7,6 +7,11 @@
 //! The manifests are read as text, following `test_helpers::toml_section` and a
 //! line scan rather than adding a TOML parser dependency.
 
+#[path = "walk.rs"]
+mod walk;
+
+pub(crate) use walk::package_directories;
+
 use camino::Utf8Path;
 use cap_std::ambient_authority;
 use cap_std::fs_utf8::Dir;
@@ -16,13 +21,6 @@ pub(crate) const ROOT: &str = env!("CARGO_MANIFEST_DIR");
 
 /// The lint tables a member must inherit rather than define for itself.
 const LINT_TABLES: [&str; 3] = ["lints.clippy", "lints.rust", "lints.rustdoc"];
-
-/// How far the package walk descends below `crates` and `tools`.
-///
-/// A workspace that nests packages deeper than this would not be reachable by
-/// a sane member pattern, and bounding the walk keeps a stray tree from
-/// stalling the contract test.
-const MAX_WALK_DEPTH: usize = 4;
 
 /// The lint tables the root manifest must populate.
 const WORKSPACE_LINT_TABLES: [&str; 3] = [
@@ -179,7 +177,11 @@ impl Repository {
 /// Returns the reason when the manifest cannot be read or names no members.
 pub(crate) fn workspace_members(repository: &Repository) -> Result<Vec<String>, String> {
     let manifest = repository.read("Cargo.toml")?;
-    let members = array_items(&manifest, "members")
+    // `members` belongs to `[workspace]`; a same-named key elsewhere is a
+    // different declaration and must not be read as the member list.
+    let workspace = test_helpers::toml_section(&manifest, "workspace")
+        .ok_or_else(|| "the root Cargo.toml must declare a [workspace] table".to_owned())?;
+    let members = array_items(&workspace, "members")
         .ok_or_else(|| "the root Cargo.toml must declare a `members` array".to_owned())?;
     if members.is_empty() {
         return Err("the root Cargo.toml must list at least one workspace member".to_owned());
@@ -315,45 +317,6 @@ fn segments_match(pattern: &str, path: &str) -> bool {
             .iter()
             .zip(&actual)
             .all(|(segment, part)| segment_glob_matches(segment, part))
-}
-
-/// Returns every package directory the repository holds.
-///
-/// A package directory holds a `Cargo.toml`. The workspace's members live
-/// under `crates/` and `tools/`, so both trees are walked; a literal member
-/// outside them is still read, because it needs no scan to be resolved. The
-/// walk descends through directories without a manifest, so a member pattern
-/// such as `crates/group/*` is reachable. A tree that cannot be listed
-/// contributes no packages, which the member checks then report rather than
-/// silently accepting.
-pub(crate) fn package_directories(repository: &Repository) -> Vec<String> {
-    let mut packages = Vec::new();
-    for root in ["crates", "tools"] {
-        collect_packages(repository, root, &mut packages, 0);
-    }
-    packages
-}
-
-/// Walks `directory`, recording packages and descending through groups.
-///
-/// `depth` bounds the walk so a deep tree cannot stall the test, and a package
-/// is not descended into because its own members are its business.
-fn collect_packages(
-    repository: &Repository,
-    directory: &str,
-    packages: &mut Vec<String>,
-    depth: usize,
-) {
-    if depth > MAX_WALK_DEPTH {
-        return;
-    }
-    for child in repository.subdirectories(directory).unwrap_or_default() {
-        if repository.read(&format!("{child}/Cargo.toml")).is_ok() {
-            packages.push(child);
-        } else {
-            collect_packages(repository, &child, packages, depth + 1);
-        }
-    }
 }
 
 /// Returns the package directories the workspace does not list.

@@ -60,23 +60,25 @@ fn unjustified_exclusions(document: &str) -> Vec<String> {
         let Some(code) = comment_free(line.trim()) else {
             continue;
         };
-        if inside_list && code.starts_with(']') {
-            inside_list = false;
+        if inside_list {
+            // A closing bracket may share the line with the final entry, so
+            // the entry is checked before the list closes.
+            let closing = code.find(']');
+            let entry = closing.map_or(code, |end| code.get(..end).unwrap_or_default());
+            record_entry(entry.trim(), &lines, index, &mut offences);
+            if closing.is_some() {
+                inside_list = false;
+            }
             continue;
         }
-        let value = if inside_list {
-            code
-        } else {
-            let Some(value) = excluded_paths_value(code) else {
-                continue;
-            };
-            if value.starts_with('[') && !value.contains(']') {
-                inside_list = true;
-                record_opening_entry(value, &lines, index, &mut offences);
-                continue;
-            }
-            value
+        let Some(value) = excluded_paths_value(code) else {
+            continue;
         };
+        if value.starts_with('[') && !value.contains(']') {
+            inside_list = true;
+            record_opening_entry(value, &lines, index, &mut offences);
+            continue;
+        }
         record_entry(value, &lines, index, &mut offences);
     }
     offences
@@ -178,6 +180,8 @@ fn an_unjustified_exclusion_is_rejected() {
         "\"excluded_paths\" = [\"crate::legacy_io\"]\n",
         "'excluded_paths' = ['crate::legacy_io']\n",
         "excluded_paths = [ # temporary [legacy]\n  \"crate::legacy_io\",\n]\n",
+        "excluded_paths = [\n  \"crate::legacy_io\"]\n",
+        "excluded_paths = [\n  # ok\n  \"crate::legacy_io\",\n  \"crate::other\"]\n",
     ] {
         assert!(
             !unjustified_exclusions(entry).is_empty(),

@@ -12,23 +12,28 @@ use super::Line;
 /// Both the mapping form and a one-line flow mapping are read. Only the
 /// block's own `env:` at `indent` counts, so a nested `env:` under `with:` in
 /// another step cannot be mistaken for the caller's environment.
-pub(super) fn environment_keys<'a>(lines: &[Line<'a>], indent: usize) -> Vec<&'a str> {
-    lines
-        .iter()
-        .enumerate()
-        .filter(|(_, line)| line.indent() == indent || line.indent() + 2 == indent)
-        .filter_map(|(index, line)| {
-            let trimmed = line.trimmed();
-            let entry = trimmed.strip_prefix("- ").unwrap_or(trimmed);
-            let rest = entry.strip_prefix("env:")?.trim();
-            Some((index, rest))
-        })
-        .flat_map(|(index, rest)| {
-            let mut keys = env_block_keys(lines, index, rest);
-            keys.extend(multiline_flow_keys(lines, index));
-            keys
-        })
-        .collect()
+/// # Errors
+///
+/// Returns the reason when an `env:` header uses a form the reader cannot
+/// interpret. Failing closed is the point: an unreadable mapping must not be
+/// treated as one without coverage variables.
+pub(super) fn environment_keys<'a>(
+    lines: &[Line<'a>],
+    indent: usize,
+) -> Result<Vec<&'a str>, String> {
+    let mut keys = Vec::new();
+    for (index, line) in lines.iter().enumerate() {
+        if line.indent() != indent && line.indent() + 2 != indent {
+            continue;
+        }
+        let trimmed = line.trimmed();
+        let entry = trimmed.strip_prefix("- ").unwrap_or(trimmed);
+        let Some(rest) = entry.strip_prefix("env:").map(str::trim) else {
+            continue;
+        };
+        keys.extend(env_block_keys(lines, index, rest)?);
+    }
+    Ok(keys)
 }
 
 /// Returns the keys a single `env:` entry declares.
@@ -36,19 +41,32 @@ pub(super) fn environment_keys<'a>(lines: &[Line<'a>], indent: usize) -> Vec<&'a
 /// A flow mapping is read from the `env:` line itself; a block mapping is read
 /// from the entries that follow, down to the first content line at or above
 /// the key's own indentation. Blank lines and comments never end the block.
-fn env_block_keys<'a>(lines: &[Line<'a>], env_index: usize, rest: &'a str) -> Vec<&'a str> {
+/// # Errors
+///
+/// Returns the reason when the header is neither a complete flow mapping, the
+/// opening brace of one, nor an empty header introducing a block mapping.
+fn env_block_keys<'a>(
+    lines: &[Line<'a>],
+    env_index: usize,
+    rest: &'a str,
+) -> Result<Vec<&'a str>, String> {
     if let Some(flow) = flow_mapping(rest) {
-        return flow.split(',').filter_map(entry_key).collect();
+        return Ok(flow.split(',').filter_map(entry_key).collect());
+    }
+    if rest.trim_start().starts_with('{') {
+        return multiline_flow_keys(lines, env_index);
     }
     let header = rest
         .split_once('#')
         .map_or(rest, |(before, _)| before)
         .trim();
     if !header.is_empty() {
-        return Vec::new();
+        return Err(format!(
+            "an `env:` header here is `{rest}`, which this contract cannot read; use a block or flow mapping"
+        ));
     }
     let Some(env_line) = lines.get(env_index) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
     let block: Vec<&Line<'a>> = lines
         .iter()
@@ -63,13 +81,13 @@ fn env_block_keys<'a>(lines: &[Line<'a>], env_index: usize, rest: &'a str) -> Ve
         })
         .collect();
     let Some(entry_indent) = block.first().map(|line| line.indent()) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
-    block
+    Ok(block
         .iter()
         .filter(|line| line.indent() == entry_indent)
         .filter_map(|line| entry_key(line.trimmed()))
-        .collect()
+        .collect())
 }
 
 /// Returns the body of a flow mapping, ignoring a trailing comment.
@@ -78,7 +96,24 @@ fn env_block_keys<'a>(lines: &[Line<'a>], env_index: usize, rest: &'a str) -> Ve
 /// trailing whitespace.
 fn flow_mapping(rest: &str) -> Option<&str> {
     let body = rest.trim().strip_prefix('{')?;
-    body.get(..body.find('}')?)
+    body.get(..closing_brace(body)?)
+}
+
+/// Returns the index of the brace closing a flow mapping.
+///
+/// A `}` inside a quoted value does not close the mapping, so the scan tracks
+/// the open quote before accepting a brace.
+fn closing_brace(body: &str) -> Option<usize> {
+    let mut quote = None;
+    for (index, character) in body.char_indices() {
+        match character {
+            '"' | '\'' if quote == Some(character) => quote = None,
+            '"' | '\'' if quote.is_none() => quote = Some(character),
+            '}' if quote.is_none() => return Some(index),
+            _ => {}
+        }
+    }
+    None
 }
 
 /// Returns the keys of a flow mapping that spans several lines.
@@ -86,22 +121,34 @@ fn flow_mapping(rest: &str) -> Option<&str> {
 /// The opening brace is followed by the entries and a closing brace on a later
 /// line, so the span is gathered before the entries are read. A brace inside a
 /// quoted value does not close the mapping.
-fn multiline_flow_keys<'a>(lines: &[Line<'a>], env_index: usize) -> Vec<&'a str> {
+fn multiline_flow_keys<'a>(lines: &[Line<'a>], env_index: usize) -> Result<Vec<&'a str>, String> {
     let Some(header) = lines.get(env_index) else {
-        return Vec::new();
+        return Ok(Vec::new());
     };
-    let Some(declared) = header.trimmed().strip_prefix("env:") else {
-        return Vec::new();
+    let trimmed = header.trimmed();
+    let after_key = trimmed
+        .strip_prefix("- ")
+        .unwrap_or(trimmed)
+        .strip_prefix("env:")
+        .map(str::trim);
+    let Some(body) = after_key.and_then(|value| value.strip_prefix('{')) else {
+        return Ok(Vec::new());
     };
-    if declared.trim() != "{" {
-        return Vec::new();
+    // A mapping that closes on its own line is already read by the flow path.
+    if closing_brace(body).is_some() {
+        return Ok(Vec::new());
     }
-    lines
-        .iter()
-        .skip(env_index + 1)
-        .take_while(|line| !line.trimmed().starts_with('}'))
-        .filter_map(|line| entry_key(line.trimmed()))
-        .collect()
+    let mut keys: Vec<&'a str> = body.split(',').filter_map(entry_key).collect();
+    for line in lines.iter().skip(env_index + 1) {
+        let text = line.trimmed();
+        let closing = closing_brace(text);
+        let segment = closing.map_or(text, |end| text.get(..end).unwrap_or_default());
+        keys.extend(segment.split(',').filter_map(entry_key));
+        if closing.is_some() {
+            return Ok(keys);
+        }
+    }
+    Err("an `env:` flow mapping is not closed, so this contract cannot read it".to_owned())
 }
 
 /// Splits a `NAME: value` entry into its key, without quotes.

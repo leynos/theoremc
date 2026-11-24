@@ -36,7 +36,7 @@ fn every_workspace_package_inherits_the_workspace_lint_tables() {
         panic!("the root manifest must hold the lint inheritance contract: {report}");
     }
     let members = workspace_members(&repository).expect("the workspace members must be readable");
-    let packages = package_directories(&repository);
+    let packages = package_directories(&repository).unwrap_or_else(|error| panic!("{error}"));
     let undeclared = undeclared_crates(&packages, &members);
     assert!(
         undeclared.is_empty(),
