@@ -9,10 +9,7 @@ use filetime::FileTime;
 
 use super::BuildLog;
 use super::build_support_manifest::fixture_build_support_cargo_toml;
-use super::fixture_build::{
-    self, BARRIER_BUILD_SCRIPT, BARRIER_READY_FILE, BARRIER_RELEASE_FILE, FixtureIdentity,
-    RunningBuild,
-};
+use super::fixture_build::{self, FixtureIdentity, RunningBuild};
 use super::fixture_isolation::{
     Reservations, WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, unique_suffix,
     with_unique_package_name,
@@ -122,41 +119,6 @@ impl FixtureCrate {
         fixture.write_scaffold(&manifest, lib_rs, BUILD_SCRIPT_SOURCE)?;
 
         Ok(fixture)
-    }
-
-    /// Creates a fixture whose build script blocks until the test releases it.
-    ///
-    /// Use [`Self::spawn_cargo_build`] to start the build, wait for
-    /// [`has_file`](Self::has_file) to report `BARRIER_READY_FILE`, then act and
-    /// write `BARRIER_RELEASE_FILE` so the build can finish. The build also
-    /// carries an internal deadline, so a test that never releases it fails
-    /// rather than leaking a process.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::new`].
-    pub fn with_release_barrier(cargo_toml: &str, lib_rs: &str) -> Result<Self, String> {
-        let fixture = Self::new(cargo_toml, lib_rs)?;
-        fixture.write(Utf8Path::new("build.rs"), BARRIER_BUILD_SCRIPT)?;
-        Ok(fixture)
-    }
-
-    /// Runs the barrier build once with its release already present.
-    ///
-    /// This compiles the barrier script and warms the fixture, so the measured
-    /// build reuses both and reaches the barrier without paying to compile it.
-    /// The release and readiness files are removed afterwards, and the caller
-    /// must touch a `rerun-if-changed` input so Cargo runs the script again.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::cargo_build`], [`Self::write`] and
-    /// [`Self::remove_file`].
-    pub fn precompile_barrier_script(&self) -> Result<(), String> {
-        self.write(Utf8Path::new(BARRIER_RELEASE_FILE), "warm")?;
-        self.cargo_build()?;
-        self.remove_file(Utf8Path::new(BARRIER_RELEASE_FILE))?;
-        self.remove_file(Utf8Path::new(BARRIER_READY_FILE))
     }
 
     /// Writes the manifest, lock, build script, library source and the

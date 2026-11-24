@@ -6,6 +6,7 @@ mod build_log;
 mod build_support_fixture;
 mod build_support_manifest;
 mod command_run;
+mod fixture_barrier;
 mod fixture_build;
 mod fixture_crate;
 mod fixture_isolation;
@@ -16,9 +17,11 @@ mod suite_layout;
 
 pub use build_log::{BuildLog, toml_section};
 pub use build_support_fixture::build_support_fixture_manifest;
-pub use fixture_build::{
-    BARRIER_BUILD_SCRIPT, BARRIER_READY_FILE, BARRIER_RELEASE_FILE, RunningBuild,
+pub use fixture_barrier::{
+    BARRIER_BUILD_SCRIPT, BARRIER_READY_FILE, BARRIER_RELEASE_FILE, await_path, install_barrier,
+    precompile_barrier,
 };
+pub use fixture_build::RunningBuild;
 pub use fixture_crate::{
     BUILD_DISCOVERY_SOURCE, BUILD_SCRIPT_SOURCE, BUILD_SUITE_SOURCE, FixtureCrate, TRIVIAL_THEOREM,
 };

@@ -6,8 +6,8 @@
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
 use test_helpers::{
-    BARRIER_READY_FILE, BARRIER_RELEASE_FILE, FixtureCrate, TRIVIAL_THEOREM,
-    build_support_fixture_manifest,
+    BARRIER_READY_FILE, BARRIER_RELEASE_FILE, FixtureCrate, TRIVIAL_THEOREM, await_path,
+    build_support_fixture_manifest, install_barrier, precompile_barrier,
 };
 
 /// Fixture lib.rs that includes the generated suite wiring.
@@ -198,17 +198,12 @@ fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(),
 /// finish until the test releases it. That is stronger than polling process
 /// state, where the child may exit immediately after any observation.
 fn require_barrier_ready(builder: &FixtureCrate) -> Result<(), String> {
-    let ready = Utf8Path::new(BARRIER_READY_FILE);
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
-    while std::time::Instant::now() < deadline {
-        if builder.has_file(ready) {
-            return Ok(());
-        }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-    Err(format!(
-        "the builder build never created {ready}, so the test could not establish the overlap",
-    ))
+    await_path(
+        builder,
+        Utf8Path::new(BARRIER_READY_FILE),
+        std::time::Duration::from_secs(120),
+        std::time::Duration::from_millis(50),
+    )
 }
 
 /// A sibling build and clean-up must not disturb another fixture's suite.
@@ -230,10 +225,11 @@ fn a_sibling_build_and_clean_up_do_not_disturb_another_fixtures_suite() -> Resul
     // The builder's build script signals readiness and then blocks. Dropping the
     // sibling after that signal means the clean-up provably runs while the build
     // is in progress, not merely observed to be so.
-    let builder = FixtureCrate::with_release_barrier(
+    let builder = FixtureCrate::new(
         &build_support_fixture_manifest("build_suite_fixture"),
         FIXTURE_LIB_RS,
     )?;
+    install_barrier(&builder)?;
     builder.write(
         Utf8Path::new("theorems/sibling_kept.theorem"),
         TRIVIAL_THEOREM,
@@ -244,7 +240,7 @@ fn a_sibling_build_and_clean_up_do_not_disturb_another_fixtures_suite() -> Resul
 
     // Compile the barrier script before measuring readiness, so the deadline
     // bounds the barrier wait rather than the compiler.
-    builder.precompile_barrier_script()?;
+    precompile_barrier(&builder)?;
     // The warm build left the crate fresh; touch a rerun-if-changed input so the
     // measured build runs the barrier script again.
     builder.write_with_advanced_mtime(
