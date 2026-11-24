@@ -10,6 +10,7 @@ use std::{
 };
 
 use cap_std::{ambient_authority, fs::Dir};
+use rstest::rstest;
 
 use super::{HostEnv, binary_name, cargo_binary, isolated_command, isolated_path, rustup_home};
 
@@ -52,60 +53,44 @@ fn has_env(command: &std::process::Command, name: &str, value: &OsString) -> boo
         .any(|(key, candidate)| key == expected && candidate == Some(value.as_os_str()))
 }
 
-#[test]
-fn rustup_home_prefers_an_explicit_value() {
-    let host = fully_populated_host();
+/// Verifies the `RUSTUP_HOME` resolution order.
+///
+/// An explicit value wins; otherwise the home directory is turned into the
+/// conventional `.rustup` path, with `USERPROFILE` as the Windows fallback.
+/// Every case supplies its values directly, so no case reads the process
+/// environment.
+#[rstest]
+#[case::explicit_value(
+    Some(os("/explicit/rustup")),
+    Some(os("/home/person")),
+    Some(os("C:\\Users\\P")),
+    Some(os("/explicit/rustup"))
+)]
+#[case::home_directory(
+    None,
+    Some(os("/home/person")),
+    Some(os("C:\\Users\\P")),
+    Some(PathBuf::from("/home/person").join(".rustup").into_os_string()),
+)]
+#[case::windows_profile(
+    None,
+    None,
+    Some(os("C:\\Users\\P")),
+    Some(PathBuf::from("C:\\Users\\P").join(".rustup").into_os_string()),
+)]
+#[case::nothing_set(None, None, None, None)]
+fn rustup_home_follows_the_documented_fallback_order(
+    #[case] rustup_home_value: Option<OsString>,
+    #[case] home: Option<OsString>,
+    #[case] user_profile: Option<OsString>,
+    #[case] expected: Option<OsString>,
+) {
+    let host = HostEnv::from_parts(Some(os("/bin")), rustup_home_value, home, user_profile);
 
     assert_eq!(
         rustup_home(&host),
-        Some(os("/explicit/rustup")),
-        "an explicit RUSTUP_HOME must win over the home directory"
-    );
-}
-
-#[test]
-fn rustup_home_falls_back_to_the_home_directory() {
-    let host = HostEnv::from_parts(
-        Some(os("/bin")),
-        None,
-        Some(os("/home/person")),
-        Some(os("C:\\Users\\P")),
-    );
-
-    assert_eq!(
-        rustup_home(&host),
-        Some(
-            PathBuf::from("/home/person")
-                .join(".rustup")
-                .into_os_string()
-        ),
-        "HOME must be used when RUSTUP_HOME is absent"
-    );
-}
-
-#[test]
-fn rustup_home_falls_back_to_the_windows_profile() {
-    let host = HostEnv::from_parts(Some(os("/bin")), None, None, Some(os("C:\\Users\\P")));
-
-    assert_eq!(
-        rustup_home(&host),
-        Some(
-            PathBuf::from("C:\\Users\\P")
-                .join(".rustup")
-                .into_os_string()
-        ),
-        "USERPROFILE must be used when RUSTUP_HOME and HOME are absent"
-    );
-}
-
-#[test]
-fn rustup_home_is_absent_when_nothing_is_set() {
-    let host = HostEnv::from_parts(Some(os("/bin")), None, None, None);
-
-    assert_eq!(
-        rustup_home(&host),
-        None,
-        "no home value means no RUSTUP_HOME is exported to the child"
+        expected,
+        "the resolved RUSTUP_HOME must follow the documented fallback order"
     );
 }
 
