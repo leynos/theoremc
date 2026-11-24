@@ -139,21 +139,29 @@ The ExecPlan file itself is excluded from every size count.
   `panic_in_result_fn` in the entry-point tests.
 - [x] (2026-11-24) Rebased onto `origin/main` `32ab0d9`, which bumped
   `ortho_config` and `cargo-orthohelp` to 0.11.0 and **trybuild** to 1.0.125.
-  trybuild 1.0.125 keeps the `<target>/tests/trybuild/<crate>/` project
-  layout, so the metadata-resolved staging is unchanged. The macros suite
-  re-ran green on 1.0.125 (9/9), including the eight new staging tests.
+  trybuild 1.0.125 keeps the `<target>/tests/trybuild/<crate>/` project layout,
+  so the metadata-resolved staging is unchanged. The macros suite re-ran green
+  on 1.0.125 (9/9), including the eight new staging tests.
 - [ ] `make test`: contention-limited on this host. The stock run reported
   1018 of 1019 tests run, with one fixture-crate BDD test
   (`existing_theorem_files_are_discovered_recursively`) terminated at nextest's
   exact 600 s ceiling while the shared compile queue held more than 400
   requests. Re-run with only that ceiling raised, all three cases in the binary
   passed (1506 s, 572 s, 614 s), and a full-suite re-run with the same raised
-  ceiling reached 1037 of 1053 tests with **zero failures** before the harness's
-  own two-hour cap. The remaining tests are the macro BDD scenarios, which are
-  being re-run in isolation. `.config/nextest.toml` is untouched; the stock gate
-  needs a quieter host to finish, not a code change.
-- [ ] CodeRabbit review at each major milestone; concerns cleared.
-- [ ] Push and open the draft PR.
+  ceiling reached 1037 of 1053 tests with **zero failures** before the
+  harness's own two-hour cap. The remaining tests are the macro BDD scenarios,
+  which are being re-run in isolation. `.config/nextest.toml` is untouched; the
+  stock gate needs a quieter host to finish, not a code change.
+- [x] (2026-11-24) CodeRabbit review: first pass found four minor issues
+  (Windows path separators in two tests, a missing target-directory create in
+  staging, and inaccurate acceptance greps in this plan); all four were fixed
+  and their focused tests pass. A second pass found the missing
+  `# Parameters`/`# Returns` sections; those were added and rustdoc with
+  `-D warnings` passes.
+- [x] (2026-11-24) Branch pushed and draft PR
+  [#285](https://github.com/leynos/theoremc/pull/285) opened against `main`,
+  tracking
+  `origin/issue-101-replace-ambient-process-environment-access-and-mutation-with-injected-seams`.
 
 ## Surprises & discoveries
 
@@ -550,10 +558,10 @@ Capture long gate output with `tee` under `/tmp` and review it afterwards.
 - `tests/lint_workspace_execution.rs` proves a direct `std::env::var` fails
   under the copied `clippy.toml` and a reasoned `#[expect]` passes.
 - `make lint` (and therefore CI's `make lint`) is the acceptance check for the
-  prohibition. `clippy::disallowed_methods` is denied workspace-wide against the
-  six configured paths, so a new direct read outside an approved root fails the
-  gate, and a stale `#[expect]` fails it too. A text search is not an acceptance
-  check here: the forbidden paths also appear as string literals in
+  prohibition. `clippy::disallowed_methods` is denied workspace-wide against
+  the six configured paths, so a new direct read outside an approved root fails
+  the gate, and a stale `#[expect]` fails it too. A text search is not an
+  acceptance check here: the forbidden paths also appear as string literals in
   `tests/lint_environment_contract.rs`, and the generated-source strings in
   `tests/lint_workspace_execution.rs`, so a grep would report those and would
   also conflate `env::var` with `env::var_os`.
