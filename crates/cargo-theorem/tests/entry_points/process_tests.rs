@@ -191,7 +191,7 @@ fn cargo_binary_is_found_in_the_first_directory_that_holds_one()
     capability.create_dir_all("with-cargo")?;
     let executable = binary_name("cargo");
     let executable_name = executable.to_string_lossy();
-    capability.write(&format!("with-cargo/{executable_name}"), b"#!/bin/sh\n")?;
+    capability.write(format!("with-cargo/{executable_name}"), b"#!/bin/sh\n")?;
     let host = HostEnv::from_parts(
         Some(std::env::join_paths([&empty, &with_cargo])?),
         None,
