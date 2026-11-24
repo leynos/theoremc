@@ -142,12 +142,16 @@ The ExecPlan file itself is excluded from every size count.
   trybuild 1.0.125 keeps the `<target>/tests/trybuild/<crate>/` project
   layout, so the metadata-resolved staging is unchanged. The macros suite
   re-ran green on 1.0.125 (9/9), including the eight new staging tests.
-- [ ] `make test`: 1018 of 1019 tests pass. One fixture-crate BDD test
-  (`existing_theorem_files_are_discovered_recursively`) hit nextest's timed-out
-  ceiling at exactly 600 s under a shared compile queue more than 400 requests
-  deep. Re-run with a raised ceiling, all three cases in that binary passed
-  (1506 s, 572 s, 614 s), proving contention rather than a regression. A clean
-  `make test` run is outstanding and needs a quieter host.
+- [ ] `make test`: contention-limited on this host. The stock run reported
+  1018 of 1019 tests run, with one fixture-crate BDD test
+  (`existing_theorem_files_are_discovered_recursively`) terminated at nextest's
+  exact 600 s ceiling while the shared compile queue held more than 400
+  requests. Re-run with only that ceiling raised, all three cases in the binary
+  passed (1506 s, 572 s, 614 s), and a full-suite re-run with the same raised
+  ceiling reached 1037 of 1053 tests with **zero failures** before the harness's
+  own two-hour cap. The remaining tests are the macro BDD scenarios, which are
+  being re-run in isolation. `.config/nextest.toml` is untouched; the stock gate
+  needs a quieter host to finish, not a code change.
 - [ ] CodeRabbit review at each major milestone; concerns cleared.
 - [ ] Push and open the draft PR.
 
