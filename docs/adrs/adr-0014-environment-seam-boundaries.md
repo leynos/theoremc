@@ -16,9 +16,7 @@ the parent process environment.
 - Technical story: issue #101, replacing ambient process-environment access and
   mutation with injected seams
 - Related records: [ADR-0008](adr-0008-workspace-build-support-boundary.md),
-  [ADR-0009](adr-0009-orthoconfig-cli-configuration.md),
-  [ADR-0012](adr-0012-shared-warm-target-for-fixture-crates.md),
-  [ADR-0013](adr-0013-workspace-complete-lint-gate.md)
+  [ADR-0009](adr-0009-orthoconfig-cli-configuration.md), [ADR-0012](adr-0012-shared-warm-target-for-fixture-crates.md), [ADR-0013](adr-0013-workspace-complete-lint-gate.md)
 
 ## Context
 
@@ -36,8 +34,8 @@ earlier test helper `EnvGuard` in `crates/test-helpers` took a process-wide
 mutex, wrote `set_var`/`remove_var`, and restored the previous values from
 `Drop`. Under Rust 2024 those writes are `unsafe`, so the helper forced a
 crate-wide exception to `unsafe_code = "forbid"`, and the mutex only
-coordinated code that chose to use it. Any other test reading the same
-variable still raced.
+coordinated code that chose to use it. Any other test reading the same variable
+still raced.
 
 [ADR-0013](adr-0013-workspace-complete-lint-gate.md) made `make lint` cover
 every workspace package and feature set, which made a mechanical prohibition
@@ -81,12 +79,11 @@ The smallest seam that carries the input wins. In increasing order:
    optional base path. No trait, no closure, no ambient read downstream.
 
 2. **A narrow closure for one variable and one caller.** The proc-macro reads
-   `CARGO_MANIFEST_DIR` through
-   `manifest_dir_from_reader(|name| ...)`, which maps a
-   `Result<String, VarError>` to `Utf8PathBuf` or `MissingManifestDir`. The
-   composition root is one annotated function,
-   `manifest_dir_from_env`, that supplies `env::var`. A trait object here would
-   be more machinery than the single read supports.
+   `CARGO_MANIFEST_DIR` through `manifest_dir_from_reader(|name| ...)`, which
+   maps a `Result<String, VarError>` to `Utf8PathBuf` or `MissingManifestDir`.
+   The composition root is one annotated function, `manifest_dir_from_env`,
+   that supplies `env::var`. A trait object here would be more machinery than
+   the single read supports.
 
 3. **`mockable::Env` when a growing group of variables is shared.** The CLI
    already takes its environment through OrthoConfig's injected sources, and
@@ -98,8 +95,8 @@ The smallest seam that carries the input wins. In increasing order:
    needs a new one today; adding `Arc` without such a boundary is overhead.
 
 5. **`Command::env_clear` plus explicit `Command::env` values for subprocess
-   tests.** A child process has its own environment, so configuring it is not
-   a global mutation. The entry-point tests build every child from a captured
+   tests.** A child process has its own environment, so configuring it is not a
+   global mutation. The entry-point tests build every child from a captured
    `HostEnv` and never write the parent's variables or current directory.
 
 ### Approved composition roots
@@ -108,8 +105,8 @@ Exactly these sites perform a direct process-environment read, each with a
 reasoned `#[expect]`:
 
 - `BuildScriptContext::from_cargo_env` in
-  `crates/theoremc-build-support/src/build_script.rs`, for
-  `CARGO_MANIFEST_DIR` and `OUT_DIR`.
+  `crates/theoremc-build-support/src/build_script.rs`, for `CARGO_MANIFEST_DIR`
+  and `OUT_DIR`.
 - `manifest_dir_from_env` in `crates/theoremc-macros/src/query.rs`, for
   `CARGO_MANIFEST_DIR`.
 - `HostEnv::capture` in `crates/cargo-theorem/tests/entry_points/process.rs`,

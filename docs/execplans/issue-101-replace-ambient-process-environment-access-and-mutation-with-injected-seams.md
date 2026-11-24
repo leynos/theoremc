@@ -7,7 +7,8 @@ be kept up to date as work proceeds.
 
 Status: IN PROGRESS (execution authorised by the issue #101 task request)
 
-Branch: `issue-101-replace-ambient-process-environment-access-and-mutation-with-injected-seams`
+Branch:
+`issue-101-replace-ambient-process-environment-access-and-mutation-with-injected-seams`
 
 Roadmap item: none. Issue [#101](https://github.com/leynos/theoremc/issues/101)
 is the governing request; related work landed under #98 (lint baseline) and #99
@@ -16,26 +17,26 @@ is the governing request; related work landed under #98 (lint baseline) and #99
 ## Purpose / big picture
 
 TheoremC currently lets a handful of places read the process environment
-directly: the Cargo build script, the `theorem_file!` proc macro, and three test
-harnesses. Some of those reads are unavoidable — a build script can only learn
-the crate root from Cargo's environment — but the surrounding logic should not
-need to know that. Issue #101 asks for the same environment-boundary policy that
-`leynos/netsuke` adopted: capture the environment once at a narrow composition
-root, pass the resulting values into pure logic, and never mutate the parent test
-process to arrange a scenario.
+directly: the Cargo build script, the `theorem_file!` proc macro, and three
+test harnesses. Some of those reads are unavoidable — a build script can only
+learn the crate root from Cargo's environment — but the surrounding logic
+should not need to know that. Issue #101 asks for the same environment-boundary
+policy that `leynos/netsuke` adopted: capture the environment once at a narrow
+composition root, pass the resulting values into pure logic, and never mutate
+the parent test process to arrange a scenario.
 
 After the change a contributor can observe three things. First, `std::env::var`,
 `var_os`, `vars`, `vars_os`, `set_var` and `remove_var` are denied by Clippy
 everywhere, so a new ambient read fails `make lint` unless it carries a reasoned
 `#[expect]` at an approved boundary. Second, the build-script, proc-macro, and
-test-harness logic can be exercised from explicit values alone, so the tests run
-in parallel with no environment mutex and no serialized group. Third,
+test-harness logic can be exercised from explicit values alone, so the tests
+run in parallel with no environment mutex and no serialized group. Third,
 `unsafe_code = "forbid"` holds workswide with no crate-wide exception, because
 the unsafe `EnvGuard` helper is gone.
 
 The behaviour of theorem discovery, suite generation, macro expansion, fixture
-builds, and the CLI entry points is unchanged; only the seam through which those
-components receive their inputs changes.
+builds, and the CLI entry points is unchanged; only the seam through which
+those components receive their inputs changes.
 
 ## Constraints
 
@@ -51,8 +52,8 @@ components receive their inputs changes.
   intentionally missing `missing_theorem` fixture.
 - Preserve the observable behaviour of the Cargo rerun directives emitted by
   `build.rs`, including their order.
-- Do not retroactively edit completed ExecPlans, ADRs, or the `docs/ortho-config`
-  import.
+- Do not retroactively edit completed ExecPlans, ADRs, or the
+  `docs/ortho-config` import.
 - Documentation must follow the documentation style guide: en-GB-oxendict
   spelling, eightieth-column prose wrapping, dash bullets.
 - Every `assert!`, `assert_eq!`, and `assert_ne!` carries a diagnostic message.
@@ -86,10 +87,10 @@ The ExecPlan file itself is excluded from every size count.
 ## Risks
 
 - Risk: `cargo metadata` resolves a different target directory than the
-  trybuild child Cargo uses, so staged fixtures land nowhere the compiler looks.
-  Severity: medium Likelihood: low Mitigation: resolve metadata from the same
-  working directory with the inherited environment, and add a unit test over
-  stub metadata plus a staging-content test.
+  trybuild child Cargo uses, so staged fixtures land nowhere the compiler
+  looks. Severity: medium Likelihood: low Mitigation: resolve metadata from the
+  same working directory with the inherited environment, and add a unit test
+  over stub metadata plus a staging-content test.
 - Risk: the fixture target helper is shared by several BDD suites; an injected
   base that skips canonicalisation changes the paths recorded in build logs.
   Severity: medium Likelihood: low Mitigation: keep canonicalisation and the
@@ -119,8 +120,8 @@ The ExecPlan file itself is excluded from every size count.
   caller in `entry_points/agent_context.rs` was found by the workspace check
   and fixed.
 - [x] (2026-11-23 19:10Z) `EP-M3` Enforcement proof and documentation written:
-  `tests/lint_environment_contract.rs`, two Clippy execution cases,
-  ADR-0014, developers' guide, `AGENTS.md`, ADR-0012 addendum, indexes.
+  `tests/lint_environment_contract.rs`, two Clippy execution cases, ADR-0014,
+  developers' guide, `AGENTS.md`, ADR-0012 addendum, indexes.
 - [x] (2026-11-23 19:25Z) Focused tests: `theoremc-build-support` 38/38,
   `cargo-theorem --test entry_points` plus
   `theoremc --test lint_environment_contract` 23/23, and all six
@@ -137,26 +138,23 @@ The ExecPlan file itself is excluded from every size count.
 ## Surprises & discoveries
 
 - Observation: Issues #98 and #99 already landed most of the mechanical
-  groundwork before this branch existed.
-  Evidence: `clippy.toml` already lists the six Netsuke entries plus
-  `std::env::set_current_dir`; `[workspace.lints.clippy]` already denies
-  `disallowed_methods`; `[workspace.lints.rust]` already forbids `unsafe_code`;
+  groundwork before this branch existed. Evidence: `clippy.toml` already lists
+  the six Netsuke entries plus `std::env::set_current_dir`;
+  `[workspace.lints.clippy]` already denies `disallowed_methods`;
+  `[workspace.lints.rust]` already forbids `unsafe_code`;
   `crates/test-helpers/src/lib.rs` no longer defines `EnvGuard` or `ENV_LOCK`.
   Impact: the remaining work is the seam reshaping, the enforcement tests, and
   the documentation, not the lint adoption itself.
 
 - Observation: `docs/adrs/adr-0013-workspace-complete-lint-gate.md` already
   exists, so the next free ADR number is 0014, not 0013 as the coding plan
-  expected.
-  Evidence: `ls docs/adrs/`.
-  Impact: the new record is
+  expected. Evidence: `ls docs/adrs/`. Impact: the new record is
   `docs/adrs/adr-0014-environment-seam-boundaries.md`; the plan records the
   deviation rather than reusing a taken number.
 
 - Observation: trybuild 1.0.122 resolves its project directory from
   `cargo metadata`'s `target_directory`, at
-  `<target>/tests/trybuild/<crate-name>/`.
-  Evidence:
+  `<target>/tests/trybuild/<crate-name>/`. Evidence:
   `~/.cargo/registry/src/.../trybuild-1.0.122/src/run.rs` lines 112–168.
   Impact: staging fixtures under that same path from a metadata-resolved target
   matches what the compiler sees, which is the behaviour the ticket requested.
@@ -165,49 +163,47 @@ The ExecPlan file itself is excluded from every size count.
 
 - D1. Decision: keep the proc-macro's direct `CARGO_MANIFEST_DIR` read as a
   single closure-plus-reader seam (`manifest_dir_from_env` calling
-  `manifest_dir_from_reader(env::var)`), rather than introducing a shared trait.
-  Rationale: one variable, one caller, and the existing pure mapping is already
-  tested for `NotPresent`, `NotUnicode`, and a valid path. Netsuke's taxonomy
-  reserves `mockable::Env` for a growing group of variables shared by many
-  tests. Date/Author: 2026-11-23, implementing agent (pre-existing shape from
-  #234, retained).
+  `manifest_dir_from_reader(env::var)`), rather than introducing a shared
+  trait. Rationale: one variable, one caller, and the existing pure mapping is
+  already tested for `NotPresent`, `NotUnicode`, and a valid path. Netsuke's
+  taxonomy reserves `mockable::Env` for a growing group of variables shared by
+  many tests. Date/Author: 2026-11-23, implementing agent (pre-existing shape
+  from #234, retained).
 
 - D2. Decision: represent the build-script inputs as `BuildScriptContext` with
   explicit `manifest_dir` and `out_dir` fields, constructed either from Cargo's
   environment (`from_cargo_env`, the single annotated read) or from a lookup
-  closure (`from_lookup`, crate-private and test-only).
-  Rationale: it gives discovery and suite generation an explicit input
-  structure as the ticket requested without introducing a universal
-  environment service. Rejected alternative: keep the loose
-  `prepare_build_script_with_env` plus `prepare_build_script_at` pair, which
-  passes two bare paths and does not name the boundary. Date/Author: 2026-11-23,
-  implementing agent.
+  closure (`from_lookup`, crate-private and test-only). Rationale: it gives
+  discovery and suite generation an explicit input structure as the ticket
+  requested without introducing a universal environment service. Rejected
+  alternative: keep the loose `prepare_build_script_with_env` plus
+  `prepare_build_script_at` pair, which passes two bare paths and does not name
+  the boundary. Date/Author: 2026-11-23, implementing agent.
 
 - D3. Decision: add `serde_json.workspace = true` to
   `crates/theoremc-macros` dev-dependencies to parse `cargo metadata` in the
-  trybuild harness. `tempfile` is already a dev-dependency there.
-  Rationale: the metadata parser is a dev-only contract; promoting a helper
-  into `test-helpers` would re-add the macro crate dev-dependency that the
-  ticket asked to remove. Date/Author: 2026-11-23, implementing agent.
+  trybuild harness. `tempfile` is already a dev-dependency there. Rationale:
+  the metadata parser is a dev-only contract; promoting a helper into
+  `test-helpers` would re-add the macro crate dev-dependency that the ticket
+  asked to remove. Date/Author: 2026-11-23, implementing agent.
 
 - D4. Decision: leave `kani_is_required` in
   `tests/theorem_file_macro_bdd/cargo_runner.rs` as an annotated host-input
-  root.
-  Rationale: it reads one operator-set CI switch, has no downstream policy, and
-  its caller is the generated BDD harness itself. The ADR records it as an
-  approved host boundary beside `HostEnv`. Date/Author: 2026-11-23, implementing
-  agent.
+  root. Rationale: it reads one operator-set CI switch, has no downstream
+  policy, and its caller is the generated BDD harness itself. The ADR records
+  it as an approved host boundary beside `HostEnv`. Date/Author: 2026-11-23,
+  implementing agent.
 
 - D5. Decision: number the new ADR 0014.
   Rationale: 0013 is taken by the workspace-complete lint gate. Date/Author:
   2026-11-23, implementing agent.
 
 - D6. Decision: use parameterized unit tests plus one live Clippy execution for
-  verification; do not add model checking or formal proof.
-  Rationale: the change maps finite input classes to explicit values and error
-  variants, with no algebraic or concurrency invariant. Stronger methods would
-  leave the third-party Cargo and Clippy interfaces unverified anyway.
-  Date/Author: 2026-11-23, implementing agent.
+  verification; do not add model checking or formal proof. Rationale: the
+  change maps finite input classes to explicit values and error variants, with
+  no algebraic or concurrency invariant. Stronger methods would leave the
+  third-party Cargo and Clippy interfaces unverified anyway. Date/Author:
+  2026-11-23, implementing agent.
 
 ## Outcomes & retrospective
 
@@ -215,8 +211,8 @@ Pending implementation.
 
 ## Context and orientation
 
-TheoremC is a Cargo workspace with a hybrid root manifest: `Cargo.toml` declares
-both `[workspace]` and `[package]`. The affected components are:
+TheoremC is a Cargo workspace with a hybrid root manifest: `Cargo.toml`
+declares both `[workspace]` and `[package]`. The affected components are:
 
 - The root `build.rs`, which calls
   `theoremc_build_support::prepare_build_script()` and emits
@@ -226,8 +222,8 @@ both `[workspace]` and `[package]`. The affected components are:
 - `crates/theoremc-build-support/src/build_script.rs`, which today holds
   `prepare_build_script()` (annotated read boundary),
   `prepare_build_script_with_env(reader)` (private lookup seam), and
-  `prepare_build_script_at(manifest_dir, out_dir)` (private explicit-path
-  step). `BuildScriptError` carries `Environment`, `OpenOutputDirectory`,
+  `prepare_build_script_at(manifest_dir, out_dir)` (private explicit-path step).
+  `BuildScriptError` carries `Environment`, `OpenOutputDirectory`,
   `Discovery`, and `Suite` variants.
 
 - `crates/theoremc-macros/src/query.rs`, which resolves the invoking crate's
@@ -244,9 +240,9 @@ both `[workspace]` and `[package]`. The affected components are:
   creates it, and canonicalises it. `tests/common/fixture_crate.rs` consumes it.
 
 - `crates/cargo-theorem/tests/entry_points/process.rs`, which reads `PATH`,
-  `RUSTUP_HOME`, `HOME`, and `USERPROFILE` in three separately annotated
-  helpers (`rustup_home`, `isolated_path`, `cargo_binary`) and builds
-  `env_clear` child commands.
+  `RUSTUP_HOME`, `HOME`, and `USERPROFILE` in three separately annotated helpers
+  (`rustup_home`, `isolated_path`, `cargo_binary`) and builds `env_clear`
+  child commands.
 
 The lint policy lives in `clippy.toml` and `[workspace.lints]` in `Cargo.toml`.
 The workspace-wide gate is `make lint`, which runs `make lint-rustdoc`,
@@ -265,11 +261,11 @@ double that returns supplied values or errors instead of touching the process.
 - Issue [#101](https://github.com/leynos/theoremc/issues/101): environment
   boundary policy, validated ambient sites, and acceptance criteria.
 - `leynos/netsuke` ADR-008 environment seam taxonomy
-  (`docs/adr-008-environment-seam-taxonomy.md`): explicit values, `mockable::Env`
-  for a growing shared group, `Arc` readers at `Send + Sync` registration
-  boundaries, `Command::env_clear` for subprocess tests. The upstream document
-  was not reachable from this environment; the taxonomy is followed as the
-  issue describes it.
+  (`docs/adr-008-environment-seam-taxonomy.md`): explicit values,
+  `mockable::Env` for a growing shared group, `Arc` readers at `Send + Sync`
+  registration boundaries, `Command::env_clear` for subprocess tests. The
+  upstream document was not reachable from this environment; the taxonomy is
+  followed as the issue describes it.
 - `leynos/netsuke` `clippy.toml`: the six `disallowed-methods` entries and
   reasons.
 - ADR-0008 workspace build-support boundary,
@@ -331,12 +327,11 @@ reproduced, and that the boundary is the only reader.
 - `INV-lookup-order`: `BuildScriptContext::from_lookup` reads
   `CARGO_MANIFEST_DIR` before `OUT_DIR` and stops at the first failure.
 - `INV-error-fidelity`: `NotPresent` and `NotUnicode` map to
-  `BuildScriptError::Environment` with the offending variable name; the
-  macro maps any failure to `MissingManifestDir`.
+  `BuildScriptError::Environment` with the offending variable name; the macro
+  maps any failure to `MissingManifestDir`.
 - `INV-target`: staged trybuild fixtures live under
-  `<target_directory>/tests/trybuild/theoremc-macros/tests/expand/<name>`,
-  where `target_directory` comes from the same `cargo metadata` the harness
-  runs.
+  `<target_directory>/tests/trybuild/theoremc-macros/tests/expand/<name>`, where
+  `target_directory` comes from the same `cargo metadata` the harness runs.
 - `INV-fixture-base`: the fixture target is
   `<base>/theoremc-fixture-builds`, canonicalised once, where `base` is the
   injected value or the repository `target`.
@@ -357,22 +352,19 @@ reproduced, and that the boundary is the only reader.
 
 - Obligation: `INV-explicit-context`, `INV-lookup-order`, `INV-error-fidelity`.
   Method: `rstest` parameterized unit tests with stub readers and temporary
-  manifest/output directories.
-  Rationale: finite partitions (`NotPresent`, `NotUnicode`, valid) with
-  observable error values.
-  Artefact: `crates/theoremc-build-support/src/build_script_tests.rs`.
-  Evidence: focused `cargo nextest run -p theoremc-build-support`; the lookup
-  order test fails if the reader order is reversed.
-  Non-vacuity: each case supplies values or a concrete `VarError`; a valid case
-  proves the reader is reached at all, and the error cases prove the mapping.
+  manifest/output directories. Rationale: finite partitions (`NotPresent`,
+  `NotUnicode`, valid) with observable error values. Artefact:
+  `crates/theoremc-build-support/src/build_script_tests.rs`. Evidence: focused
+  `cargo nextest run -p theoremc-build-support`; the lookup order test fails if
+  the reader order is reversed. Non-vacuity: each case supplies values or a
+  concrete `VarError`; a valid case proves the reader is reached at all, and
+  the error cases prove the mapping.
 
 - Obligation: `INV-target`.
   Method: a pure parser test over stub JSON (a valid document, a missing key,
-  and malformed JSON) plus an integration staging test.
-  Rationale: the parser is finite; the staging path is the contract trybuild
-  relies on.
-  Artefact: `crates/theoremc-macros/tests/expand.rs` and a colocated test
-  module.
+  and malformed JSON) plus an integration staging test. Rationale: the parser
+  is finite; the staging path is the contract trybuild relies on. Artefact:
+  `crates/theoremc-macros/tests/expand.rs` and a colocated test module.
   Evidence: `cargo nextest run -p theoremc-macros --test expand`; removing a
   staged file makes a compile-pass case fail for the intended reason.
   Non-vacuity: the valid metadata case must produce a path; the missing-key
@@ -381,43 +373,42 @@ reproduced, and that the boundary is the only reader.
 
 - Obligation: `INV-fixture-base`.
   Method: parameterized tests over absolute, relative, and absent bases.
-  Rationale: three documented behaviours, each observable.
-  Artefact: `tests/common/fixture_isolation_tests.rs`.
-  Evidence: `cargo nextest run -p theoremc --test build_discovery_bdd`
-  exercises the helper through fixtures; the unit tests cover the selector.
-  Non-vacuity: the relative case proves canonicalisation happens; the absent
-  case proves the fallback is used.
+  Rationale: three documented behaviours, each observable. Artefact:
+  `tests/common/fixture_isolation_tests.rs`. Evidence:
+  `cargo nextest run -p theoremc --test build_discovery_bdd` exercises the
+  helper through fixtures; the unit tests cover the selector. Non-vacuity: the
+  relative case proves canonicalisation happens; the absent case proves the
+  fallback is used.
 
 - Obligation: `INV-host-env`.
   Method: unit tests over a constructed `HostEnv` and inspection of
-  `Command::get_envs`.
-  Rationale: the child environment is the observable contract.
-  Artefact: `crates/cargo-theorem/tests/entry_points/process_tests.rs` (or a
-  colocated module) plus the existing entry-point integration tests.
-  Evidence: `cargo nextest run -p cargo-theorem --test entry_points`.
-  Non-vacuity: at least one case with every field set and one with none set,
-  plus a missing-`PATH` case that must return the documented error.
+  `Command::get_envs`. Rationale: the child environment is the observable
+  contract. Artefact:
+  `crates/cargo-theorem/tests/entry_points/process_tests.rs` (or a colocated
+  module) plus the existing entry-point integration tests. Evidence:
+  `cargo nextest run -p cargo-theorem --test entry_points`. Non-vacuity: at
+  least one case with every field set and one with none set, plus a
+  missing-`PATH` case that must return the documented error.
 
 - Obligation: the lint contract and its enforcement.
   Method: text contract test over `clippy.toml` and `Cargo.toml`, plus two
-  execution tests that run Clippy in a throwaway workspace.
-  Rationale: text alone cannot prove Clippy acts; execution alone cannot prove
-  the workspace baseline is set.
-  Artefact: `tests/lint_environment_contract.rs` and two cases in
-  `tests/lint_workspace_execution.rs`.
-  Evidence: the execution test fails if the `clippy.toml` is not copied, and
-  the `#[expect]` case fails if the expectation is malformed.
-  Non-vacuity: the denied case observes exit failure and the configured reason
-  in stderr; the expected case observes success; the clean control proves the
-  workspace itself is buildable.
+  execution tests that run Clippy in a throwaway workspace. Rationale: text
+  alone cannot prove Clippy acts; execution alone cannot prove the workspace
+  baseline is set. Artefact: `tests/lint_environment_contract.rs` and two cases
+  in `tests/lint_workspace_execution.rs`. Evidence: the execution test fails if
+  the `clippy.toml` is not copied, and the `#[expect]` case fails if the
+  expectation is malformed. Non-vacuity: the denied case observes exit failure
+  and the configured reason in stderr; the expected case observes success; the
+  clean control proves the workspace itself is buildable.
 
 ### Formal verification decision
 
 No new invariant is algebraic, arithmetic, or concurrency-sensitive. The change
-is input plumbing plus error mapping, so parameterized tests and one live Clippy
-execution are proportionate. Model checking or proof would add no coverage over
-the finite input classes and would leave the third-party Cargo/Clippy
-interfaces unverified regardless. Recorded as D6 in the decision log.
+is input plumbing plus error mapping, so parameterized tests and one live
+Clippy execution are proportionate. Model checking or proof would add no
+coverage over the finite input classes and would leave the third-party
+Cargo/Clippy interfaces unverified regardless. Recorded as D6 in the decision
+log.
 
 ## Plan of work
 
@@ -446,19 +437,17 @@ impl BuildScriptContext {
 }
 ```
 
-`from_cargo_env` is the single annotated read:
-`Self::from_lookup(env::var)`. `from_lookup` reads `CARGO_MANIFEST_DIR` then
-`OUT_DIR`, stopping at the first failure, and maps each failure to
-`BuildScriptError::Environment`. `prepare_build_script` becomes
-`prepare_build_script(&BuildScriptContext)`: discovery, then open
-`context.out_dir()`, then write the suite, in that order. Delete
-`prepare_build_script_with_env`, `prepare_build_script_at`, and
+`from_cargo_env` is the single annotated read: `Self::from_lookup(env::var)`.
+`from_lookup` reads `CARGO_MANIFEST_DIR` then `OUT_DIR`, stopping at the first
+failure, and maps each failure to `BuildScriptError::Environment`.
+`prepare_build_script` becomes `prepare_build_script(&BuildScriptContext)`:
+discovery, then open `context.out_dir()`, then write the suite, in that order.
+Delete `prepare_build_script_with_env`, `prepare_build_script_at`, and
 `required_cargo_path`. Export `BuildScriptContext` from
 `crates/theoremc-build-support/src/lib.rs`.
 
-Change the root `build.rs` to call
-`BuildScriptContext::from_cargo_env()?` and then
-`prepare_build_script(&context)?`, keeping the directive order.
+Change the root `build.rs` to call `BuildScriptContext::from_cargo_env()?` and
+then `prepare_build_script(&context)?`, keeping the directive order.
 
 Migrate `build_script_tests.rs` to construct contexts explicitly and to use
 `from_lookup` with stub readers. Keep the two filesystem-failure tests, which
@@ -470,10 +459,9 @@ already pass explicit paths. Add cases for lookup order, short-circuiting,
 In `crates/theoremc-macros/tests/expand.rs`, add a `target_directory()` helper
 that runs `env!("CARGO") metadata --no-deps --format-version=1` in the current
 working directory with the inherited environment, checks the exit status, and
-parses `target_directory` with `serde_json`. Pass the resolved
-`Utf8PathBuf` and the fixture name into `stage_fixture`. Stage the eleven
-`.theorem` fixtures under
-`<target>/tests/trybuild/theoremc-macros/tests/expand/<name>` before
+parses `target_directory` with `serde_json`. Pass the resolved `Utf8PathBuf`
+and the fixture name into `stage_fixture`. Stage the eleven `.theorem` fixtures
+under `<target>/tests/trybuild/theoremc-macros/tests/expand/<name>` before
 registering the trybuild cases. Add unit tests for the JSON parser: valid,
 missing key, and malformed.
 
@@ -505,9 +493,9 @@ Create `docs/adrs/adr-0014-environment-seam-boundaries.md` with status, date,
 context, decision, and consequences. Map `BuildScriptContext`, the
 metadata-resolved trybuild target, the injected fixture base, and `HostEnv` to
 explicit values; the macro mapping to a narrow closure for one variable and one
-caller; `env_clear` child commands to isolated child processes; and `MapEnv` CLI
-sources to the existing shared configuration source. Record the upstream ADR's
-unreachability.
+caller; `env_clear` child commands to isolated child processes; and `MapEnv`
+CLI sources to the existing shared configuration source. Record the upstream
+ADR's unreachability.
 
 Add an environment-boundaries rule, the `#[expect]` convention, and the
 approved roots to `docs/developers-guide.md`. Update `AGENTS.md` to forbid
@@ -549,14 +537,14 @@ Capture long gate output with `tee` under `/tmp` and review it afterwards.
 
 Every step edits tracked files and is safe to re-run. Fixture staging recreates
 directories with `create_dir_all` and overwrites files. Temporary directories
-are removed by `tempfile`. If a gate fails, read the captured log, fix the cited
-cause, and re-run only that gate before continuing.
+are removed by `tempfile`. If a gate fails, read the captured log, fix the
+cited cause, and re-run only that gate before continuing.
 
 ## Artefacts and notes
 
 Reconnaissance evidence: `git log --oneline main..HEAD` shows #98 and #99 work
-already merged; `clippy.toml` contains the six entries; `test-helpers` no longer
-defines `EnvGuard`.
+already merged; `clippy.toml` contains the six entries; `test-helpers` no
+longer defines `EnvGuard`.
 
 ## Interfaces and dependencies
 

@@ -80,8 +80,7 @@ then:
 `CARGO_MANIFEST_DIR` before `OUT_DIR` and stops at the first failure, so an
 error names the variable that actually failed. Tests build a context from
 temporary directories with `BuildScriptContext::new`, or through the private
-`from_lookup` with a stub reader; none of them changes the process
-environment.
+`from_lookup` with a stub reader; none of them changes the process environment.
 
 The root `build.rs` adapter registers the theorem cfg with
 `cargo::rustc-check-cfg`, emits `cargo::rustc-cfg=theoremc_has_theorems` when
@@ -506,11 +505,10 @@ re-open it.
 [ADR-0014](adrs/adr-0014-environment-seam-boundaries.md) records the seam
 shapes, and it is the place to change them. The rule is that the smallest seam
 carrying the input wins: an explicit value for one variable and one caller; a
-narrow closure for one variable and one caller where the value must be
-resolved lazily; `mockable::Env` and the CLI's existing `MapEnv` sources for a
-growing shared group; and `Command::env_clear` plus explicit `Command::env`
-values for a child process. The approved roots are
-`BuildScriptContext::from_cargo_env`,
+narrow closure for one variable and one caller where the value must be resolved
+lazily; `mockable::Env` and the CLI's existing `MapEnv` sources for a growing
+shared group; and `Command::env_clear` plus explicit `Command::env` values for
+a child process. The approved roots are `BuildScriptContext::from_cargo_env`,
 `manifest_dir_from_env`, `HostEnv::capture`, `ambient_target_base`,
 `kani_is_required`, and the `GlobalOptions` derive. Adding a boundary is an
 ADR-level change.
@@ -649,8 +647,8 @@ suite.
   `fixture_target_dir(ambient_target_base().as_deref())` in
   `tests/common/fixture_isolation.rs`: `ambient_target_base` is the one
   annotated read of `CARGO_TARGET_DIR`, and `fixture_target_dir` is a pure
-  selector that appends the directory name, creates it, and canonicalises it.
-  A test exercises the selector from an explicit base rather than by exporting
+  selector that appends the directory name, creates it, and canonicalises it. A
+  test exercises the selector from an explicit base rather than by exporting
   the variable. Each fixture's package gets a short unique name (`fx_` and a
   run-and-sequence suffix; short because Kani derives a file name from the
   crate name), which keeps its build artefacts apart in that directory;
@@ -669,8 +667,8 @@ suite.
 - The macros crate's trybuild suite stages its `.theorem` fixtures into the
   project trybuild generates. Both trybuild and the staging step resolve the
   target directory from `cargo metadata`'s `target_directory`, so the two agree
-  without either reading `CARGO_TARGET_DIR`; staging then copies each fixture
-  to `<target>/tests/trybuild/theoremc-macros/tests/expand/`. A new fixture
+  without either reading `CARGO_TARGET_DIR`; staging then copies each fixture to
+  `<target>/tests/trybuild/theoremc-macros/tests/expand/`. A new fixture
   document is added to `STAGED_FIXTURES` in
   `crates/theoremc-macros/tests/expand.rs` as well as to the fixture directory,
   or the expanded macro will not find it.
