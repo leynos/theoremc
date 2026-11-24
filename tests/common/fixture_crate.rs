@@ -8,8 +8,8 @@ use filetime::FileTime;
 
 use super::BuildLog;
 use super::fixture_isolation::{
-    WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, suffix_is_taken, unique_suffix,
-    with_unique_package_name,
+    FixtureLock, first_unused_suffix, fixture_cargo_home, seeded_lock, shared_target_dir,
+    suffix_is_taken, unique_suffix, with_unique_package_name,
 };
 use super::hermetic_cargo::hermetic_cargo;
 use super::suite_layout::{package_directories, read_suite};
@@ -61,6 +61,8 @@ pub struct FixtureCrate {
     manifest_dir: Utf8PathBuf,
     /// Shared target directory used by all fixture builds.
     target_dir: Utf8PathBuf,
+    /// Cargo home every fixture build resolves from.
+    cargo_home: Utf8PathBuf,
     /// Package name used in generated manifests and lookups.
     package_name: String,
     /// Capability-scoped handle to the fixture's manifest directory.
@@ -72,19 +74,26 @@ impl FixtureCrate {
     ///
     /// The crate builds into a target directory shared by every fixture, so
     /// third-party dependencies compile once per run rather than once per
-    /// fixture. Its package gets a short unique name, which keeps each
-    /// fixture's build artefacts apart inside that directory, and the
-    /// workspace lock is copied in so every fixture resolves the same versions.
+    /// fixture, and resolves from the fixture Cargo home, so it never waits on
+    /// the caller's package-cache lock. Its package gets a short unique name,
+    /// which keeps each fixture's build artefacts apart inside that directory.
+    ///
+    /// `lock` names the committed template whose versions the fixture starts
+    /// from, so it must describe exactly the manifest's dependency graph: the
+    /// build runs `--frozen` and would rather fail than re-resolve.
     ///
     /// # Errors
     ///
     /// Returns an error when the temporary directory cannot be created, when
-    /// the manifest names no package, or when fixture files cannot be written.
-    pub fn new(cargo_toml: &str, lib_rs: &str) -> Result<Self, String> {
+    /// the manifest names no package, when the template lock cannot be seeded,
+    /// or when fixture files cannot be written.
+    pub fn new(cargo_toml: &str, lib_rs: &str, lock: FixtureLock) -> Result<Self, String> {
         let target_dir = shared_target_dir()?;
+        let cargo_home = fixture_cargo_home()?;
         let suffix =
             first_unused_suffix(unique_suffix, |taken| suffix_is_taken(&target_dir, taken))?;
         let (manifest, package_name) = with_unique_package_name(cargo_toml, &suffix)?;
+        let seed = seeded_lock(lock, &package_name)?;
         let temp_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
         let manifest_dir = Utf8Path::from_path(temp_dir.path())
             .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
@@ -95,22 +104,23 @@ impl FixtureCrate {
             _temp_dir: temp_dir,
             manifest_dir,
             target_dir,
+            cargo_home,
             package_name,
             dir,
         };
 
-        fixture.write_scaffold(&manifest, lib_rs)?;
+        fixture.write_scaffold(&manifest, lib_rs, &seed)?;
 
         Ok(fixture)
     }
 
-    /// Writes the manifest, lock, build script, library source and the
+    /// Writes the manifest, seeded lock, build script, library source and the
     /// build-support crate into the fixture directory.
-    fn write_scaffold(&self, manifest: &str, lib_rs: &str) -> Result<(), String> {
+    fn write_scaffold(&self, manifest: &str, lib_rs: &str, seed: &str) -> Result<(), String> {
         let build_support_manifest = fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?;
         let files = [
             ("Cargo.toml", manifest),
-            ("Cargo.lock", WORKSPACE_LOCK),
+            ("Cargo.lock", seed),
             ("build.rs", BUILD_SCRIPT_SOURCE),
             ("src/lib.rs", lib_rs),
             ("build-support/Cargo.toml", build_support_manifest.as_str()),
@@ -246,6 +256,18 @@ impl FixtureCrate {
         &self.target_dir
     }
 
+    /// Returns the Cargo home the fixture's builds resolve from.
+    #[must_use]
+    pub fn cargo_home(&self) -> &Utf8Path {
+        &self.cargo_home
+    }
+
+    /// Returns the generated package name, which the seeded lock's root uses.
+    #[must_use]
+    pub fn package_name(&self) -> &str {
+        &self.package_name
+    }
+
     /// Runs `cargo build` in the fixture crate.
     ///
     /// # Errors
@@ -256,15 +278,29 @@ impl FixtureCrate {
         self.cargo_build_log().map(|_| ())
     }
 
-    /// Runs `cargo build -vv --color never` and returns the combined log.
+    /// Runs `cargo build -vv --color never --frozen` and returns the log.
     ///
     /// # Errors
     ///
     /// Returns the combined Cargo output when the command fails or cannot be
     /// executed.
     pub fn cargo_build_log(&self) -> Result<BuildLog, String> {
-        let output = hermetic_cargo(&self.manifest_dir, &self.target_dir)
-            .args(["build", "-vv", "--color", "never"])
+        self.cargo_build_log_in(&self.cargo_home)
+    }
+
+    /// Runs the frozen build against `cargo_home` instead of the fixture's own.
+    ///
+    /// This is the narrow seam the offline-failure regression test needs: a
+    /// build pointed at a Cargo home the fetch step never populated must fail
+    /// at once, which a shared home would hide behind the package-cache lock.
+    ///
+    /// # Errors
+    ///
+    /// Returns the combined Cargo output when the command fails or cannot be
+    /// executed.
+    pub fn cargo_build_log_in(&self, cargo_home: &Utf8Path) -> Result<BuildLog, String> {
+        let output = hermetic_cargo(&self.manifest_dir, &self.target_dir, cargo_home)
+            .args(["build", "-vv", "--color", "never", "--frozen"])
             .output()
             .map_err(|error| error.to_string())?;
         let log = format!(

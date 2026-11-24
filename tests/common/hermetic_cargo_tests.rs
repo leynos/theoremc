@@ -30,12 +30,19 @@ fn environment(command: &std::process::Command, name: &str) -> EnvState {
     })
 }
 
+/// A prepared command for a fixture whose target and home are both its own.
+fn command() -> std::process::Command {
+    hermetic_cargo(
+        Utf8Path::new("/fixture"),
+        Utf8Path::new("/fixture/target"),
+        Utf8Path::new("/fixture/cargo-home"),
+    )
+}
+
 #[test]
 fn builds_into_the_target_directory_it_was_given() {
-    let command = hermetic_cargo(Utf8Path::new("/fixture"), Utf8Path::new("/fixture/target"));
-
     assert_eq!(
-        environment(&command, "CARGO_TARGET_DIR"),
+        environment(&command(), "CARGO_TARGET_DIR"),
         EnvState::Exported("/fixture/target".to_owned()),
         "an exported CARGO_TARGET_DIR must not win",
     );
@@ -43,11 +50,9 @@ fn builds_into_the_target_directory_it_was_given() {
 
 #[test]
 fn removes_the_variables_that_would_move_or_share_the_build() {
-    let command = hermetic_cargo(Utf8Path::new("/fixture"), Utf8Path::new("/fixture/target"));
-
     for variable in ["CARGO_BUILD_TARGET_DIR", "CARGO_BUILD_BUILD_DIR"] {
         assert_eq!(
-            environment(&command, variable),
+            environment(&command(), variable),
             EnvState::Removed,
             "{variable} must be removed, not merely unset in the test"
         );
@@ -55,21 +60,26 @@ fn removes_the_variables_that_would_move_or_share_the_build() {
 }
 
 #[test]
-fn runs_in_the_fixture_directory() {
-    let command = hermetic_cargo(Utf8Path::new("/fixture"), Utf8Path::new("/fixture/target"));
-
+fn resolves_from_the_fixture_cargo_home() {
     assert_eq!(
-        command.get_current_dir(),
+        environment(&command(), "CARGO_HOME"),
+        EnvState::Exported("/fixture/cargo-home".to_owned()),
+        "a fixture build must take its own package-cache lock, not the caller's",
+    );
+}
+
+#[test]
+fn runs_in_the_fixture_directory() {
+    assert_eq!(
+        command().get_current_dir(),
         Some(std::path::Path::new("/fixture"))
     );
 }
 
 #[test]
 fn runs_offline() {
-    let command = hermetic_cargo(Utf8Path::new("/fixture"), Utf8Path::new("/fixture/target"));
-
     assert_eq!(
-        environment(&command, "CARGO_NET_OFFLINE"),
+        environment(&command(), "CARGO_NET_OFFLINE"),
         EnvState::Exported("true".to_owned()),
         "a fixture build must not wait on the registry index",
     );

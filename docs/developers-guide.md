@@ -611,13 +611,38 @@ suite.
   per fixture. Each fixture's package gets a short unique name (`fx_` and a
   run-and-sequence suffix; short because Kani derives a file name from the
   crate name), which keeps its build artefacts apart in that directory;
-  `generated_suite_contents` reads only the directories named after the
-  fixture. The workspace `Cargo.lock` is copied into each fixture so every
-  fixture resolves the versions the workspace already built, and the fixture's
-  `cargo` runs with `CARGO_NET_OFFLINE=true`, with `CARGO_BUILD_TARGET_DIR` and
-  `CARGO_BUILD_BUILD_DIR` removed so a caller's environment cannot move the
-  artefacts or share a lock. A fixture that needs a private target must say so
-  here and in its helper.
+  `generated_suite_contents` reads only the directories named after the fixture.
+  `CARGO_BUILD_TARGET_DIR` and `CARGO_BUILD_BUILD_DIR` are removed from a
+  fixture's environment so a caller cannot move the artefacts or share a lock.
+  A fixture that needs a private target must say so here and in its helper.
+- Fixture builds resolve from a dedicated Cargo home, not the caller's. The
+  path comes from `THEOREMC_FIXTURE_CARGO_HOME` when it is set, which is how
+  `make fetch` and `make test` pass the one they populated, and otherwise falls
+  back to `<repository>/target/theoremc-fixture-cargo-home`. The separation is
+  not cosmetic: offline Cargo still takes `$CARGO_HOME/.package-cache`
+  exclusively, so three nested builds sharing a home stall behind any other
+  `cargo` on the machine, which is what issue #199 recorded. One home for all
+  fixtures keeps that lock private without giving each fixture a cold cache. It
+  sits inside `target/`, so `make clean` removes it and the next run fetches it
+  again.
+- Fixture builds run `--frozen`, so their dependency graph must be complete
+  before the tests start. `make fetch` is a prerequisite of `make test` and runs
+  `cargo fetch --locked` for the workspace and, with
+  `CARGO_HOME=$(FIXTURE_CARGO_HOME)`, once per committed fixture manifest.
+  Anything the fetch misses then fails at once with Cargo's offline diagnostic,
+  naming the crate; the fix is to add the missing manifest to
+  `FIXTURE_MANIFESTS` in the Makefile, not to drop `--frozen`.
+- Each fixture dependency graph has a committed template under
+  `tests/fixtures/`, holding a manifest, an empty `src/lib.rs` and a
+  `Cargo.lock`. Nothing builds a template; the lock is what a fixture seeds
+  from, with the template's root entry renamed to the fixture's generated `fx_`
+  name and nothing else changed. `tests/fixture_lock_contract.rs` holds every
+  template to concordat NC-001: each registry package must appear in the root
+  `Cargo.lock` at the same name, version and source. Regenerate a lock with
+  `make fixture-locks` after changing a template manifest, the build-support
+  crate or a workspace dependency, and commit the result. A new fixture
+  dependency graph needs a template, its `FIXTURE_MANIFESTS` entry, a
+  `FixtureLock` variant, and a `--frozen` build.
 - Tests that start a child `cargo` or `rustc` (the fixture suites, the macros
   crate's trybuild suite and the `rustc` compile-fail unit test) run in the
   `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,

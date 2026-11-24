@@ -10,7 +10,7 @@ use camino::Utf8Path;
 use theoremc_core::path_format::{normalize_path_separators, toml_basic_string_value};
 
 use super::cargo_runner::{CargoGuard, CargoSubcommand, cargo_run, cargo_run_output};
-use test_helpers::FixtureCrate as CommonFixtureCrate;
+use test_helpers::{FixtureCrate as CommonFixtureCrate, FixtureLock};
 
 const ROOT_MANIFEST_DIR: &str = env!("CARGO_MANIFEST_DIR");
 pub(crate) struct TheoremFixtureSpec<'a> {
@@ -26,7 +26,7 @@ impl FixtureCrate {
     pub(crate) fn new(lib_rs: &str) -> Result<Self, String> {
         let cargo_toml = fixture_cargo_toml();
         Ok(Self {
-            inner: CommonFixtureCrate::new(&cargo_toml, lib_rs)?,
+            inner: CommonFixtureCrate::new(&cargo_toml, lib_rs, FixtureLock::TheoremFileMacro)?,
         })
     }
 

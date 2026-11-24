@@ -9,7 +9,7 @@ use std::process::Command;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use camino::Utf8Path;
-use test_helpers::hermetic_cargo;
+use test_helpers::{fixture_cargo_home, hermetic_cargo};
 
 #[derive(Clone, Copy)]
 pub(crate) enum CargoSubcommand {
@@ -22,7 +22,7 @@ pub(crate) enum CargoSubcommand {
 impl CargoSubcommand {
     const fn args(self) -> &'static [&'static str] {
         match self {
-            Self::Build => &["build", "--color", "never"],
+            Self::Build => &["build", "--color", "never", "--frozen"],
             Self::KaniList => &["kani", "list"],
             Self::Kani => &["kani"],
         }
@@ -55,24 +55,24 @@ impl CargoGuard<'_> {
 
 /// Serializes all fixture `cargo` invocations.
 ///
-/// `cargo` writes lock files, registry caches, and incremental artefacts to
-/// paths derived from the manifest directory. When multiple fixture crates run
-/// `cargo build` concurrently they race on the shared `~/.cargo` registry
-/// cache and on any workspace-level `Cargo.lock`, producing spurious build
-/// failures even with isolated `CARGO_TARGET_DIR` values. A single global
-/// mutex is the minimal correct serialization mechanism for in-process test
-/// parallelism; the alternative--spawning each fixture in a fully isolated
-/// toolchain environment--would require per-test network access and is
-/// disproportionate for a test suite this size.
+/// Every fixture build resolves from the dedicated fixture Cargo home, so it
+/// takes that home's package-cache lock rather than the caller's, and it runs
+/// `--frozen`, so it never needs the lock for an index update. Two fixture
+/// builds still share one warm target directory and one Cargo home, so running
+/// them at once would have them contend for the same lock and interleave their
+/// artefacts. A single global mutex keeps them apart; the alternative, a
+/// private home and target per fixture, would lose the warm cache that keeps
+/// these builds to seconds.
 pub(crate) static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
 
 /// Runs a Cargo subcommand in the fixture crate directory.
 ///
 /// `CARGO_TARGET_DIR` is set to the target directory every fixture shares, so
 /// third-party dependencies compile once per run; fixtures keep their own
-/// artefacts apart through unique package names. The caller must supply a [`CargoGuard`] proving that
-/// `FIXTURE_CARGO_LOCK` is held, because registry cache access and
-/// workspace-level lock files are still shared across invocations.
+/// artefacts apart through unique package names. `CARGO_HOME` is the dedicated
+/// fixture home, so a build never waits on the caller's package-cache lock. The
+/// caller must supply a [`CargoGuard`] proving that `FIXTURE_CARGO_LOCK` is
+/// held, because the target and the home are still shared across invocations.
 ///
 /// # Timeout
 ///
@@ -97,7 +97,7 @@ pub(crate) fn cargo_run_output(
     subcommand: CargoSubcommand,
     _guard: &CargoGuard<'_>,
 ) -> Result<String, String> {
-    let output = hermetic_cargo(manifest_dir, target_dir)
+    let output = hermetic_cargo(manifest_dir, target_dir, &fixture_cargo_home()?)
         .args(subcommand.args())
         .output()
         .map_err(|error| error.to_string())?;
@@ -115,11 +115,19 @@ pub(crate) fn recover_mutex_guard(mutex: &Mutex<()>) -> MutexGuard<'_, ()> {
 /// `error: no such command: 'kani'`; `Command::output()` itself still succeeds
 /// because the `cargo` binary was found. The boolean is derived from the exit
 /// status alone, so no stderr parsing is required.
+///
+/// The probe resolves from the fixture Cargo home, so it takes the same lock
+/// the fixture builds do rather than the caller's. Cargo finds an external
+/// subcommand on `PATH`, not in `CARGO_HOME/bin`, so `cargo-kani` resolves as
+/// it would for the caller.
 pub(crate) fn kani_is_installed() -> bool {
-    Command::new("cargo")
-        .args(["kani", "--version"])
-        .output()
-        .is_ok_and(|o| o.status.success())
+    fixture_cargo_home().is_ok_and(|home| {
+        Command::new("cargo")
+            .args(["kani", "--version"])
+            .env("CARGO_HOME", home.as_str())
+            .output()
+            .is_ok_and(|output| output.status.success())
+    })
 }
 
 /// Returns `true` when the run must fail rather than skip without Kani.

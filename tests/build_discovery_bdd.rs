@@ -2,9 +2,7 @@
 
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{
-    ExpectedFragment, FixtureCrate, StrNewtype, TRIVIAL_THEOREM, build_support_fixture_manifest,
-};
+use test_helpers::{ExpectedFragment, StrNewtype, TRIVIAL_THEOREM, build_support_fixture};
 const FIXTURE_LIB_RS: &str = "//! Fixture crate for build discovery behavioural tests.\n";
 
 /// Precondition stub; the nested theorem fixture is created in the `then` step.
@@ -14,10 +12,7 @@ fn given_a_crate_with_nested_theorem_files() {}
 #[then("building twice stays fresh and editing a theorem reruns the build script")]
 fn then_building_twice_stays_fresh_and_editing_a_theorem_reruns_the_build_script()
 -> Result<(), String> {
-    let fixture = FixtureCrate::new(
-        &build_support_fixture_manifest("build_discovery_fixture"),
-        FIXTURE_LIB_RS,
-    )?;
+    let fixture = build_support_fixture("build_discovery_fixture", FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new("theorems/root.theorem"), TRIVIAL_THEOREM)?;
     fixture.write(
         Utf8Path::new("theorems/nested/alpha.theorem"),
@@ -67,10 +62,7 @@ fn given_a_crate_with_ignored_non_theorem_files_under_theorems() {}
 
 #[then("the build script emits only theorem inputs")]
 fn then_the_build_script_emits_only_theorem_inputs() -> Result<(), String> {
-    let fixture = FixtureCrate::new(
-        &build_support_fixture_manifest("build_discovery_fixture"),
-        FIXTURE_LIB_RS,
-    )?;
+    let fixture = build_support_fixture("build_discovery_fixture", FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new("theorems/kept.theorem"), TRIVIAL_THEOREM)?;
     fixture.write(Utf8Path::new("theorems/ignored.txt"), "not a theorem")?;
 
@@ -97,10 +89,7 @@ fn given_a_crate_without_a_theorems_directory() {}
 #[then("creating theorems later reruns the build script without manual seeding")]
 fn then_creating_theorems_later_reruns_the_build_script_without_manual_seeding()
 -> Result<(), String> {
-    let fixture = FixtureCrate::new(
-        &build_support_fixture_manifest("build_discovery_fixture"),
-        FIXTURE_LIB_RS,
-    )?;
+    let fixture = build_support_fixture("build_discovery_fixture", FIXTURE_LIB_RS)?;
 
     let first_build = fixture.cargo_build_log()?;
     if !first_build.ran() {
