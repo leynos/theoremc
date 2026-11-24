@@ -131,18 +131,35 @@ impl RunningBuild {
         drop(child.kill());
         match child.wait() {
             Ok(status) => {
+                // A log that vanished is itself diagnostic, so name it instead
+                // of presenting the stream as empty; whichever log survives is
+                // still reported.
+                let mut unreadable = Vec::new();
                 let output = std::process::Output {
                     status,
-                    stdout: read_log(&self.stdout_path()).unwrap_or_default(),
-                    stderr: read_log(&self.stderr_path()).unwrap_or_default(),
+                    stdout: self.read_log_or_record(&self.stdout_path(), &mut unreadable),
+                    stderr: self.read_log_or_record(&self.stderr_path(), &mut unreadable),
                 };
-                format!(
+                let report = format!(
                     "{reason}\n{}",
                     command_run::completed_failure(&self.command, &output),
-                )
+                );
+                if unreadable.is_empty() {
+                    report
+                } else {
+                    format!("{report}\nunreadable logs: {}", unreadable.join("; "))
+                }
             }
             Err(error) => format!("{reason}; also could not reap the child: {error}"),
         }
+    }
+
+    /// Reads one build log, recording the failure instead of hiding it.
+    fn read_log_or_record(&self, path: &Utf8Path, unreadable: &mut Vec<String>) -> Vec<u8> {
+        read_log(path).unwrap_or_else(|error| {
+            unreadable.push(error);
+            Vec::new()
+        })
     }
 
     /// Takes the child, or explains that it was already collected.
