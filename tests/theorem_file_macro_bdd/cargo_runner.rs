@@ -209,6 +209,8 @@ fn command_result(
 mod tests {
     //! Unit tests for the Kani probe-and-run policy.
 
+    use rstest::rstest;
+
     use super::{KaniOutcome, classify_kani_run};
 
     /// The loader failure observed when Kani's toolchain cannot start.
@@ -250,40 +252,24 @@ mod tests {
         assert_eq!(outcome, KaniOutcome::Ran("harnesses".to_owned()));
     }
 
-    #[test]
-    fn a_loader_failure_after_a_successful_probe_fails_even_when_kani_is_optional() {
-        let error = classify_kani_run("listing", true, false, || Err(LOADER_ERROR.to_owned()))
-            .expect_err("a broken installation must not pass as an optional skip");
+    /// Every failure after a successful probe is reported, whatever it says.
+    ///
+    /// The loader error is the case that previously passed as a skip, so it
+    /// must fail even when Kani is optional.
+    #[rstest]
+    #[case::loader_error("listing", LOADER_ERROR)]
+    #[case::run_failure("verification", "cargo kani failed with status exit status: 1")]
+    #[case::fixture_build_failure("listing", "could not compile fixture crate")]
+    fn a_failure_after_a_successful_probe_fails_the_check(
+        #[case] check: &str,
+        #[case] error: &str,
+    ) {
+        let failure = classify_kani_run(check, true, false, || Err(error.to_owned()))
+            .expect_err("a failure after a successful probe must fail the check");
 
         assert_eq!(
-            error, LOADER_ERROR,
-            "the listing error should propagate unchanged"
-        );
-    }
-
-    #[test]
-    fn another_run_failure_after_a_successful_probe_fails_the_check() {
-        let error = classify_kani_run("verification", true, false, || {
-            Err("cargo kani failed with status exit status: 1".to_owned())
-        })
-        .expect_err("a run failure after a successful probe must fail the check");
-
-        assert!(
-            error.contains("exit status: 1"),
-            "the run failure should propagate, got: {error}"
-        );
-    }
-
-    #[test]
-    fn a_fixture_build_failure_after_a_successful_probe_fails_the_check() {
-        let error = classify_kani_run("listing", true, true, || {
-            Err("could not compile fixture crate".to_owned())
-        })
-        .expect_err("a fixture build failure must fail the check");
-
-        assert!(
-            error.contains("could not compile fixture crate"),
-            "the build failure should propagate, got: {error}"
+            failure, error,
+            "the {check} error should propagate unchanged"
         );
     }
 }
