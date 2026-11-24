@@ -119,13 +119,15 @@ fn allowance_of(entry: &Value) -> Result<Duration, String> {
 #[test]
 fn the_fixture_group_runs_one_test_at_a_time() -> Result<(), String> {
     let config = parse(CONFIG)?;
+    let limit = group_max_threads(&config)?;
 
-    assert_eq!(
-        group_max_threads(&config)?,
-        1,
-        "test group `{GROUP}` must serialize the fixture suites",
-    );
-    Ok(())
+    if limit == 1 {
+        Ok(())
+    } else {
+        Err(format!(
+            "test group `{GROUP}` must serialize the fixture suites, got max-threads = {limit}"
+        ))
+    }
 }
 
 #[test]
@@ -133,14 +135,18 @@ fn the_group_override_covers_every_fixture_suite() -> Result<(), String> {
     let config = parse(CONFIG)?;
     let filter = filter_of(group_override(&config)?)?;
 
-    for binary in FIXTURE_BINARIES {
-        let expected = format!("binary(={binary})");
-        assert!(
-            filter.contains(&expected),
-            "the fixture-group filter must contain `{expected}`, got: {filter}",
-        );
+    let missing: Vec<String> = FIXTURE_BINARIES
+        .iter()
+        .map(|binary| format!("binary(={binary})"))
+        .filter(|expected| !filter.contains(expected))
+        .collect();
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "the fixture-group filter must contain {missing:?}, got: {filter}"
+        ))
     }
-    Ok(())
 }
 
 #[test]
@@ -148,34 +154,38 @@ fn the_group_allowance_exceeds_the_fixture_deadline() -> Result<(), String> {
     let config = parse(CONFIG)?;
     let allowance = allowance_of(group_override(&config)?)?;
 
-    assert!(
-        allowance > DEFAULT_FIXTURE_COMMAND_TIMEOUT,
-        "the group allows {allowance:?}, so the exported fixture deadline \
-         {DEFAULT_FIXTURE_COMMAND_TIMEOUT:?} must fire first",
-    );
-    Ok(())
+    if allowance > DEFAULT_FIXTURE_COMMAND_TIMEOUT {
+        Ok(())
+    } else {
+        Err(format!(
+            "the group allows {allowance:?}, so the exported fixture deadline \
+             {DEFAULT_FIXTURE_COMMAND_TIMEOUT:?} must fire first"
+        ))
+    }
 }
 
-/// The serialised fixture suites run one after another, so the whole run is at
+/// The serialized fixture suites run one after another, so the whole run is at
 /// least the sum of their allowances; a global cap at or below one test's
 /// allowance would cancel legitimate work.
 #[test]
 fn the_run_allowance_exceeds_the_group_allowance() -> Result<(), String> {
     let config = parse(CONFIG)?;
     let group = allowance_of(group_override(&config)?)?;
-    let run = config
+    let declared = config
         .get("profile")
         .and_then(|profile| profile.get("default"))
         .and_then(|default| default.get("global-timeout"))
         .and_then(Value::as_str)
         .ok_or_else(|| "the default profile must declare a `global-timeout`".to_owned())?;
-    let run = parse_duration(run)?;
+    let run = parse_duration(declared)?;
 
-    assert!(
-        run > group,
-        "the run allows {run:?}, which must exceed the group's {group:?}",
-    );
-    Ok(())
+    if run > group {
+        Ok(())
+    } else {
+        Err(format!(
+            "the run allows {run:?}, which must exceed the group's {group:?}"
+        ))
+    }
 }
 
 /// A configuration that lost the group's limit must be detected, so the checks
@@ -192,11 +202,11 @@ fn a_group_without_a_limit_is_rejected() -> Result<(), String> {
         .ok_or_else(|| "the group must be a table".to_owned())?;
     table.remove("max-threads");
 
-    assert!(
-        group_max_threads(&config).is_err(),
-        "a group without `max-threads` must be rejected, not defaulted",
-    );
-    Ok(())
+    if group_max_threads(&config).is_err() {
+        Ok(())
+    } else {
+        Err("a group without `max-threads` must be rejected, not defaulted".to_owned())
+    }
 }
 
 /// The filter must name binaries exactly, so a suite whose name merely contains
@@ -206,11 +216,13 @@ fn the_filter_names_each_binary_exactly() -> Result<(), String> {
     let config = parse(CONFIG)?;
     let filter = filter_of(group_override(&config)?)?;
 
-    assert!(
-        !filter.contains("binary(theorem_file_macro_bdd)"),
-        "an unanchored `binary(...)` filter would also match look-alike names, got: {filter}",
-    );
-    Ok(())
+    if filter.contains("binary(theorem_file_macro_bdd)") {
+        Err(format!(
+            "an unanchored `binary(...)` filter would also match look-alike names, got: {filter}"
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 #[test]

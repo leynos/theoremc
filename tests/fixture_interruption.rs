@@ -102,7 +102,7 @@ struct Scratch {
     /// The external `CARGO_TARGET_DIR` handed to the owner.
     ///
     /// It is kept alive for the test's duration and removed by `remove`.
-    _target_dir: tempfile::TempDir,
+    target_dir: tempfile::TempDir,
     /// The `TMPDIR` path, for diagnostics and assertions.
     temp_path: Utf8PathBuf,
     /// The external target path, for diagnostics and assertions.
@@ -118,7 +118,7 @@ impl Scratch {
             temp_path: utf8_path(temp_dir.path())?,
             target_path: utf8_path(target_dir.path())?,
             temp_dir,
-            _target_dir: target_dir,
+            target_dir,
         })
     }
 
@@ -183,7 +183,7 @@ impl Scratch {
 
     /// Removes both isolated directories and everything under them.
     fn remove(self) -> Result<(), String> {
-        for directory in [self.temp_dir, self._target_dir] {
+        for directory in [self.temp_dir, self.target_dir] {
             directory
                 .close()
                 .map_err(|error| format!("could not remove the isolated area: {error}"))?;
@@ -230,20 +230,20 @@ impl Owner {
         let started = Instant::now();
         loop {
             let left = HANDSHAKE_DEADLINE.saturating_sub(started.elapsed());
-            match self.lines.recv_timeout(left) {
-                Ok(line) => {
-                    if let Some(path) = line.strip_prefix(READY_PREFIX) {
-                        return Ok(Utf8PathBuf::from(path.trim()));
-                    }
-                }
-                Err(RecvTimeoutError::Timeout) => {
-                    return Err(format!(
-                        "the owner did not announce its fixture within {HANDSHAKE_DEADLINE:?}"
-                    ));
-                }
-                Err(RecvTimeoutError::Disconnected) => {
-                    return Err("the owner exited before announcing its fixture".to_owned());
-                }
+            let line = self.next_line(left)?;
+            if let Some(path) = ready_path(&line) {
+                return Ok(path);
+            }
+        }
+    }
+
+    /// Returns the owner's next line, or why the wait ended without one.
+    fn next_line(&mut self, wait: Duration) -> Result<String, String> {
+        match self.lines.recv_timeout(wait) {
+            Ok(line) => Ok(line),
+            Err(RecvTimeoutError::Timeout) => Err(timeout_error()),
+            Err(RecvTimeoutError::Disconnected) => {
+                Err("the owner exited before announcing its fixture".to_owned())
             }
         }
     }
@@ -260,18 +260,25 @@ impl Owner {
     }
 }
 
+/// The error reported when the owner never announces its fixture.
+fn timeout_error() -> String {
+    format!("the owner did not announce its fixture within {HANDSHAKE_DEADLINE:?}")
+}
+
+/// Returns the fixture path a ready line carries, if it is one.
+fn ready_path(line: &str) -> Option<Utf8PathBuf> {
+    line.strip_prefix(READY_PREFIX)
+        .map(|path| Utf8PathBuf::from(path.trim()))
+}
+
 /// Reads `reader` line by line on its own thread and forwards each line.
 fn line_reader(reader: impl std::io::Read + Send + 'static) -> Receiver<String> {
     let (sender, receiver) = mpsc::channel();
     std::thread::spawn(move || {
         for line in BufReader::new(reader).lines() {
-            match line {
-                Ok(line) => {
-                    if sender.send(line).is_err() {
-                        break;
-                    }
-                }
-                Err(_) => break,
+            let Ok(text) = line else { break };
+            if sender.send(text).is_err() {
+                break;
             }
         }
     });
