@@ -21,8 +21,8 @@ mod lint_workspace_inheritance_support;
 
 use lint_workspace_inheritance_support::{
     Repository, array_items, is_workspace_opt_in, member_manifest_path, package_directories,
-    resolved_members, undeclared_crates, verify_member_manifest, verify_root_manifest,
-    workspace_members,
+    resolved_members, undeclared_crates, unsupported_member_patterns, verify_member_manifest,
+    verify_root_manifest, workspace_members,
 };
 
 /// Verifies the whole inheritance contract over the committed manifests.
@@ -36,6 +36,11 @@ fn every_workspace_package_inherits_the_workspace_lint_tables() {
         panic!("the root manifest must hold the lint inheritance contract: {report}");
     }
     let members = workspace_members(&repository).expect("the workspace members must be readable");
+    let unsupported = unsupported_member_patterns(&members);
+    assert!(
+        unsupported.is_empty(),
+        "these member patterns are not Cargo's whole-segment globs, so this check cannot interpret them: {unsupported:?}"
+    );
     let packages = package_directories(&repository).unwrap_or_else(|error| panic!("{error}"));
     let undeclared = undeclared_crates(&packages, &members);
     assert!(
@@ -200,19 +205,11 @@ fn a_glob_member_covers_its_matches() {
         vec!["crates/two".to_owned(), "tools/helper".to_owned()],
         "a literal member must not cover its siblings"
     );
-    let prefix = vec!["crates/t*".to_owned(), "tools/*".to_owned()];
+    let unsupported = unsupported_member_patterns(&["crates/theorem-*".to_owned()]);
     assert_eq!(
-        undeclared_crates(&directories, &prefix),
-        vec!["crates/one".to_owned()],
-        "a segment glob must match a prefix, as Cargo's matching does"
-    );
-    // `*w*` must require the literal `w`, so `crates/two` matches and
-    // `crates/one` does not.
-    let middle = vec!["crates/*w*".to_owned(), "tools/*".to_owned()];
-    assert_eq!(
-        undeclared_crates(&directories, &middle),
-        vec!["crates/one".to_owned()],
-        "a literal between wildcards must still have to appear"
+        unsupported,
+        vec!["crates/theorem-*".to_owned()],
+        "a partial-segment glob is not a Cargo member pattern and must be reported"
     );
     // A nested package is only covered by a nested pattern, so `two` and
     // `group/member` must both be reported as undeclared.

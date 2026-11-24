@@ -250,12 +250,42 @@ pub(crate) fn has_bypass_key(lines: &[Line<'_>], indent: usize) -> bool {
         .any(|line| {
             let trimmed = line.trimmed();
             let entry = trimmed.strip_prefix("- ").unwrap_or(trimmed);
-            ["if:", "continue-on-error:"].iter().any(|key| {
-                entry
-                    .strip_prefix(*key)
-                    .is_some_and(|rest| rest.is_empty() || rest.starts_with(' '))
-            })
+            ["if", "continue-on-error"]
+                .iter()
+                .any(|key| owns_key(entry, key))
         })
+}
+
+/// Reports whether `entry` declares `key`, quoted or not.
+///
+/// YAML permits a quoted key, a tab or a space after the colon, and a value on
+/// the next line, so all of those count:
+///
+/// ```text
+/// if: false            -> true
+/// "if": false          -> true
+/// 'continue-on-error': true    -> true
+/// if:                  -> true
+/// ```
+fn owns_key(entry: &str, key: &str) -> bool {
+    let unquoted = entry.trim_start_matches(['"', '\'']);
+    ["", "\"", "'"].iter().any(|quote| {
+        unquoted
+            .strip_prefix(key)
+            .and_then(|rest| rest.strip_prefix(quote))
+            .and_then(|rest| rest.strip_prefix(':'))
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with([' ', '\t']))
+    })
+}
+
+/// Reports whether a block's own lines include a sequence entry.
+///
+/// A job's own keys sit at its key indentation; a sequence entry there belongs
+/// to an indentless step list, so a job-level check must skip it.
+pub(crate) fn has_sequence_entry(lines: &[Line<'_>], indent: usize) -> bool {
+    lines
+        .iter()
+        .any(|line| line.indent() == indent && line.opens_step())
 }
 
 /// Returns the step's own `run:` line, ignoring nested keys such as `env:`.

@@ -5,6 +5,7 @@
 //! contract, and names the first drift it can prove.
 
 use super::environment::environment_keys;
+use super::workflow_contract_support::has_sequence_entry;
 use super::{
     COVERAGE_VARIABLES, LINT_COMMAND, Line, WHITAKER_INSTALLER, Workflow, has_bypass_key,
     invokes_aggregate, jobs, key_indent, run_command, steps, uses_reference,
@@ -96,14 +97,20 @@ fn lint_steps<'a, 'b>(name: &'a str, job: &'a [Line<'b>]) -> Result<Vec<LintStep
 ///
 /// Returns the job-level bypass key or coverage override.
 fn verify_lint_job(name: &str, job: &[Line<'_>], job_indent: usize) -> Result<(), String> {
-    // A job's own keys sit at `job_indent`; a `- if:` at that indentation in
-    // an indentless step list belongs to a step, and the step checks cover it.
-    let job_keys: Vec<Line<'_>> = job
-        .iter()
-        .filter(|line| line.indent() == job_indent && !line.trimmed().starts_with("- "))
-        .copied()
-        .collect();
-    if has_bypass_key(&job_keys, job_indent) {
+    // A `- if:` at the job's own indentation belongs to an indentless step
+    // list, and the step checks cover it, so the job scan skips it.
+    if has_sequence_entry(job, job_indent) {
+        let job_keys: Vec<Line<'_>> = job
+            .iter()
+            .filter(|line| line.indent() == job_indent && !line.trimmed().starts_with("- "))
+            .copied()
+            .collect();
+        if has_bypass_key(&job_keys, job_indent) {
+            return Err(format!(
+                "job `{name}` must not make the lint gate conditional or non-fatal"
+            ));
+        }
+    } else if has_bypass_key(job, job_indent) {
         return Err(format!(
             "job `{name}` must not make the lint gate conditional or non-fatal"
         ));
@@ -297,6 +304,32 @@ mod reader_contracts {
         ));
         if let Err(report) = verify_lint_gate(&workflow) {
             panic!("a quoted `make lint` scalar must be accepted: {report}");
+        }
+    }
+
+    /// A shell separator starts a new command, so a later aggregate is read.
+    #[test]
+    fn a_later_command_is_read() {
+        let workflow = job_running("true && make lint");
+        let decision = verify_lint_gate(&workflow);
+        if let Err(report) = decision {
+            assert!(
+                report.contains("must run exactly"),
+                "`true && make lint` must be read as the aggregate; found {report:?}"
+            );
+        }
+    }
+
+    /// A quoted bypass key and a tab after the colon are both honoured.
+    #[test]
+    fn a_quoted_bypass_key_is_detected() {
+        for key in ["\"if\": false", "'if': false", "if:\tfalse"] {
+            let body =
+                format!("{INSTALL}      - name: Lint\n        {key}\n        run: make lint\n");
+            assert!(
+                verify_lint_gate(&single_job(&body)).is_err(),
+                "a bypass written as `{key}` must be rejected"
+            );
         }
     }
 

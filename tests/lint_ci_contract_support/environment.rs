@@ -105,8 +105,14 @@ fn flow_mapping(rest: &str) -> Option<&str> {
 /// the open quote before accepting a brace.
 fn closing_brace(body: &str) -> Option<usize> {
     let mut quote = None;
+    let mut escaped = false;
     for (index, character) in body.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
         match character {
+            '\\' if quote == Some('"') => escaped = true,
             '"' | '\'' if quote == Some(character) => quote = None,
             '"' | '\'' if quote.is_none() => quote = Some(character),
             '}' if quote.is_none() => return Some(index),

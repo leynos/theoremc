@@ -154,14 +154,30 @@ fn invokes_aggregate(command: &str) -> bool {
         .any(|line| make_goals(line).contains(&"lint"))
 }
 
-/// Returns the goals Make is asked to build, ignoring option arguments.
+/// Returns every goal the command asks Make to build.
 ///
 /// Make accepts options before the goals, and several of them take the next
 /// token as their argument. Skipping both keeps `make -s lint` and
 /// `make -f Makefile lint` classified by the word `lint`, and every goal is
-/// returned because `make clean lint` still invokes the aggregate.
-fn make_goals(line: &str) -> Vec<&str> {
-    let mut tokens = line.split_whitespace();
+/// returned because `make clean lint` still invokes the aggregate. A shell
+/// separator starts a new command, so `true && make lint` is read too.
+fn make_goals(command: &str) -> Vec<&str> {
+    let mut goals = Vec::new();
+    // A command is a small shell program: a separator starts a new command,
+    // so each segment is scanned and a later `make lint` is found.
+    for line in command.split([';', '|', '&', '\n']) {
+        goals.extend(segment_goals(line));
+    }
+    goals
+}
+
+/// Returns the goals of one shell segment when it is a Make invocation.
+///
+/// A pre-command variable assignment (`FOO=1 make lint`) is an
+/// execution-control input this contract cannot reason about, so that segment
+/// contributes no goal and the lint step is rejected as inexact.
+fn segment_goals(segment: &str) -> Vec<&str> {
+    let mut tokens = segment.split_whitespace();
     if tokens.next() != Some("make") {
         return Vec::new();
     }

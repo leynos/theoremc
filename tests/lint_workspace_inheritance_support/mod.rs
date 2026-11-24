@@ -262,61 +262,43 @@ pub(crate) fn verify_member_manifest(path: &str, manifest: &str) -> Result<(), S
     verify_opt_in(path, manifest)
 }
 
+/// Reports whether a `members` pattern is one Cargo accepts.
+///
+/// Cargo supports a `*` only as a whole final path segment: `crates/*` and
+/// `crates/group/*` are valid, while `crates/theorem-*` is not. A partial
+/// segment would resolve differently under Cargo than under this checker, so
+/// the caller reports it rather than guessing.
+fn is_supported_member_pattern(pattern: &str) -> bool {
+    let wanted = pattern.trim_end_matches('/');
+    let segments: Vec<&str> = wanted.split('/').collect();
+    segments.iter().enumerate().all(|(index, segment)| {
+        !segment.contains('*') || (*segment == "*" && index + 1 == segments.len())
+    })
+}
+
+/// Returns the member patterns this checker cannot interpret.
+pub(crate) fn unsupported_member_patterns(members: &[String]) -> Vec<String> {
+    members
+        .iter()
+        .filter(|pattern| !is_supported_member_pattern(pattern))
+        .cloned()
+        .collect()
+}
+
 /// Reports whether a `members` pattern names `path`.
 ///
-/// Cargo accepts a glob in any segment of a member path, so `crates/*` covers
-/// every crate directory one level down and `crates/theorem-*` covers the
-/// crates whose names share that prefix. A pattern with no `*` must match
-/// exactly.
+/// A final `*` covers every directory one level below its parent, and a
+/// pattern with no `*` must match exactly.
 fn member_covers(pattern: &str, path: &str) -> bool {
     let wanted = pattern.trim_end_matches('/');
     let candidate = path.trim_end_matches('/');
-    if !wanted.contains('*') {
+    let Some(parent) = wanted.strip_suffix("/*") else {
         return wanted == candidate;
-    }
-    segments_match(wanted, candidate)
-}
-
-/// Reports whether one path segment matches a pattern segment.
-///
-/// Each `*` stands for any run of characters within the segment. Every literal
-/// run between two wildcards must appear in order, and the segment must begin
-/// with the first run and end with the last, so `*core*` matches `theorem-core`
-/// but not `forgotten`.
-fn segment_glob_matches(pattern: &str, value: &str) -> bool {
-    let parts: Vec<&str> = pattern.split('*').collect();
-    let Some((first, rest)) = parts.split_first() else {
-        return false;
     };
-    let Some((last, middle)) = rest.split_last() else {
-        return *first == value;
-    };
-    let Some(mut remainder) = value.strip_prefix(first) else {
-        return false;
-    };
-    for literal in middle {
-        let Some(after) = remainder.find(literal) else {
-            return false;
-        };
-        remainder = remainder.get(after + literal.len()..).unwrap_or_default();
-    }
-    let Some(without_suffix) = remainder.strip_suffix(last) else {
-        return false;
-    };
-    // A middle literal is consumed greedily from the left, so a suffix that
-    // overlaps it must still be present in what is left.
-    !first.is_empty() || !last.is_empty() || without_suffix.len() <= remainder.len()
-}
-
-/// Reports whether every segment of a pattern matches its path segment.
-fn segments_match(pattern: &str, path: &str) -> bool {
-    let expected: Vec<&str> = pattern.split('/').collect();
-    let actual: Vec<&str> = path.split('/').collect();
-    expected.len() == actual.len()
-        && expected
-            .iter()
-            .zip(&actual)
-            .all(|(segment, part)| segment_glob_matches(segment, part))
+    candidate
+        .strip_prefix(parent)
+        .and_then(|rest| rest.strip_prefix('/'))
+        .is_some_and(|rest| !rest.is_empty() && !rest.contains('/'))
 }
 
 /// Returns the package directories the workspace does not list.

@@ -51,11 +51,16 @@ fn collect_packages(
     depth: usize,
 ) -> Result<(), String> {
     if depth > MAX_WALK_DEPTH {
-        return Ok(());
+        return Err(format!(
+            "{directory} is nested deeper than {MAX_WALK_DEPTH} levels, so package discovery cannot reach it"
+        ));
     }
     for child in repository.subdirectories(directory)? {
-        if repository.read(&format!("{child}/Cargo.toml")).is_ok() {
-            packages.push(child.clone());
+        match repository.read(&format!("{child}/Cargo.toml")) {
+            Ok(_) => packages.push(child.clone()),
+            // A child without a manifest is a group directory, not an error.
+            Err(error) if error.contains("No such file") || error.contains("Not a directory") => {}
+            Err(error) => return Err(error),
         }
         collect_packages(repository, &child, packages, depth + 1)?;
     }
