@@ -5,7 +5,9 @@
 
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{FixtureCrate, TRIVIAL_THEOREM, build_support_fixture_manifest};
+use test_helpers::{
+    FixtureCrate, FixtureLock, TRIVIAL_THEOREM, build_support_fixture, seeded_lock,
+};
 
 /// Fixture lib.rs that includes the generated suite wiring.
 const FIXTURE_LIB_RS: &str = concat!(
@@ -55,10 +57,7 @@ fn given_a_crate_without_a_theorems_directory() {}
 
 #[then("the crate compiles successfully with the generated suite")]
 fn then_the_crate_compiles_successfully_with_the_generated_suite() -> Result<(), String> {
-    let fixture = FixtureCrate::new(
-        &build_support_fixture_manifest("build_suite_fixture"),
-        FIXTURE_LIB_RS,
-    )?;
+    let fixture = build_support_fixture("build_suite_fixture", FIXTURE_LIB_RS)?;
     // No theorems directory created - testing empty suite case
     fixture.cargo_build()?;
     Ok(())
@@ -71,10 +70,7 @@ fn given_a_crate_with_one_theorem_file() {}
 #[then("the single theorem is included automatically and the crate compiles")]
 fn then_the_single_theorem_is_included_automatically_and_the_crate_compiles() -> Result<(), String>
 {
-    let fixture = FixtureCrate::new(
-        &build_support_fixture_manifest("build_suite_fixture"),
-        FIXTURE_LIB_RS,
-    )?;
+    let fixture = build_support_fixture("build_suite_fixture", FIXTURE_LIB_RS)?;
     fixture.write(Utf8Path::new("theorems/single.theorem"), TRIVIAL_THEOREM)?;
 
     fixture.cargo_build()?;
@@ -87,10 +83,7 @@ fn given_a_crate_with_multiple_theorem_files_created_in_non_sorted_order() {}
 
 #[then("all theorems compile in deterministic suite order")]
 fn then_all_theorems_compile_in_deterministic_suite_order() -> Result<(), String> {
-    let fixture = FixtureCrate::new(
-        &build_support_fixture_manifest("build_suite_fixture"),
-        FIXTURE_LIB_RS,
-    )?;
+    let fixture = build_support_fixture("build_suite_fixture", FIXTURE_LIB_RS)?;
     // Create theorems in non-sorted order (z, a, m)
     fixture.write(Utf8Path::new("theorems/z.theorem"), TRIVIAL_THEOREM)?;
     fixture.write(Utf8Path::new("theorems/a.theorem"), TRIVIAL_THEOREM)?;
@@ -121,10 +114,7 @@ fn multiple_theorem_files_compile_in_deterministic_suite_order() {}
 
 /// Builds a fixture whose only theorem is `theorems/<name>.theorem`.
 fn fixture_with_theorem(name: &str) -> Result<FixtureCrate, String> {
-    let fixture = FixtureCrate::new(
-        &build_support_fixture_manifest("build_suite_fixture"),
-        FIXTURE_LIB_RS,
-    )?;
+    let fixture = build_support_fixture("build_suite_fixture", FIXTURE_LIB_RS)?;
     fixture.write(
         Utf8Path::new(&format!("theorems/{name}.theorem")),
         TRIVIAL_THEOREM,
@@ -132,27 +122,61 @@ fn fixture_with_theorem(name: &str) -> Result<FixtureCrate, String> {
     Ok(fixture)
 }
 
-/// Requires both fixtures to build into the warm target and start from the
-/// workspace lock.
-fn require_shared_target_and_lock(fixtures: [&FixtureCrate; 2]) -> Result<(), String> {
-    let [first, second] = fixtures;
+/// Requires both fixtures to build into the warm target.
+fn require_shared_target([first, second]: [&FixtureCrate; 2]) -> Result<(), String> {
     let shared = first.target_dir() == second.target_dir()
         && first
             .target_dir()
             .as_str()
             .ends_with("theoremc-fixture-builds");
-    if !shared {
-        return Err(format!(
+    if shared {
+        Ok(())
+    } else {
+        Err(format!(
             "fixtures must share the warm target, got {} and {}",
             first.target_dir(),
             second.target_dir()
+        ))
+    }
+}
+
+/// Requires both fixtures to resolve from one Cargo home, outside their own
+/// temporary directories.
+fn require_shared_cargo_home(fixtures: [&FixtureCrate; 2]) -> Result<(), String> {
+    let [first, second] = fixtures;
+    if first.cargo_home() != second.cargo_home() {
+        return Err(format!(
+            "fixtures must resolve from one shared Cargo home, got {} and {}",
+            first.cargo_home(),
+            second.cargo_home()
         ));
     }
-    for fixture in fixtures {
-        let lock = fixture.read_to_string(Utf8Path::new("Cargo.lock"))?;
-        if lock != include_str!("../Cargo.lock") {
-            return Err("a fixture must start from the workspace lock".to_owned());
-        }
+    // A home inside the fixture's own temporary directory would be cold for
+    // every fixture, which is the cost this home exists to avoid.
+    fixtures
+        .into_iter()
+        .find(|fixture| fixture.cargo_home().starts_with(fixture.manifest_dir()))
+        .map_or(Ok(()), |fixture| {
+            Err(format!(
+                "{} must not keep its Cargo home in its own temporary directory",
+                fixture.package_name()
+            ))
+        })
+}
+
+/// Requires `fixture` to start from the build-support template's lock, with
+/// only the template's root entry renamed.
+fn require_seeded_lock(fixture: &FixtureCrate) -> Result<(), String> {
+    let lock = fixture.read_to_string(Utf8Path::new("Cargo.lock"))?;
+    let expected = seeded_lock(FixtureLock::BuildSupport, fixture.package_name())?;
+    if lock != expected {
+        return Err(format!(
+            "{} must start from the build-support template lock with only its root renamed",
+            fixture.package_name()
+        ));
+    }
+    if lock.contains("name = \"build_support_fixture\"") {
+        return Err("the template's own root name must not survive in a fixture lock".to_owned());
     }
     Ok(())
 }
@@ -172,7 +196,12 @@ fn require_only_own_theorem(suite: &str, own: &str, other: &str) -> Result<(), S
 fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(), String> {
     let first = fixture_with_theorem("only_first")?;
     let second = fixture_with_theorem("only_second")?;
-    require_shared_target_and_lock([&first, &second])?;
+    let fixtures = [&first, &second];
+    require_shared_target(fixtures)?;
+    require_shared_cargo_home(fixtures)?;
+    for fixture in fixtures {
+        require_seeded_lock(fixture)?;
+    }
 
     first.cargo_build()?;
     second.cargo_build()?;
@@ -187,4 +216,34 @@ fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(),
         "only_second",
         "only_first",
     )
+}
+
+/// A frozen build pointed at a Cargo home the fetch step never populated fails
+/// at once, with Cargo's offline diagnostic, instead of waiting on a lock.
+///
+/// The fixture's own home is populated by `make fetch`, so a shared home would
+/// hide the missing dependency behind the package-cache lock. Pointing the
+/// build at an empty home is what makes the failure observable.
+#[test]
+fn an_unfetched_fixture_fails_fast_with_the_offline_diagnostic() -> Result<(), String> {
+    let fixture = fixture_with_theorem("unfetched")?;
+    let empty_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
+    let empty_home = Utf8Path::from_path(empty_dir.path())
+        .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?;
+
+    let error = fixture
+        .cargo_build_log_in(empty_home)
+        .err()
+        .ok_or_else(|| "a frozen build must not resolve from an empty Cargo home".to_owned())?;
+
+    // Both fragments are Cargo's own: the resolution failure names the crate
+    // the fetch step would have provided, and the note names offline mode.
+    for fragment in ["no matching package named", "offline mode"] {
+        if !error.contains(fragment) {
+            return Err(format!(
+                "expected the offline diagnostic to contain {fragment:?}, got:\n{error}"
+            ));
+        }
+    }
+    Ok(())
 }

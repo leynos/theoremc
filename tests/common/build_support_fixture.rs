@@ -1,5 +1,8 @@
 //! Shared Cargo manifest builders for build-support fixture crates.
 
+use super::fixture_crate::FixtureCrate;
+use super::fixture_isolation::FixtureLock;
+
 /// Builds a minimal manifest for a build-support integration fixture.
 ///
 /// # Examples
@@ -20,5 +23,22 @@ pub fn build_support_fixture_manifest(package_name: &str) -> String {
             "theoremc-build-support = {{ path = \"build-support\" }}\n",
         ),
         package_name = package_name,
+    )
+}
+
+/// Creates a build-support fixture crate with the supplied library source.
+///
+/// The manifest and the lock it resolves against are chosen together, so a
+/// caller cannot pair this manifest with another dependency graph's template.
+/// The lock must match, because every fixture build runs `--frozen`.
+///
+/// # Errors
+///
+/// Returns the error [`FixtureCrate::new`] reports.
+pub fn build_support_fixture(package_name: &str, lib_rs: &str) -> Result<FixtureCrate, String> {
+    FixtureCrate::new(
+        &build_support_fixture_manifest(package_name),
+        lib_rs,
+        FixtureLock::BuildSupport,
     )
 }

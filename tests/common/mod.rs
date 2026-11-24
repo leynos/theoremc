@@ -7,15 +7,18 @@ mod build_support_fixture;
 mod fixture_crate;
 mod fixture_isolation;
 mod hermetic_cargo;
+mod lock_file;
 mod schema_fixtures;
 mod suite_layout;
 
 pub use build_log::{BuildLog, toml_section};
-pub use build_support_fixture::build_support_fixture_manifest;
+pub use build_support_fixture::{build_support_fixture, build_support_fixture_manifest};
 pub use fixture_crate::{
     BUILD_DISCOVERY_SOURCE, BUILD_SCRIPT_SOURCE, BUILD_SUITE_SOURCE, FixtureCrate, TRIVIAL_THEOREM,
 };
+pub use fixture_isolation::{FixtureLock, fixture_cargo_home, seeded_lock};
 pub use hermetic_cargo::hermetic_cargo;
+pub use lock_file::{LockPackage, lock_packages};
 pub use schema_fixtures::{
     FIXTURES_DIR, assert_diagnostic_failure, assert_fixture_error_contains, assert_fixture_fails,
     assert_fixture_loads, fixture_error_message, fixture_source_id, load_fixture,

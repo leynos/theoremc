@@ -1,0 +1,20 @@
+# Template for the build-support fixture crates that `build_discovery_bdd` and
+# `build_suite_bdd` generate. Nothing builds this manifest: the integration
+# tests copy the build-support crate into a temporary project and generate a
+# manifest of their own, so this file exists to give the committed `Cargo.lock`
+# beside it a manifest to describe.
+#
+# Two properties keep the lock usable as that seed. An empty `[workspace]` makes
+# this a workspace root of its own, so Cargo does not resolve it as part of the
+# repository workspace; and the path dependency names the checkout's
+# build-support crate, so the locked graph is the one a generated fixture
+# resolves after the crate is copied in beside it.
+[package]
+name = "build_support_fixture"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[build-dependencies]
+theoremc-build-support = { path = "../../../crates/theoremc-build-support" }

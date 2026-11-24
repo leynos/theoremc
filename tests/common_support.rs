@@ -4,7 +4,7 @@ use std::time::SystemTime;
 
 use camino::Utf8Path;
 use rstest::rstest;
-use test_helpers::{FixtureCrate, toml_section};
+use test_helpers::{FixtureCrate, FixtureLock, toml_section};
 
 const MINIMAL_CARGO_TOML: &str = concat!(
     "[package]\n",
@@ -62,7 +62,11 @@ fn toml_section_extracts_expected_section_body(
 
 #[test]
 fn write_with_advanced_mtime_marks_created_file_and_parent_newer() -> Result<(), String> {
-    let fixture = FixtureCrate::new(MINIMAL_CARGO_TOML, MINIMAL_LIB_RS)?;
+    let fixture = FixtureCrate::new(
+        MINIMAL_CARGO_TOML,
+        MINIMAL_LIB_RS,
+        FixtureLock::DependencyFree,
+    )?;
     let write_started = SystemTime::now();
 
     fixture.write_with_advanced_mtime(Utf8Path::new("theorems/created.theorem"), "created")?;
@@ -80,7 +84,11 @@ fn write_with_advanced_mtime_marks_created_file_and_parent_newer() -> Result<(),
 
 #[test]
 fn overwrite_in_place_with_advanced_mtime_marks_file_newer() -> Result<(), String> {
-    let fixture = FixtureCrate::new(MINIMAL_CARGO_TOML, MINIMAL_LIB_RS)?;
+    let fixture = FixtureCrate::new(
+        MINIMAL_CARGO_TOML,
+        MINIMAL_LIB_RS,
+        FixtureLock::DependencyFree,
+    )?;
     let theorem_path = Utf8Path::new("theorems/existing.theorem");
     fixture.write(theorem_path, "before")?;
     let previous_mtime = fixture.modified_time(theorem_path)?;
@@ -101,7 +109,11 @@ fn overwrite_in_place_with_advanced_mtime_marks_file_newer() -> Result<(), Strin
 
 #[test]
 fn overwrite_in_place_rejects_missing_files() -> Result<(), String> {
-    let fixture = FixtureCrate::new(MINIMAL_CARGO_TOML, "//! fixture\n")?;
+    let fixture = FixtureCrate::new(
+        MINIMAL_CARGO_TOML,
+        "//! fixture\n",
+        FixtureLock::DependencyFree,
+    )?;
     fixture.create_dir(Utf8Path::new("theorems"))?;
 
     let result = fixture.overwrite_in_place(Utf8Path::new("theorems/missing.theorem"), "after");

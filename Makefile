@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint lint-rustdoc lint-clippy lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv check-adr-rfc-names install-kani kani
+.PHONY: help all clean fetch fixture-locks test build release lint lint-rustdoc lint-clippy lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv check-adr-rfc-names install-kani kani
 
 TARGET ?= cargo-theorem
 
@@ -82,8 +82,12 @@ install-kani: ## Install the pinned Kani release (front-end in CARGO_HOME/bin, b
 # The two scenarios are named exactly, and the recipe requires that both ran: a
 # renamed scenario would otherwise match nothing and pass with zero tests.
 override KANI_SCENARIOS := kani_lists_the_generated_proof_harness kani_verifies_every_generated_harness
-kani: ## Verify the generated theorem harnesses with cargo kani (requires an installed Kani)
-	@out=$$(THEOREMC_REQUIRE_KANI=1 RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS)" $(CARGO) test --test theorem_file_macro_bdd $(BUILD_JOBS) -- --exact --test-threads=1 $(KANI_SCENARIOS) 2>&1); \
+# The scenarios build the macro fixture `--frozen`, so they need the fixture
+# Cargo home populated exactly as `make test` does; `fetch` is its prerequisite
+# for that reason. The home is exported so the fixture build and the fetch step
+# cannot disagree about which directory holds the crates.
+kani: fetch ## Verify the generated theorem harnesses with cargo kani (requires an installed Kani)
+	@out=$$(THEOREMC_REQUIRE_KANI=1 THEOREMC_FIXTURE_CARGO_HOME="$(FIXTURE_CARGO_HOME)" RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS)" $(CARGO) test --test theorem_file_macro_bdd $(BUILD_JOBS) -- --exact --test-threads=1 $(KANI_SCENARIOS) 2>&1); \
 	status=$$?; printf '%s\n' "$$out"; \
 	[ "$$status" -eq 0 ] || exit "$$status"; \
 	for scenario in $(KANI_SCENARIOS); do \
@@ -98,10 +102,51 @@ all: check-fmt lint test test-workflow-contracts ## Perform a comprehensive chec
 clean: ## Remove build artefacts
 	$(CARGO) clean
 
-test: ## Run tests with warnings treated as errors
+# The fixture crates the BDD suites build get their own Cargo home, because
+# offline Cargo still takes `$CARGO_HOME/.package-cache` exclusively: a nested
+# build sharing the caller's home waits behind any other `cargo` on the
+# machine. Nothing else uses this home, so it sits inside the target directory
+# and `make clean` removes it with the rest of the build output. `make test`
+# exports the resolved path under the name the fixture helpers read.
+FIXTURE_CARGO_HOME ?= $(CURDIR)/target/theoremc-fixture-cargo-home
+# One committed template per fixture dependency graph. `fixture-locks`
+# regenerates each one's lock; `tests/fixture_lock_contract.rs` holds them to
+# the workspace lock (concordat NC-001).
+FIXTURE_MANIFESTS := \
+	tests/fixtures/build_support_fixture/Cargo.toml \
+	tests/fixtures/theorem_file_macro_fixture/Cargo.toml
+
+# Fetch once, then frozen. Every nested cargo these tests start runs
+# `--frozen`, so a package the fetch missed fails at once with Cargo's offline
+# diagnostic instead of resolving from the network while holding a lock. Add a
+# manifest here when a fixture gains one: the failure names the crate, and the
+# fix is this list.
+fetch: ## Fetch every dependency the workspace and the fixture crates need
 	$(CARGO) fetch --locked
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) nextest run $(NEXTEST_FLAGS) $(BUILD_JOBS)
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test $(DOCTEST_FLAGS) $(BUILD_JOBS)
+	@set -e; for manifest in $(FIXTURE_MANIFESTS); do \
+		echo "  fetching $$manifest into $(FIXTURE_CARGO_HOME)"; \
+		CARGO_HOME="$(FIXTURE_CARGO_HOME)" $(CARGO) fetch --locked --manifest-path "$$manifest"; \
+	done
+
+# Copies the workspace lock into each template and prunes it to the graph that
+# template declares. The pruning runs offline and only removes entries, so the
+# versions the workspace resolved are preserved; a template that resolves a
+# different version would fail `tests/fixture_lock_contract.rs`.
+fixture-locks: ## Regenerate the committed fixture-template locks from the workspace lock
+	@set -e; for manifest in $(FIXTURE_MANIFESTS); do \
+		lock=$$(dirname "$$manifest")/Cargo.lock; \
+		echo "  reseeding $$lock"; \
+		cp Cargo.lock "$$lock"; \
+		$(CARGO) update --workspace --offline --manifest-path "$$manifest" >/dev/null; \
+	done
+
+# `fetch` is a prerequisite rather than a recipe line so `make -j test` still
+# completes it before any test starts. A sub-make would also work, but under
+# `make -n` GNU make runs sub-makes for real, and the build-standard contract
+# reads this target with `make -n`; a prerequisite is printed and not run.
+test: fetch ## Run tests with warnings treated as errors
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" THEOREMC_FIXTURE_CARGO_HOME="$(FIXTURE_CARGO_HOME)" $(CARGO) nextest run $(NEXTEST_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" THEOREMC_FIXTURE_CARGO_HOME="$(FIXTURE_CARGO_HOME)" $(CARGO) test $(DOCTEST_FLAGS) $(BUILD_JOBS)
 
 target/%/$(TARGET): ## Build binary in debug or release mode
 	$(if $(findstring release,$(@)),RUSTFLAGS="$${RUSTFLAGS-}",RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(STANDARD_RUSTFLAGS)") $(CARGO) build $(BUILD_JOBS) $(if $(findstring release,$(@)),--release) -p cargo-theorem --bin $(TARGET)

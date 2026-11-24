@@ -1,0 +1,26 @@
+# Template for the `theorem_file_macro_bdd` fixture crates. Nothing builds this
+# manifest: the suite generates a temporary project that depends on this
+# checkout, so this file exists to give the committed `Cargo.lock` beside it a
+# manifest to describe.
+#
+# Two properties keep the lock usable as that seed. An empty `[workspace]` makes
+# this a workspace root of its own, so Cargo does not resolve it as part of the
+# repository workspace; and the path dependencies name this checkout, so the
+# locked graph is the one a generated fixture resolves. `theoremc` appears as a
+# dependency and a dev-dependency because the generated manifest declares both,
+# and `build.rs` calls the build-support crate so that dependency is used.
+[package]
+name = "theorem_file_macro_fixture"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+theoremc = { path = "../../..", features = ["test-support"] }
+
+[dev-dependencies]
+theoremc = { path = "../../..", features = ["test-support"] }
+
+[build-dependencies]
+theoremc-build-support = { path = "../../../crates/theoremc-build-support" }

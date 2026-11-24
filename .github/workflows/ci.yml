@@ -72,7 +72,9 @@ jobs:
         run: make check-agent-native
       - name: Fetch dependencies
         # Tests start their own cargo offline; fetch once so none resolves cold.
-        run: cargo fetch --locked
+        # `make fetch` covers the fixture crates' dedicated Cargo home as well
+        # as the workspace, and `make test` repeats it as a prerequisite.
+        run: make fetch
       - name: Test and Measure Coverage
         env:
           # One of the two exclusions from the build standard: a coverage build is a
