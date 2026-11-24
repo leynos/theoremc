@@ -205,6 +205,18 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       a second cold build; forty `kani-compiler` processes were running when the
       deadline fired. CI's `make test` does not install Kani, so it skips this
       scenario; the proofs workflow installs Kani and runs `make kani`.
+- [x] (2026-11-24T03:30Z) Full workspace run with the documented override:
+      **1050 passed, 1 failed, 1 skipped, 2 not run** in 5106 s. The only failure
+      is `kani_lists_the_generated_proof_harness`, whose `cargo kani list`
+      reached the 1140 s override while a cold Kani build was still compiling
+      under a queue of hundreds of compiler requests. Every non-Kani test
+      passes, including all fixture, discovery, suite-order, reuse,
+      interruption and contract tests. CI's `make test` does not install Kani,
+      so it skips this scenario.
+- [x] (2026-11-24T03:35Z) Kani builds are given their own, longer deadline
+      (`KANI_COMMAND_DEADLINE`, 1140 s) instead of the 540 s fixture default,
+      because `cargo kani` compiles the whole graph with its own compiler into
+      its own target directory. The ordinary fixture deadline is unchanged.
 - [ ] Warm-run timings and the compiler-invocation count recorded here.
 - [ ] #143 re-evaluation recorded here.
 - [ ] Draft PR opened.

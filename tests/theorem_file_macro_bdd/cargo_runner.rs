@@ -17,6 +17,15 @@ use test_helpers::{
     FixtureOutcome, hermetic_cargo, run_fixture_command, run_fixture_command_within,
 };
 
+/// How long one `cargo kani` build may take before the test fails.
+///
+/// Kani compiles the whole fixture graph with its own compiler into its own
+/// target directory, so its first run is a second cold build and is much slower
+/// than a fixture `cargo build`. Giving it the ordinary fixture deadline would
+/// fail a legitimate verification run on a slow or busy host; the nextest
+/// group's allowance still bounds it.
+const KANI_COMMAND_DEADLINE: Duration = Duration::from_secs(1140);
+
 /// How long the Kani probe may take before it is reported as a failure.
 ///
 /// `cargo kani --version` starts a toolchain lookup, not a build, so a probe that
@@ -74,7 +83,13 @@ pub(crate) fn cargo_run_output(
 ) -> Result<String, String> {
     let mut command = hermetic_cargo(manifest_dir, target_dir);
     command.args(subcommand.args());
-    match run_fixture_command(command)? {
+    let outcome = match subcommand {
+        CargoSubcommand::Build => run_fixture_command(command)?,
+        CargoSubcommand::KaniList | CargoSubcommand::Kani => {
+            run_fixture_command_within(command, KANI_COMMAND_DEADLINE)?
+        }
+    };
+    match outcome {
         FixtureOutcome::Completed(output) if output.is_success() => Ok(output.combined()),
         FixtureOutcome::Completed(output) => Err(format!(
             "cargo {} failed with status {}\nstdout:\n{}\nstderr:\n{}",
