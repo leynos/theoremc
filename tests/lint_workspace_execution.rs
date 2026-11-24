@@ -270,59 +270,47 @@ fn run_policy_clippy(workspace: &Path) -> Result<Output, String> {
         .map_err(|error| format!("running Clippy over the policy workspace: {error}"))
 }
 
-/// The result the policy must produce for a workspace's source.
-#[derive(Clone, Copy, Debug)]
-enum PolicyOutcome {
-    /// Clippy must fail, and its diagnostic must contain every fragment.
-    Rejected(&'static [&'static str]),
-    /// Clippy must succeed.
-    Accepted,
-}
-
-/// Verifies the configured prohibition in both directions.
+/// Verifies that the configured prohibition really fails a build.
 ///
-/// A `clippy.toml` entry is inert without `disallowed_methods = "deny"`, so the
-/// rejected case proves the two halves meet and that the diagnostic names the
-/// lint and the advice a contributor is meant to follow. The accepted case
-/// proves a reasoned `#[expect]` is the sanctioned escape hatch, and therefore
-/// that the lint fires at all: Clippy reports an unfulfilled expectation, so an
-/// inert configuration would fail it rather than pass.
-#[rstest]
-#[case::direct_read(
-    AMBIENT_READ,
-    PolicyOutcome::Rejected(&["disallowed_methods", "inject an environment reader"])
-)]
-#[case::reasoned_expectation(EXPECTED_READ, PolicyOutcome::Accepted)]
-fn the_configured_lint_enforces_the_environment_policy(
-    #[case] source: &str,
-    #[case] expected: PolicyOutcome,
-) -> Result<(), String> {
-    let workspace = write_policy_workspace(source)?;
+/// A `clippy.toml` entry is inert without `disallowed_methods = "deny"`. This
+/// case proves the two halves meet: the diagnostic must name the lint and the
+/// advice the contributor is meant to follow.
+#[test]
+fn a_direct_environment_read_fails_the_configured_lint() -> Result<(), String> {
+    let workspace = write_policy_workspace(AMBIENT_READ)?;
     let output = run_policy_clippy(workspace.path())?;
     let stderr = String::from_utf8_lossy(&output.stderr);
-    match expected {
-        PolicyOutcome::Rejected(fragments) => {
-            if output.status.success() {
-                return Err(format!(
-                    "Clippy must fail this source, but it passed; stderr was:\n{stderr}"
-                ));
-            }
-            for fragment in fragments {
-                if !stderr.contains(fragment) {
-                    return Err(format!(
-                        "the diagnostic must contain {fragment:?}; stderr was:\n{stderr}"
-                    ));
-                }
-            }
-            Ok(())
-        }
-        PolicyOutcome::Accepted => {
-            if !output.status.success() {
-                return Err(format!(
-                    "Clippy must accept this source, but it failed; stderr was:\n{stderr}"
-                ));
-            }
-            Ok(())
+    if output.status.success() {
+        return Err(format!(
+            "a direct `std::env::var` must fail the configured lint, but Clippy passed; \
+             stderr was:\n{stderr}"
+        ));
+    }
+    for fragment in ["disallowed_methods", "inject an environment reader"] {
+        if !stderr.contains(fragment) {
+            return Err(format!(
+                "the diagnostic must contain {fragment:?}; stderr was:\n{stderr}"
+            ));
         }
     }
+    Ok(())
+}
+
+/// Verifies that a reasoned expectation is the sanctioned escape hatch.
+///
+/// Clippy reports an unfulfilled `#[expect]`, so this case also proves the lint
+/// fires at all: if the configuration were inert, the expectation would be
+/// unfulfilled and the build would fail instead of passing.
+#[test]
+fn a_reasoned_expectation_passes_the_configured_lint() -> Result<(), String> {
+    let workspace = write_policy_workspace(EXPECTED_READ)?;
+    let output = run_policy_clippy(workspace.path())?;
+    if !output.status.success() {
+        return Err(format!(
+            "a reasoned `#[expect(clippy::disallowed_methods)]` must pass, but Clippy failed; \
+             stderr was:\n{}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+    Ok(())
 }
