@@ -37,7 +37,7 @@ pub fn checkout_root() -> Utf8PathBuf {
 /// use test_helpers::toml_path;
 ///
 /// let value = toml_path(camino::Utf8Path::new("/work/checkout"));
-/// assert_eq!(value, "/work/checkout");
+/// assert_eq!(value, "\"/work/checkout\"");
 /// ```
 #[must_use]
 pub fn toml_path(path: &Utf8Path) -> String {

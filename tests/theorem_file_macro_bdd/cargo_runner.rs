@@ -14,7 +14,8 @@ use std::time::Duration;
 
 use camino::Utf8Path;
 use test_helpers::{
-    FixtureOutcome, hermetic_cargo, run_fixture_command, run_fixture_command_within,
+    FixtureCommandError, FixtureOutcome, hermetic_cargo, run_fixture_command,
+    run_fixture_command_within,
 };
 
 /// How long one `cargo kani` build may take before the test fails.
@@ -24,7 +25,7 @@ use test_helpers::{
 /// than a fixture `cargo build`. Giving it the ordinary fixture deadline would
 /// fail a legitimate verification run on a slow or busy host; the nextest
 /// group's allowance still bounds it.
-const KANI_COMMAND_DEADLINE: Duration = Duration::from_secs(1140);
+const KANI_COMMAND_DEADLINE: Duration = Duration::from_secs(1_080);
 
 /// How long the Kani probe may take before it is reported as a failure.
 ///
@@ -72,41 +73,69 @@ pub(crate) fn cargo_run(
     manifest_dir: &Utf8Path,
     target_dir: &Utf8Path,
     subcommand: CargoSubcommand,
-) -> Result<(), String> {
+) -> Result<(), CargoRunFailure> {
     cargo_run_output(manifest_dir, target_dir, subcommand).map(|_| ())
+}
+
+/// Why a fixture Cargo command did not complete successfully.
+///
+/// The variants exist because the Kani scenarios skip when the *environment*
+/// is unusable but must fail when the command overran: a partial log that
+/// happens to contain a library-loader message must not turn a timeout into a
+/// skip.
+#[derive(Debug)]
+pub(crate) enum CargoRunFailure {
+    /// The command was never run, or the fixture lock could not be taken.
+    NotRun(String),
+    /// The command completed with a non-zero exit status.
+    Failed(String),
+    /// The command overran its deadline.
+    TimedOut(String),
+}
+
+impl std::fmt::Display for CargoRunFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotRun(reason) | Self::Failed(reason) | Self::TimedOut(reason) => {
+                formatter.write_str(reason)
+            }
+        }
+    }
 }
 
 pub(crate) fn cargo_run_output(
     manifest_dir: &Utf8Path,
     target_dir: &Utf8Path,
     subcommand: CargoSubcommand,
-) -> Result<String, String> {
+) -> Result<String, CargoRunFailure> {
     let mut command = hermetic_cargo(manifest_dir, target_dir);
     command.args(subcommand.args());
     let outcome = match subcommand {
-        CargoSubcommand::Build => run_fixture_command(command)?,
+        CargoSubcommand::Build => run_fixture_command(command)
+            .map_err(|reason| CargoRunFailure::NotRun(reason.to_string()))?,
         CargoSubcommand::KaniList | CargoSubcommand::Kani => {
-            run_fixture_command_within(command, KANI_COMMAND_DEADLINE)?
+            run_fixture_command_within(command, KANI_COMMAND_DEADLINE)
+                .map_err(|error| CargoRunFailure::NotRun(error.to_string()))?
         }
     };
     match outcome {
         FixtureOutcome::Completed(output) if output.is_success() => Ok(output.combined()),
-        FixtureOutcome::Completed(output) => Err(format!(
+        FixtureOutcome::Completed(output) => Err(CargoRunFailure::Failed(format!(
             "cargo {} failed with status {}\nstdout:\n{}\nstderr:\n{}",
             subcommand.label(),
             output.status,
             output.stdout,
             output.stderr,
-        )),
+        ))),
         FixtureOutcome::TimedOut {
             deadline,
             elapsed,
             output,
-        } => Err(format!(
+        } => Err(CargoRunFailure::TimedOut(format!(
             "cargo {} did not finish within {deadline:?} (ran for {elapsed:?}); \
              it printed:\n{output}",
             subcommand.label(),
-        )),
+        ))),
     }
 }
 
@@ -119,6 +148,11 @@ pub(crate) enum KaniAvailability {
     Unavailable(String),
     /// The probe itself did not finish in time.
     TimedOut(Duration),
+    /// Another fixture command held the lock for the probe's whole deadline.
+    ///
+    /// This says nothing about Kani, so it must not become a skip or an
+    /// "unavailable" verdict.
+    LockBusy(Duration),
 }
 
 /// Probes for a usable `cargo kani`.
@@ -144,7 +178,14 @@ fn probe_kani_within(
 ) -> Result<KaniAvailability, String> {
     let mut command = Command::new(program);
     command.args(["kani", "--version"]);
-    match run_fixture_command_within(command, deadline)? {
+    let outcome = match run_fixture_command_within(command, deadline) {
+        Ok(outcome) => outcome,
+        Err(FixtureCommandError::Lock(_)) => {
+            return Ok(KaniAvailability::LockBusy(deadline));
+        }
+        Err(FixtureCommandError::Command(reason)) => return Err(reason),
+    };
+    match outcome {
         FixtureOutcome::Completed(output) if output.is_success() => Ok(KaniAvailability::Available),
         FixtureOutcome::Completed(output) => {
             let detail = output.stderr.trim();

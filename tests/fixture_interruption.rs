@@ -64,7 +64,9 @@ fn owner_creates_a_fixture_and_holds_the_lock() -> Result<(), String> {
         "//! Fixture crate for the interruption test.\n",
     )?;
     let lock = FixtureLock::acquire_for(Duration::from_secs(30))?;
-    println!("{READY_PREFIX}{}", fixture.manifest_dir());
+    // Serial libtest prints its running-test prefix without a newline, so the
+    // handshake starts on a line of its own and stays recognisable.
+    println!("\n{READY_PREFIX}{}", fixture.manifest_dir());
     std::io::stdout()
         .flush()
         .map_err(|error| format!("the ready handshake could not be flushed: {error}"))?;

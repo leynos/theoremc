@@ -260,7 +260,8 @@ impl FixtureCrate {
     pub fn cargo_build_log(&self) -> Result<BuildLog, String> {
         let mut command = hermetic_cargo(&self.manifest_dir, &self.target_dir);
         command.args(["build", "-vv", "--color", "never"]);
-        match run_fixture_command(command)? {
+        let outcome = run_fixture_command(command).map_err(|error| error.to_string())?;
+        match outcome {
             FixtureOutcome::Completed(output) if output.is_success() => {
                 Ok(BuildLog(output.combined()))
             }

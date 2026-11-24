@@ -9,7 +9,7 @@ use rstest_bdd_macros::then;
 use theoremc::mangle::mangle_theorem_harness;
 
 use super::VALID_SINGLE_THEOREM;
-use super::cargo_runner::{KaniAvailability, kani_is_available, kani_is_required};
+use super::cargo_runner::{CargoRunFailure, KaniAvailability, kani_is_available, kani_is_required};
 use super::fixture_crate::{
     TheoremFixtureSpec, build_fixture_and_list_kani_harnesses,
     build_fixture_and_verify_kani_harnesses,
@@ -56,13 +56,15 @@ pub(super) fn then_kani_lists_the_generated_proof_harness() -> Result<(), String
         content: VALID_SINGLE_THEOREM,
     }) {
         Ok(output) => output,
-        Err(error) if is_unusable_kani_environment(&error) => {
+        // Only a completed, failing command can mean the environment is
+        // unusable. A timeout fails the test whatever its partial log says.
+        Err(CargoRunFailure::Failed(error)) if is_unusable_kani_environment(&error) => {
             return skip_without_kani(
                 &format!("cargo-kani is installed but unusable: {error}"),
                 "listing",
             );
         }
-        Err(error) => return Err(error),
+        Err(error) => return Err(error.to_string()),
     };
     let expected_mangled_harness = mangle_theorem_harness("theorems/single.theorem", "SmokeMacro");
     let expected_harness_identifier = expected_mangled_harness.identifier();
@@ -87,13 +89,13 @@ pub(super) fn then_kani_verifies_every_generated_proof_harness() -> Result<(), S
         content: KANI_VERIFY_THEOREM,
     }) {
         Ok(output) => output,
-        Err(error) if is_unusable_kani_environment(&error) => {
+        Err(CargoRunFailure::Failed(error)) if is_unusable_kani_environment(&error) => {
             return skip_without_kani(
                 &format!("cargo-kani is installed but unusable: {error}"),
                 "verification",
             );
         }
-        Err(error) => return Err(error),
+        Err(error) => return Err(error.to_string()),
     };
 
     // Two theorem documents, so two harnesses, each of which must verify. The
@@ -135,6 +137,11 @@ fn kani_skip_reason(check: &str) -> Result<Option<String>, String> {
         KaniAvailability::TimedOut(deadline) => Err(format!(
             "the cargo-kani availability probe for the Kani {check} check did not finish \
              within {deadline:?}; a hung probe is a failure, not a skip"
+        )),
+        KaniAvailability::LockBusy(deadline) => Err(format!(
+            "the cargo-kani availability probe for the Kani {check} check could not take \
+             the fixture lock within {deadline:?}; another fixture command held it, so \
+             Kani's availability is unknown"
         )),
     }
 }

@@ -11,7 +11,7 @@ use test_helpers::{
     FixtureCrate as CommonFixtureCrate, build_support_dependency_for, checkout_root, toml_path,
 };
 
-use super::cargo_runner::{CargoSubcommand, cargo_run, cargo_run_output};
+use super::cargo_runner::{CargoRunFailure, CargoSubcommand, cargo_run, cargo_run_output};
 
 pub(crate) struct TheoremFixtureSpec<'a> {
     pub(crate) path: &'a str,
@@ -34,11 +34,11 @@ impl FixtureCrate {
         self.inner.write(path, contents)
     }
 
-    pub(crate) fn cargo_build(&self) -> Result<(), String> {
+    pub(crate) fn cargo_build(&self) -> Result<(), CargoRunFailure> {
         self.cargo_run(CargoSubcommand::Build)
     }
 
-    pub(crate) fn cargo_kani_list(&self) -> Result<String, String> {
+    pub(crate) fn cargo_kani_list(&self) -> Result<String, CargoRunFailure> {
         cargo_run_output(
             self.inner.manifest_dir(),
             self.inner.target_dir(),
@@ -46,7 +46,7 @@ impl FixtureCrate {
         )
     }
 
-    pub(crate) fn cargo_kani_verify(&self) -> Result<String, String> {
+    pub(crate) fn cargo_kani_verify(&self) -> Result<String, CargoRunFailure> {
         cargo_run_output(
             self.inner.manifest_dir(),
             self.inner.target_dir(),
@@ -54,7 +54,7 @@ impl FixtureCrate {
         )
     }
 
-    fn cargo_run(&self, subcommand: CargoSubcommand) -> Result<(), String> {
+    fn cargo_run(&self, subcommand: CargoSubcommand) -> Result<(), CargoRunFailure> {
         cargo_run(
             self.inner.manifest_dir(),
             self.inner.target_dir(),
@@ -110,23 +110,27 @@ pub(crate) fn run_valid_fixture_build(spec: &TheoremFixtureSpec<'_>) -> Result<(
 pub(crate) fn run_fixture_build(lib_rs: &str, spec: &TheoremFixtureSpec<'_>) -> Result<(), String> {
     let fixture = FixtureCrate::new(lib_rs)?;
     fixture.write(Utf8Path::new(spec.path), spec.content)?;
-    fixture.cargo_build()
+    fixture.cargo_build().map_err(|error| error.to_string())
 }
 
 /// Builds the fixture crate and runs `cargo kani` over every generated harness.
 pub(crate) fn build_fixture_and_verify_kani_harnesses(
     spec: &TheoremFixtureSpec<'_>,
-) -> Result<String, String> {
-    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
-    fixture.write(Utf8Path::new(spec.path), spec.content)?;
+) -> Result<String, CargoRunFailure> {
+    let fixture = FixtureCrate::new(FIXTURE_LIB_RS).map_err(CargoRunFailure::NotRun)?;
+    fixture
+        .write(Utf8Path::new(spec.path), spec.content)
+        .map_err(CargoRunFailure::NotRun)?;
     fixture.cargo_kani_verify()
 }
 
 pub(crate) fn build_fixture_and_list_kani_harnesses(
     spec: &TheoremFixtureSpec<'_>,
-) -> Result<String, String> {
-    let fixture = FixtureCrate::new(FIXTURE_LIB_RS)?;
-    fixture.write(Utf8Path::new(spec.path), spec.content)?;
+) -> Result<String, CargoRunFailure> {
+    let fixture = FixtureCrate::new(FIXTURE_LIB_RS).map_err(CargoRunFailure::NotRun)?;
+    fixture
+        .write(Utf8Path::new(spec.path), spec.content)
+        .map_err(CargoRunFailure::NotRun)?;
     fixture.cargo_kani_list()
 }
 

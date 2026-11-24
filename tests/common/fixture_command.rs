@@ -58,7 +58,7 @@ pub enum FixtureOutcome {
 /// started, or when the wait for the command fails. An overrun is *not* an error
 /// here: it is reported as [`FixtureOutcome::TimedOut`], because a build timeout
 /// and a build failure need different diagnostics.
-pub fn run_fixture_command(command: Command) -> Result<FixtureOutcome, String> {
+pub fn run_fixture_command(command: Command) -> Result<FixtureOutcome, FixtureCommandError> {
     run_fixture_command_within(command, fixture_command_timeout())
 }
 
@@ -69,18 +69,43 @@ pub fn run_fixture_command(command: Command) -> Result<FixtureOutcome, String> {
 /// same deadline, so a caller can never spend longer waiting for the lock than
 /// the work it is about to do is allowed to take.
 ///
+/// A busy lock is reported as [`FixtureCommandError::Lock`], not as a command
+/// failure: a probe that could not start must not be mistaken for a missing
+/// tool.
+///
 /// # Errors
 ///
-/// Returns an error when the lock cannot be taken, when the command cannot be
-/// started, or when waiting for the command fails.
+/// Returns [`FixtureCommandError::Lock`] when the lock cannot be taken, and
+/// [`FixtureCommandError::Command`] when the command cannot be started or
+/// waiting for it fails.
 pub fn run_fixture_command_within(
     command: Command,
     deadline: Duration,
-) -> Result<FixtureOutcome, String> {
+) -> Result<FixtureOutcome, FixtureCommandError> {
     let started = Instant::now();
-    let lock = FixtureLock::acquire_for(deadline)?;
+    let lock = FixtureLock::acquire_for(deadline).map_err(FixtureCommandError::Lock)?;
     let left = deadline.saturating_sub(started.elapsed());
-    run_locked(&lock, command, left)
+    run_locked(&lock, command, left).map_err(FixtureCommandError::Command)
+}
+
+/// Why a fixture command did not produce an outcome.
+#[derive(Debug)]
+pub enum FixtureCommandError {
+    /// The fixture lock could not be taken within the deadline.
+    ///
+    /// This is the caller's contention, not a property of the command, so a
+    /// caller that is diagnosing a tool must never read it as absence.
+    Lock(String),
+    /// The command could not be started, or waiting for it failed.
+    Command(String),
+}
+
+impl std::fmt::Display for FixtureCommandError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Lock(reason) | Self::Command(reason) => formatter.write_str(reason),
+        }
+    }
 }
 
 /// Runs `command` while `lock` is held, applying `deadline`.

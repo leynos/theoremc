@@ -14,12 +14,14 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 use super::{CommandFailure, run_within_deadline};
 
 /// Builds a `sh` command that runs `script`.
+#[cfg(unix)]
 fn shell(script: &str) -> Command {
     let mut command = Command::new("sh");
     command.args(["-c", script]);
     command
 }
 
+#[cfg(unix)]
 #[test]
 fn both_streams_are_captured_and_the_status_is_reported() {
     let outcome = run_within_deadline(
@@ -48,6 +50,7 @@ fn both_streams_are_captured_and_the_status_is_reported() {
 
 /// Output larger than a pipe buffer would deadlock a runner that waits for the
 /// child without draining. 200 KiB is far beyond a 64 KiB pipe.
+#[cfg(unix)]
 #[test]
 fn output_larger_than_a_pipe_buffer_is_drained_without_deadlocking() {
     let script = "i=0; while [ $i -lt 2000 ]; do \
@@ -69,6 +72,7 @@ fn output_larger_than_a_pipe_buffer_is_drained_without_deadlocking() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn a_child_that_outlives_its_deadline_fails_with_a_timeout() {
     let started = Instant::now();
@@ -86,6 +90,7 @@ fn a_child_that_outlives_its_deadline_fails_with_a_timeout() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 fn a_timed_out_child_reports_what_it_printed_first() -> Result<(), String> {
     let outcome = run_within_deadline(
@@ -107,6 +112,7 @@ fn a_timed_out_child_reports_what_it_printed_first() -> Result<(), String> {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn a_timed_out_direct_child_is_killed_and_reaped() {
     let temp = tempfile::tempdir().expect("create a scratch directory");
@@ -133,6 +139,7 @@ fn a_timed_out_direct_child_is_killed_and_reaped() {
 /// holding stdout; the run must still finish promptly and report the child's
 /// success. The test kills the descendant itself, because the runner deliberately
 /// leaves a successfully completed command's descendants alone.
+#[cfg(unix)]
 #[test]
 fn a_descendant_holding_the_pipe_open_does_not_block_the_runner() {
     let temp = tempfile::tempdir().expect("create a scratch directory");
@@ -162,6 +169,7 @@ fn a_descendant_holding_the_pipe_open_does_not_block_the_runner() {
 }
 
 /// Reads the pid a child recorded in `path`.
+#[cfg(unix)]
 fn read_pid_file(path: &std::path::Path) -> String {
     let root = camino::Utf8Path::from_path(path.parent().expect("the pid file has a parent"))
         .expect("the scratch path is UTF-8");
@@ -175,6 +183,7 @@ fn read_pid_file(path: &std::path::Path) -> String {
 }
 
 /// Kills the process whose id `path` holds, so a test leaves nothing behind.
+#[cfg(unix)]
 fn kill_recorded_process(path: &std::path::Path) {
     let pid = read_pid_file(path);
     let _kill_result = Command::new("kill")
@@ -196,10 +205,40 @@ fn a_command_that_cannot_be_started_reports_the_spawn_failure() {
 }
 
 /// Returns whether `pid` names a live process.
+#[cfg(unix)]
 fn process_is_alive(pid: &str) -> bool {
     Command::new("kill")
         .args(["-0", pid])
         .stderr(Stdio::null())
         .status()
         .is_ok_and(|status| status.success())
+}
+
+/// A timeout must terminate a descendant, not only the direct child.
+///
+/// The stub starts a descendant that records its own pid and outlives the
+/// deadline. Killing only the direct child would leave it running, so this test
+/// fails whenever the process-group kill is removed.
+#[cfg(unix)]
+#[test]
+fn a_timed_out_command_terminates_its_descendants() {
+    let temp = tempfile::tempdir().expect("create a scratch directory");
+    let pid_file = temp.path().join("descendant.pid");
+
+    // The direct child waits on the descendant, so the deadline fires while
+    // both are alive, and the descendant is the only thing recording a pid.
+    let mut command = shell("sh -c 'echo $$ > \"$1\"; exec sleep 30' sh \"$2\" & wait");
+    command.arg("sh").arg(&pid_file);
+    let outcome = run_within_deadline(command, Duration::from_millis(400));
+    assert!(
+        matches!(&outcome, Err(CommandFailure::Timeout { .. })),
+        "the command must time out, got {outcome:?}",
+    );
+
+    let pid = read_pid_file(&pid_file);
+    assert!(
+        !process_is_alive(pid.trim()),
+        "descendant {} must have been killed with its group",
+        pid.trim(),
+    );
 }

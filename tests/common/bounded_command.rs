@@ -196,7 +196,17 @@ impl Reader {
             CommandFailure::Spawn(io::Error::other(format!("{name} was not captured")))
         })?;
         let (sender, chunks) = mpsc::channel();
-        std::thread::spawn(move || forward_chunks(source, &sender));
+        // A failed spawn must not leave the child running behind a released
+        // lock, so it is reported through the same failure the caller already
+        // handles by killing and reaping the child.
+        std::thread::Builder::new()
+            .name(format!("fixture-{name}-reader"))
+            .spawn(move || forward_chunks(source, &sender))
+            .map_err(|error| {
+                CommandFailure::Spawn(io::Error::other(format!(
+                    "could not start the {name} reader: {error}"
+                )))
+            })?;
         Ok(Self {
             chunks,
             collected: Vec::new(),
@@ -204,9 +214,14 @@ impl Reader {
     }
 
     /// Collects the forwarded chunks, waiting at most [`DRAIN_GRACE`] for more.
+    ///
+    /// The elapsed time is checked before each receive, because a channel with
+    /// queued chunks answers even a zero timeout: a descendant that keeps the
+    /// pipe busy would otherwise hold this loop, and the fixture lock with it,
+    /// past the grace period.
     fn finish(mut self) -> String {
         let started = Instant::now();
-        loop {
+        while started.elapsed() < DRAIN_GRACE {
             let left = DRAIN_GRACE.saturating_sub(started.elapsed());
             match self.chunks.recv_timeout(left) {
                 Ok(chunk) => self.collected.extend_from_slice(&chunk),
