@@ -140,6 +140,22 @@ fn ci_runs_the_aggregate_lint_with_a_pinned_installer() {
     )
 )]
 #[case::block_scalar_lint("      - name: Lint\n        run: |\n          make lint\n")]
+#[case::opening_env_override(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - env: { LINT_PACKAGES: --package theoremc }\n        run: make lint\n",
+    )
+)]
+#[case::quoted_installer_bypass(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        run: 'make lint'\n        continue-on-error: true\n",
+    )
+)]
 fn an_invalid_lint_job_is_rejected(#[case] body: &str) {
     let workflow = single_job(body);
     assert!(
@@ -260,6 +276,20 @@ fn a_single_key_step_form_is_read(#[case] body: &str) {
         verify_lint_gate(&workflow).is_err(),
         "this job must be rejected:\n{body}"
     );
+}
+
+/// A quoted `run:` scalar is the same command after YAML decoding.
+#[test]
+fn a_quoted_run_scalar_is_read() {
+    let body = concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        run: 'make lint'\n",
+    );
+    if let Err(report) = verify_lint_gate(&single_job(body)) {
+        panic!("a quoted `make lint` scalar must be accepted: {report}");
+    }
 }
 
 /// A one-key `- run: make lint` step satisfies the aggregate contract.

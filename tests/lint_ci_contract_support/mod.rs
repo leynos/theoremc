@@ -50,10 +50,11 @@ const COVERAGE_VARIABLES: [&str; 8] = [
 fn run_command(step: &[Line<'_>], indent: usize) -> Option<String> {
     let run_line = step_run_line(step, indent)?;
     let trimmed = run_line.trimmed();
-    let value = trimmed
+    let raw = trimmed
         .strip_prefix("- run:")
         .or_else(|| trimmed.strip_prefix("run:"))?
         .trim();
+    let value = unquote(raw);
     if !value.starts_with(['|', '>']) {
         return Some(value.to_owned());
     }
@@ -67,6 +68,24 @@ fn run_command(step: &[Line<'_>], indent: usize) -> Option<String> {
         .collect::<Vec<_>>()
         .join("\n");
     Some(body)
+}
+
+/// Removes one layer of YAML quoting from a scalar value.
+///
+/// YAML permits a plain, single-quoted, or double-quoted scalar, and the
+/// quotes are syntax rather than part of the command, so `'make lint'` runs the
+/// same command as `make lint`.
+fn unquote(value: &str) -> &str {
+    let trimmed = value.trim();
+    for quote in ['"', '\''] {
+        if let Some(inner) = trimmed
+            .strip_prefix(quote)
+            .and_then(|rest| rest.strip_suffix(quote))
+        {
+            return inner;
+        }
+    }
+    trimmed
 }
 
 /// Reports whether a command invokes the aggregate lint target.
@@ -110,9 +129,11 @@ fn environment_keys<'a>(lines: &[Line<'a>], indent: usize) -> Vec<&'a str> {
     lines
         .iter()
         .enumerate()
-        .filter(|(_, line)| line.indent() == indent)
+        .filter(|(_, line)| line.indent() == indent || line.indent() + 2 == indent)
         .filter_map(|(index, line)| {
-            let rest = line.trimmed().strip_prefix("env:")?.trim();
+            let trimmed = line.trimmed();
+            let entry = trimmed.strip_prefix("- ").unwrap_or(trimmed);
+            let rest = entry.strip_prefix("env:")?.trim();
             Some((index, rest))
         })
         .flat_map(|(index, rest)| env_block_keys(lines, index, rest))

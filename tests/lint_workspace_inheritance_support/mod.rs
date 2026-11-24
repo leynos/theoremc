@@ -125,31 +125,36 @@ impl Repository {
             .map_err(|error| format!("reading {path}: {error}"))
     }
 
-    /// Returns the names of the directories under `crates`.
+    /// Returns the directories under `root` one level down, as repository
+    /// paths.
+    ///
+    /// First-level packages live under `crates/` in this workspace, but a
+    /// member pattern may name any tree, so the scan is rooted at the
+    /// caller's choice.
     ///
     /// # Errors
     ///
-    /// Returns the reason when `crates` cannot be listed.
-    pub(crate) fn crate_directories(&self) -> Result<Vec<String>, String> {
+    /// Returns the reason when `root` cannot be listed.
+    pub(crate) fn subdirectories(&self, root: &str) -> Result<Vec<String>, String> {
         let entries = self
             .dir
-            .read_dir("crates")
-            .map_err(|error| format!("listing crates: {error}"))?;
-        let mut names = Vec::new();
+            .read_dir(root)
+            .map_err(|error| format!("listing {root}: {error}"))?;
+        let mut paths = Vec::new();
         for entry in entries {
-            let item = entry.map_err(|error| format!("reading a crates entry: {error}"))?;
+            let item = entry.map_err(|error| format!("reading a {root} entry: {error}"))?;
             let name = item
                 .file_name()
-                .map_err(|error| format!("reading a crates entry name: {error}"))?;
+                .map_err(|error| format!("reading a {root} entry name: {error}"))?;
             let is_directory = item
                 .file_type()
-                .map_err(|error| format!("reading the type of crates/{name}: {error}"))?
+                .map_err(|error| format!("reading the type of {root}/{name}: {error}"))?
                 .is_dir();
             if is_directory {
-                names.push(name);
+                paths.push(format!("{root}/{name}"));
             }
         }
-        Ok(names)
+        Ok(paths)
     }
 }
 
@@ -241,44 +246,87 @@ pub(crate) fn verify_member_manifest(path: &str, manifest: &str) -> Result<(), S
     verify_opt_in(path, manifest)
 }
 
-/// Reports whether a `members` entry names `path`.
+/// Reports whether a `members` pattern names `path`.
 ///
-/// Cargo accepts a glob in `members`, so `crates/*` covers every crate
-/// directory one level down. A literal entry must match exactly.
-fn member_covers(entry: &str, path: &str) -> bool {
-    entry.strip_suffix("/*").map_or_else(
-        || entry == path.trim_end_matches('/'),
-        |prefix| {
-            path.strip_prefix(prefix)
-                .and_then(|rest| rest.strip_prefix('/'))
-                .is_some_and(|rest| !rest.is_empty() && !rest.contains('/'))
-        },
-    )
+/// Cargo accepts a glob in any segment of a member path, so `crates/*` covers
+/// every crate directory one level down and `crates/theorem-*` covers the
+/// crates whose names share that prefix. A pattern with no `*` must match
+/// exactly.
+fn member_covers(pattern: &str, path: &str) -> bool {
+    let wanted = pattern.trim_end_matches('/');
+    let candidate = path.trim_end_matches('/');
+    if !wanted.contains('*') {
+        return wanted == candidate;
+    }
+    segments_match(wanted, candidate)
 }
 
-/// Returns the crate directories the workspace does not list.
+/// Reports whether one path segment matches a pattern segment.
 ///
-/// A crate directory that is no member is compiled by no gate and linted by
+/// Each `*` stands for any run of characters within the segment, and the
+/// segments before and after it must match literally.
+fn segment_glob_matches(pattern: &str, value: &str) -> bool {
+    let Some((prefix, rest)) = pattern.split_once('*') else {
+        return pattern == value;
+    };
+    let Some(remainder) = value.strip_prefix(prefix) else {
+        return false;
+    };
+    match rest.rsplit_once('*') {
+        Some((_, suffix)) => remainder.ends_with(suffix),
+        None => rest.is_empty() || remainder.ends_with(rest),
+    }
+}
+
+/// Reports whether every segment of a pattern matches its path segment.
+fn segments_match(pattern: &str, path: &str) -> bool {
+    let expected: Vec<&str> = pattern.split('/').collect();
+    let actual: Vec<&str> = path.split('/').collect();
+    expected.len() == actual.len()
+        && expected
+            .iter()
+            .zip(&actual)
+            .all(|(segment, part)| segment_glob_matches(segment, part))
+}
+
+/// Returns every package directory the repository holds.
+///
+/// A package directory holds a `Cargo.toml`. The workspace's members live
+/// under `crates/` and `tools/`, so both trees are scanned; a literal member
+/// outside them is still read, because it needs no scan to be resolved. A tree
+/// that cannot be listed contributes no packages, which the member checks then
+/// report rather than silently accepting.
+pub(crate) fn package_directories(repository: &Repository) -> Vec<String> {
+    let mut packages = Vec::new();
+    for root in ["crates", "tools"] {
+        for directory in repository.subdirectories(root).unwrap_or_default() {
+            if repository.read(&format!("{directory}/Cargo.toml")).is_ok() {
+                packages.push(directory);
+            }
+        }
+    }
+    packages
+}
+
+/// Returns the package directories the workspace does not list.
+///
+/// A package directory that is no member is compiled by no gate and linted by
 /// none either, so the caller treats any entry here as a failure.
-pub(crate) fn undeclared_crates(crate_directories: &[String], members: &[String]) -> Vec<String> {
-    crate_directories
+pub(crate) fn undeclared_crates(package_directories: &[String], members: &[String]) -> Vec<String> {
+    package_directories
         .iter()
-        .map(|name| format!("crates/{name}"))
         .filter(|path| !members.iter().any(|entry| member_covers(entry, path)))
+        .cloned()
         .collect()
 }
 
-/// Returns the member manifest paths, with a glob expanded to its matches.
-pub(crate) fn resolved_members(members: &[String], crate_directories: &[String]) -> Vec<String> {
-    let crate_paths: Vec<String> = crate_directories
-        .iter()
-        .map(|name| format!("crates/{name}"))
-        .collect();
+/// Returns the member manifest paths, with every glob expanded to its matches.
+pub(crate) fn resolved_members(members: &[String], package_directories: &[String]) -> Vec<String> {
     members
         .iter()
         .flat_map(|entry| {
             if entry.contains('*') {
-                crate_paths
+                package_directories
                     .iter()
                     .filter(|path| member_covers(entry, path))
                     .cloned()

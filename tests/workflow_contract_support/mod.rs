@@ -70,6 +70,9 @@ impl<'a> Line<'a> {
 ///   build-test-extra:                    -> Some("build-test-extra")
 /// ```
 fn job_key(line: Line<'_>) -> Option<&str> {
+    if line.is_comment() {
+        return None;
+    }
     let rest = line.text.strip_prefix("  ")?;
     if rest.starts_with(' ') {
         return None;
@@ -79,6 +82,27 @@ fn job_key(line: Line<'_>) -> Option<&str> {
     (trimmed_suffix.is_empty() || trimmed_suffix.starts_with('#')).then_some(key)
 }
 
+/// Returns the line range of the workflow's `jobs:` mapping.
+///
+/// Discovery starts after the top-level `jobs:` key and stops at the next
+/// column-zero key, so `build-test:` text inside an earlier top-level block
+/// scalar is data rather than a job.
+fn jobs_range(lines: &[Line<'_>]) -> Option<(usize, usize)> {
+    let start = lines
+        .iter()
+        .position(|line| line.indent() == 0 && line.trimmed().starts_with("jobs:"))?
+        + 1;
+    let end = lines
+        .iter()
+        .enumerate()
+        .skip(start)
+        .find(|(_, line)| {
+            line.indent() == 0 && !line.is_blank() && !line.is_comment() && !line.opens_step()
+        })
+        .map_or(lines.len(), |(index, _)| index);
+    Some((start, end))
+}
+
 /// Returns every top-level job in file order, with the lines it owns.
 ///
 /// A job runs until the next line that opens a job, so a contract can inspect
@@ -86,9 +110,14 @@ fn job_key(line: Line<'_>) -> Option<&str> {
 /// the name beside the lines lets a diagnostic say which job drifted.
 pub(crate) fn jobs<'a>(workflow: Workflow<'a>) -> Vec<(&'a str, Vec<Line<'a>>)> {
     let lines: Vec<Line<'a>> = workflow.0.lines().map(Line::new).collect();
+    let Some((first, last)) = jobs_range(&lines) else {
+        return Vec::new();
+    };
     let starts: Vec<usize> = lines
         .iter()
         .enumerate()
+        .take(last)
+        .skip(first)
         .filter(|(_, line)| job_key(**line).is_some())
         .map(|(index, _)| index)
         .collect();
@@ -97,7 +126,7 @@ pub(crate) fn jobs<'a>(workflow: Workflow<'a>) -> Vec<(&'a str, Vec<Line<'a>>)> 
         .enumerate()
         .filter_map(|(position, start)| {
             let name = job_key(*lines.get(*start)?)?;
-            let end = starts.get(position + 1).copied().unwrap_or(lines.len());
+            let end = starts.get(position + 1).copied().unwrap_or(last);
             Some((name, lines.get(*start..end)?.to_vec()))
         })
         .collect()
@@ -190,7 +219,10 @@ pub(crate) fn steps<'a, 'b>(job: &'a [Line<'b>]) -> Vec<(usize, &'a [Line<'b>])>
         .collect();
     starts
         .iter()
-        .filter_map(|start| Some((*start, job.get(*start..step_end(job, *start, step_indent))?)))
+        .filter_map(|start| {
+            let stop = step_end(job, *start, step_indent).min(end);
+            Some((*start, job.get(*start..stop)?))
+        })
         .collect()
 }
 

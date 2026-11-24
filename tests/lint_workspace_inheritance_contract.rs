@@ -20,8 +20,9 @@
 mod lint_workspace_inheritance_support;
 
 use lint_workspace_inheritance_support::{
-    Repository, array_items, is_workspace_opt_in, member_manifest_path, resolved_members,
-    undeclared_crates, verify_member_manifest, verify_root_manifest, workspace_members,
+    Repository, array_items, is_workspace_opt_in, member_manifest_path, package_directories,
+    resolved_members, undeclared_crates, verify_member_manifest, verify_root_manifest,
+    workspace_members,
 };
 
 /// Verifies the whole inheritance contract over the committed manifests.
@@ -35,15 +36,13 @@ fn every_workspace_package_inherits_the_workspace_lint_tables() {
         panic!("the root manifest must hold the lint inheritance contract: {report}");
     }
     let members = workspace_members(&repository).expect("the workspace members must be readable");
-    let crate_directories = repository
-        .crate_directories()
-        .unwrap_or_else(|error| panic!("{error}"));
-    let undeclared = undeclared_crates(&crate_directories, &members);
+    let packages = package_directories(&repository);
+    let undeclared = undeclared_crates(&packages, &members);
     assert!(
         undeclared.is_empty(),
         "every crate directory must be a workspace member, or no gate reaches it; found {undeclared:?}"
     );
-    for member in resolved_members(&members, &crate_directories) {
+    for member in resolved_members(&members, &packages) {
         let path = member_manifest_path(&member);
         let manifest = repository
             .read(&path)
@@ -158,13 +157,15 @@ fn the_opt_in_is_read_by_its_meaning() {
 #[test]
 fn an_undeclared_crate_is_reported() {
     let members = vec!["crates/declared".to_owned()];
+    let packages = vec!["crates/declared".to_owned(), "crates/forgotten".to_owned()];
     assert_eq!(
-        undeclared_crates(&["declared".to_owned(), "forgotten".to_owned()], &members),
+        undeclared_crates(&packages, &members),
         vec!["crates/forgotten".to_owned()],
         "a crate directory missing from `members` must be reported"
     );
+    let declared_only = vec!["crates/declared".to_owned()];
     assert!(
-        undeclared_crates(&["declared".to_owned()], &members).is_empty(),
+        undeclared_crates(&declared_only, &members).is_empty(),
         "a declared crate directory must not be reported"
     );
 }
@@ -172,26 +173,32 @@ fn an_undeclared_crate_is_reported() {
 /// A glob member covers the crate directories it matches, and no others.
 #[test]
 fn a_glob_member_covers_its_matches() {
-    let directories = vec!["one".to_owned(), "two".to_owned(), "nested".to_owned()];
-    let glob = vec!["crates/*".to_owned()];
+    let directories = vec![
+        "crates/one".to_owned(),
+        "crates/two".to_owned(),
+        "tools/helper".to_owned(),
+    ];
+    let glob = vec!["crates/*".to_owned(), "tools/*".to_owned()];
     assert!(
         undeclared_crates(&directories, &glob).is_empty(),
-        "a `crates/*` member must cover every crate directory"
+        "the glob members must cover every package directory"
     );
     assert_eq!(
         resolved_members(&glob, &directories),
-        vec![
-            "crates/one".to_owned(),
-            "crates/two".to_owned(),
-            "crates/nested".to_owned()
-        ],
-        "a glob member must expand to the crate directories it matches"
+        directories,
+        "a glob member must expand to the directories it matches"
     );
     let narrower = vec!["crates/one".to_owned()];
     assert_eq!(
         undeclared_crates(&directories, &narrower),
-        vec!["crates/two".to_owned(), "crates/nested".to_owned()],
+        vec!["crates/two".to_owned(), "tools/helper".to_owned()],
         "a literal member must not cover its siblings"
+    );
+    let prefix = vec!["crates/t*".to_owned(), "tools/*".to_owned()];
+    assert_eq!(
+        undeclared_crates(&directories, &prefix),
+        vec!["crates/one".to_owned()],
+        "a segment glob must match a prefix, as Cargo's matching does"
     );
 }
 
