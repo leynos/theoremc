@@ -175,6 +175,9 @@ the committed file changes in the way the rule forbids.
 - [x] (2026-11-23) Recorded the unmodified `make lint` result for the final
       tree: exit 0, zero errors, all three stages in order.
 - [x] (2026-11-23) Pushed the branch and opened draft pull request 279.
+- [x] (2026-11-24) Answered ten CodeRabbit review passes, fixing every finding
+      at source with a case that fails when the fix is reverted. Hosted CI was
+      green on each code commit.
 
 ## Surprises & discoveries
 
@@ -209,6 +212,23 @@ the committed file changes in the way the rule forbids.
 - Leave the CI workflow and installer SHA untouched. The suite pin remains an
   open owner and QG-002 decision; ADR 0013 records that only the installer
   action is pinned and the suite is rolling.
+
+## Surprises & discoveries (review loop)
+
+CodeRabbit ran ten times against the branch. The first review found seven
+findings, the second ten, and later passes found five to nine each. They were
+not repetitions: each named a distinct YAML or TOML form the handwritten
+readers treated as absent, and several were real bypasses rather than
+robustness suggestions. A second job could run `make -s lint` or
+`env make lint` behind a valid first job; a `}` inside a `#` comment closed a
+flow mapping before the override beneath it; a step slice could absorb a
+sibling key holding `run: make spelling`.
+
+The decisive change was not any single fix but the stance. The readers now
+distinguish "no such key" from "a form I cannot interpret", and report the
+second as an error. Without that, every tolerance added widened the set of
+inputs that passed by being skipped. With it, a syntax the checker does not
+understand fails the contract, which is the safe direction for a gate.
 
 ## Outcomes & retrospective
 
