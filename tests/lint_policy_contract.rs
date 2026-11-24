@@ -70,17 +70,19 @@ fn lint_level<'a>(group: &'a Table, name: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("lint `{name}` must be declared as a level string"))
 }
 
-/// Returns every lint in `group` whose declared level is not `deny`.
+/// Returns every lint in `group` that is missing or weaker than required.
 ///
-/// Reporting the whole group at once means a failure names every downgraded
-/// rule rather than only the first, which is what a reviewer needs after a
-/// bulk edit.
+/// `deny` and `forbid` both satisfy the baseline, because the policy is a
+/// minimum: promoting a lint to `forbid` raises it, and promoting it to `allow`
+/// or `warn` lowers it. Reporting the whole group at once means a failure names
+/// every offending rule rather than only the first, which is what a reviewer
+/// needs after a bulk edit.
 fn rules_not_denied(group: &Table, names: &[&str]) -> Vec<String> {
     names
         .iter()
         .filter_map(|name| {
             let level = lint_level(group, name).unwrap_or("<missing>");
-            (level != "deny").then(|| format!("{name} = {level}"))
+            (!matches!(level, "deny" | "forbid")).then(|| format!("{name} = {level}"))
         })
         .collect()
 }
@@ -189,6 +191,35 @@ fn read_manifest(manifest_path: &str) -> Result<String, String> {
 }
 
 #[test]
+fn the_minimum_predicate_accepts_stricter_and_rejects_weaker_levels() {
+    // The baseline is a floor. A promotion to `forbid` must satisfy it, while a
+    // downgrade to `warn` or `allow`, or a deleted entry, must not, or the
+    // contract would block a policy increase or hide a decrease.
+    let mut table = Table::new();
+    for (name, level) in [
+        ("denied", "deny"),
+        ("forbidden", "forbid"),
+        ("warned", "warn"),
+        ("allowed", "allow"),
+    ] {
+        table.insert(name.to_owned(), Value::String(level.to_owned()));
+    }
+    let names = ["denied", "forbidden", "warned", "allowed", "absent"];
+
+    let offending = rules_not_denied(&table, &names);
+
+    assert_eq!(
+        offending,
+        vec![
+            "warned = warn".to_owned(),
+            "allowed = allow".to_owned(),
+            "absent = <missing>".to_owned(),
+        ],
+        "only weaker or missing levels should be reported"
+    );
+}
+
+#[test]
 fn clippy_table_denies_the_netsuke_baseline() {
     let lints = lint_tables().expect("the root manifest should declare workspace lints");
     let clippy = lint_group(&lints, "clippy").expect("the Clippy lint table should exist");
@@ -285,9 +316,15 @@ fn clippy_config_disallows_every_environment_method_with_a_reason() {
     let declared =
         disallowed_method_paths(&config).expect("every disallowed method should carry a reason");
 
-    assert_eq!(
-        declared, BASELINE_DISALLOWED_METHODS,
-        "clippy.toml should disallow every baseline environment method, in order"
+    // Membership, not equality: the baseline is a floor, so an additional
+    // restriction is an improvement rather than a contract break.
+    let absent: Vec<&&str> = BASELINE_DISALLOWED_METHODS
+        .iter()
+        .filter(|method| !declared.iter().any(|entry| entry == *method))
+        .collect();
+    assert!(
+        absent.is_empty(),
+        "clippy.toml must disallow every baseline environment method; absent: {absent:?}"
     );
 }
 

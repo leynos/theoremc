@@ -107,8 +107,11 @@ pub(crate) fn cargo_run_output(
 /// Runs a Cargo subcommand in the fixture crate with warnings denied.
 ///
 /// The child process owns its flags, so this does not mutate the test
-/// process. `CARGO_ENCODED_RUSTFLAGS` is removed because Cargo prefers it over
-/// `RUSTFLAGS`, and an inherited value would silently defeat the denial.
+/// process. An assigned `RUSTFLAGS` replaces the repository's
+/// `.cargo/config.toml` build standard, so the inherited value is composed in
+/// first, exactly as the Makefile recipes do, and the denial is appended
+/// rather than substituted. `CARGO_ENCODED_RUSTFLAGS` is removed because Cargo
+/// prefers it over `RUSTFLAGS`, and a stale value would silently defeat both.
 pub(crate) fn cargo_run_denying_warnings(
     manifest_dir: &Utf8Path,
     target_dir: &Utf8Path,
@@ -118,10 +121,27 @@ pub(crate) fn cargo_run_denying_warnings(
     let output = hermetic_cargo(manifest_dir, target_dir)
         .args(subcommand.args())
         .env_remove("CARGO_ENCODED_RUSTFLAGS")
-        .env("RUSTFLAGS", "-D warnings")
+        .env("RUSTFLAGS", denying_warnings_rustflags())
         .output()
         .map_err(|error| error.to_string())?;
     command_result(subcommand, &output).map(|_| ())
+}
+
+/// Composes the warning denial onto any inherited `RUSTFLAGS`.
+///
+/// An inherited value is preserved rather than replaced, mirroring
+/// `${RUSTFLAGS:+$RUSTFLAGS }` in the Makefile. Cargo supplies
+/// `.cargo/config.toml` flags itself when `RUSTFLAGS` is unset, so a bare
+/// environment gives the build standard plus the denial.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the fixture build must inherit the host Cargo invocation's rustflags, so it composes them exactly as the Makefile recipes do"
+)]
+fn denying_warnings_rustflags() -> String {
+    std::env::var("RUSTFLAGS").map_or_else(
+        |_| "-D warnings".to_owned(),
+        |inherited| format!("{inherited} -D warnings"),
+    )
 }
 
 pub(crate) fn recover_mutex_guard(mutex: &Mutex<()>) -> MutexGuard<'_, ()> {
