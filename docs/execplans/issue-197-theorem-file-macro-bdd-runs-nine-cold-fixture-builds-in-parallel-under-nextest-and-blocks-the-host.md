@@ -273,6 +273,19 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       the limit is kept whole and unmarked. The truncation path previously had
       no test of its own, only the incidental coverage of the chatty-child
       test.
+- [x] (2026-11-24T15:10Z) Gates for the third-pass fixes, all green:
+      `make check-fmt`, `make lint` (rustdoc 32m, Clippy 8m54s, Whitaker
+      52m19s), `make typecheck` (78m35s), `make markdownlint`, `make nixie`,
+      `make spelling`, all 53 `test-helpers` tests, all 8
+      `nextest_config_contract` tests, and all 12 non-Kani
+      `theorem_file_macro_bdd` tests (1685 s with
+      `THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS=1140`). The first macro-suite
+      attempt, without the override, failed
+      `a_missing_forall_type_fails_ordinary_compilation` at the 540 s default:
+      the shared fixture target held no compiled dependencies at that moment,
+      so the build was genuinely cold, which is the case the override exists
+      for. Every elapsed time above reflects this host's saturated
+      compiler-admission pool, not repository work.
 - [x] (2026-11-24T09:20Z) Hosted CI is green on `8ffb662`: every step of the
       `CI` workflow passed (Format, ADR/RFC names, Markdown lint, Spelling,
       Lint, Typecheck, MSRV, agent-native policy, Test and coverage), and the
