@@ -236,7 +236,11 @@ Acceptance commands: the full gate list above.
 | `make check-adr-rfc-names`              | pass                                                  |
 | wildcard-import Clippy                  | pass                                                  |
 | `cargo modules graph --acyclic`         | unavailable locally; `cargo-modules` is not installed |
-| `make test`                             | see below                                             |
+
+The baseline was re-checked after Netsuke `main` advanced to `37a0bcc`. Its
+three lint tables are byte-identical to the `871b609` baseline recorded above,
+so the comparison this plan relies on still describes the current policy.
+| `make test` | see below |
 
 Three findings were fixed rather than suppressed: `clippy::doc_markdown` wanted
 the project name in backticks; `format!(concat!(..))` cannot capture a variable
