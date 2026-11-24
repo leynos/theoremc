@@ -235,7 +235,14 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       <https://github.com/leynos/theoremc/pull/281>, titled with `(#197)` and
       stating `Closes #197`, with a `## References` section linking the issue,
       #143, the ExecPlan, ADR-0014 and the Lody session.
-- [ ] Re-evaluate #143 and post the summary there.
+- [x] (2026-11-24T08:20Z) Issue #143 re-evaluated and a summary posted
+      (<https://github.com/leynos/theoremc/issues/143#issuecomment-7126321385>).
+      The ENOENT failure did not recur in these runs, but #143 is left **open**:
+      the plan requires repeated clean runs, and one clean run on a heavily
+      contended host is not that evidence. The structural fix is that a fixture
+      directory can no longer disappear under a sibling test, because the
+      commands are serialized by a file lock and the sources live under the
+      shared target rather than in `$TMPDIR`.
 - [ ] Mark the plan COMPLETE once the draft PR's checks are green.
 
 ## Surprises & discoveries
