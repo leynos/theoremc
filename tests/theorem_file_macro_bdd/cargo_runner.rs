@@ -121,6 +121,17 @@ pub(crate) fn kani_is_installed() -> bool {
         .is_ok_and(|o| o.status.success())
 }
 
+/// Maps the `THEOREMC_REQUIRE_KANI` value to the required-Kani policy.
+///
+/// Only the exact value `1` requires Kani. The comparison is deliberate: an
+/// `is_some()` rule would turn any stray value, including `0` or `false`, into
+/// a required run, and treating "unset" as the required state would make every
+/// developer machine red. Taking the value as an argument keeps the mapping
+/// testable without touching the process environment.
+pub(crate) fn kani_required_from(value: Option<&std::ffi::OsStr>) -> bool {
+    value.is_some_and(|declared| declared == "1")
+}
+
 /// Returns `true` when the run must fail rather than skip without Kani.
 ///
 /// `make kani` and the proofs workflow set `THEOREMC_REQUIRE_KANI=1`, so a
@@ -131,7 +142,7 @@ pub(crate) fn kani_is_installed() -> bool {
     reason = "the CI proofs workflow and `make kani` export THEOREMC_REQUIRE_KANI to the test process, so the harness reads the host's value at this boundary"
 )]
 pub(crate) fn kani_is_required() -> bool {
-    std::env::var_os("THEOREMC_REQUIRE_KANI").is_some_and(|value| value == "1")
+    kani_required_from(std::env::var_os("THEOREMC_REQUIRE_KANI").as_deref())
 }
 
 /// What the Kani scenarios should do with one probe-plus-run outcome.
@@ -209,12 +220,38 @@ fn command_result(
 mod tests {
     //! Unit tests for the Kani probe-and-run policy.
 
+    use std::ffi::OsStr;
+
     use rstest::rstest;
 
-    use super::{KaniOutcome, classify_kani_run};
+    use super::{KaniOutcome, classify_kani_run, kani_required_from};
 
     /// The loader failure observed when Kani's toolchain cannot start.
     const LOADER_ERROR: &str = "error while loading shared libraries: libLLVM.so";
+
+    /// Only the exact value `1` requires Kani.
+    ///
+    /// The other values are the ones an `is_some()` rule, or an "unset means
+    /// required" rule, would misclassify.
+    #[rstest]
+    #[case::unset(None, false)]
+    #[case::one(Some("1"), true)]
+    #[case::zero(Some("0"), false)]
+    #[case::empty(Some(""), false)]
+    #[case::true_word(Some("true"), false)]
+    #[case::leading_zero(Some("01"), false)]
+    fn kani_is_required_only_for_the_exact_value_one(
+        #[case] value: Option<&str>,
+        #[case] expected: bool,
+    ) {
+        let os_value = value.map(OsStr::new);
+
+        assert_eq!(
+            kani_required_from(os_value),
+            expected,
+            "THEOREMC_REQUIRE_KANI={value:?} should map to {expected}"
+        );
+    }
 
     /// Proves the probe gate by failing the test when the run closure executes.
     fn run_must_not_happen() -> Result<String, String> {
