@@ -322,33 +322,56 @@ pub(super) fn shared_target_dir() -> Result<Utf8PathBuf, String> {
         .map_err(|error| error.to_string())
 }
 
-/// Returns the Cargo home every fixture build shares, creating it if absent.
+/// Returns the absolute Cargo home every fixture build shares, creating it if
+/// absent.
 ///
 /// `make fetch` populates this home and exports its path, so a nested build
 /// resolves from it without touching the caller's `$CARGO_HOME`. That keeps a
 /// fixture out of the shared package-cache lock, which even an offline Cargo
 /// takes exclusively, and leaves the caller's target warm.
 ///
+/// The result is absolute even when `THEOREMC_FIXTURE_CARGO_HOME` is relative.
+/// Cargo resolves a relative `CARGO_HOME` against its own working directory,
+/// and each fixture build runs in the fixture's temporary directory, so a
+/// relative home would send every fixture to a different, empty cache.
+///
 /// # Errors
 ///
-/// Returns an error when the directory cannot be created.
+/// Returns an error when the directory cannot be created or its absolute path
+/// cannot be resolved.
 #[expect(
     clippy::disallowed_methods,
     reason = "the fixture Cargo home is chosen by the host build (`make fetch` exports it), so the helper reads the ambient THEOREMC_FIXTURE_CARGO_HOME and otherwise falls back to the repository's target"
 )]
 pub fn fixture_cargo_home() -> Result<Utf8PathBuf, String> {
-    let configured = std::env::var(FIXTURE_CARGO_HOME_VARIABLE).ok();
-    let directory = resolved_cargo_home(configured.as_deref());
+    prepared_cargo_home(std::env::var(FIXTURE_CARGO_HOME_VARIABLE).ok().as_deref())
+}
+
+/// Creates the Cargo home `configured` names and returns its absolute path.
+///
+/// Taking the configured value as an argument keeps the environment read at
+/// the one boundary above, so the relative-path rule can be tested without
+/// mutating process state.
+///
+/// # Errors
+///
+/// Returns an error when the directory cannot be created or its absolute path
+/// cannot be resolved.
+fn prepared_cargo_home(configured: Option<&str>) -> Result<Utf8PathBuf, String> {
+    let directory = resolved_cargo_home(configured);
     Dir::create_ambient_dir_all(&directory, ambient_authority())
         .map_err(|error| error.to_string())?;
-    Ok(directory)
+    directory
+        .canonicalize_utf8()
+        .map_err(|error| error.to_string())
 }
 
 /// Returns the Cargo home a fixture build uses when `configured` names one.
 ///
 /// The fallback sits inside the repository's target directory, so it is warm
 /// on a second run and `cargo clean` removes it with the rest of the build
-/// output.
+/// output. A configured value is taken as given; [`fixture_cargo_home`] makes
+/// the result absolute.
 fn resolved_cargo_home(configured: Option<&str>) -> Utf8PathBuf {
     configured.map_or_else(
         || repository_root().join("target/theoremc-fixture-cargo-home"),

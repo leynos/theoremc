@@ -618,13 +618,16 @@ suite.
 - Fixture builds resolve from a dedicated Cargo home, not the caller's. The
   path comes from `THEOREMC_FIXTURE_CARGO_HOME` when it is set, which is how
   `make fetch` and `make test` pass the one they populated, and otherwise falls
-  back to `<repository>/target/theoremc-fixture-cargo-home`. The separation is
-  not cosmetic: offline Cargo still takes `$CARGO_HOME/.package-cache`
-  exclusively, so three nested builds sharing a home stall behind any other
-  `cargo` on the machine, which is what issue #199 recorded. One home for all
-  fixtures keeps that lock private without giving each fixture a cold cache. It
-  sits inside `target/`, so `make clean` removes it and the next run fetches it
-  again.
+  back to `<repository>/target/theoremc-fixture-cargo-home`. The helper
+  canonicalises the path, so a relative `THEOREMC_FIXTURE_CARGO_HOME` still
+  yields the absolute value a fixture build needs: Cargo resolves a relative
+  `CARGO_HOME` against the child's own directory, which is the fixture's
+  temporary directory. The separation is not cosmetic: offline Cargo still takes
+  `$CARGO_HOME/.package-cache` exclusively, so three nested builds sharing a
+  home stall behind any other `cargo` on the machine, which is what issue #199
+  recorded. One home for all fixtures keeps that lock private without giving
+  each fixture a cold cache. It sits inside `target/`, so `make clean` removes
+  it and the next run fetches it again.
 - Fixture builds run `--frozen`, so their dependency graph must be complete
   before the tests start. `make fetch` is a prerequisite of `make test` and runs
   `cargo fetch --locked` for the workspace and, with

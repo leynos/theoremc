@@ -298,3 +298,46 @@ fn an_exported_fixture_home_wins() {
         "the fetch step exports the home it populated",
     );
 }
+
+/// A relative configured home must come back absolute.
+///
+/// Cargo resolves a relative `CARGO_HOME` against its own working directory,
+/// and every fixture build runs in the fixture's temporary directory. A
+/// relative home would therefore send each fixture to a different, empty
+/// cache, and every frozen build would fail. The value is injected rather than
+/// exported, so the test mutates no process state.
+#[test]
+fn a_relative_fixture_home_is_resolved_to_an_absolute_path() -> Result<(), String> {
+    let home = super::prepared_cargo_home(Some("relative-fixture-home"))?;
+    let absolute = home.is_absolute();
+    let named = home.as_str().ends_with("relative-fixture-home");
+    std::fs::remove_dir_all(home.as_std_path()).map_err(|error| error.to_string())?;
+
+    if absolute && named {
+        Ok(())
+    } else {
+        Err(format!(
+            "{home} must be absolute and keep the configured name \
+             so a build cannot resolve it from its own directory"
+        ))
+    }
+}
+
+/// An absolute configured home is kept as it is.
+#[test]
+fn an_absolute_fixture_home_is_unchanged() -> Result<(), String> {
+    let temp = tempfile::tempdir().map_err(|error| error.to_string())?;
+    let configured = Utf8Path::from_path(temp.path())
+        .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
+        .join("fixture-home");
+
+    let home = super::prepared_cargo_home(Some(configured.as_str()))?;
+
+    if home == configured {
+        Ok(())
+    } else {
+        Err(format!(
+            "an absolute configuration must survive unchanged, got {home}"
+        ))
+    }
+}

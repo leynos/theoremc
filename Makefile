@@ -121,7 +121,7 @@ fetch: ## Fetch every dependency the workspace and the fixture crates need
 	$(CARGO) fetch --locked
 	@set -e; for manifest in $(FIXTURE_MANIFESTS); do \
 		echo "  fetching $$manifest into $(FIXTURE_CARGO_HOME)"; \
-		CARGO_HOME=$(FIXTURE_CARGO_HOME) $(CARGO) fetch --locked --manifest-path "$$manifest"; \
+		CARGO_HOME="$(FIXTURE_CARGO_HOME)" $(CARGO) fetch --locked --manifest-path "$$manifest"; \
 	done
 
 # Copies the workspace lock into each template and prunes it to the graph that
