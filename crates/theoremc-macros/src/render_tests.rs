@@ -52,3 +52,29 @@ fn render_expansion_omits_probes_when_none_are_referenced() {
         "no referenced-type probes should be rendered: {tokens}"
     );
 }
+
+#[test]
+fn render_expansion_allows_rather_than_expects_unexpected_cfgs() {
+    // An `expect` would be unfulfilled in a consumer that registers
+    // `cfg(kani)`, and `-D warnings` turns that into a build failure. Only
+    // `allow` is correct for generated code, so pin the keyword here rather
+    // than relying solely on the slower consumer builds.
+    let tokens = render_expansion(&empty_plan()).to_string();
+
+    assert!(
+        tokens.contains("allow"),
+        "the generated gate should use `allow`: {tokens}"
+    );
+    assert!(
+        !tokens.contains("# [expect"),
+        "the generated gate must not emit an `expect` attribute: {tokens}"
+    );
+    assert!(
+        tokens.contains("unexpected_cfgs"),
+        "the generated gate should name `unexpected_cfgs`: {tokens}"
+    );
+    assert!(
+        tokens.contains("register cfg(kani)"),
+        "the generated gate should carry a reason naming its assumption: {tokens}"
+    );
+}

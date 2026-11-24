@@ -6,6 +6,14 @@ Feature: theorem_file macro expansion
     Given a fixture crate with one valid theorem file
     Then the fixture crate builds without a Kani dependency
 
+  Scenario: A strict-warning consumer registering cfg(kani) compiles
+    Given a fixture crate with one valid theorem file
+    Then the fixture crate builds with warnings denied and cfg(kani) registered
+
+  Scenario: A strict-warning consumer without a cfg(kani) registration compiles
+    Given a fixture crate with one valid theorem file
+    Then the fixture crate builds with warnings denied and cfg(kani) unregistered
+
   Scenario: A valid theorem file exposes a Kani proof harness when cargo-kani is installed
     Given a fixture crate with one valid theorem file
     Then cargo-kani lists the generated proof harness when installed

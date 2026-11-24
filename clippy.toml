@@ -16,6 +16,12 @@ allow-expect-in-tests = true
 # `#[expect(clippy::disallowed_methods, reason = "...")]` rather than `allow`,
 # so the expectation becomes unfulfilled, and warns, once the site is migrated.
 # The backlog removes itself instead of rotting.
+#
+# Intentional divergences from the Netsuke baseline:
+# - `shell_quote::QuoteRefExt::quoted` is omitted, because TheoremC has no
+#   `shell_quote` dependency; backend commands are lowered as argument vectors.
+# - `std::io::IsTerminal::is_terminal` is omitted, because TheoremC performs no
+#   terminal detection and writes machine-readable output.
 disallowed-methods = [
   { path = "std::env::var", reason = "inject an environment reader" },
   { path = "std::env::var_os", reason = "inject an environment reader" },
@@ -25,4 +31,3 @@ disallowed-methods = [
   { path = "std::env::remove_var", reason = "use a stub environment in tests" },
   { path = "std::env::set_current_dir", reason = "inject a base-directory seam; confine CWD changes to Command::current_dir" },
 ]
-

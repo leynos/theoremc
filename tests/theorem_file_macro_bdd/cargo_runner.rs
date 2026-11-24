@@ -66,31 +66,6 @@ impl CargoGuard<'_> {
 /// disproportionate for a test suite this size.
 pub(crate) static FIXTURE_CARGO_LOCK: Mutex<()> = Mutex::new(());
 
-/// Runs a Cargo subcommand in the fixture crate directory.
-///
-/// `CARGO_TARGET_DIR` is set to the target directory every fixture shares, so
-/// third-party dependencies compile once per run; fixtures keep their own
-/// artefacts apart through unique package names. The caller must supply a [`CargoGuard`] proving that
-/// `FIXTURE_CARGO_LOCK` is held, because registry cache access and
-/// workspace-level lock files are still shared across invocations.
-///
-/// # Timeout
-///
-/// `Command::output()` blocks until the subprocess exits. No explicit timeout
-/// is imposed: `cargo` is a first-party trusted tool, and introducing
-/// cross-platform `wait_timeout` polling would add significant complexity
-/// disproportionate to this test suite's scope. If a runaway `cargo` process
-/// causes a stall in CI, the job-level timeout enforced by the CI runtime
-/// (e.g. GitHub Actions' `timeout-minutes`) provides the outer bound.
-pub(crate) fn cargo_run(
-    manifest_dir: &Utf8Path,
-    target_dir: &Utf8Path,
-    subcommand: CargoSubcommand,
-    guard: &CargoGuard<'_>,
-) -> Result<(), String> {
-    cargo_run_output(manifest_dir, target_dir, subcommand, guard).map(|_| ())
-}
-
 pub(crate) fn cargo_run_output(
     manifest_dir: &Utf8Path,
     target_dir: &Utf8Path,
@@ -102,6 +77,90 @@ pub(crate) fn cargo_run_output(
         .output()
         .map_err(|error| error.to_string())?;
     command_result(subcommand, &output)
+}
+
+/// The development build standard: the parallel `rustc` frontend and, on
+/// Linux, the `mold` linker, matching `.cargo/config.toml` and the Makefile.
+const STANDARD_RUSTFLAGS: &str = if cfg!(target_os = "linux") {
+    "-Zthreads=8 -Clink-arg=-fuse-ld=mold"
+} else {
+    "-Zthreads=8"
+};
+
+/// Runs a Cargo subcommand in the fixture crate with warnings denied.
+///
+/// The child process owns its flags, so this does not mutate the test
+/// process. Assigning `RUSTFLAGS` makes Cargo ignore the `rustflags` in
+/// `.cargo/config.toml`, so the development build standard is composed in
+/// explicitly. Failing rather than guessing is deliberate: an inherited flag
+/// set that this helper cannot read safely would silently weaken the very
+/// check the scenario exists to perform.
+pub(crate) fn cargo_run_denying_warnings(
+    manifest_dir: &Utf8Path,
+    target_dir: &Utf8Path,
+    subcommand: CargoSubcommand,
+    _guard: &CargoGuard<'_>,
+) -> Result<(), String> {
+    let rustflags = denying_warnings_rustflags()?;
+    let output = hermetic_cargo(manifest_dir, target_dir)
+        .args(subcommand.args())
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env("RUSTFLAGS", rustflags)
+        .output()
+        .map_err(|error| error.to_string())?;
+    command_result(subcommand, &output).map(|_| ())
+}
+
+/// Composes the build standard, inherited arguments, and the denial.
+///
+/// Inherited arguments are preserved rather than replaced, mirroring
+/// `${RUSTFLAGS:+$RUSTFLAGS }` in the Makefile, and blank entries add nothing.
+/// Any inherited `--cap-lints` is dropped, because a cap of `warn` would turn
+/// the denial back into a warning and let a fixture pass that should fail.
+fn compose_rustflags(standard: &str, inherited: &[String]) -> String {
+    let mut composed = vec![standard.to_owned()];
+    composed.extend(
+        inherited
+            .iter()
+            .map(|flag| flag.trim())
+            .filter(|flag| !flag.is_empty())
+            .filter(|flag| !flag.starts_with("--cap-lints"))
+            .map(str::to_owned),
+    );
+    composed.push("-D warnings".to_owned());
+    composed.join(" ")
+}
+
+/// Returns the child build's `RUSTFLAGS`.
+///
+/// Cargo prefers `CARGO_ENCODED_RUSTFLAGS` over `RUSTFLAGS` and splits it on
+/// its own separator rather than on whitespace, so an encoded value is read as
+/// distinct arguments; that keeps a linker path containing spaces intact.
+/// Blank values in the legacy variable are dropped, which is what the Makefile
+/// does when it appends its flags.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the fixture build must inherit the host Cargo invocation's rustflags, so it composes them exactly as the Makefile recipes do"
+)]
+fn denying_warnings_rustflags() -> Result<String, String> {
+    let encoded = std::env::var("CARGO_ENCODED_RUSTFLAGS").ok();
+    let inherited = match encoded.as_deref() {
+        Some(value) if !value.trim().is_empty() => value
+            .split('\u{1f}')
+            .filter(|flag| !flag.trim().is_empty())
+            .map(str::to_owned)
+            .collect::<Vec<_>>(),
+        _ => {
+            let legacy = std::env::var("RUSTFLAGS").map_err(|error| {
+                format!("reading the inherited RUSTFLAGS for the strict build: {error}")
+            })?;
+            legacy
+                .split_whitespace()
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        }
+    };
+    Ok(compose_rustflags(STANDARD_RUSTFLAGS, &inherited))
 }
 
 pub(crate) fn recover_mutex_guard(mutex: &Mutex<()>) -> MutexGuard<'_, ()> {
@@ -154,4 +213,58 @@ fn command_result(
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr),
     ))
+}
+
+mod tests {
+    //! Tests for the child-build flag composition.
+
+    use super::compose_rustflags;
+
+    /// Builds the argument list a caller would pass in.
+    fn flags(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_owned()).collect()
+    }
+
+    #[test]
+    fn compose_rustflags_without_inherited_flags_keeps_the_standard() {
+        let composed = compose_rustflags("-Zthreads=8", &[]);
+
+        assert_eq!(
+            composed, "-Zthreads=8 -D warnings",
+            "the standard and the denial should both be present"
+        );
+    }
+
+    #[test]
+    fn compose_rustflags_places_inherited_flags_before_the_denial() {
+        let composed = compose_rustflags("-Zthreads=8", &flags(&["-Cdebuginfo=1"]));
+
+        assert_eq!(
+            composed, "-Zthreads=8 -Cdebuginfo=1 -D warnings",
+            "inherited flags should sit between the standard and the denial"
+        );
+    }
+
+    #[test]
+    fn compose_rustflags_drops_a_weakening_lint_cap() {
+        let composed = compose_rustflags(
+            "-Zthreads=8",
+            &flags(&["--cap-lints=warn", "-Cdebuginfo=1"]),
+        );
+
+        assert_eq!(
+            composed, "-Zthreads=8 -Cdebuginfo=1 -D warnings",
+            "an inherited cap must not survive to soften the denial"
+        );
+    }
+
+    #[test]
+    fn compose_rustflags_ignores_a_blank_inherited_argument() {
+        let composed = compose_rustflags("-Zthreads=8", &flags(&["   "]));
+
+        assert_eq!(
+            composed, "-Zthreads=8 -D warnings",
+            "a blank argument should not leave a stray space"
+        );
+    }
 }

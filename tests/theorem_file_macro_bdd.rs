@@ -15,8 +15,9 @@ mod referenced_type_fixtures;
 
 use cargo_runner::CargoGuard;
 use fixture_crate::{
-    FIXTURE_LIB_RS, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses,
-    build_fixture_and_verify_kani_harnesses, run_fixture_build, run_valid_fixture_build,
+    ConsumerCfgRegistration, FIXTURE_LIB_RS, TheoremFixtureSpec,
+    build_fixture_and_list_kani_harnesses, build_fixture_and_verify_kani_harnesses,
+    run_fixture_build, run_fixture_build_denying_warnings, run_valid_fixture_build,
 };
 use referenced_type_fixtures::{
     EMPTY_TYPES_LIB_RS, ExpectedBuildFailure, MISSING_FORALL_TYPE_THEOREM,
@@ -160,6 +161,32 @@ fn then_the_fixture_crate_builds_without_a_kani_dependency() -> Result<(), Strin
         path: "theorems/single.theorem",
         content: VALID_SINGLE_THEOREM,
     })
+}
+
+#[then("the fixture crate builds with warnings denied and cfg(kani) registered")]
+fn then_the_fixture_crate_builds_with_warnings_denied_and_cfg_kani_registered() -> Result<(), String>
+{
+    run_fixture_build_denying_warnings(
+        FIXTURE_LIB_RS,
+        ConsumerCfgRegistration::Registered,
+        &TheoremFixtureSpec {
+            path: "theorems/single.theorem",
+            content: VALID_SINGLE_THEOREM,
+        },
+    )
+}
+
+#[then("the fixture crate builds with warnings denied and cfg(kani) unregistered")]
+fn then_the_fixture_crate_builds_with_warnings_denied_and_cfg_kani_unregistered()
+-> Result<(), String> {
+    run_fixture_build_denying_warnings(
+        FIXTURE_LIB_RS,
+        ConsumerCfgRegistration::Unregistered,
+        &TheoremFixtureSpec {
+            path: "theorems/single.theorem",
+            content: VALID_SINGLE_THEOREM,
+        },
+    )
 }
 
 #[then("cargo-kani lists the generated proof harness when installed")]
@@ -420,6 +447,18 @@ fn then_compiling_the_fixture_crate_fails_with_the_partial_kani_evidence_diagnos
     name = "A valid theorem file compiles without Kani installed"
 )]
 fn a_valid_theorem_file_compiles_without_kani_installed() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "A strict-warning consumer registering cfg(kani) compiles"
+)]
+fn a_strict_warning_consumer_registering_cfg_kani_compiles() {}
+
+#[scenario(
+    path = "tests/features/theorem_file_macro.feature",
+    name = "A strict-warning consumer without a cfg(kani) registration compiles"
+)]
+fn a_strict_warning_consumer_without_cfg_kani_registration_compiles() {}
 
 #[scenario(
     path = "tests/features/theorem_file_macro.feature",

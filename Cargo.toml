@@ -49,6 +49,7 @@ quote = "1.0.45"
 syn = { version = "3.0.3", default-features = false, features = ["parsing", "full", "clone-impls", "printing"] }
 test-helpers = { path = "crates/test-helpers" }
 thiserror = "2.0.18"
+toml = "1.1"
 
 [[test]]
 name = "action_mangle_bdd"
@@ -139,11 +140,23 @@ unknown_lints                       = "deny"
 renamed_and_removed_lints           = "deny"
 missing_docs                        = "deny"
 unsafe_code                         = "forbid"
+# `cfg(kani)` is set by Kani when it compiles the generated proof harnesses,
+# and `cfg(dylint_lib)` is set by Whitaker when it builds a lint crate. Both
+# are declared here so generated and lint code needs no per-site expectation.
+#
+# Intentional divergences from the Netsuke baseline:
+# - `cfg(verus)` is not registered, because no Verus cfg exists yet; the Verus
+#   backend is planned rather than implemented (ADR-0007).
+# - `cfg(theoremc_has_theorems)` is registered by the package's `build.rs`
+#   (`cargo::rustc-check-cfg`) instead, because that script is copied into each
+#   consumer crate and owns that package's discovery result.
 unexpected_cfgs                     = { level = "warn", check-cfg = [
   "cfg(kani)",
   "cfg(dylint_lib, values(any()))",
 ] }
 
+# The complete Netsuke rustdoc baseline. TheoremC adds no rustdoc rule beyond
+# it and omits none, so no divergence is recorded here.
 [workspace.lints.rustdoc]
 missing_crate_level_docs            = "deny"
 broken_intra_doc_links              = "deny"

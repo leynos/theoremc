@@ -104,6 +104,11 @@
   gate](adrs/adr-0013-workspace-complete-lint-gate.md)
   - Decision record for workspace-scoped rustdoc, Clippy, and Whitaker stages,
     the sequential `make lint` aggregate, and the exclusion-free `dylint.toml`.
+- [Architectural decision record (ADR) 0014: Netsuke lint baseline
+  alignment](adrs/adr-0014-netsuke-lint-baseline-alignment.md)
+  - Decision record for treating the `leynos/netsuke` tables as a minimum,
+    recording each divergence, and scoping the generated Kani gate to an
+    `allow`.
 
 ## Requests for comments
 
@@ -201,3 +206,6 @@
       tests, documentation, and dependency policy.
   - [Include provenance in action-signature conflict diagnostics](execplans/issue-51-include-provenance-in-macro-action-signature-conflict-diagnostics.md)
     - ExecPlan for adding theorem provenance to signature-conflict errors.
+  - [Align the workspace lint baseline with `leynos/netsuke`](execplans/issue-98-align-the-workspace-lint-baseline-with-leynos-netsuke.md)
+    - ExecPlan for the baseline comparison, divergences, generated Kani gate,
+      and policy contract.

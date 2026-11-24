@@ -93,11 +93,11 @@ use error::MacroExpansionError;
 /// expands to (approximately):
 ///
 /// ```ignore
+/// #[allow(unexpected_cfgs, reason = "the invoking crate may or may not register cfg(kani); generated code cannot know")]
 /// mod theorems__my_theorem__h<hash> {
 ///     const _: &str = include_str!(
 ///         concat!(env!("CARGO_MANIFEST_DIR"), "/", "theorems/my_theorem.theorem")
 ///     );
-///     #[expect(unexpected_cfgs, reason = "Kani sets cfg(kani) when compiling proof harnesses")]
 ///     #[cfg(kani)]
 ///     pub(super) mod kani {
 ///         #[kani::proof]

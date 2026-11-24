@@ -141,7 +141,7 @@ pub(super) fn expected_expansion_with_unwinds(
         .join(" , ");
 
     normalize(&format!(
-        "# [expect (unexpected_cfgs, reason = \"Kani sets cfg(kani) when compiling proof harnesses\")]
+        "# [allow (unexpected_cfgs, reason = \"the invoking crate may or may not register cfg(kani); generated code cannot know\")]
          mod {module_name} {{
             const _: & str = include_str! ( concat! ( env! (\"CARGO_MANIFEST_DIR\") , \"/\" , \"{path}\" ) ) ;
             # [cfg (kani)]

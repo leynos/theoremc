@@ -1614,9 +1614,18 @@ lowering.
 
 The per-file module also carries a tightly scoped
 `#[allow(unexpected_cfgs, reason = "...")]`. This is needed because `cfg(kani)`
-is supplied by Kani rather than by Cargo feature configuration, and normal
-consumer crates should compile theorem files without adding their own
-`check-cfg` configuration.
+is supplied by Kani rather than by Cargo feature configuration. A consumer that
+does not register the cfg needs the diagnostic suppressed; a consumer that does
+register it would leave an `expect` unfulfilled, which `-D warnings` turns into
+an error. The macro cannot know which configuration it expands into, so only
+`allow` is correct for both, and it is scoped to the generated module and names
+one lint. The action and referenced-type probes are emitted inside that module,
+so they share the scope; that is the narrowest boundary the current emission
+supports. Two behavioural scenarios build independent consumers with
+`RUSTFLAGS=-D warnings`, one registering `cfg(kani)` and one not, and both must
+compile. In this workspace the repository's own `check-cfg` declares
+`cfg(kani)` and `cfg(dylint_lib)`, so a new undeclared `cfg` still fails the
+gate.
 
 ### 7.3 Binding probes
 
