@@ -632,6 +632,14 @@ suite.
   Anything the fetch misses then fails at once with Cargo's offline diagnostic,
   naming the crate; the fix is to add the missing manifest to
   `FIXTURE_MANIFESTS` in the Makefile, not to drop `--frozen`.
+- Prefer `make test` over a bare `cargo nextest run … -E 'binary(=…)'` for
+  these suites. The Makefile fetches the fixture home and exports its path to
+  the test process, so the two always agree. A bare invocation exports nothing,
+  and the fixtures then fall back to `<repository>/target/…`; that is the same
+  directory only when `make fetch` ran with `CURDIR` at the repository root,
+  which is the normal case. If you do run one suite directly and the fixture
+  builds report `no matching package named`, export
+  `THEOREMC_FIXTURE_CARGO_HOME` with the path `make fetch` populated.
 - Each fixture dependency graph has a committed template under
   `tests/fixtures/`, holding a manifest, an empty `src/lib.rs` and a
   `Cargo.lock`. Nothing builds a template; the lock is what a fixture seeds
