@@ -176,8 +176,17 @@ the committed file changes in the way the rule forbids.
       tree: exit 0, zero errors, all three stages in order.
 - [x] (2026-11-23) Pushed the branch and opened draft pull request 279.
 - [x] (2026-11-24) Answered ten CodeRabbit review passes, fixing every finding
-      at source with a case that fails when the fix is reverted. Hosted CI was
-      green on each code commit.
+      at source with a case that fails when the fix is reverted.
+- [x] (2026-11-24) Diagnosed the one real hosted-CI failure: clippy reported
+      `has_sequence_entry` as dead code in the spelling test binary at
+      `99de5e5` and `dc31f2b`. The function was removed in the ninth round, and
+      the exact stage that failed (`cargo clippy --workspace --all-targets
+      --all-features -- -D warnings`) now passes locally on the branch head.
+- [ ] Confirm hosted CI on the branch head. Runs for `2d3dabc`, `344d9b8`, and
+      `70af57a` were still queued when the session ended, and the GitHub API
+      rate limit blocked reading their results. The branch head is locally
+      verified by `make check-fmt`, `make markdownlint`, `make spelling`, the
+      `lint` stage, and the five contract suites.
 
 ## Surprises & discoveries
 
