@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use camino::Utf8Path;
 use test_helpers::{
-    CommandFailure, FixtureOutcome, hermetic_cargo, run_fixture_command,
+    CommandFailure, FixtureOutcome, hermetic_cargo, remaining_fixture_budget, run_fixture_command,
     run_fixture_command_within, run_within_deadline,
 };
 
@@ -23,15 +23,18 @@ use test_helpers::{
 /// Kani compiles the whole fixture graph with its own compiler into its own
 /// target directory, so its first run is a second cold build and is much slower
 /// than a fixture `cargo build`. Giving it the ordinary fixture deadline would
-/// fail a legitimate verification run on a slow or busy host; the nextest
-/// group's allowance still bounds it.
+/// fail a legitimate verification run on a slow or busy host. It is clamped to
+/// what remains of the test's fixture budget, so a build that ran first cannot
+/// push the Kani command past nextest's per-test allowance.
 const KANI_COMMAND_DEADLINE: Duration = Duration::from_secs(1_080);
 
 /// How long the Kani probe may take before it is reported as a failure.
 ///
 /// `cargo kani --version` starts a toolchain lookup, not a build, so a probe that
 /// outlives a minute is a broken environment rather than a slow one. Bounding it
-/// separately keeps a hung probe from spending the whole fixture deadline.
+/// separately keeps a hung probe from spending the whole fixture deadline. It
+/// also starts the test's fixture budget, so the later build is charged for the
+/// probe's time.
 const KANI_PROBE_DEADLINE: Duration = Duration::from_secs(60);
 
 #[derive(Clone, Copy)]
@@ -114,7 +117,8 @@ pub(crate) fn cargo_run_output(
         CargoSubcommand::Build => run_fixture_command(command)
             .map_err(|reason| CargoRunFailure::NotRun(reason.to_string()))?,
         CargoSubcommand::KaniList | CargoSubcommand::Kani => {
-            run_fixture_command_within(command, KANI_COMMAND_DEADLINE)
+            let deadline = KANI_COMMAND_DEADLINE.min(remaining_fixture_budget());
+            run_fixture_command_within(command, deadline)
                 .map_err(|error| CargoRunFailure::NotRun(error.to_string()))?
         }
     };
@@ -163,8 +167,11 @@ pub(crate) fn kani_is_available() -> Result<KaniAvailability, String> {
 }
 
 /// Probes `program kani --version`, using the production deadline.
+///
+/// Asking for the remaining budget here starts the test's clock, so the probe's
+/// own time is charged to the test rather than being free.
 fn probe_kani(program: impl AsRef<std::ffi::OsStr>) -> Result<KaniAvailability, String> {
-    probe_kani_within(program, KANI_PROBE_DEADLINE)
+    probe_kani_within(program, KANI_PROBE_DEADLINE.min(remaining_fixture_budget()))
 }
 
 /// Probes `program kani --version` with an explicit deadline.

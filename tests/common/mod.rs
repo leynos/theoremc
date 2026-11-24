@@ -19,7 +19,8 @@ pub use build_log::{BuildLog, toml_section};
 pub use build_support_fixture::build_support_fixture_manifest;
 pub use fixture_command::{
     DEFAULT_FIXTURE_COMMAND_TIMEOUT, FIXTURE_TIMEOUT_ENV, FixtureCommandError, FixtureOutcome,
-    fixture_command_timeout, run_fixture_command, run_fixture_command_within,
+    TEST_FIXTURE_BUDGET, fixture_command_timeout, remaining_fixture_budget, run_fixture_command,
+    run_fixture_command_within,
 };
 pub use fixture_crate::{BUILD_SCRIPT_SOURCE, FixtureCrate, TRIVIAL_THEOREM};
 pub use fixture_isolation::{shared_target_dir, shared_target_sources_dir};

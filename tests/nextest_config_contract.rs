@@ -13,7 +13,7 @@
 
 use std::time::Duration;
 
-use test_helpers::DEFAULT_FIXTURE_COMMAND_TIMEOUT;
+use test_helpers::{DEFAULT_FIXTURE_COMMAND_TIMEOUT, TEST_FIXTURE_BUDGET};
 use toml::Value;
 
 /// The nextest configuration under test.
@@ -179,6 +179,24 @@ fn the_group_allowance_exceeds_the_fixture_deadline() -> Result<(), String> {
         Err(format!(
             "the group allows {allowance:?}, so the exported fixture deadline \
              {DEFAULT_FIXTURE_COMMAND_TIMEOUT:?} must fire first"
+        ))
+    }
+}
+
+/// The allowance bounds a whole test, and one test's fixture commands share
+/// [`TEST_FIXTURE_BUDGET`]; the budget must stay strictly inside the allowance
+/// or the clamp never decides anything.
+#[test]
+fn the_group_allowance_exceeds_the_per_test_budget() -> Result<(), String> {
+    let config = parse(CONFIG)?;
+    let allowance = allowance_of(group_override(&config)?)?;
+
+    if allowance > TEST_FIXTURE_BUDGET {
+        Ok(())
+    } else {
+        Err(format!(
+            "the group allows {allowance:?}, so the per-test fixture budget \
+             {TEST_FIXTURE_BUDGET:?} must be lower or the clamp never fires"
         ))
     }
 }

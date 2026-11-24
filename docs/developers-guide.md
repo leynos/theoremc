@@ -644,21 +644,25 @@ suite.
   THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS=900 cargo nextest run -E 'binary(theorem_file_macro_bdd)'
   ```
 
+  An override above 1140 seconds has no effect on its own: to let one test's
+  commands run longer than that, raise the group's `slow-timeout` in
+  `.config/nextest.toml` as well, because the group is what nextest enforces.
   The `nested-cargo-builds` group allows 1200 seconds **per test**, not per
-  command, and every fixture command a test runs shares that budget. A test
-  that runs several commands must fit their combined allowances inside it, or
-  nextest terminates the test and the fixture code's own diagnostic is lost.
-  This is why the Kani scenarios use fixed deadlines rather than the build
-  override: their availability probe allows 60 seconds and their Kani command
-  1080 seconds, which sum to the group's limit. The guarantee that fixture code
-  reports a timeout before nextest terminates the test therefore holds for a
-  single command only. The contract test in `tests/nextest_config_contract.rs`
-  fails if the group allows less than the exported default or if the run
-  allowance does not exceed the group's. A cold fixture build — the dependency
-  graph compiled once into a target that was just removed — was measured at
-  more than the 540-second default while other processes held every compiler
-  slot, so raise the deadline on a saturated host rather than treating the
-  failure as a fixture defect.
+  command, so `run_fixture_command` also clamps each command to what remains of
+  a 1140-second per-test fixture budget. A test that runs several commands
+  therefore still fails from inside the fixture code, with the command and its
+  output, before nextest terminates the test. The budget is thread-scoped
+  because that is the scope of a test under both runners in use: nextest gives
+  each test a process, and libtest — which `make kani` invokes directly — gives
+  each test a freshly spawned thread. The Kani scenarios use fixed deadlines
+  rather than the build override — 60 seconds for the availability probe and
+  1080 seconds for the Kani command — and clamp them to the same budget. The
+  contract test in `tests/nextest_config_contract.rs` fails if the group allows
+  less than the exported default or if the run allowance does not exceed the
+  group's. A cold fixture build — the dependency graph compiled once into a
+  target that was just removed — was measured at more than the 540-second
+  default while other processes held every compiler slot, so raise the deadline
+  on a saturated host rather than treating the failure as a fixture defect.
 - Tests that start a child `cargo` or `rustc` (the fixture suites, the macros
   crate's trybuild suite and the `rustc` compile-fail unit test) run in the
   `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,
@@ -680,8 +684,10 @@ suite.
   Before removing anything, stop every test run that could be using those
   paths, and confirm each candidate. A theoremc fixture's `Cargo.toml` names a
   package beginning `fx_` (the fixture renames its package for the shared
-  target), its `build.rs` calls `theoremc_build_support::prepare_build_script`,
-  and its `Cargo.lock` matches the workspace lock. Another application's
+  target) and its `build.rs` calls
+  `theoremc_build_support::prepare_build_script`. Do not use `Cargo.lock`
+  equality as part of the test: the copied lock is only a seed, and a fixture's
+  lock can differ from the workspace's after a build. Another application's
   temporary directory can satisfy the listing without being a fixture.
 - Integration tests under `tests/` are separate crates and inherit
   package lint policy. Note that `expect_used = "deny"` fires in integration

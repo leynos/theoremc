@@ -82,6 +82,27 @@ correctly failed it. The default stays below 600 seconds so an ordinary host
 reports the overrun itself; the larger allowance exists so a saturated host can
 raise the deadline without nextest killing the test first.
 
+Each stream's output is retained up to a fixed limit, and the retained text is
+marked when the limit cut it off. The readers forward chunks while the child
+runs and nothing consumes them until it exits, so an uncapped stream would grow
+with the child's total output, and a build that wrote without bound would
+exhaust the host's memory before its deadline could fire.
+
+Per command is not enough, because the group's allowance is per test. Every
+command is therefore also clamped to what remains of a 1140-second per-test
+budget, which starts at the test's first fixture command. The clock is
+thread-scoped: nextest gives each test its own process, and libtest gives each
+test its own freshly spawned thread, so the thread is the test under both
+runners this repository uses. A test whose commands would sum past the group's
+allowance now fails with the fixture diagnostic instead of being killed by
+nextest.
+
+The clamp caps the override as well, so a host that genuinely needs more than
+1140 seconds for one test must raise the group's `slow-timeout` too. That is
+deliberate: the exported deadline exists to fail before nextest does, and a
+deadline that outlived the group allowance would never be the thing reporting
+the overrun.
+
 On Unix the child runs in its own process group, and a timeout kills the group
 before reaping the direct child. Killing only `cargo` would leave the `rustc`
 and `kani-compiler` work it started running, still holding the resources the
@@ -90,11 +111,16 @@ the compiler work a `cargo` started can then run to completion on its own. That
 is a documented limitation of the fallback, and this repository's gates run on
 Unix.
 
-The `cargo kani` availability probe is part of the same policy. It runs under
-the lock with its own short deadline and reports one of three outcomes:
-available; unavailable with the reason; or timed out. Unavailability skips the
-scenario unless `THEOREMC_REQUIRE_KANI=1`, and a timeout is always a failure. A
-hung probe is a broken environment, not evidence that Kani is absent.
+The `cargo kani` availability probe is part of the same policy, with one
+deliberate exception to the lock. It runs **without** the fixture lock, under
+its own short deadline, and reports one of three outcomes: available;
+unavailable with the reason; or timed out. Taking the lock would let an
+unrelated fixture build's hold be reported as Kani being unavailable, which is
+the wrong diagnosis for a probe that never reached the tool. The probe starts
+the test's fixture budget, so its time is charged to the test rather than being
+free. Unavailability skips the scenario unless `THEOREMC_REQUIRE_KANI=1`, and a
+timeout is always a failure: a hung probe is a broken environment, not evidence
+that Kani is absent.
 
 ### Placement
 
@@ -152,6 +178,23 @@ none failed, and nextest's 45-minute `global-timeout` cancelled it. The run
 allowance is therefore 2 h, which this record treats as the same kind of bound
 as the per-test one: it terminates a hang, it does not decide whether slow work
 is allowed to finish.
+
+## Known limitations
+
+Because a fixture command leads its own process group, a signal the test runner
+sends to the *test's* process group does not reach it. If nextest cancels a
+test — on its own timeout, or when the run is interrupted — the fixture command
+and the compiler work under it can outlive the test process until that work
+finishes on its own. The child's own deadline cannot close the gap, because the
+code that enforces it is in the dead parent.
+
+The alternatives are worse within this repository's constraints. Making the
+child die with its parent on Linux needs `PR_SET_PDEATHSIG`, set from a
+`pre_exec` closure, which is `unsafe`, and the workspace forbids `unsafe`.
+Leaving the child in the test's process group would let cancellation reach it,
+but would give up the timeout cleanup the deadline exists for: killing only
+`cargo` leaves `rustc` and `kani-compiler` running. The trade-off is recorded
+here so a future change can revisit it with the cost in view.
 
 ## Consequences
 

@@ -168,7 +168,10 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       directly, outside the test harness and without a deadline, using a fixture
       crate with the same manifest shape. The test runs then measure the warm
       path, which is what the gates and CI exercise after the first build.
-- [ ] Milestone 1-3 gates: `make check-fmt`, `make lint`, `make test`.
+- [x] (2026-11-24T09:20Z) Milestone 1-3 gates passed locally and in hosted CI:
+      `make check-fmt`, `make lint` (rustdoc, Clippy and Whitaker) and
+      `make test` are green on `8ffb662`, and the `Proofs` workflow is green
+      with Kani installed.
 - [x] (2026-11-23T22:20Z) The committed 540 s deadline fired, as designed, on
       the first `theorem_file_macro_bdd` scenario: `cargo build did not finish
       within 539.999804507s (ran for 540.008830284s); it printed:` followed by
@@ -229,8 +232,6 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       killed, it fails with `descendant … must have been killed with its group`,
       and it passes with the real implementation restored. All 48 `test-helpers`
       tests pass.
-- [ ] Warm-run timings and the compiler-invocation count recorded here.
-- [ ] #143 re-evaluation recorded here.
 - [x] (2026-11-24T07:40Z) Draft PR opened:
       <https://github.com/leynos/theoremc/pull/281>, titled with `(#197)` and
       stating `Closes #197`, with a `## References` section linking the issue,
@@ -243,7 +244,48 @@ completes, and while it runs `pgrep -fc 'cargo build'` never exceeds 1.
       directory can no longer disappear under a sibling test, because the
       commands are serialized by a file lock and the sources live under the
       shared target rather than in `$TMPDIR`.
-- [ ] Mark the plan COMPLETE once the draft PR's checks are green.
+- [x] (2026-11-24T08:50Z) CodeRabbit's second pass reported six findings, all
+      valid and all fixed: the reader used `thread::spawn` and could panic
+      after the child started (now `Builder::spawn` with the error mapped), the
+      drain loop could spin on `recv_timeout(Duration::ZERO)` (now bounded by
+      an explicit elapsed comparison), and the contract test's exact-filter
+      and allowance assertions were tightened.
+- [x] (2026-11-24T10:15Z) CodeRabbit's third pass reported five findings, all
+      valid and all fixed: retained output is now capped at 4 MiB per stream
+      with an explicit truncation note, the cancellation limitation is
+      documented in the module and in ADR-0014, the direct-child reap
+      assertion uses a zombie-aware probe, the developers guide no longer
+      offers `Cargo.lock` equality as a leftover-fixture test, and a per-test
+      fixture budget (1140 s) stops a test's commands from summing past
+      nextest's allowance. A first version of the cap truncated normal output
+      and failed five tests; it was corrected and the suite re-run.
+- [x] (2026-11-24T10:30Z) The per-test budget was made thread-scoped rather
+      than process-scoped. A process clock is the test only under nextest;
+      `make kani` runs the two scenarios in one libtest process, where a shared
+      clock would let the first scenario spend the second's budget. libtest
+      spawns a fresh thread per test, so the thread is the test under both
+      runners. The Kani probe and Kani command deadlines are clamped by the same
+      budget, because probe + build + Kani could otherwise sum past the group's
+      1200 s allowance, which is the defect the budget exists to prevent. The
+      contract test now also asserts that the allowance exceeds the budget.
+- [x] (2026-11-24T10:45Z) The output cap gained two direct tests: a chunk past
+      the limit is kept to exactly the limit and marked, and a chunk exactly at
+      the limit is kept whole and unmarked. The truncation path previously had
+      no test of its own, only the incidental coverage of the chatty-child
+      test.
+- [x] (2026-11-24T09:20Z) Hosted CI is green on `8ffb662`: every step of the
+      `CI` workflow passed (Format, ADR/RFC names, Markdown lint, Spelling,
+      Lint, Typecheck, MSRV, agent-native policy, Test and coverage), and the
+      `Proofs` workflow passed in 13m16s with Kani installed. That is the
+      strongest evidence for the feature's own behaviour: on a dedicated runner
+      the serialized fixture suites and the Kani scenarios all complete.
+- [x] (2026-11-24T09:25Z) The first hosted run failed on the Spelling step for
+      four `-ise` spellings introduced after the earlier spelling run; they were
+      fixed in `8ffb662`, and the regenerated `typos.toml` was unchanged.
+- [x] (2026-11-24T09:30Z) Warm-run timings recorded in the measurements table,
+      together with the process-level observation of a single `fx_*` compiler
+      child on a warm build.
+- [ ] Mark the plan COMPLETE once the final CodeRabbit pass is clear.
 
 ## Surprises & discoveries
 
@@ -362,6 +404,7 @@ on what a contended host can do.
 | `build_discovery_bdd` scenarios (up to three builds) | cold build per scenario         | 504.9 s, 441.4 s and 295.9 s, warm target, contended queue |
 | `build_suite_bdd` scenarios                          | cold build per scenario         | 234.0 s, 223.0 s, 436.9 s and 242.3 s                      |
 | Second fixture build's compiled packages             | whole graph per fixture         | only its own `fx_*` package (asserted)                     |
+| Compiler children in flight on a warm build          | up to 145, queued host-wide     | one `--crate-name fx_*` rustc at a time                    |
 | Focused fixture-suite run (14 tests)                 | n/a                             | 14 passed, 1 skipped, 2378.5 s total                       |
 
 The fixture suites were validated end to end with a temporary permissive
@@ -378,6 +421,13 @@ processes and 145 compiler invocations in flight or queued, with 62 host Cargo
 processes blocked behind one fixture's package-cache lock. That state was not
 reproduced deliberately: reproducing it would block the shared host again,
 which this host's operating policy forbids.
+
+The one-compiler figure is the same claim `build_suite_bdd` asserts from the
+`Compiling` lines, observed independently at the process level on a warm
+target: the only compiler child of the fixture build was the fixture's own
+`--crate-name fx_*`. It was an observation during a suite run, not a repeatable
+measurement, which is why the regression guard is the asserted `Compiling`
+lines rather than a process-count check.
 
 ### Retrospective
 

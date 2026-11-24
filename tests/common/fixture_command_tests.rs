@@ -9,18 +9,67 @@ use std::ffi::OsStr;
 use std::process::Command;
 use std::time::Duration;
 
-use super::{DEFAULT_FIXTURE_COMMAND_TIMEOUT, FixtureOutcome, deadline_from_override, run_locked};
+use super::{
+    DEFAULT_FIXTURE_COMMAND_TIMEOUT, FixtureOutcome, MINIMUM_FIXTURE_DEADLINE, TEST_FIXTURE_BUDGET,
+    command_deadline, deadline_from_override, remaining_fixture_budget, run_locked,
+};
 use crate::integration::fixture_lock::FixtureLock;
 
 #[test]
-fn the_default_deadline_leaves_room_inside_the_nextest_group_allowance() {
+fn the_default_deadline_fires_before_nextest_allows_the_group() {
     assert!(
         DEFAULT_FIXTURE_COMMAND_TIMEOUT < Duration::from_secs(600),
-        "the nextest group allows 600 s, so the deadline must fire first; got {DEFAULT_FIXTURE_COMMAND_TIMEOUT:?}",
+        "the deadline must stay below ten warning periods so an ordinary host \
+         reports the overrun itself; got {DEFAULT_FIXTURE_COMMAND_TIMEOUT:?}",
     );
     assert!(
         DEFAULT_FIXTURE_COMMAND_TIMEOUT >= Duration::from_secs(60),
         "a deadline below a minute would fail ordinary cold builds; got {DEFAULT_FIXTURE_COMMAND_TIMEOUT:?}",
+    );
+}
+
+#[test]
+fn the_per_test_budget_leaves_room_inside_the_group_allowance() {
+    assert!(
+        TEST_FIXTURE_BUDGET < Duration::from_secs(1_200),
+        "the per-test budget must fire before nextest's 1200 s group \
+         allowance; got {TEST_FIXTURE_BUDGET:?}",
+    );
+    assert!(
+        TEST_FIXTURE_BUDGET >= DEFAULT_FIXTURE_COMMAND_TIMEOUT,
+        "the budget must admit at least one command at its default deadline; \
+         got {TEST_FIXTURE_BUDGET:?}",
+    );
+}
+
+#[test]
+fn the_budget_lowers_a_configured_deadline_but_never_raises_it() {
+    let configured = Duration::from_secs(540);
+    let almost_spent = Duration::from_secs(30);
+
+    assert_eq!(
+        command_deadline(configured, almost_spent),
+        almost_spent,
+        "a command must not outlive the test's remaining budget",
+    );
+    assert_eq!(
+        command_deadline(configured, Duration::from_secs(1_140)),
+        configured,
+        "a fresh test must not give a command more than its configured deadline",
+    );
+}
+
+#[test]
+fn a_fresh_test_still_has_almost_all_of_its_budget() {
+    let remaining = remaining_fixture_budget();
+
+    assert!(
+        remaining <= TEST_FIXTURE_BUDGET
+            && remaining > TEST_FIXTURE_BUDGET / 2
+            && remaining >= MINIMUM_FIXTURE_DEADLINE,
+        "a test that has just started must still have nearly its whole \
+         budget, and never less than one command's minimum; got {remaining:?} \
+         of {TEST_FIXTURE_BUDGET:?}",
     );
 }
 

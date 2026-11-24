@@ -12,6 +12,19 @@
 //! spawns a whole build, so killing only the direct child would leave the
 //! compiler work running and still holding the resources the deadline exists to
 //! release.
+//!
+//! Each stream's output is retained up to [`MAX_RETAINED_BYTES`]. A build that
+//! wrote without bound would otherwise exhaust the host's memory before its
+//! deadline could fire, so what is kept is a bounded prefix, explicitly marked
+//! when the limit cut it off.
+//!
+//! Known limitation: because the child leads its own group, a signal the test
+//! runner sends to the *test's* group does not reach it. If nextest cancels a
+//! test, the fixture command can outlive the test process until it finishes on
+//! its own. Closing that gap needs the child to die with its parent, which on
+//! Linux means `PR_SET_PDEATHSIG` in a `pre_exec` hook — unsafe, and this
+//! workspace forbids `unsafe` — or dropping the separate group, which would
+//! give up the timeout cleanup above. ADR-0014 records the trade-off.
 
 use std::io::{self, Read};
 use std::process::{Child, Command, ExitStatus, Stdio};
@@ -20,6 +33,18 @@ use std::time::{Duration, Instant};
 
 /// How often a running child is checked against its deadline.
 const POLL_INTERVAL: Duration = Duration::from_millis(25);
+
+/// The most output retained for one stream.
+///
+/// The readers forward chunks while the child runs and nothing consumes them
+/// until it exits, so an uncapped channel would grow with the child's total
+/// output. A build that somehow wrote gigabytes would then exhaust the host's
+/// memory before its deadline; retaining a bounded prefix keeps the diagnostic
+/// and the deadline meaningful.
+const MAX_RETAINED_BYTES: usize = 4 * 1024 * 1024;
+
+/// Marks where retained output was cut off.
+const TRUNCATION_NOTE: &str = "\n[output truncated: the stream exceeded the retained limit]\n";
 
 /// How long the output readers may take to finish after the child is gone.
 ///
@@ -184,6 +209,8 @@ struct Reader {
     chunks: Receiver<Vec<u8>>,
     /// The bytes collected from those chunks.
     collected: Vec<u8>,
+    /// Whether output beyond [`MAX_RETAINED_BYTES`] was discarded.
+    truncated: bool,
 }
 
 impl Reader {
@@ -210,6 +237,7 @@ impl Reader {
         Ok(Self {
             chunks,
             collected: Vec::new(),
+            truncated: false,
         })
     }
 
@@ -224,11 +252,31 @@ impl Reader {
         while started.elapsed() < DRAIN_GRACE {
             let left = DRAIN_GRACE.saturating_sub(started.elapsed());
             match self.chunks.recv_timeout(left) {
-                Ok(chunk) => self.collected.extend_from_slice(&chunk),
+                Ok(chunk) => self.retain(&chunk),
                 Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => break,
             }
         }
-        String::from_utf8_lossy(&self.collected).into_owned()
+        let mut text = String::from_utf8_lossy(&self.collected).into_owned();
+        if self.truncated {
+            text.push_str(TRUNCATION_NOTE);
+        }
+        text
+    }
+
+    /// Appends as much of `chunk` as fits, keeping at most
+    /// [`MAX_RETAINED_BYTES`] in total.
+    ///
+    /// The part that does not fit is discarded and the truncation is recorded,
+    /// so the caller can tell a complete log from a bounded prefix.
+    fn retain(&mut self, chunk: &[u8]) {
+        let room = MAX_RETAINED_BYTES.saturating_sub(self.collected.len());
+        let keep = chunk.len().min(room);
+        if let Some(fitting) = chunk.get(..keep) {
+            self.collected.extend_from_slice(fitting);
+        }
+        if keep < chunk.len() {
+            self.truncated = true;
+        }
     }
 }
 

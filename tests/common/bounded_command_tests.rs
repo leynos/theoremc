@@ -67,8 +67,68 @@ fn output_larger_than_a_pipe_buffer_is_drained_without_deadlocking() {
         output.stdout.len(),
     );
     assert!(
+        !output.stdout.contains("output truncated"),
+        "output inside the retained limit must not be marked truncated, got {} bytes",
+        output.stdout.len(),
+    );
+    assert!(
         started.elapsed() < Duration::from_secs(30),
         "draining must not wait for the deadline",
+    );
+}
+
+/// The retained prefix is bounded, so a stream that ran past the cap is cut off
+/// and says so. This is asserted on the reader rather than by making `sh` write
+/// four megabytes: the cap is what is under test, not `sh`.
+#[test]
+fn output_beyond_the_retained_limit_is_truncated_and_marked() {
+    let (sender, chunks) = std::sync::mpsc::channel();
+    drop(sender);
+    let mut reader = super::Reader {
+        chunks,
+        collected: Vec::new(),
+        truncated: false,
+    };
+    let chunk = vec![b'x'; super::MAX_RETAINED_BYTES + 1];
+
+    reader.retain(&chunk);
+    let text = reader.finish();
+
+    assert_eq!(
+        text.len(),
+        super::MAX_RETAINED_BYTES + super::TRUNCATION_NOTE.len(),
+        "exactly the retained limit, plus the note, must be kept",
+    );
+    assert!(
+        text.ends_with(super::TRUNCATION_NOTE),
+        "truncated output must be marked so a reader does not mistake it for the whole log",
+    );
+}
+
+/// A chunk that exactly fills the limit is complete, not truncated: marking it
+/// would make every large-but-bounded log look partial.
+#[test]
+fn output_exactly_at_the_retained_limit_is_not_marked() {
+    let (sender, chunks) = std::sync::mpsc::channel();
+    drop(sender);
+    let mut reader = super::Reader {
+        chunks,
+        collected: Vec::new(),
+        truncated: false,
+    };
+    let chunk = vec![b'x'; super::MAX_RETAINED_BYTES];
+
+    reader.retain(&chunk);
+    let text = reader.finish();
+
+    assert_eq!(
+        text.len(),
+        super::MAX_RETAINED_BYTES,
+        "output at the limit must be kept whole",
+    );
+    assert!(
+        !text.ends_with(super::TRUNCATION_NOTE),
+        "output at the limit must not be marked truncated",
     );
 }
 
@@ -128,8 +188,9 @@ fn a_timed_out_direct_child_is_killed_and_reaped() {
 
     let pid = read_pid_file(&pid_file);
     assert!(
-        !process_is_alive(pid.trim()),
-        "process {} must have been killed and reaped",
+        !process_entry_exists(pid.trim()),
+        "process {} must have been killed and reaped, so no process-table entry \
+         (including a zombie) may remain",
         pid.trim(),
     );
 }
@@ -213,6 +274,20 @@ fn process_is_alive(pid: &str) -> bool {
         .status()
         .is_ok_and(|status| status.success());
     probe && !process_is_zombie(pid)
+}
+
+/// Returns whether the process table still lists `pid`, zombie or not.
+///
+/// This is the right probe for a reaped direct child: `process_is_alive`
+/// deliberately treats a zombie as gone, which would let a missing `wait()`
+/// pass the reap assertion.
+#[cfg(unix)]
+fn process_entry_exists(pid: &str) -> bool {
+    Command::new("kill")
+        .args(["-0", pid])
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
 }
 
 /// Returns whether `pid` is a terminated process awaiting its parent's reap.

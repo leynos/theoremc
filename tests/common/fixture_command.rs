@@ -2,9 +2,11 @@
 //!
 //! A fixture command is a real `cargo` invocation, so it both races other
 //! fixtures over the shared target directory and can stall. This module composes
-//! the two guards that make such a command safe to run inside a test suite: the
+//! the guards that make such a command safe to run inside a test suite: the
 //! cross-process lock from [`super::fixture_lock`], held for the command's whole
-//! lifetime, and the deadline from [`super::bounded_command`].
+//! lifetime; the deadline from [`super::bounded_command`]; and
+//! [`TEST_FIXTURE_BUDGET`], which keeps a test's several commands inside the
+//! per-test allowance the nextest group enforces.
 
 use std::process::Command;
 use std::time::{Duration, Instant};
@@ -17,7 +19,10 @@ pub const FIXTURE_TIMEOUT_ENV: &str = "THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS";
 
 /// How long a fixture command may run before the test fails.
 ///
-/// This sits deliberately below the `nested-cargo-builds` group's own allowance
+/// This is the default ceiling for **one** command. [`run_fixture_command`] also
+/// clamps it to what remains of [`TEST_FIXTURE_BUDGET`], so a test that runs
+/// several commands cannot spend more than one per-test allowance in total.
+/// It sits deliberately below the `nested-cargo-builds` allowance
 /// (twenty warning periods of 60 s in `.config/nextest.toml`), so an overrun is
 /// reported by this code with the command and its output, rather than by nextest
 /// killing the test with nothing but a timeout notice. The headroom covers the
@@ -26,9 +31,19 @@ pub const FIXTURE_TIMEOUT_ENV: &str = "THEOREMC_FIXTURE_COMMAND_TIMEOUT_SECS";
 /// The default assumes a host that is not saturated. A cold fixture build — the
 /// dependency graph compiled once into a target that was just removed — was
 /// measured at more than 540 s while other agents held every compiler slot, so a
-/// slow host raises the deadline through [`FIXTURE_TIMEOUT_ENV`] and the group's
-/// 1200 s allowance keeps that override below nextest's own termination.
+/// slow host raises the deadline through [`FIXTURE_TIMEOUT_ENV`]. The per-test
+/// budget still clamps an override, so even a very large one cannot push a test
+/// past the group's 1200 s allowance.
 pub const DEFAULT_FIXTURE_COMMAND_TIMEOUT: Duration = Duration::from_secs(540);
+
+/// The total time one test may spend on fixture commands.
+///
+/// Each command's own deadline bounds that command; this bounds their sum, so a
+/// test that runs three builds cannot start its third at 1080 s and be killed by
+/// nextest with the fixture diagnostic lost. It sits below the
+/// `nested-cargo-builds` per-test allowance (1200 s), and
+/// `tests/nextest_config_contract.rs` holds that relation.
+pub const TEST_FIXTURE_BUDGET: Duration = Duration::from_secs(1_140);
 
 /// What a fixture command did.
 #[derive(Debug)]
@@ -59,8 +74,49 @@ pub enum FixtureOutcome {
 /// here: it is reported as [`FixtureOutcome::TimedOut`], because a build timeout
 /// and a build failure need different diagnostics.
 pub fn run_fixture_command(command: Command) -> Result<FixtureOutcome, FixtureCommandError> {
-    run_fixture_command_within(command, fixture_command_timeout())
+    let deadline = command_deadline(fixture_command_timeout(), remaining_fixture_budget());
+    run_fixture_command_within(command, deadline)
 }
+
+/// The deadline one command is given, given its configured ceiling and the
+/// time left in the test's budget.
+///
+/// Split from both clocks so a test can prove the clamp: taking the larger of
+/// the two, or ignoring the budget, would let a test's commands sum past the
+/// group's per-test allowance.
+fn command_deadline(configured: Duration, remaining: Duration) -> Duration {
+    configured.min(remaining)
+}
+
+/// Returns the time left in this test's fixture budget.
+///
+/// The budget starts at the test's first fixture command and is spent by every
+/// later one, including the gaps between them. It is thread-scoped, which is the
+/// scope that *is* the test under both runners this repository uses: nextest
+/// runs each test in its own process, and libtest — which `make kani` invokes
+/// directly — runs each test on its own freshly spawned thread. A process-wide
+/// clock would instead be shared by every test in a libtest binary.
+///
+/// Callers that apply a longer, purpose-specific bound, such as the Kani
+/// command, clamp it with this value so one test's commands cannot sum past
+/// nextest's per-test allowance.
+#[must_use]
+pub fn remaining_fixture_budget() -> Duration {
+    thread_local! {
+        /// When this test's first fixture command started.
+        static STARTED: Instant = Instant::now();
+    }
+    STARTED
+        .with(|started| TEST_FIXTURE_BUDGET.saturating_sub(started.elapsed()))
+        .max(MINIMUM_FIXTURE_DEADLINE)
+}
+
+/// The least time a fixture command is ever given.
+///
+/// Once the test's budget is spent, the next command still gets this much: it
+/// fails with the fixture's own diagnostic rather than starting with a
+/// zero-length deadline that reports a timeout before `cargo` could run.
+const MINIMUM_FIXTURE_DEADLINE: Duration = Duration::from_secs(5);
 
 /// Runs `command` under the fixture lock with an explicit `deadline`.
 ///
