@@ -5,9 +5,9 @@
 Accepted. TheoremC's three workspace lint tables now enforce the
 `leynos/netsuke` lint policy as a minimum, keep any stricter TheoremC rule, and
 record every deliberate divergence beside the setting it affects. At this
-decision no stricter Clippy rule remains; the divergences are cfg
-registrations and disallowed methods. The generated Kani gate is an `allow`
-scoped to one module rather than an `expect`.
+decision no stricter Clippy rule remains; the divergences are cfg registrations
+and disallowed methods. The generated Kani gate is an `allow` scoped to one
+module rather than an `expect`.
 
 ## Date
 

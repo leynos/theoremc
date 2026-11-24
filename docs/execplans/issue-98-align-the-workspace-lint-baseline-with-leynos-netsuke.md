@@ -144,10 +144,9 @@ Acceptance commands: the full gate list above.
 - 2026-11-23: Oriented. Read the issue, the CodeRabbit plan, and the current
   tree. Confirmed by direct comparison with `leynos/netsuke@main` that no
   baseline rule is missing; `cognitive_complexity` was then the only extra.
-  Confirmed
-  `unsafe` code is gone and the guard helper deleted by #234. Remaining work is
-  the generated gate, the consumer proof, divergence comments, the contract
-  test, and documentation.
+  Confirmed `unsafe` code is gone and the guard helper deleted by #234.
+  Remaining work is the generated gate, the consumer proof, divergence
+  comments, the contract test, and documentation.
 - 2026-11-23: Milestone 1 done in source. `render.rs` emits a reasoned,
   module-scoped `allow(unexpected_cfgs)`; the macro doc example, the expected
   tokens in `tests_support.rs`, and the golden snapshot agree. Added a fast

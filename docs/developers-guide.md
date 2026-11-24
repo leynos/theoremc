@@ -480,12 +480,12 @@ after macro expansion and so counts branching a macro generated. Whitaker's
 experimental `macro_aware_cognitive_complexity` gates complexity at 9,
 CodeScene's ceiling, and `dylint.toml` opts in with
 `[whitaker] experimental = ["macro_aware_cognitive_complexity"]`. Fix a finding
-by extracting named helpers, never by raising the threshold.
-`clippy.toml` also records why
-`shell_quote::QuoteRefExt::quoted` and `std::io::IsTerminal::is_terminal` are
-not disallowed, and the manifest records why `cfg(verus)` is not registered and
-why `cfg(theoremc_has_theorems)` stays with each package's `build.rs`. ADR-0014
-records the baseline, its retrieval date, and these decisions.
+by extracting named helpers, never by raising the threshold. `clippy.toml` also
+records why `shell_quote::QuoteRefExt::quoted` and
+`std::io::IsTerminal::is_terminal` are not disallowed, and the manifest records
+why `cfg(verus)` is not registered and why `cfg(theoremc_has_theorems)` stays
+with each package's `build.rs`. ADR-0014 records the baseline, its retrieval
+date, and these decisions.
 
 `tests/lint_policy_contract.rs` pins the policy semantically. It parses the
 manifest and `clippy.toml`, then asserts every baseline rule, level, and
