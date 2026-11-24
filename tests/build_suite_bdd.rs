@@ -214,8 +214,8 @@ fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(),
 #[test]
 fn an_unfetched_fixture_fails_fast_with_the_offline_diagnostic() -> Result<(), String> {
     let fixture = fixture_with_theorem("unfetched")?;
-    let empty_home = tempfile::tempdir().map_err(|error| error.to_string())?;
-    let empty_home = Utf8Path::from_path(empty_home.path())
+    let empty_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
+    let empty_home = Utf8Path::from_path(empty_dir.path())
         .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?;
 
     let error = fixture
