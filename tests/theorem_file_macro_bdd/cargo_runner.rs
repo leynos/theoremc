@@ -121,14 +121,6 @@ pub(crate) fn kani_is_installed() -> bool {
         .is_ok_and(|o| o.status.success())
 }
 
-/// Returns whether a Kani command failure indicates an unusable installation.
-pub(crate) fn is_unusable_kani_environment(error: &str) -> bool {
-    error.contains("error while loading shared libraries")
-        || error.contains("cannot open shared object file")
-        || error.contains("Broken pipe")
-        || error.contains("unexpected output from `rustc --version`: \"\"")
-}
-
 /// Returns `true` when the run must fail rather than skip without Kani.
 ///
 /// `make kani` and the proofs workflow set `THEOREMC_REQUIRE_KANI=1`, so a
@@ -142,27 +134,54 @@ pub(crate) fn kani_is_required() -> bool {
     std::env::var_os("THEOREMC_REQUIRE_KANI").is_some_and(|value| value == "1")
 }
 
-/// Runs the Kani harness listing only when the availability probe succeeded.
+/// What the Kani scenarios should do with one probe-plus-run outcome.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum KaniOutcome {
+    /// The probe and the run both succeeded; the run's output follows.
+    Ran(String),
+    /// Kani is unavailable, so the check may be skipped.
+    Skipped(String),
+}
+
+/// Classifies one availability probe and the Kani run that follows it.
 ///
-/// The probe and the listing have different meanings. A failed availability
-/// probe — a missing `cargo-kani`, a launch failure, or a non-zero
-/// `--version` exit — is a reason to skip the check, but a toolchain that
-/// answers the probe and still cannot list harnesses is a failure the caller
-/// must report. Taking the probe result as an argument keeps that policy
-/// testable without running Kani.
+/// The probe and the run have different meanings, and so do their failures. A
+/// failed availability probe — a missing `cargo-kani`, a launch failure, or a
+/// non-zero `--version` exit — means Kani is unavailable: a skip when the suite
+/// runs without `require_kani`, and a failure when it is required.
+///
+/// Everything after a successful probe is a failure, whatever the error says.
+/// A toolchain that answers `cargo kani --version` is installed, so a run that
+/// then cannot load a shared library or produce output is a broken installation
+/// rather than an absent optional tool. Downgrading such a failure to a skip is
+/// the silent pass that the required-Kani jobs exist to prevent, so
+/// [`KaniOutcome::Skipped`] is only ever produced for a failed probe.
 ///
 /// # Errors
 ///
-/// Returns the listing error unchanged when the probe succeeded.
-pub(crate) fn list_when_installed<F>(is_installed: bool, list: F) -> Result<Option<String>, String>
+/// Returns the run's error unchanged when the probe succeeded, and the
+/// required-Kani refusal when the probe failed under `require_kani`.
+pub(crate) fn classify_kani_run<F>(
+    check: &str,
+    is_installed: bool,
+    require_kani: bool,
+    run: F,
+) -> Result<KaniOutcome, String>
 where
     F: FnOnce() -> Result<String, String>,
 {
-    if is_installed {
-        list().map(Some)
-    } else {
-        Ok(None)
+    if !is_installed {
+        let reason = "the cargo kani --version probe failed";
+        return if require_kani {
+            Err(format!(
+                "THEOREMC_REQUIRE_KANI=1 forbids skipping the Kani {check} check: {reason}"
+            ))
+        } else {
+            Ok(KaniOutcome::Skipped(reason.to_owned()))
+        };
     }
+
+    run().map(KaniOutcome::Ran)
 }
 
 fn command_result(
@@ -188,33 +207,82 @@ fn command_result(
 
 #[cfg(test)]
 mod tests {
-    //! Unit tests for fixture cargo runner helpers.
+    //! Unit tests for the Kani probe-and-run policy.
 
-    use super::{is_unusable_kani_environment, list_when_installed};
+    use super::{KaniOutcome, classify_kani_run};
 
-    #[test]
-    fn a_missing_kani_toolchain_skips_the_listing() {
-        let result = list_when_installed(false, || {
-            panic!("the listing must not run when the probe fails")
-        });
+    /// The loader failure observed when Kani's toolchain cannot start.
+    const LOADER_ERROR: &str = "error while loading shared libraries: libLLVM.so";
 
-        assert_eq!(result, Ok(None));
+    fn run_must_not_happen() -> Result<String, String> {
+        panic!("the Kani run must not start when the availability probe fails")
     }
 
     #[test]
-    fn a_listing_failure_after_a_successful_probe_is_an_error() {
-        let result = list_when_installed(true, || Err("kani list failed".to_owned()));
+    fn a_missing_kani_toolchain_skips_the_check_when_kani_is_optional() {
+        let outcome = classify_kani_run("listing", false, false, run_must_not_happen)
+            .expect("an unavailable optional tool should skip rather than fail");
 
-        assert_eq!(result, Err("kani list failed".to_owned()));
+        assert_eq!(
+            outcome,
+            KaniOutcome::Skipped("the cargo kani --version probe failed".to_owned()),
+            "a failed probe should report why the check was skipped"
+        );
     }
 
     #[test]
-    fn recognizes_kani_without_a_usable_rustc_version_probe() {
-        assert!(is_unusable_kani_environment(
-            "unexpected output from `rustc --version`: \"\""
-        ));
-        assert!(!is_unusable_kani_environment(
-            "harness listing was incorrect"
-        ));
+    fn a_missing_kani_toolchain_fails_the_check_when_kani_is_required() {
+        let error = classify_kani_run("listing", false, true, run_must_not_happen)
+            .expect_err("a required Kani must not skip when the probe fails");
+
+        assert!(
+            error.contains("THEOREMC_REQUIRE_KANI=1") && error.contains("listing"),
+            "the failure should name the requirement and the check, got: {error}"
+        );
+    }
+
+    #[test]
+    fn a_successful_probe_reports_the_run_output() {
+        let outcome = classify_kani_run("listing", true, false, || Ok("harnesses".to_owned()))
+            .expect("a successful run should report its output");
+
+        assert_eq!(outcome, KaniOutcome::Ran("harnesses".to_owned()));
+    }
+
+    #[test]
+    fn a_loader_failure_after_a_successful_probe_fails_even_when_kani_is_optional() {
+        let error = classify_kani_run("listing", true, false, || Err(LOADER_ERROR.to_owned()))
+            .expect_err("a broken installation must not pass as an optional skip");
+
+        assert_eq!(
+            error, LOADER_ERROR,
+            "the listing error should propagate unchanged"
+        );
+    }
+
+    #[test]
+    fn another_run_failure_after_a_successful_probe_fails_the_check() {
+        let error = classify_kani_run("verification", true, false, || {
+            Err("cargo kani failed with status exit status: 1".to_owned())
+        })
+        .expect_err("a run failure after a successful probe must fail the check");
+
+        assert!(
+            error.contains("exit status: 1"),
+            "the run failure should propagate, got: {error}"
+        );
+    }
+
+    #[test]
+    fn a_fixture_build_failure_after_a_successful_probe_fails_the_check() {
+        let error = classify_kani_run("listing", true, true, || {
+            Err("could not compile fixture crate".to_owned())
+        })
+        .expect_err("a fixture build failure must fail the check");
+
+        assert!(
+            error.contains("could not compile fixture crate"),
+            "the build failure should propagate, got: {error}"
+        );
     }
 }
