@@ -44,21 +44,38 @@ const COVERAGE_VARIABLES: [&str; 8] = [
 
 /// Returns a step's own `run:` command, without the key.
 ///
-/// Only the step's own key is read, so a nested `env: { run: … }` is data.
-fn run_command<'a>(step: &'a [Line<'_>], indent: usize) -> Option<&'a str> {
-    step_run_line(step, indent)?
-        .trimmed()
-        .strip_prefix("run:")
-        .map(str::trim)
+/// Only the step's own key is read, so a nested `env: { run: … }` is data. A
+/// block scalar's `|` or `>` marker is replaced by the scalar's body, because
+/// the command a step actually runs is the body, not the marker.
+fn run_command(step: &[Line<'_>], indent: usize) -> Option<String> {
+    let run_line = step_run_line(step, indent)?;
+    let value = run_line.trimmed().strip_prefix("run:")?.trim();
+    if !value.starts_with(['|', '>']) {
+        return Some(value.to_owned());
+    }
+    let body = step
+        .iter()
+        .skip_while(|line| !std::ptr::eq(*line, run_line))
+        .skip(1)
+        .take_while(|line| line.trimmed().is_empty() || line.indent() > indent)
+        .filter(|line| !line.trimmed().is_empty())
+        .map(|line| line.trimmed())
+        .collect::<Vec<_>>()
+        .join("\n");
+    Some(body)
 }
 
 /// Reports whether a command invokes the aggregate lint target.
 ///
-/// The target name is matched as a whole token, so `make lint-whitaker` is a
-/// different command and does not satisfy the aggregate contract.
+/// Each line of a block-scalar body is checked, so a `run: |` step that calls
+/// `make lint` is recognized and then rejected for not being the exact
+/// command. The target name is matched as a whole token, so `make
+/// lint-whitaker` is a different command.
 fn invokes_aggregate(command: &str) -> bool {
-    let mut tokens = command.split_whitespace();
-    tokens.next() == Some("make") && tokens.next() == Some("lint")
+    command.lines().any(|line| {
+        let mut tokens = line.split_whitespace();
+        tokens.next() == Some("make") && tokens.next() == Some("lint")
+    })
 }
 
 /// Returns the reference a step's own `uses:` key names.
@@ -104,13 +121,14 @@ fn environment_keys<'a>(lines: &[Line<'a>], indent: usize) -> Vec<&'a str> {
 /// from the entries that follow, down to the first content line at or above
 /// the key's own indentation. Blank lines and comments never end the block.
 fn env_block_keys<'a>(lines: &[Line<'a>], env_index: usize, rest: &'a str) -> Vec<&'a str> {
-    if let Some(flow) = rest
-        .strip_prefix('{')
-        .and_then(|body| body.strip_suffix('}'))
-    {
+    if let Some(flow) = flow_mapping(rest) {
         return flow.split(',').filter_map(entry_key).collect();
     }
-    if !rest.is_empty() {
+    let header = rest
+        .split_once('#')
+        .map_or(rest, |(before, _)| before)
+        .trim();
+    if !header.is_empty() {
         return Vec::new();
     }
     let Some(env_line) = lines.get(env_index) else {
@@ -138,9 +156,23 @@ fn env_block_keys<'a>(lines: &[Line<'a>], env_index: usize, rest: &'a str) -> Ve
         .collect()
 }
 
-/// Splits a `NAME: value` entry into its key.
+/// Returns the body of a flow mapping, ignoring a trailing comment.
+///
+/// A flow mapping is `{ … }`; anything after the closing brace is a comment or
+/// trailing whitespace.
+fn flow_mapping(rest: &str) -> Option<&str> {
+    let body = rest.trim().strip_prefix('{')?;
+    body.get(..body.find('}')?)
+}
+
+/// Splits a `NAME: value` entry into its key, without quotes.
+///
+/// YAML permits a quoted key, and the quotes are syntax rather than part of the
+/// name, so they are removed before the key is compared with the policy list.
 fn entry_key(entry: &str) -> Option<&str> {
-    entry.split_once(':').map(|(key, _)| key.trim())
+    entry
+        .split_once(':')
+        .map(|(key, _)| key.trim().trim_matches(['"', '\'']))
 }
 
 /// Fails when `keys` assign a variable that would narrow the lint gate.
@@ -192,7 +224,7 @@ struct LintStep<'a, 'b> {
     /// The indentation of the step's own keys.
     indent: usize,
     /// The command the step's `run:` key carries.
-    command: &'a str,
+    command: String,
 }
 
 /// Collects the steps of `job` that invoke the aggregate lint target.
@@ -202,7 +234,7 @@ fn lint_steps<'a, 'b>(name: &'a str, job: &'a [Line<'b>]) -> Vec<LintStep<'a, 'b
         .filter_map(|(start, step)| {
             let indent = key_indent(step)?;
             let command = run_command(step, indent)?;
-            invokes_aggregate(command).then_some(LintStep {
+            invokes_aggregate(&command).then_some(LintStep {
                 job: name,
                 start,
                 lines: step,
@@ -313,7 +345,7 @@ fn verify_lint_job_steps(name: &str, job: &[Line<'_>]) -> Result<usize, String> 
     verify_lint_job(name, job, indent)?;
     let job_steps = steps(job);
     for lint in &found {
-        verify_lint_step(name, lint.lines, lint.indent, lint.command)?;
+        verify_lint_step(name, lint.lines, lint.indent, &lint.command)?;
         verify_installer(&job_steps, lint)?;
     }
     Ok(found.len())

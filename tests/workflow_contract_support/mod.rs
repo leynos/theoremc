@@ -120,22 +120,48 @@ fn step_end(job: &[Line<'_>], start: usize, step_indent: usize) -> usize {
         .map_or(job.len(), |(index, _)| index)
 }
 
+/// Returns the index of the job's own `steps:` key.
+///
+/// Only a key at the job's key indentation counts, so `steps:` text inside an
+/// earlier block scalar — a `run: |` body, for example — is data and not a
+/// mapping key. The key is matched with or without a trailing comment.
+fn steps_key_index(job: &[Line<'_>]) -> Option<(usize, usize)> {
+    let key_indent = key_indent(job)?;
+    job.iter().enumerate().find_map(|(index, line)| {
+        let trailing = line
+            .trimmed()
+            .strip_prefix("steps:")
+            .map(str::trim)
+            .filter(|trailing| trailing.is_empty() || trailing.starts_with('#'));
+        (line.indent() == key_indent && trailing.is_some()).then_some((index, key_indent))
+    })
+}
+
 /// Returns each step of a job with its start index, in file order.
 ///
 /// The search starts at the job's own `steps:` key, so a block sequence that
 /// belongs to something else — a `strategy.matrix.os` list, for example —
-/// cannot set the step indentation. Only sequence items exactly two spaces
-/// below `steps:` count: a nested sequence under `with:` is data, not a
-/// second step.
+/// cannot set the step indentation. The sequence indentation is read from the
+/// first item after the key, because YAML allows a step list to start at the
+/// key's own indentation as well as two spaces deeper. Only items at that
+/// indentation count: a nested sequence under `with:` is data, not a step.
 pub(crate) fn steps<'a, 'b>(job: &'a [Line<'b>]) -> Vec<(usize, &'a [Line<'b>])> {
-    let Some(steps_line) = job.iter().position(|line| line.trimmed() == "steps:") else {
+    let Some((steps_line, key_indent)) = steps_key_index(job) else {
         return Vec::new();
     };
-    let step_indent = job.get(steps_line).map_or(0, |line| line.indent()) + 2;
-    let starts: Vec<usize> = job
+    let Some((first, step_indent)) = job
         .iter()
         .enumerate()
         .skip(steps_line + 1)
+        .find(|(_, line)| line.opens_step() && line.indent() >= key_indent)
+        .map(|(index, line)| (index, line.indent()))
+    else {
+        return Vec::new();
+    };
+    let starts: Vec<usize> = job
+        .iter()
+        .enumerate()
+        .skip(first)
         .filter(|(_, line)| line.opens_step() && line.indent() == step_indent)
         .map(|(index, _)| index)
         .collect();
@@ -148,7 +174,8 @@ pub(crate) fn steps<'a, 'b>(job: &'a [Line<'b>]) -> Vec<(usize, &'a [Line<'b>])>
 /// Returns the indentation of a block's own keys.
 ///
 /// A block's first line opens it (a job key or a step's `- name:` line), and
-/// its keys sit two spaces deeper.
+/// its keys sit two spaces deeper. A step's keys sit two spaces past the `- `,
+/// which is the same arithmetic and keeps one rule.
 pub(crate) fn key_indent(block: &[Line<'_>]) -> Option<usize> {
     block.first().map(|line| line.indent() + 2)
 }

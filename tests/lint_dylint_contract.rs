@@ -92,9 +92,19 @@ fn record_opening_entry(value: &str, lines: &[&str], index: usize, offences: &mu
 
 /// Records `line` when it is an exclusion entry with no adjacent reason.
 fn record_entry(line: &str, lines: &[&str], index: usize, offences: &mut Vec<String>) {
-    if starts_with_string(line.trim_start_matches('[')) && !has_justification(lines, index) {
+    let entry = line.trim_start_matches('[').trim_start();
+    if starts_with_string(entry) && !has_justification(lines, index) {
         offences.push(line.to_owned());
     }
+}
+
+/// Returns the key of a TOML assignment, without quotes.
+///
+/// TOML permits a quoted key, so the quotes are syntax rather than part of the
+/// name and are removed before the key is compared with the policy.
+fn assignment_key(line: &str) -> Option<&str> {
+    line.split_once('=')
+        .map(|(key, _)| key.trim().trim_matches(['"', '\'']))
 }
 
 /// Verifies that `dylint.toml` declares no whole-crate exclusion.
@@ -103,9 +113,25 @@ fn the_dylint_configuration_exempts_no_whole_crate() {
     assert!(
         !active_lines(DYLINT)
             .iter()
-            .any(|line| line.starts_with("excluded_crates")),
+            .any(|line| assignment_key(line) == Some("excluded_crates")),
         "dylint.toml must not exempt a whole crate; prefer `excluded_paths` with a recorded reason"
     );
+}
+
+/// A whole-crate exclusion is rejected in every key spelling.
+#[test]
+fn a_whole_crate_exclusion_is_rejected() {
+    for entry in [
+        "excluded_crates = [\"theoremc\"]\n",
+        "\"excluded_crates\" = [\"theoremc\"]\n",
+        "'excluded_crates' = ['theoremc']\n",
+    ] {
+        assert_eq!(
+            assignment_key(entry.trim_end()),
+            Some("excluded_crates"),
+            "a whole-crate exclusion must be recognized whatever the key spelling: {entry:?}"
+        );
+    }
 }
 
 /// Verifies that every committed exclusion carries an adjacent reason.
@@ -124,6 +150,7 @@ fn an_unjustified_exclusion_is_rejected() {
     for entry in [
         "excluded_paths = [\"crate::legacy_io\"]\n",
         "excluded_paths = ['crate::legacy_io']\n",
+        "excluded_paths = [ \"crate::legacy_io\" ]\n",
         "excluded_paths = [\n  \"crate::legacy_io\",\n]\n",
         "excluded_paths = [\n  'crate::legacy_io',\n]\n",
         "excluded_paths = [\"crate::legacy_io\",\n]\n",

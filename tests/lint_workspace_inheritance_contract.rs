@@ -78,10 +78,10 @@ fn quoted_items(text: &str) -> Vec<String> {
 /// body is joined before the quoted items are read. Comments are removed
 /// first, because a commented path is not a member.
 fn array_items(document: &str, key: &str) -> Option<Vec<String>> {
-    let header = format!("{key} =");
-    let start = document
-        .lines()
-        .position(|line| line.starts_with(&header))?;
+    let start = document.lines().position(|line| {
+        line.split_once('=')
+            .is_some_and(|(name, _)| name.trim().trim_matches(['"', '\'']) == key)
+    })?;
     let mut body = String::new();
     let mut depth = 0usize;
     for raw in document.lines().skip(start) {
@@ -177,13 +177,34 @@ fn workspace_members(repository: &Repository) -> Result<Vec<String>, String> {
     Ok(members)
 }
 
+/// Reports whether a `[lints]` section body is exactly the workspace opt-in.
+///
+/// TOML ignores whitespace around `=`, so the check normalizes each assignment
+/// rather than comparing raw text, and rejects any other declaration in the
+/// table. A commented-out line is prose, not a declaration.
+fn is_workspace_opt_in(body: &str) -> bool {
+    let declarations: Vec<String> = body
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| {
+            line.split_once('=').map_or_else(
+                || line.to_owned(),
+                |(key, value)| format!("{} = {}", key.trim(), value.trim()),
+            )
+        })
+        .collect();
+    declarations == ["workspace = true"]
+}
+
 /// Fails unless a manifest opts into the workspace lints.
 ///
 /// # Errors
 ///
 /// Returns the missing opt-in.
 fn verify_opt_in(path: &str, manifest: &str) -> Result<(), String> {
-    if test_helpers::toml_section(manifest, "lints").as_deref() == Some("workspace = true\n") {
+    let body = test_helpers::toml_section(manifest, "lints").unwrap_or_default();
+    if is_workspace_opt_in(&body) {
         Ok(())
     } else {
         Err(format!(
@@ -327,6 +348,38 @@ fn members_are_read_across_line_breaks() {
         Some(vec!["crates/one".to_owned()]),
         "a commented path must not count as a member"
     );
+    let tight = "[workspace]\nmembers=[\"crates/one\"]\n";
+    assert_eq!(
+        array_items(tight, "members"),
+        Some(vec!["crates/one".to_owned()]),
+        "TOML ignores whitespace around the assignment"
+    );
+}
+
+/// The opt-in is accepted whatever the whitespace, and nothing else is.
+#[test]
+fn the_opt_in_is_read_by_its_meaning() {
+    for body in [
+        "workspace = true\n",
+        "workspace=true\n",
+        "workspace   =   true\n",
+        "# inherit the shared policy\nworkspace = true\n",
+    ] {
+        assert!(
+            is_workspace_opt_in(body),
+            "a valid opt-in must be accepted: {body:?}"
+        );
+    }
+    for body in [
+        "workspace = false\n",
+        "workspace = true\npedantic = \"warn\"\n",
+        "",
+    ] {
+        assert!(
+            !is_workspace_opt_in(body),
+            "anything but the opt-in alone must be rejected: {body:?}"
+        );
+    }
 }
 
 /// A literal-quoted member is registered like a basic-quoted one.

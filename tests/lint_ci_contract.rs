@@ -19,6 +19,7 @@
 mod lint_ci_contract_support;
 
 use lint_ci_contract_support::{CI, verify_lint_gate};
+use rstest::rstest;
 
 /// A pinned Whitaker install step, as the synthetic jobs spell it.
 const INSTALL_STEP: &str = concat!(
@@ -43,6 +44,11 @@ fn workflow_with(job_bodies: &[(&str, &str)]) -> String {
         })
 }
 
+/// A single-job workflow whose body is `body`.
+fn single_job(body: &str) -> String {
+    workflow_with(&[("build-test", body)])
+}
+
 /// Verifies that the committed workflow satisfies the whole contract.
 #[test]
 fn ci_runs_the_aggregate_lint_with_a_pinned_installer() {
@@ -51,111 +57,106 @@ fn ci_runs_the_aggregate_lint_with_a_pinned_installer() {
     }
 }
 
-/// A job that never installs Whitaker cannot run the aggregate.
-#[test]
-fn a_missing_installer_is_rejected() {
-    let workflow = workflow_with(&[("build-test", LINT_STEP)]);
+/// Every way a lint job can be provisioned or narrowed wrongly is rejected.
+///
+/// Each case is a whole workflow, so the verifier sees exactly what a reviewer
+/// would: the shape that must fail, with no fixture hiding it.
+#[rstest]
+#[case::no_installer(LINT_STEP)]
+#[case::installer_after_lint(
+    concat!(
+        "      - name: Lint\n        run: make lint\n",
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+    )
+)]
+#[case::lint_step_if(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        if: false\n        run: make lint\n",
+    )
+)]
+#[case::installer_continue_on_error(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        continue-on-error: true\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        run: make lint\n",
+    )
+)]
+#[case::make_argument(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        run: make lint LINT_PACKAGES=--package theoremc\n",
+    )
+)]
+#[case::step_env(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        env:\n          CARGO_FLAGS: --package theoremc\n",
+        "        run: make lint\n",
+    )
+)]
+#[case::step_env_after_blank_line(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        env:\n\n          CARGO_FLAGS: --package theoremc\n",
+        "        run: make lint\n",
+    )
+)]
+#[case::step_env_annotated_header(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        env:  # lint settings\n",
+        "          LINT_PACKAGES: --package theoremc\n        run: make lint\n",
+    )
+)]
+#[case::step_env_quoted_key(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@",
+        "0eabb6bc07148981de5da395e30cd78d83f5c7c2\n",
+        "      - name: Lint\n        env:\n          'LINT_PACKAGES': --package theoremc\n",
+        "        run: make lint\n",
+    )
+)]
+#[case::rolling_installer(
+    concat!(
+        "      - name: Install Whitaker\n",
+        "        uses: leynos/shared-actions/.github/actions/install-whitaker@main\n",
+        "      - name: Lint\n        run: make lint\n",
+    )
+)]
+#[case::block_scalar_lint("      - name: Lint\n        run: |\n          make lint\n")]
+fn an_invalid_lint_job_is_rejected(#[case] body: &str) {
+    let workflow = single_job(body);
     assert!(
         verify_lint_gate(&workflow).is_err(),
-        "a lint step without an installer must be rejected"
+        "this job must be rejected:\n{body}"
     );
 }
 
-/// An installer placed after the lint step is not a provisioning step.
-#[test]
-fn an_installer_after_the_lint_step_is_rejected() {
-    let body = format!("{LINT_STEP}{INSTALL_STEP}");
-    let workflow = workflow_with(&[("build-test", &body)]);
-    assert!(
-        verify_lint_gate(&workflow).is_err(),
-        "an installer after the lint step must be rejected"
-    );
-}
-
-/// A conditional lint step is a bypass even when the command is exact.
-#[test]
-fn a_bypass_key_on_the_lint_step_is_rejected() {
-    let body =
-        format!("{INSTALL_STEP}      - name: Lint\n        if: false\n        run: make lint\n");
-    let workflow = workflow_with(&[("build-test", &body)]);
-    assert!(
-        verify_lint_gate(&workflow).is_err(),
-        "a step-level if: must be rejected"
-    );
-}
-
-/// A non-fatal installer could hide a missing suite.
-#[test]
-fn a_bypass_key_on_the_installer_step_is_rejected() {
-    let body = format!(
-        "      - name: Install Whitaker\n        continue-on-error: true\n        uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2\n{LINT_STEP}"
-    );
-    let workflow = workflow_with(&[("build-test", &body)]);
-    assert!(
-        verify_lint_gate(&workflow).is_err(),
-        "a continue-on-error: on the installer must be rejected"
-    );
-}
-
-/// A conditional job could skip the whole gate.
-#[test]
-fn a_bypass_key_on_the_job_is_rejected() {
-    let mut workflow = String::from("jobs:\n  build-test:\n    if: false\n    steps:\n");
-    workflow.push_str(INSTALL_STEP);
-    workflow.push_str(LINT_STEP);
+/// A job-level bypass key is rejected wherever it appears.
+#[rstest]
+#[case::before_steps("jobs:\n  build-test:\n    if: false\n    steps:\n", "")]
+#[case::after_steps("jobs:\n  build-test:\n    steps:\n", "    if: false\n")]
+fn a_bypass_key_on_the_job_is_rejected(#[case] skeleton: &str, #[case] trailer: &str) {
+    let workflow = format!("{skeleton}{INSTALL_STEP}{LINT_STEP}{trailer}");
     assert!(
         verify_lint_gate(&workflow).is_err(),
         "a job-level if: must be rejected"
-    );
-}
-
-/// Every job that runs the aggregate needs its own pinned install.
-#[test]
-fn a_second_unprotected_lint_job_is_rejected() {
-    let protected = format!("{INSTALL_STEP}{LINT_STEP}");
-    let workflow = workflow_with(&[("build-test", &protected), ("second", LINT_STEP)]);
-    assert!(
-        verify_lint_gate(&workflow).is_err(),
-        "a second job running make lint without an installer must be rejected"
-    );
-}
-
-/// A command-line variable would override the Makefile default.
-#[test]
-fn a_make_argument_override_is_rejected() {
-    let body = format!(
-        "{INSTALL_STEP}      - name: Lint\n        run: make lint LINT_PACKAGES=--package theoremc\n"
-    );
-    let workflow = workflow_with(&[("build-test", &body)]);
-    assert!(
-        verify_lint_gate(&workflow).is_err(),
-        "a make argument override must be rejected"
-    );
-}
-
-/// A step-level environment override would narrow the gate.
-#[test]
-fn a_step_environment_override_is_rejected() {
-    let body = format!(
-        "{INSTALL_STEP}      - name: Lint\n        env:\n          CARGO_FLAGS: --package theoremc\n        run: make lint\n"
-    );
-    let workflow = workflow_with(&[("build-test", &body)]);
-    assert!(
-        verify_lint_gate(&workflow).is_err(),
-        "a step-level env override must be rejected"
-    );
-}
-
-/// A blank line inside an `env:` mapping does not end the block.
-#[test]
-fn a_blank_line_does_not_hide_a_step_environment_override() {
-    let body = format!(
-        "{INSTALL_STEP}      - name: Lint\n        env:\n\n          CARGO_FLAGS: --package theoremc\n        run: make lint\n"
-    );
-    let workflow = workflow_with(&[("build-test", &body)]);
-    assert!(
-        verify_lint_gate(&workflow).is_err(),
-        "a blank line must not hide a step-level env override"
     );
 }
 
@@ -183,16 +184,32 @@ fn a_workflow_environment_override_is_rejected() {
     );
 }
 
-/// The installer must name a full commit SHA, not a rolling reference.
+/// Every job that runs the aggregate needs its own pinned install.
 #[test]
-fn a_rolling_installer_reference_is_rejected() {
-    let body = format!(
-        "      - name: Install Whitaker\n        uses: leynos/shared-actions/.github/actions/install-whitaker@main\n{LINT_STEP}"
-    );
-    let workflow = workflow_with(&[("build-test", &body)]);
+fn a_second_unprotected_lint_job_is_rejected() {
+    let protected = format!("{INSTALL_STEP}{LINT_STEP}");
+    let workflow = workflow_with(&[("build-test", &protected), ("second", LINT_STEP)]);
     assert!(
         verify_lint_gate(&workflow).is_err(),
-        "a rolling installer reference must be rejected"
+        "a second job running make lint without an installer must be rejected"
+    );
+}
+
+/// A normal lint job cannot mask a second job that runs the aggregate in a
+/// block scalar without an installer.
+#[test]
+fn a_block_scalar_lint_job_cannot_hide_behind_a_normal_one() {
+    let protected = format!("{INSTALL_STEP}{LINT_STEP}");
+    let workflow = workflow_with(&[
+        ("build-test", &protected),
+        (
+            "second",
+            "      - name: Lint\n        run: |\n          make lint\n",
+        ),
+    ]);
+    assert!(
+        verify_lint_gate(&workflow).is_err(),
+        "a block-scalar lint job without an installer must be rejected"
     );
 }
 
@@ -202,19 +219,28 @@ fn an_inline_uses_step_satisfies_the_installer_requirement() {
     let body = format!(
         "      - uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2\n{LINT_STEP}"
     );
-    let workflow = workflow_with(&[("build-test", &body)]);
+    let workflow = single_job(&body);
     if let Err(report) = verify_lint_gate(&workflow) {
         panic!("an inline uses step must satisfy the installer requirement: {report}");
     }
 }
 
-/// A job's own `steps:` mapping is found even after a matrix list.
-#[test]
-fn a_matrix_list_before_steps_does_not_hide_the_gate() {
-    let workflow = format!(
-        "jobs:\n  build-test:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        include:\n          - os: ubuntu-latest\n    steps:\n{INSTALL_STEP}{LINT_STEP}"
-    );
+/// A job's own `steps:` mapping is found after a matrix list, and a step list
+/// at the key's own indentation is read as readily as an indented one.
+#[rstest]
+#[case::matrix_before_steps(
+    "jobs:\n  build-test:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        include:\n          - os: ubuntu-latest\n    steps:\n"
+)]
+#[case::list_at_key_indentation("jobs:\n  build-test:\n    runs-on: ubuntu-latest\n    steps:\n")]
+fn a_valid_lint_job_is_accepted(#[case] skeleton: &str) {
+    let workflow = if skeleton.contains("matrix") {
+        format!("{skeleton}{INSTALL_STEP}{LINT_STEP}")
+    } else {
+        format!(
+            "{skeleton}    - name: Install Whitaker\n      uses: leynos/shared-actions/.github/actions/install-whitaker@0eabb6bc07148981de5da395e30cd78d83f5c7c2\n    - name: Lint\n      run: make lint\n"
+        )
+    };
     if let Err(report) = verify_lint_gate(&workflow) {
-        panic!("a matrix list before steps must not hide the lint gate: {report}");
+        panic!("a valid lint job must be accepted: {report}");
     }
 }
