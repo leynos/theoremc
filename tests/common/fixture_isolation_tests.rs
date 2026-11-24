@@ -184,18 +184,18 @@ fn an_absolute_base_selects_a_canonical_shared_directory() {
     assert_eq!(
         target,
         base.canonicalize_utf8()
-            .expect("the temporary directory canonicalises")
+            .expect("the temporary directory canonicalizes")
             .join("theoremc-fixture-builds"),
         "the shared directory must sit inside the injected base and be canonical"
     );
     assert!(target.is_dir(), "{target} must be created");
 }
 
-/// A base spelled with `.` and `..` segments is canonicalised before it is
+/// A base spelled with `.` and `..` segments is canonicalized before it is
 /// returned, so child Cargo invocations receive one absolute path however the
-/// caller spelled it. A relative base travels the same canonicalisation step.
+/// caller spelled it. A relative base travels the same canonicalization step.
 #[test]
-fn a_non_canonical_base_is_canonicalised_before_it_is_returned() {
+fn a_non_canonical_base_is_canonicalized_before_it_is_returned() {
     let temp = tempfile::tempdir().expect("temp dir");
     let base = Utf8Path::from_path(temp.path()).expect("temp dir path is UTF-8");
     let spelled = base.join("nested").join("..");
@@ -205,9 +205,9 @@ fn a_non_canonical_base_is_canonicalised_before_it_is_returned() {
     assert_eq!(
         target,
         base.canonicalize_utf8()
-            .expect("the temporary directory canonicalises")
+            .expect("the temporary directory canonicalizes")
             .join("theoremc-fixture-builds"),
-        "canonicalisation must remove the `..` segment before the path is returned"
+        "canonicalization must remove the `..` segment before the path is returned"
     );
 }
 

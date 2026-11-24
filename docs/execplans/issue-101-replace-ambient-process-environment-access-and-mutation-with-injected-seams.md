@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS (execution authorised by the issue #101 task request)
+Status: IN PROGRESS (execution authorized by the issue #101 task request)
 
 Branch:
 `issue-101-replace-ambient-process-environment-access-and-mutation-with-injected-seams`
@@ -60,7 +60,7 @@ those components receive their inputs changes.
 - Files must stay under 400 lines. Use `#[cfg(test)] #[path = "..._tests.rs"]`
   for colocated unit tests.
 - Implementation proceeds without a further approval gate because the task
-  request that supplied the coding plan also authorised implementation and PR
+  request that supplied the coding plan also authorized implementation and PR
   delivery.
 
 ## Tolerances (exception triggers)
@@ -92,8 +92,8 @@ The ExecPlan file itself is excluded from every size count.
   same working directory with the inherited environment, and add a unit test
   over stub metadata plus a staging-content test.
 - Risk: the fixture target helper is shared by several BDD suites; an injected
-  base that skips canonicalisation changes the paths recorded in build logs.
-  Severity: medium Likelihood: low Mitigation: keep canonicalisation and the
+  base that skips canonicalization changes the paths recorded in build logs.
+  Severity: medium Likelihood: low Mitigation: keep canonicalization and the
   existing suffix logic untouched; test absolute, relative, and absent bases.
 - Risk: `HostEnv` plumbed through every call site changes argument counts and
   trips `too_many_arguments`. Severity: low Likelihood: medium Mitigation: pass
@@ -237,7 +237,7 @@ declares both `[workspace]` and `[package]`. The affected components are:
 
 - `tests/common/fixture_isolation.rs`, whose `shared_target_dir()` appends
   `theoremc-fixture-builds` to `CARGO_TARGET_DIR` or the repository `target`,
-  creates it, and canonicalises it. `tests/common/fixture_crate.rs` consumes it.
+  creates it, and canonicalizes it. `tests/common/fixture_crate.rs` consumes it.
 
 - `crates/cargo-theorem/tests/entry_points/process.rs`, which reads `PATH`,
   `RUSTUP_HOME`, `HOME`, and `USERPROFILE` in three separately annotated helpers
@@ -333,7 +333,7 @@ reproduced, and that the boundary is the only reader.
   `<target_directory>/tests/trybuild/theoremc-macros/tests/expand/<name>`, where
   `target_directory` comes from the same `cargo metadata` the harness runs.
 - `INV-fixture-base`: the fixture target is
-  `<base>/theoremc-fixture-builds`, canonicalised once, where `base` is the
+  `<base>/theoremc-fixture-builds`, canonicalized once, where `base` is the
   injected value or the repository `target`.
 - `INV-host-env`: child commands are built from explicitly captured host values
   and always run with `env_clear` plus explicit `env` entries.
@@ -377,7 +377,7 @@ reproduced, and that the boundary is the only reader.
   `tests/common/fixture_isolation_tests.rs`. Evidence:
   `cargo nextest run -p theoremc --test build_discovery_bdd` exercises the
   helper through fixtures; the unit tests cover the selector. Non-vacuity: the
-  relative case proves canonicalisation happens; the absent case proves the
+  relative case proves canonicalization happens; the absent case proves the
   fallback is used.
 
 - Obligation: `INV-host-env`.
@@ -467,7 +467,7 @@ missing key, and malformed.
 
 In `tests/common/fixture_isolation.rs`, split `shared_target_dir` into a pure
 `fixture_target_dir(base: Option<Utf8PathBuf>)` selector that appends
-`theoremc-fixture-builds`, creates it, and canonicalises it, plus one annotated
+`theoremc-fixture-builds`, creates it, and canonicalizes it, plus one annotated
 `ambient_target_base()` that reads `CARGO_TARGET_DIR`. `shared_target_dir`
 becomes the composition of the two. Add unit tests for absolute, relative, and
 absent bases.
@@ -565,7 +565,7 @@ pub fn prepare_build_script(
 
 Private test-only interfaces: `BuildScriptContext::from_lookup`,
 `HostEnv::capture`, `fixture_target_dir`, and the trybuild metadata parser.
-Authorised dependency changes: `serde_json.workspace = true` added to
+Authorized dependency changes: `serde_json.workspace = true` added to
 `crates/theoremc-macros` dev-dependencies. No runtime dependency changes.
 
 Reuse policy: `BuildScriptContext` owns the build-script input boundary;

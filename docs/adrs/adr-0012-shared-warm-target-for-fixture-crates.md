@@ -38,7 +38,7 @@ builds that serial group could not finish inside the job.
   [ADR-0014](adr-0014-environment-seam-boundaries.md) names the read of
   `CARGO_TARGET_DIR` as an approved composition root: `ambient_target_base`
   captures it once, and the pure `fixture_target_dir` selector owns the
-  directory choice, creation, and canonicalisation.
+  directory choice, creation, and canonicalization.
 - Each fixture's package is renamed to a short unique name,
   `fx_<pid>_<sequence>_<clock>`: the process id separates concurrent processes,
   the sequence number separates fixtures within one, and the clock separates

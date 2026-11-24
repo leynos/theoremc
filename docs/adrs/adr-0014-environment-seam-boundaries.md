@@ -15,8 +15,11 @@ the parent process environment.
 - Deciders: theoremc maintainers
 - Technical story: issue #101, replacing ambient process-environment access and
   mutation with injected seams
-- Related records: [ADR-0008](adr-0008-workspace-build-support-boundary.md),
-  [ADR-0009](adr-0009-orthoconfig-cli-configuration.md), [ADR-0012](adr-0012-shared-warm-target-for-fixture-crates.md), [ADR-0013](adr-0013-workspace-complete-lint-gate.md)
+- Related records:
+  - [ADR-0008](adr-0008-workspace-build-support-boundary.md).
+  - [ADR-0009](adr-0009-orthoconfig-cli-configuration.md).
+  - [ADR-0012](adr-0012-shared-warm-target-for-fixture-crates.md).
+  - [ADR-0013](adr-0013-workspace-complete-lint-gate.md).
 
 ## Context
 

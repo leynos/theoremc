@@ -647,7 +647,7 @@ suite.
   `fixture_target_dir(ambient_target_base().as_deref())` in
   `tests/common/fixture_isolation.rs`: `ambient_target_base` is the one
   annotated read of `CARGO_TARGET_DIR`, and `fixture_target_dir` is a pure
-  selector that appends the directory name, creates it, and canonicalises it. A
+  selector that appends the directory name, creates it, and canonicalizes it. A
   test exercises the selector from an explicit base rather than by exporting
   the variable. Each fixture's package gets a short unique name (`fx_` and a
   run-and-sequence suffix; short because Kani derives a file name from the

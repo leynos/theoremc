@@ -173,12 +173,12 @@ fn ambient_target_base() -> Option<Utf8PathBuf> {
 /// `target` when no base was supplied.
 ///
 /// A relative base is resolved against the current directory and the result is
-/// canonicalised, so child Cargo invocations receive one absolute path however
+/// canonicalized, so child Cargo invocations receive one absolute path however
 /// the caller spelled it.
 ///
 /// # Errors
 ///
-/// Returns an error when the directory cannot be created or canonicalised.
+/// Returns an error when the directory cannot be created or canonicalized.
 pub(super) fn fixture_target_dir(base: Option<&Utf8Path>) -> Result<Utf8PathBuf, String> {
     let resolved_base =
         base.map_or_else(|| repository_root().join("target"), Utf8Path::to_path_buf);
