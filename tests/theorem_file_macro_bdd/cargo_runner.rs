@@ -117,50 +117,75 @@ const STANDARD_RUSTFLAGS: &str = if cfg!(target_os = "linux") {
 /// The child process owns its flags, so this does not mutate the test
 /// process. Assigning `RUSTFLAGS` makes Cargo ignore the `rustflags` in
 /// `.cargo/config.toml`, so the development build standard is composed in
-/// explicitly, then any inherited value, then the denial: the same precedence
-/// the Makefile recipes use. `CARGO_ENCODED_RUSTFLAGS` is removed because Cargo
-/// prefers it over `RUSTFLAGS`, and a stale value would silently defeat the
-/// denial and the standard alike.
+/// explicitly. Failing rather than guessing is deliberate: an inherited flag
+/// set that this helper cannot read safely would silently weaken the very
+/// check the scenario exists to perform.
 pub(crate) fn cargo_run_denying_warnings(
     manifest_dir: &Utf8Path,
     target_dir: &Utf8Path,
     subcommand: CargoSubcommand,
     _guard: &CargoGuard<'_>,
 ) -> Result<(), String> {
+    let rustflags = denying_warnings_rustflags()?;
     let output = hermetic_cargo(manifest_dir, target_dir)
         .args(subcommand.args())
         .env_remove("CARGO_ENCODED_RUSTFLAGS")
-        .env("RUSTFLAGS", denying_warnings_rustflags())
+        .env("RUSTFLAGS", rustflags)
         .output()
         .map_err(|error| error.to_string())?;
     command_result(subcommand, &output).map(|_| ())
 }
 
-/// Composes the build standard, an inherited value, and the denial.
+/// Composes the build standard, inherited arguments, and the denial.
 ///
-/// An inherited value is preserved rather than replaced, mirroring
-/// `${RUSTFLAGS:+$RUSTFLAGS }` in the Makefile. A blank inherited value adds
-/// nothing, so the result never carries a stray space.
-fn compose_rustflags(standard: &str, inherited: Option<&str>) -> String {
-    inherited
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map_or_else(
-            || format!("{standard} -D warnings"),
-            |flags| format!("{standard} {flags} -D warnings"),
-        )
+/// Inherited arguments are preserved rather than replaced, mirroring
+/// `${RUSTFLAGS:+$RUSTFLAGS }` in the Makefile, and blank entries add nothing.
+/// Any inherited `--cap-lints` is dropped, because a cap of `warn` would turn
+/// the denial back into a warning and let a fixture pass that should fail.
+fn compose_rustflags(standard: &str, inherited: &[String]) -> String {
+    let mut composed = vec![standard.to_owned()];
+    composed.extend(
+        inherited
+            .iter()
+            .map(|flag| flag.trim())
+            .filter(|flag| !flag.is_empty())
+            .filter(|flag| !flag.starts_with("--cap-lints"))
+            .map(str::to_owned),
+    );
+    composed.push("-D warnings".to_owned());
+    composed.join(" ")
 }
 
 /// Returns the child build's `RUSTFLAGS`.
+///
+/// Cargo prefers `CARGO_ENCODED_RUSTFLAGS` over `RUSTFLAGS` and splits it on
+/// its own separator rather than on whitespace, so an encoded value is read as
+/// distinct arguments; that keeps a linker path containing spaces intact.
+/// Blank values in the legacy variable are dropped, which is what the Makefile
+/// does when it appends its flags.
 #[expect(
     clippy::disallowed_methods,
     reason = "the fixture build must inherit the host Cargo invocation's rustflags, so it composes them exactly as the Makefile recipes do"
 )]
-fn denying_warnings_rustflags() -> String {
-    compose_rustflags(
-        STANDARD_RUSTFLAGS,
-        std::env::var("RUSTFLAGS").ok().as_deref(),
-    )
+fn denying_warnings_rustflags() -> Result<String, String> {
+    let encoded = std::env::var("CARGO_ENCODED_RUSTFLAGS").ok();
+    let inherited = match encoded.as_deref() {
+        Some(value) if !value.trim().is_empty() => value
+            .split('\u{1f}')
+            .filter(|flag| !flag.trim().is_empty())
+            .map(str::to_owned)
+            .collect::<Vec<_>>(),
+        _ => {
+            let legacy = std::env::var("RUSTFLAGS").map_err(|error| {
+                format!("reading the inherited RUSTFLAGS for the strict build: {error}")
+            })?;
+            legacy
+                .split_whitespace()
+                .map(str::to_owned)
+                .collect::<Vec<_>>()
+        }
+    };
+    Ok(compose_rustflags(STANDARD_RUSTFLAGS, &inherited))
 }
 
 pub(crate) fn recover_mutex_guard(mutex: &Mutex<()>) -> MutexGuard<'_, ()> {
@@ -220,9 +245,14 @@ mod tests {
 
     use super::compose_rustflags;
 
+    /// Builds the argument list a caller would pass in.
+    fn flags(values: &[&str]) -> Vec<String> {
+        values.iter().map(|value| (*value).to_owned()).collect()
+    }
+
     #[test]
     fn compose_rustflags_without_inherited_flags_keeps_the_standard() {
-        let composed = compose_rustflags("-Zthreads=8", None);
+        let composed = compose_rustflags("-Zthreads=8", &[]);
 
         assert_eq!(
             composed, "-Zthreads=8 -D warnings",
@@ -232,7 +262,7 @@ mod tests {
 
     #[test]
     fn compose_rustflags_places_inherited_flags_before_the_denial() {
-        let composed = compose_rustflags("-Zthreads=8", Some("-Cdebuginfo=1"));
+        let composed = compose_rustflags("-Zthreads=8", &flags(&["-Cdebuginfo=1"]));
 
         assert_eq!(
             composed, "-Zthreads=8 -Cdebuginfo=1 -D warnings",
@@ -241,12 +271,25 @@ mod tests {
     }
 
     #[test]
-    fn compose_rustflags_ignores_a_blank_inherited_value() {
-        let composed = compose_rustflags("-Zthreads=8", Some("   "));
+    fn compose_rustflags_drops_a_weakening_lint_cap() {
+        let composed = compose_rustflags(
+            "-Zthreads=8",
+            &flags(&["--cap-lints=warn", "-Cdebuginfo=1"]),
+        );
+
+        assert_eq!(
+            composed, "-Zthreads=8 -Cdebuginfo=1 -D warnings",
+            "an inherited cap must not survive to soften the denial"
+        );
+    }
+
+    #[test]
+    fn compose_rustflags_ignores_a_blank_inherited_argument() {
+        let composed = compose_rustflags("-Zthreads=8", &flags(&["   "]));
 
         assert_eq!(
             composed, "-Zthreads=8 -D warnings",
-            "a blank inherited value should not leave a stray space"
+            "a blank argument should not leave a stray space"
         );
     }
 }

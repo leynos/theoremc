@@ -93,6 +93,51 @@ fn rules_not_denied(group: &Table, names: &[&str]) -> Vec<String> {
         .collect()
 }
 
+/// Returns every denied lint whose priority a weaker group would override.
+///
+/// Cargo's table spelling carries a `priority`; the highest wins. A group such
+/// as `pedantic` at priority -1 therefore overrides an individual denial left
+/// at Cargo's default of 0 only when that denial declares a lower priority.
+/// A denial that survives on paper but loses to a `warn` group is not a
+/// denial, so the contract has to check the precedence, not just the level.
+fn rules_outranked_by_a_group(group: &Table, names: &[&str]) -> Vec<String> {
+    let group_priority = highest_weakening_group_priority(group);
+    names
+        .iter()
+        .filter_map(|name| {
+            let entry = group.get(*name).and_then(Value::as_table)?;
+            if !matches!(
+                entry.get("level").and_then(Value::as_str),
+                Some("deny" | "forbid")
+            ) {
+                return None;
+            }
+            let priority = entry.get("priority").and_then(Value::as_integer)?;
+            (priority < group_priority).then(|| format!("{name} = priority {priority}"))
+        })
+        .collect()
+}
+
+/// Returns the priority of the weakest non-denying group entry.
+///
+/// This is the highest priority among entries that do not deny, because any
+/// individual denial below it loses. When no such entry exists, the minimum
+/// possible priority is returned, so nothing is reported.
+fn highest_weakening_group_priority(group: &Table) -> i64 {
+    group
+        .values()
+        .filter_map(Value::as_table)
+        .filter(|entry| {
+            matches!(
+                entry.get("level").and_then(Value::as_str),
+                Some("warn" | "allow")
+            )
+        })
+        .filter_map(|entry| entry.get("priority").and_then(Value::as_integer))
+        .max()
+        .unwrap_or(i64::MIN)
+}
+
 /// Parses the Clippy configuration.
 fn clippy_config() -> Result<Table, String> {
     toml::from_str(CLIPPY_CONFIG).map_err(|error| format!("clippy.toml is not valid TOML: {error}"))
@@ -242,6 +287,36 @@ fn the_minimum_predicate_accepts_stricter_and_rejects_weaker_levels() {
 }
 
 #[test]
+fn the_precedence_check_rejects_a_denial_below_a_weaker_group() {
+    // A group at priority -1 outranks an individual entry at a lower
+    // priority, whatever that entry's level says, so `deny` at -2 is not a
+    // denial in effect. The same entry at 0 wins, which is Cargo's default.
+    let mut table = Table::new();
+    let mut pedantic = Table::new();
+    pedantic.insert("level".to_owned(), Value::String("warn".to_owned()));
+    pedantic.insert("priority".to_owned(), Value::Integer(-1));
+    table.insert("pedantic".to_owned(), Value::Table(pedantic));
+    for (name, priority) in [("outranked", -2), ("default_priority", 0)] {
+        let mut entry = Table::new();
+        entry.insert("level".to_owned(), Value::String("deny".to_owned()));
+        entry.insert("priority".to_owned(), Value::Integer(priority));
+        table.insert(name.to_owned(), Value::Table(entry));
+    }
+    // A bare string entry has no priority key, so it is Cargo's default 0 and
+    // outranks the -1 group.
+    table.insert("bare".to_owned(), Value::String("deny".to_owned()));
+
+    let outranked =
+        rules_outranked_by_a_group(&table, &["outranked", "default_priority", "bare", "absent"]);
+
+    assert_eq!(
+        outranked,
+        vec!["outranked = priority -2".to_owned()],
+        "only the denial below the group's priority should be reported"
+    );
+}
+
+#[test]
 fn clippy_table_denies_the_netsuke_baseline() {
     let lints = lint_tables().expect("the root manifest should declare workspace lints");
     let clippy = lint_group(&lints, "clippy").expect("the Clippy lint table should exist");
@@ -250,6 +325,11 @@ fn clippy_table_denies_the_netsuke_baseline() {
     assert!(
         downgraded.is_empty(),
         "every baseline Clippy rule must be denied; these are not: {downgraded:?}"
+    );
+    let outranked = rules_outranked_by_a_group(clippy, &BASELINE_CLIPPY_DENIALS);
+    assert!(
+        outranked.is_empty(),
+        "these denials are outranked by a weaker group: {outranked:?}"
     );
 
     let pedantic = clippy
@@ -277,6 +357,11 @@ fn rust_table_denies_the_baseline_and_forbids_unsafe() {
     assert!(
         downgraded.is_empty(),
         "every baseline Rust rule must be denied; these are not: {downgraded:?}"
+    );
+    let outranked = rules_outranked_by_a_group(rust, &BASELINE_RUST_DENIALS);
+    assert!(
+        outranked.is_empty(),
+        "these denials are outranked by a weaker group: {outranked:?}"
     );
     assert_eq!(
         lint_level(rust, "unsafe_code").ok(),
@@ -321,6 +406,11 @@ fn rustdoc_table_denies_the_complete_baseline() {
     assert!(
         downgraded.is_empty(),
         "every baseline rustdoc rule must be denied; these are not: {downgraded:?}"
+    );
+    let outranked = rules_outranked_by_a_group(rustdoc, &BASELINE_RUSTDOC_DENIALS);
+    assert!(
+        outranked.is_empty(),
+        "these denials are outranked by a weaker group: {outranked:?}"
     );
 }
 
