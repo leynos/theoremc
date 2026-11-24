@@ -137,8 +137,8 @@ impl RunningBuild {
                 let mut unreadable = Vec::new();
                 let output = std::process::Output {
                     status,
-                    stdout: self.read_log_or_record(&self.stdout_path(), &mut unreadable),
-                    stderr: self.read_log_or_record(&self.stderr_path(), &mut unreadable),
+                    stdout: read_log_or_record(&self.stdout_path(), &mut unreadable),
+                    stderr: read_log_or_record(&self.stderr_path(), &mut unreadable),
                 };
                 let report = format!(
                     "{reason}\n{}",
@@ -152,14 +152,6 @@ impl RunningBuild {
             }
             Err(error) => format!("{reason}; also could not reap the child: {error}"),
         }
-    }
-
-    /// Reads one build log, recording the failure instead of hiding it.
-    fn read_log_or_record(&self, path: &Utf8Path, unreadable: &mut Vec<String>) -> Vec<u8> {
-        read_log(path).unwrap_or_else(|error| {
-            unreadable.push(error);
-            Vec::new()
-        })
     }
 
     /// Takes the child, or explains that it was already collected.
@@ -221,6 +213,14 @@ impl Drop for RunningBuild {
             drop(child.wait());
         }
     }
+}
+
+/// Reads one build log, recording the failure instead of hiding it.
+fn read_log_or_record(path: &Utf8Path, unreadable: &mut Vec<String>) -> Vec<u8> {
+    read_log(path).unwrap_or_else(|error| {
+        unreadable.push(error);
+        Vec::new()
+    })
 }
 
 /// Reads a build log written by the redirected child streams.
