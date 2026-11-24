@@ -221,3 +221,45 @@ Acceptance commands: the full gate list above.
 - Full `make lint`, `make test`, and `make msrv`: delegated to `scrutineer`
   once the targeted checks finished, because the shared compiler pool was
   saturated by other agents (hundreds of queued crates, waits over 150 s).
+
+### Final gate run on `d97e8a2`
+
+| Gate                                    | Result                                                |
+| --------------------------------------- | ----------------------------------------------------- |
+| `make check-fmt`                        | pass                                                  |
+| `make lint` (rustdoc, Clippy, Whitaker) | pass                                                  |
+| `make msrv`                             | pass                                                  |
+| `make typecheck`                        | pass                                                  |
+| `make markdownlint`                     | pass                                                  |
+| `make nixie`                            | pass                                                  |
+| `make spelling`                         | pass                                                  |
+| `make check-adr-rfc-names`              | pass                                                  |
+| wildcard-import Clippy                  | pass                                                  |
+| `cargo modules graph --acyclic`         | unavailable locally; `cargo-modules` is not installed |
+| `make test`                             | see below                                             |
+
+Three findings were fixed rather than suppressed: `clippy::doc_markdown` wanted
+the project name in backticks; `format!(concat!(..))` cannot capture a variable
+implicitly, so the fixture builder passes `lint_table` by name; and the
+spelling gate rejects the hyphenated form of "handwritten".
+
+`make test` is the one gate without a green whole-suite run. It aborts on
+`theoremc::build_discovery_bdd::existing_theorem_files_are_discovered_recursively`
+exceeding nextest's 600 s allowance, in three separate attempts, with no
+assertion failure and 997 tests passing before the abort. Run directly through
+libtest, which has no per-test deadline, that test passes:
+`test result: ok. 1 passed ... finished in 539.54s`. The cause is host
+contention — the fixture under test builds a crate, and the shared compiler
+pool was carrying several hundred queued crates throughout the session.
+
+Because the whole-suite run never reached the new tests, they were run
+directly, and all pass:
+
+- `tests/lint_policy_contract.rs`: 8 passed.
+- `theorem_file_macro_bdd` strict-warning scenarios: 2 passed, including the
+  consumer that registers `cfg(kani)`, which is the case the old `expect` gate
+  failed.
+
+Conclusion: every gate that the host could run to completion passes, the one
+abort is environmental and reproducible on unmodified code, and the tests that
+prove this change pass when run individually.
