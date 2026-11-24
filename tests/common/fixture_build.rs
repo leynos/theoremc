@@ -62,8 +62,8 @@ impl FixtureIdentity {
 pub struct RunningBuild {
     /// The prepared command, retained so a failure can name it.
     command: Command,
-    /// The child process that is running it.
-    child: Child,
+    /// The child process that is running it, until `wait` collects it.
+    child: Option<Child>,
     /// The fixture the build belongs to.
     identity: FixtureIdentity,
 }
@@ -75,24 +75,25 @@ impl RunningBuild {
     ///
     /// Returns the exit status with labelled streams when Cargo fails, and the
     /// underlying error when its output cannot be collected.
-    pub fn wait(self) -> Result<BuildLog, String> {
-        let Self {
-            command,
-            child,
-            identity,
-        } = self;
+    pub fn wait(mut self) -> Result<BuildLog, String> {
+        let Some(child) = self.child.take() else {
+            return Err(format!(
+                "{} was already collected",
+                self.identity.describe(),
+            ));
+        };
         let output = child.wait_with_output().map_err(|error| {
             format!(
                 "waiting for {}: {error}; {} could not be built",
-                command_run::describe(&command),
-                identity.describe(),
+                command_run::describe(&self.command),
+                self.identity.describe(),
             )
         })?;
         if !output.status.success() {
             return Err(format!(
                 "{}\n{}",
-                command_run::completed_failure(&command, &output),
-                identity.describe(),
+                command_run::completed_failure(&self.command, &output),
+                self.identity.describe(),
             ));
         }
         Ok(BuildLog(format!(
@@ -100,6 +101,20 @@ impl RunningBuild {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr),
         )))
+    }
+}
+
+impl Drop for RunningBuild {
+    /// Stops and reaps a build the test never waited for.
+    ///
+    /// A test that returns early must not leave a child holding the shared
+    /// build-directory lock, because every later fixture in the run would wait
+    /// on it. Cleanup is best effort: the child may already have exited.
+    fn drop(&mut self) {
+        if let Some(mut child) = self.child.take() {
+            drop(child.kill());
+            drop(child.wait());
+        }
     }
 }
 
@@ -124,7 +139,7 @@ pub(super) fn spawn_build(identity: &FixtureIdentity) -> Result<RunningBuild, St
     })?;
     Ok(RunningBuild {
         command,
-        child,
+        child: Some(child),
         identity: identity.clone(),
     })
 }

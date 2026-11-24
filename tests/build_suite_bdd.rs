@@ -242,6 +242,16 @@ fn a_sibling_build_and_clean_up_do_not_disturb_another_fixtures_suite() -> Resul
     // lock while resolving it.
     require_shared_target_and_lock([&builder, &sibling])?;
 
+    // Compile the barrier script before measuring readiness, so the deadline
+    // bounds the barrier wait rather than the compiler.
+    builder.precompile_barrier_script()?;
+    // The warm build left the crate fresh; touch a rerun-if-changed input so the
+    // measured build runs the barrier script again.
+    builder.write_with_advanced_mtime(
+        Utf8Path::new("theorems/sibling_kept.theorem"),
+        TRIVIAL_THEOREM,
+    )?;
+
     sibling.cargo_build()?;
     require_only_own_theorem(
         &generated_suite_contents(&sibling)?,

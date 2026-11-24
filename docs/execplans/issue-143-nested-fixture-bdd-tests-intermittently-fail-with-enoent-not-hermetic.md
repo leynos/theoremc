@@ -268,6 +268,16 @@ Observable success:
   platforms. Only the `sh`-based test stays Unix-gated, and that case genuinely
   needs a POSIX shell. Date/Author: 2026-11-24, implementing agent, from
   CodeRabbit review.
+- D12. Decision (review-driven): give `RunningBuild` a `Drop` that kills and
+  reaps an unwaited child, and pre-compile the barrier script before measuring
+  readiness. Rationale: an early return left the Cargo child holding the shared
+  build-directory lock, blocking later fixtures; the child now lives in an
+  `Option` that `wait` takes, so a completed build leaves nothing to clean up.
+  Compilation of the barrier script otherwise consumed the readiness allowance,
+  so `precompile_barrier_script` runs the barrier once with its release already
+  present, and the measured build is forced to rerun by touching a
+  `rerun-if-changed` input. The test passed end to end in 823 s. Date/Author:
+  2026-11-24, implementing agent, from CodeRabbit review.
 
 ## Outcomes & retrospective
 

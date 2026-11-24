@@ -9,7 +9,10 @@ use filetime::FileTime;
 
 use super::BuildLog;
 use super::build_support_manifest::fixture_build_support_cargo_toml;
-use super::fixture_build::{self, BARRIER_BUILD_SCRIPT, FixtureIdentity, RunningBuild};
+use super::fixture_build::{
+    self, BARRIER_BUILD_SCRIPT, BARRIER_READY_FILE, BARRIER_RELEASE_FILE, FixtureIdentity,
+    RunningBuild,
+};
 use super::fixture_isolation::{
     Reservations, WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, unique_suffix,
     with_unique_package_name,
@@ -136,6 +139,24 @@ impl FixtureCrate {
         let fixture = Self::new(cargo_toml, lib_rs)?;
         fixture.write(Utf8Path::new("build.rs"), BARRIER_BUILD_SCRIPT)?;
         Ok(fixture)
+    }
+
+    /// Runs the barrier build once with its release already present.
+    ///
+    /// This compiles the barrier script and warms the fixture, so the measured
+    /// build reuses both and reaches the barrier without paying to compile it.
+    /// The release and readiness files are removed afterwards, and the caller
+    /// must touch a `rerun-if-changed` input so Cargo runs the script again.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::cargo_build`], [`Self::write`] and
+    /// [`Self::remove_file`].
+    pub fn precompile_barrier_script(&self) -> Result<(), String> {
+        self.write(Utf8Path::new(BARRIER_RELEASE_FILE), "warm")?;
+        self.cargo_build()?;
+        self.remove_file(Utf8Path::new(BARRIER_RELEASE_FILE))?;
+        self.remove_file(Utf8Path::new(BARRIER_READY_FILE))
     }
 
     /// Writes the manifest, lock, build script, library source and the
@@ -289,6 +310,17 @@ impl FixtureCrate {
     #[must_use]
     pub fn has_file(&self, path: &Utf8Path) -> bool {
         self.dir.metadata(path).is_ok()
+    }
+
+    /// Removes a file relative to the fixture crate root.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the file cannot be removed.
+    pub fn remove_file(&self, path: &Utf8Path) -> Result<(), String> {
+        self.dir
+            .remove_file(path.as_str())
+            .map_err(|error| self.io_error("removing", &self.absolute(path), &error))
     }
 
     /// Returns the fixture crate manifest directory.
