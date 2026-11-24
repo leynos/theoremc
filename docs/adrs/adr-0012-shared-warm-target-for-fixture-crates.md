@@ -82,7 +82,7 @@ crates.io index again. Issue #199 records the stall.
 
 - **A dedicated Cargo home.** Fixture builds resolve from
   `THEOREMC_FIXTURE_CARGO_HOME` when it is set, and otherwise from
-  `<repository>/target/theoremc-fixture-cargo-home`, canonicalised so a
+  `<repository>/target/theoremc-fixture-cargo-home`, canonicalized so a
   relative configuration cannot be resolved against a fixture's own working
   directory. `make fetch` populates that home and `make test` exports its path,
   so the fetch and the build agree on one directory. The home has its own

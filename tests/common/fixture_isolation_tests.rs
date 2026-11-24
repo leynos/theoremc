@@ -339,7 +339,7 @@ fn a_relative_fixture_home_is_resolved_to_an_absolute_path() -> Result<(), Strin
 #[test]
 fn an_absolute_fixture_home_is_unchanged() -> Result<(), String> {
     let temp = tempfile::tempdir().map_err(|error| error.to_string())?;
-    // Compare against the canonical spelling: the helper canonicalises, and a
+    // Compare against the canonical spelling: the helper canonicalizes, and a
     // temporary root containing a symlink would otherwise compare unequal.
     let root = Utf8Path::from_path(temp.path())
         .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?

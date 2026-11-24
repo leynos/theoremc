@@ -619,7 +619,7 @@ suite.
   path comes from `THEOREMC_FIXTURE_CARGO_HOME` when it is set, which is how
   `make fetch` and `make test` pass the one they populated, and otherwise falls
   back to `<repository>/target/theoremc-fixture-cargo-home`. The helper
-  canonicalises the path, so a relative `THEOREMC_FIXTURE_CARGO_HOME` still
+  canonicalizes the path, so a relative `THEOREMC_FIXTURE_CARGO_HOME` still
   yields the absolute value a fixture build needs: Cargo resolves a relative
   `CARGO_HOME` against the child's own directory, which is the fixture's
   temporary directory. The separation is not cosmetic: offline Cargo still takes
