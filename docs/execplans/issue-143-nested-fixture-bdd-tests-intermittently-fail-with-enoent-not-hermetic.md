@@ -148,7 +148,16 @@ Observable success:
       `theorem_file_macro_bdd` 13/13 (after the two Kani tests passed
       individually), `lint_workspace_execution` 4/4, macros trybuild 1/1 and
       `arg_lowering` compile-fail 6/6.
-- [ ] `EP-M5` CodeRabbit review cleared, commits pushed, draft PR created.
+- [x] (2026-11-25) `EP-M5` CodeRabbit review cleared over six rounds, each
+      finding fixed and re-verified (barrier synchronisation, `Drop` reaping,
+      pre-compiled barrier, file-redirected logs with a regression test, named
+      unreadable logs, platform-correct path assertions). Final gate evidence:
+      `make check-fmt`, `make markdownlint`, `make nixie`, `cargo clippy
+      --workspace`, `cargo doc --workspace`, `make lint-whitaker` and
+      `make typecheck` all pass; `test-helpers` unit tests pass 43/43;
+      `build_suite_bdd` passes 5/5 and `build_discovery_bdd` 3/3 with real
+      Cargo.
+- [ ] Push the branch and open the draft pull request.
 
 ## Surprises & discoveries
 
