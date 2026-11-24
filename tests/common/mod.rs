@@ -15,7 +15,9 @@ mod suite_layout;
 
 pub use build_log::{BuildLog, toml_section};
 pub use build_support_fixture::build_support_fixture_manifest;
-pub use fixture_build::RunningBuild;
+pub use fixture_build::{
+    BARRIER_BUILD_SCRIPT, BARRIER_READY_FILE, BARRIER_RELEASE_FILE, RunningBuild,
+};
 pub use fixture_crate::{
     BUILD_DISCOVERY_SOURCE, BUILD_SCRIPT_SOURCE, BUILD_SUITE_SOURCE, FixtureCrate, TRIVIAL_THEOREM,
 };

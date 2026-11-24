@@ -8,7 +8,7 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 use filetime::FileTime;
 
 use super::BuildLog;
-use super::fixture_build::{self, FixtureIdentity, RunningBuild};
+use super::fixture_build::{self, BARRIER_BUILD_SCRIPT, FixtureIdentity, RunningBuild};
 use super::fixture_isolation::{
     Reservations, WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, unique_suffix,
     with_unique_package_name,
@@ -115,19 +115,44 @@ impl FixtureCrate {
             dir,
         };
 
-        fixture.write_scaffold(&manifest, lib_rs)?;
+        fixture.write_scaffold(&manifest, lib_rs, BUILD_SCRIPT_SOURCE)?;
 
+        Ok(fixture)
+    }
+
+    /// Creates a fixture whose build script blocks until the test releases it.
+    ///
+    /// Use [`Self::spawn_cargo_build`] to start the build, wait for
+    /// [`has_file`](Self::has_file) to report `BARRIER_READY_FILE`, then act and
+    /// write `BARRIER_RELEASE_FILE` so the build can finish. The build also
+    /// carries an internal deadline, so a test that never releases it fails
+    /// rather than leaking a process.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::new`].
+    pub fn with_release_barrier(cargo_toml: &str, lib_rs: &str) -> Result<Self, String> {
+        let fixture = Self::new(cargo_toml, lib_rs)?;
+        fixture.write(Utf8Path::new("build.rs"), BARRIER_BUILD_SCRIPT)?;
         Ok(fixture)
     }
 
     /// Writes the manifest, lock, build script, library source and the
     /// build-support crate into the fixture directory.
-    fn write_scaffold(&self, manifest: &str, lib_rs: &str) -> Result<(), String> {
+    ///
+    /// `build_script` lets a test substitute a script that synchronises with
+    /// the test, such as the barrier build in `fixture_build`.
+    fn write_scaffold(
+        &self,
+        manifest: &str,
+        lib_rs: &str,
+        build_script: &str,
+    ) -> Result<(), String> {
         let build_support_manifest = fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?;
         let files = [
             ("Cargo.toml", manifest),
             ("Cargo.lock", WORKSPACE_LOCK),
-            ("build.rs", BUILD_SCRIPT_SOURCE),
+            ("build.rs", build_script),
             ("src/lib.rs", lib_rs),
             ("build-support/Cargo.toml", build_support_manifest.as_str()),
             ("build-support/src/lib.rs", BUILD_SUPPORT_LIB_SOURCE),
@@ -254,6 +279,15 @@ impl FixtureCrate {
         self.overwrite_in_place(path, contents)?;
         self.advance_mtime(path)?;
         self.advance_parent_mtime(path)
+    }
+
+    /// Returns whether `path` exists relative to the fixture crate root.
+    ///
+    /// This is a capability-scoped existence probe for tests that must wait for
+    /// a build to create a file, without reaching for the ambient filesystem.
+    #[must_use]
+    pub fn has_file(&self, path: &Utf8Path) -> bool {
+        self.dir.metadata(path).is_ok()
     }
 
     /// Returns the fixture crate manifest directory.

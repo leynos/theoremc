@@ -5,7 +5,10 @@
 
 use camino::Utf8Path;
 use rstest_bdd_macros::{given, scenario, then};
-use test_helpers::{FixtureCrate, RunningBuild, TRIVIAL_THEOREM, build_support_fixture_manifest};
+use test_helpers::{
+    BARRIER_READY_FILE, BARRIER_RELEASE_FILE, FixtureCrate, TRIVIAL_THEOREM,
+    build_support_fixture_manifest,
+};
 
 /// Fixture lib.rs that includes the generated suite wiring.
 const FIXTURE_LIB_RS: &str = concat!(
@@ -189,17 +192,23 @@ fn fixtures_sharing_a_target_read_only_their_own_generated_suite() -> Result<(),
     )
 }
 
-/// Requires the spawned build's child process to still be alive.
+/// Requires the fixture's build script to reach its release barrier.
 ///
-/// A build that has already finished cannot overlap the sibling's clean-up, so
-/// the test would pass without exercising what it claims. Failing here says the
-/// overlap was not established rather than that isolation held.
-fn require_child_running(build: &mut RunningBuild) -> Result<(), String> {
-    if build.is_running()? {
-        Ok(())
-    } else {
-        Err("the builder build finished before the sibling could be dropped, so the test did not exercise the overlap".to_owned())
+/// Readiness is written by the child, so once it is observed the build cannot
+/// finish until the test releases it. That is stronger than polling process
+/// state, where the child may exit immediately after any observation.
+fn require_barrier_ready(builder: &FixtureCrate) -> Result<(), String> {
+    let ready = Utf8Path::new(BARRIER_READY_FILE);
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(120);
+    while std::time::Instant::now() < deadline {
+        if builder.has_file(ready) {
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
+    Err(format!(
+        "the builder build never created {ready}, so the test could not establish the overlap",
+    ))
 }
 
 /// A sibling build and clean-up must not disturb another fixture's suite.
@@ -210,20 +219,29 @@ fn require_child_running(build: &mut RunningBuild) -> Result<(), String> {
 /// reservation and the per-fixture temporary root must keep both suites intact.
 #[test]
 fn a_sibling_build_and_clean_up_do_not_disturb_another_fixtures_suite() -> Result<(), String> {
-    // Warm the shared target once before the measured pair. Otherwise the two
-    // concurrent builds below spend the test's whole nextest allowance on the
-    // first compilation of the shared build-support dependencies, and the test
-    // measures the host's compile queue instead of the isolation it targets.
+    // Warm the shared target once before the measured pair, so the test measures
+    // isolation rather than the first compilation of the shared dependencies.
     let warmup = fixture_with_theorem("sibling_warmup")?;
     warmup.cargo_build()?;
     drop(warmup);
 
     let sibling = fixture_with_theorem("sibling_dropped")?;
-    let builder = fixture_with_theorem("sibling_kept")?;
+
+    // The builder's build script signals readiness and then blocks. Dropping the
+    // sibling after that signal means the clean-up provably runs while the build
+    // is in progress, not merely observed to be so.
+    let builder = FixtureCrate::with_release_barrier(
+        &build_support_fixture_manifest("build_suite_fixture"),
+        FIXTURE_LIB_RS,
+    )?;
+    builder.write(
+        Utf8Path::new("theorems/sibling_kept.theorem"),
+        TRIVIAL_THEOREM,
+    )?;
+    // Check the copied lock before any build, because Cargo rewrites a fixture's
+    // lock while resolving it.
     require_shared_target_and_lock([&builder, &sibling])?;
 
-    // Read the sibling's suite while its root still exists, so the drop below
-    // can happen at the moment that matters.
     sibling.cargo_build()?;
     require_only_own_theorem(
         &generated_suite_contents(&sibling)?,
@@ -231,16 +249,12 @@ fn a_sibling_build_and_clean_up_do_not_disturb_another_fixtures_suite() -> Resul
         "sibling_kept",
     )?;
 
-    // Start the builder's build and confirm the child is running *before*
-    // dropping the sibling. A flag set before `cargo_build` would prove nothing;
-    // a live child proves the build is genuinely in progress when the sibling's
-    // root disappears. Only the confirmation sits between the two.
-    let mut builder_build = builder.spawn_cargo_build()?;
-    require_child_running(&mut builder_build)?;
+    let builder_build = builder.spawn_cargo_build()?;
+    require_barrier_ready(&builder)?;
     drop(sibling);
+    builder.write(Utf8Path::new(BARRIER_RELEASE_FILE), "release")?;
 
-    // `wait` drains both pipes while it waits, so a verbose build cannot block
-    // on a full pipe. The test's own nextest allowance bounds the whole run.
+    // `wait` drains both pipes while it waits, so a verbose build cannot block.
     builder_build.wait()?;
     require_only_own_theorem(
         &generated_suite_contents(&builder)?,

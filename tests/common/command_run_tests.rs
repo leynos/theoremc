@@ -1,8 +1,9 @@
 //! Tests for command diagnostics, without running a real fixture build.
 
+use std::io;
 use std::process::Command;
 
-use super::{completed_failure, run};
+use super::{completed_failure, run, spawn_failure};
 
 #[test]
 fn a_missing_program_names_the_command_that_could_not_start() {
@@ -14,9 +15,30 @@ fn a_missing_program_names_the_command_that_could_not_start() {
         error.contains("running `theoremc-absent-program-for-tests`"),
         "spawn failure must name the command: {error}",
     );
+    let system_error = io::Error::from_raw_os_error(2).to_string();
     assert!(
-        error.contains("No such file or directory"),
-        "spawn failure must keep the underlying error: {error}",
+        error.contains(&system_error),
+        "spawn failure must keep the system's own error text ({system_error}): {error}",
+    );
+}
+
+/// A spawn failure embeds whatever text the operating system produced, so the
+/// assertion follows `Display` rather than hard-coding a Unix-only string; on
+/// Windows the same failure reads "The system cannot find the file specified.".
+#[test]
+fn a_spawn_failure_embeds_the_operating_systems_own_text() {
+    let command = Command::new("theoremc-absent-program-for-tests");
+    let system_error = io::Error::from_raw_os_error(2);
+
+    let message = spawn_failure(&command, &system_error);
+
+    assert!(
+        message.contains(&system_error.to_string()),
+        "the message must carry the system's own text: {message}",
+    );
+    assert!(
+        message.contains("`theoremc-absent-program-for-tests`"),
+        "the message must still name the command: {message}",
     );
 }
 

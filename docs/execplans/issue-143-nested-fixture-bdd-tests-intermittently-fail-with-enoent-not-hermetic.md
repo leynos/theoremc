@@ -250,6 +250,25 @@ Observable success:
   failure cannot strand the others. Date/Author: 2026-11-24, implementing
   agent, from CodeRabbit review.
 
+- D10. Decision (review-driven): replace `try_wait()` overlap detection with a
+  child-controlled release barrier. Rationale: `try_wait()` reports an
+  observation, not a guarantee that the child is still alive, so a correct
+  build could exit between the check and the drop.
+  `FixtureCrate::with_release_barrier` installs a build script that writes
+  `barrier-ready` and then blocks until `barrier-release` exists, with an
+  internal 300 s deadline. The test waits for readiness, drops the sibling,
+  then releases the build, so the overlap is guaranteed rather than hoped for.
+  The test passed end to end with real Cargo in 625 s. Date/Author: 2026-11-24,
+  implementing agent, from CodeRabbit review.
+- D11. Decision (review-driven): replace the Unix-only error-string assertion
+  with one derived from the operating system's own text. Rationale: "No such
+  file or directory" is Unix wording; Windows reports "The system cannot find
+  the file specified". The test now formats `io::Error::from_raw_os_error(2)`
+  and asserts the message contains its `Display`, which holds on both
+  platforms. Only the `sh`-based test stays Unix-gated, and that case genuinely
+  needs a POSIX shell. Date/Author: 2026-11-24, implementing agent, from
+  CodeRabbit review.
+
 ## Outcomes & retrospective
 
 Implementation is complete and every gate passes when its suites are run

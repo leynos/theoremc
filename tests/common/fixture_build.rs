@@ -69,28 +69,6 @@ pub struct RunningBuild {
 }
 
 impl RunningBuild {
-    /// Returns whether the child process is still running.
-    ///
-    /// A build that has already exited is reported as not running; a process
-    /// that could not be queried is an error, not an absence.
-    ///
-    /// # Errors
-    ///
-    /// Returns the command and the underlying error when the child status
-    /// cannot be read.
-    pub fn is_running(&mut self) -> Result<bool, String> {
-        self.child
-            .try_wait()
-            .map(|status| status.is_none())
-            .map_err(|error| {
-                format!(
-                    "checking {}: {error}; {} could not be queried",
-                    command_run::describe(&self.command),
-                    self.identity.describe(),
-                )
-            })
-    }
-
     /// Waits for the build to finish and returns its log.
     ///
     /// # Errors
@@ -161,6 +139,56 @@ pub(super) fn spawn_build(identity: &FixtureIdentity) -> Result<RunningBuild, St
 pub(super) fn build_log(identity: &FixtureIdentity) -> Result<BuildLog, String> {
     spawn_build(identity)?.wait()
 }
+
+/// A fixture build script that blocks until the test releases it.
+///
+/// The script writes `barrier-ready` in the fixture root and then waits for
+/// `barrier-release`. That gives a test a synchronisation point controlled by
+/// the build itself: once readiness is observed, the build cannot finish until
+/// the test writes the release file, so an action taken between the two is
+/// provably concurrent with the build. Process-state polling cannot promise
+/// that, because the child may exit immediately after any observation.
+///
+/// The wait is bounded so a test that never releases it fails the build instead
+/// of leaving a process behind.
+pub const BARRIER_BUILD_SCRIPT: &str = concat!(
+    "//! Fixture build script that waits for the test to release it.\n",
+    "\n",
+    "fn main() -> Result<(), theoremc_build_support::BuildScriptError> {\n",
+    "    let root = std::path::PathBuf::from(\n",
+    "        std::env::var_os(\"CARGO_MANIFEST_DIR\").expect(\"Cargo sets CARGO_MANIFEST_DIR\"),\n",
+    "    );\n",
+    "    let readiness = root.join(\"barrier-ready\");\n",
+    "    let release = root.join(\"barrier-release\");\n",
+    "    std::fs::write(&readiness, b\"ready\").expect(\"signal the barrier readiness\");\n",
+    "    let deadline =\n",
+    "        std::time::Instant::now() + std::time::Duration::from_secs(300);\n",
+    "    while !release.exists() {\n",
+    "        assert!(\n",
+    "            std::time::Instant::now() < deadline,\n",
+    "            \"the test never released the fixture build\",\n",
+    "        );\n",
+    "        std::thread::sleep(std::time::Duration::from_millis(10));\n",
+    "    }\n",
+    "    let build_output = theoremc_build_support::prepare_build_script()?;\n",
+    "\n",
+    "    println!(\"cargo::rustc-check-cfg=cfg(theoremc_has_theorems)\");\n",
+    "    if build_output.has_theorems() {\n",
+    "        println!(\"cargo::rustc-cfg=theoremc_has_theorems\");\n",
+    "    }\n",
+    "    for path in build_output.rerun_paths() {\n",
+    "        println!(\"cargo::rerun-if-changed={}\", path.as_str());\n",
+    "    }\n",
+    "\n",
+    "    Ok(())\n",
+    "}\n",
+);
+
+/// Name of the readiness file the barrier build script creates.
+pub const BARRIER_READY_FILE: &str = "barrier-ready";
+
+/// Name of the release file the test creates to let the build finish.
+pub const BARRIER_RELEASE_FILE: &str = "barrier-release";
 
 /// Reads the theorem suite the fixture's build script generated.
 ///
