@@ -130,23 +130,42 @@ fn the_fixture_group_runs_one_test_at_a_time() -> Result<(), String> {
     }
 }
 
+/// The rest of the filter's union, after the three fixture binaries.
+///
+/// The complete filter is asserted rather than searched for substrings: a filter
+/// joining the three binaries with `&` contains every one of them and yet selects
+/// nothing, so presence alone would not prove the suites are serialized.
+const REMAINING_FILTER_TERMS: &str = "binary(=lint_workspace_execution) | \
+     binary_id(=theoremc-macros::expand) | \
+     (package(=theoremc) & test(/^arg_lowering::compile_fail_tests::/))";
+
+/// Returns the filter this contract requires, in the order it must appear.
+fn required_filter() -> String {
+    let binaries: Vec<String> = FIXTURE_BINARIES
+        .iter()
+        .map(|binary| format!("binary(={binary})"))
+        .collect();
+    format!("{} | {REMAINING_FILTER_TERMS}", binaries.join(" | "))
+}
+
 #[test]
 fn the_group_override_covers_every_fixture_suite() -> Result<(), String> {
     let config = parse(CONFIG)?;
-    let filter = filter_of(group_override(&config)?)?;
+    let filter = normalize_filter(filter_of(group_override(&config)?)?);
+    let required = normalize_filter(&required_filter());
 
-    let missing: Vec<String> = FIXTURE_BINARIES
-        .iter()
-        .map(|binary| format!("binary(={binary})"))
-        .filter(|expected| !filter.contains(expected))
-        .collect();
-    if missing.is_empty() {
+    if filter == required {
         Ok(())
     } else {
         Err(format!(
-            "the fixture-group filter must contain {missing:?}, got: {filter}"
+            "the fixture-group filter must be the required union\n  expected: {required}\n  actual:   {filter}"
         ))
     }
+}
+
+/// Collapses whitespace so formatting differences do not change the comparison.
+fn normalize_filter(filter: &str) -> String {
+    filter.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 #[test]

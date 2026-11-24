@@ -62,6 +62,7 @@ fn a_malformed_override_falls_back_to_the_default() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn a_shell_command_runs_through_the_entry_point() -> Result<(), String> {
     let temp = tempfile::tempdir().map_err(|error| error.to_string())?;
@@ -85,6 +86,7 @@ fn a_shell_command_runs_through_the_entry_point() -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(unix)]
 #[test]
 fn a_timed_out_command_is_reported_as_a_timeout_not_an_error() -> Result<(), String> {
     let temp = tempfile::tempdir().map_err(|error| error.to_string())?;

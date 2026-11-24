@@ -138,11 +138,6 @@ fn kani_skip_reason(check: &str) -> Result<Option<String>, String> {
             "the cargo-kani availability probe for the Kani {check} check did not finish \
              within {deadline:?}; a hung probe is a failure, not a skip"
         )),
-        KaniAvailability::LockBusy(deadline) => Err(format!(
-            "the cargo-kani availability probe for the Kani {check} check could not take \
-             the fixture lock within {deadline:?}; another fixture command held it, so \
-             Kani's availability is unknown"
-        )),
     }
 }
 

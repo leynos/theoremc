@@ -267,6 +267,19 @@ fn timeout_error() -> String {
     format!("the owner did not announce its fixture within {HANDSHAKE_DEADLINE:?}")
 }
 
+impl Drop for Owner {
+    /// Kills and reaps the owner on every exit path.
+    ///
+    /// Dropping a `Child` does not terminate or reap it, so an assertion that
+    /// fails before `kill_and_reap` would otherwise leave the owner holding the
+    /// fixture lock until its own lifetime ran out. Killing an exited child and
+    /// waiting on one already waited for are both harmless.
+    fn drop(&mut self) {
+        let _kill_result = self.child.kill();
+        let _reap_result = self.child.wait();
+    }
+}
+
 /// Returns the fixture path a ready line carries, if it is one.
 fn ready_path(line: &str) -> Option<Utf8PathBuf> {
     line.strip_prefix(READY_PREFIX)

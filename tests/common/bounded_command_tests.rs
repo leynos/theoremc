@@ -204,14 +204,49 @@ fn a_command_that_cannot_be_started_reports_the_spawn_failure() {
     );
 }
 
-/// Returns whether `pid` names a live process.
+/// Returns whether `pid` names a live, non-zombie process.
 #[cfg(unix)]
 fn process_is_alive(pid: &str) -> bool {
-    Command::new("kill")
+    let probe = Command::new("kill")
         .args(["-0", pid])
         .stderr(Stdio::null())
         .status()
-        .is_ok_and(|status| status.success())
+        .is_ok_and(|status| status.success());
+    probe && !process_is_zombie(pid)
+}
+
+/// Returns whether `pid` is a terminated process awaiting its parent's reap.
+///
+/// A zombie has already exited; `kill -0` still succeeds for it, so a
+/// termination check that ignored zombies could fail after a correct group
+/// kill, for example when PID 1 in a container does not reap orphans.
+#[cfg(unix)]
+fn process_is_zombie(pid: &str) -> bool {
+    Command::new("ps")
+        .args(["-o", "stat=", "-p", pid])
+        .stderr(Stdio::null())
+        .output()
+        .is_ok_and(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .starts_with('Z')
+        })
+}
+
+/// Polls `pid` until it has exited, for at most `budget`.
+///
+/// A signal returns as soon as it is delivered, so a single immediate probe can
+/// see the descendant still alive even when the group kill worked.
+#[cfg(unix)]
+fn process_exits_within(pid: &str, budget: Duration) -> bool {
+    let started = Instant::now();
+    while started.elapsed() < budget {
+        if !process_is_alive(pid.trim()) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    !process_is_alive(pid.trim())
 }
 
 /// A timeout must terminate a descendant, not only the direct child.
@@ -237,7 +272,7 @@ fn a_timed_out_command_terminates_its_descendants() {
 
     let pid = read_pid_file(&pid_file);
     assert!(
-        !process_is_alive(pid.trim()),
+        process_exits_within(&pid, Duration::from_secs(10)),
         "descendant {} must have been killed with its group",
         pid.trim(),
     );

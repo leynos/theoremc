@@ -14,8 +14,8 @@ use std::time::Duration;
 
 use camino::Utf8Path;
 use test_helpers::{
-    FixtureCommandError, FixtureOutcome, hermetic_cargo, run_fixture_command,
-    run_fixture_command_within,
+    CommandFailure, FixtureOutcome, hermetic_cargo, run_fixture_command,
+    run_fixture_command_within, run_within_deadline,
 };
 
 /// How long one `cargo kani` build may take before the test fails.
@@ -148,20 +148,16 @@ pub(crate) enum KaniAvailability {
     Unavailable(String),
     /// The probe itself did not finish in time.
     TimedOut(Duration),
-    /// Another fixture command held the lock for the probe's whole deadline.
-    ///
-    /// This says nothing about Kani, so it must not become a skip or an
-    /// "unavailable" verdict.
-    LockBusy(Duration),
 }
 
 /// Probes for a usable `cargo kani`.
 ///
-/// The probe runs under the fixture lock and its own short deadline, so a broken
-/// Kani cannot leave a `kani-compiler` build running while the rest of the suite
-/// waits behind the lock. A timeout is distinguished from unavailability: the
-/// first is a failure of the environment this run must report, the second is a
-/// reason to skip.
+/// The probe runs under its own short deadline but **not** under the fixture
+/// lock: `cargo kani --version` only queries the toolchain, and taking the lock
+/// would let an unrelated fixture build's 540-second hold be reported as Kani
+/// being unavailable. A timeout is distinguished from unavailability: the first
+/// is a failure of the environment this run must report, the second is a reason
+/// to skip.
 pub(crate) fn kani_is_available() -> Result<KaniAvailability, String> {
     probe_kani("cargo")
 }
@@ -178,16 +174,9 @@ fn probe_kani_within(
 ) -> Result<KaniAvailability, String> {
     let mut command = Command::new(program);
     command.args(["kani", "--version"]);
-    let outcome = match run_fixture_command_within(command, deadline) {
-        Ok(outcome) => outcome,
-        Err(FixtureCommandError::Lock(_)) => {
-            return Ok(KaniAvailability::LockBusy(deadline));
-        }
-        Err(FixtureCommandError::Command(reason)) => return Err(reason),
-    };
-    match outcome {
-        FixtureOutcome::Completed(output) if output.is_success() => Ok(KaniAvailability::Available),
-        FixtureOutcome::Completed(output) => {
+    match run_within_deadline(command, deadline) {
+        Ok(output) if output.is_success() => Ok(KaniAvailability::Available),
+        Ok(output) => {
             let detail = output.stderr.trim();
             Ok(KaniAvailability::Unavailable(if detail.is_empty() {
                 format!(
@@ -198,9 +187,10 @@ fn probe_kani_within(
                 detail.to_owned()
             }))
         }
-        FixtureOutcome::TimedOut {
+        Err(CommandFailure::Timeout {
             deadline: overran, ..
-        } => Ok(KaniAvailability::TimedOut(overran)),
+        }) => Ok(KaniAvailability::TimedOut(overran)),
+        Err(failure @ CommandFailure::Spawn(_)) => Err(failure.to_string()),
     }
 }
 
