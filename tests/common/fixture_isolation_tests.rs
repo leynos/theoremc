@@ -8,7 +8,7 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 use proptest::prelude::*;
 
 use super::{
-    Claim, Reservations, first_unused_suffix, suffix_is_taken, unique_suffix,
+    Claim, Reservations, Suffix, first_unused_suffix, suffix_is_taken, unique_suffix,
     with_unique_package_name,
 };
 
@@ -23,7 +23,7 @@ fn scratch_target() -> (tempfile::TempDir, camino::Utf8PathBuf) {
 
 /// Runs `count` allocators that all offer the same `offered` names, starting
 /// together on a barrier, and returns the suffixes they reserved.
-fn race_allocators(target: &Utf8Path, count: usize, offered: &[String]) -> HashSet<String> {
+fn race_allocators(target: &Utf8Path, count: usize, offered: &[String]) -> HashSet<Suffix> {
     let gate = Arc::new(Barrier::new(count));
     let mut workers = Vec::with_capacity(count);
     for _ in 0..count {
@@ -38,9 +38,13 @@ fn race_allocators(target: &Utf8Path, count: usize, offered: &[String]) -> HashS
             thread_gate.wait();
             let reservations =
                 Reservations::open(&thread_target).expect("open the reservation root");
-            let mut candidates = thread_offered.into_iter().chain(std::iter::repeat_with(|| {
-                format!("spare-{}", unique_suffix())
-            }));
+            let mut candidates =
+                thread_offered
+                    .into_iter()
+                    .map(Suffix::new)
+                    .chain(std::iter::repeat_with(|| {
+                        Suffix::new(format!("spare-{}", unique_suffix()))
+                    }));
             first_unused_suffix(
                 || candidates.next().expect("an endless candidate stream"),
                 |candidate| reservations.claim(candidate),
@@ -62,8 +66,8 @@ fn renames_only_the_package_name() {
         "[dependencies.renamed]\nname = \"not-the-package\"\n",
     );
 
-    let (renamed, name) =
-        with_unique_package_name(manifest, "abc_1").expect("the manifest names its package");
+    let (renamed, name) = with_unique_package_name(manifest, &Suffix::new("abc_1"))
+        .expect("the manifest names its package");
 
     assert_eq!(
         name, "fx_abc_1",
@@ -87,8 +91,8 @@ fn renames_only_the_package_name() {
 fn renames_the_first_package_name_when_two_appear() {
     let manifest = "[package]\nname = \"a\"\nname = \"b\"\n";
 
-    let (renamed, name) =
-        with_unique_package_name(manifest, "s").expect("the manifest names its package");
+    let (renamed, name) = with_unique_package_name(manifest, &Suffix::new("s"))
+        .expect("the manifest names its package");
 
     assert_eq!(name, "fx_s", "the first package name must be rewritten");
     assert!(
@@ -99,7 +103,7 @@ fn renames_the_first_package_name_when_two_appear() {
 
 #[test]
 fn rejects_a_manifest_that_names_no_package() {
-    let result = with_unique_package_name("[dependencies]\nname = \"x\"\n", "s");
+    let result = with_unique_package_name("[dependencies]\nname = \"x\"\n", &Suffix::new("s"));
 
     assert_eq!(
         result,
@@ -119,7 +123,7 @@ fn two_fixtures_never_share_a_suffix() {
 
 #[test]
 fn a_thousand_suffixes_in_one_process_are_all_distinct() {
-    let suffixes: HashSet<String> = (0..1000).map(|_| unique_suffix()).collect();
+    let suffixes: HashSet<Suffix> = (0..1000).map(|_| unique_suffix()).collect();
 
     assert_eq!(
         suffixes.len(),
@@ -133,7 +137,9 @@ fn the_suffix_carries_the_process_id_so_concurrent_runs_cannot_collide() {
     let suffix = unique_suffix();
 
     assert!(
-        suffix.starts_with(&format!("{:x}_", std::process::id())),
+        suffix
+            .as_str()
+            .starts_with(&format!("{:x}_", std::process::id())),
         "{suffix} must begin with this process's id",
     );
 }
@@ -148,14 +154,12 @@ fn a_fixture_name_stays_short_enough_for_the_files_tools_derive_from_it() {
 
 #[test]
 fn a_suffix_a_stale_build_directory_already_uses_is_skipped() {
-    let mut offered = ["taken", "also_taken", "free"]
-        .into_iter()
-        .map(str::to_owned);
+    let mut offered = ["taken", "also_taken", "free"].into_iter().map(Suffix::new);
 
     let chosen = first_unused_suffix(
         || offered.next().expect("a free suffix is offered"),
         |suffix| {
-            Ok(if suffix.ends_with("taken") {
+            Ok(if suffix.as_str().ends_with("taken") {
                 Claim::Taken
             } else {
                 Claim::Reserved
@@ -165,14 +169,14 @@ fn a_suffix_a_stale_build_directory_already_uses_is_skipped() {
 
     assert_eq!(
         chosen,
-        Ok("free".to_owned()),
+        Ok(Suffix::new("free")),
         "a claimed suffix must be passed over for the next candidate",
     );
 }
 
 #[test]
 fn a_scan_that_fails_stops_the_allocation_instead_of_calling_the_name_free() {
-    let chosen = first_unused_suffix(|| "any".to_owned(), |_| Err("cannot read".to_owned()));
+    let chosen = first_unused_suffix(|| Suffix::new("any"), |_| Err("cannot read".to_owned()));
 
     assert_eq!(
         chosen,
@@ -186,14 +190,16 @@ fn a_pre_existing_reservation_marker_is_skipped() {
     let (_temp, root) = scratch_target();
     let reservations = Reservations::open(&root).expect("open the reservation root");
     assert_eq!(
-        reservations.claim("already").expect("claim the first name"),
+        reservations
+            .claim(&Suffix::new("already"))
+            .expect("claim the first name"),
         Claim::Reserved,
         "the first claim must succeed",
     );
 
     let chosen = first_unused_suffix(
         {
-            let mut offered = ["already", "fresh"].into_iter().map(str::to_owned);
+            let mut offered = ["already", "fresh"].into_iter().map(Suffix::new);
             move || offered.next().expect("a free suffix is offered")
         },
         |candidate| reservations.claim(candidate),
@@ -201,7 +207,7 @@ fn a_pre_existing_reservation_marker_is_skipped() {
 
     assert_eq!(
         chosen,
-        Ok("fresh".to_owned()),
+        Ok(Suffix::new("fresh")),
         "a suffix another allocator holds must be skipped",
     );
 }
@@ -238,22 +244,22 @@ fn a_stale_build_directory_takes_only_its_own_suffix() {
             .expect("leave a stale build directory");
 
         assert_eq!(
-            suffix_is_taken(&root, "ab_1_0001"),
+            suffix_is_taken(&root, &Suffix::new("ab_1_0001")),
             Ok(true),
             "the stale directory {stale_path} must take the suffix",
         );
         assert_eq!(
-            suffix_is_taken(&root, "ab_1_000"),
+            suffix_is_taken(&root, &Suffix::new("ab_1_000")),
             Ok(false),
             "a prefix of a suffix is not the suffix",
         );
         assert_eq!(
-            suffix_is_taken(&root, "ab_2_0001"),
+            suffix_is_taken(&root, &Suffix::new("ab_2_0001")),
             Ok(false),
             "an unrelated suffix must remain free",
         );
         assert_eq!(
-            suffix_is_taken(&root.join("missing"), "ab_1_0001"),
+            suffix_is_taken(&root.join("missing"), &Suffix::new("ab_1_0001")),
             Ok(false),
             "a target with no build directory holds nothing",
         );
@@ -275,11 +281,13 @@ proptest! {
             .into_iter()
             .map(u32::from)
             .chain(std::iter::repeat(u32::from(free)));
-        let taken: HashSet<String> =
-            stale.iter().map(|value| format!("s{value}")).collect();
+        let taken: HashSet<Suffix> = stale
+            .iter()
+            .map(|value| Suffix::new(format!("s{value}")))
+            .collect();
 
         let chosen = first_unused_suffix(
-            || format!("s{}", sequence.next().expect("an endless sequence")),
+            || Suffix::new(format!("s{}", sequence.next().expect("an endless sequence"))),
             |candidate| {
                 Ok(if taken.contains(candidate) { Claim::Taken } else { Claim::Reserved })
             },

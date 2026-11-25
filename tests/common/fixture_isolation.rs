@@ -25,6 +25,38 @@ pub(super) const WORKSPACE_LOCK: &str = include_str!("../../Cargo.lock");
 /// Counts fixtures in this process, so package names stay unique within it.
 static FIXTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
+/// The distinguishing part of a fixture's package name.
+///
+/// A suffix travels with every allocation step -- generated, scanned for,
+/// formatted into a package name and reserved -- so it is one value here rather
+/// than a bare string each helper reinterprets. It is deliberately opaque: the
+/// only way to build one is [`Suffix::new`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) struct Suffix(String);
+
+impl Suffix {
+    /// Wraps an already-generated suffix.
+    pub(super) fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    /// Returns the package name this suffix gives its fixture.
+    pub(super) fn package_name(&self) -> String {
+        format!("fx_{}", self.as_str())
+    }
+
+    /// Returns the suffix as a string slice.
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for Suffix {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
 /// Returns a short suffix that is unlikely to clash with any other fixture's.
 ///
 /// Three parts make a clash unlikely: the process id separates processes that
@@ -33,13 +65,13 @@ static FIXTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 /// make it impossible, because the clock bits wrap; `first_unused_suffix`
 /// closes that gap by claiming a suffix the shared target has not already
 /// allocated.
-pub(super) fn unique_suffix() -> String {
+pub(super) fn unique_suffix() -> Suffix {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_nanos());
     let clock = u32::try_from(nanos & 0xffff).unwrap_or(0);
     let sequence = FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    format!("{:x}_{sequence:x}_{clock:04x}", std::process::id())
+    Suffix::new(format!("{:x}_{sequence:x}_{clock:04x}", std::process::id()))
 }
 
 /// Whether a candidate suffix could be claimed for a fixture.
@@ -62,9 +94,9 @@ pub(super) enum Claim {
 ///
 /// Returns the first error `claim` reports.
 pub(super) fn first_unused_suffix(
-    mut next: impl FnMut() -> String,
-    mut claim: impl FnMut(&str) -> Result<Claim, String>,
-) -> Result<String, String> {
+    mut next: impl FnMut() -> Suffix,
+    mut claim: impl FnMut(&Suffix) -> Result<Claim, String>,
+) -> Result<Suffix, String> {
     loop {
         let suffix = next();
         if claim(&suffix)? == Claim::Reserved {
@@ -118,11 +150,11 @@ impl Reservations {
     ///
     /// Returns an error when the scan fails, or when a marker cannot be created
     /// for any reason other than already existing.
-    pub(super) fn claim(&self, suffix: &str) -> Result<Claim, String> {
+    pub(super) fn claim(&self, suffix: &Suffix) -> Result<Claim, String> {
         if suffix_is_taken(&self.target_dir, suffix)? {
             return Ok(Claim::Taken);
         }
-        let marker = format!("fx_{suffix}");
+        let marker = suffix.package_name();
         match self.root.create_dir(&marker) {
             Ok(()) => Ok(Claim::Reserved),
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(Claim::Taken),
@@ -143,8 +175,8 @@ impl Reservations {
 ///
 /// Returns an error when the build directory exists but cannot be read; a build
 /// directory that does not exist yet holds nothing.
-pub(super) fn suffix_is_taken(target_dir: &Utf8Path, suffix: &str) -> Result<bool, String> {
-    let package = format!("fx_{suffix}");
+pub(super) fn suffix_is_taken(target_dir: &Utf8Path, suffix: &Suffix) -> Result<bool, String> {
+    let package = suffix.package_name();
     let prefix = format!("{package}-");
     let build_path = target_dir.join("debug/build");
     let build = match Dir::open_ambient_dir(&build_path, ambient_authority()) {
@@ -213,7 +245,7 @@ fn quoted_name(line: &str) -> Option<&str> {
 /// `[package]` changes.
 pub(super) fn with_unique_package_name(
     manifest: &str,
-    suffix: &str,
+    suffix: &Suffix,
 ) -> Result<(String, String), String> {
     let mut in_package = false;
     let mut unique = None;
@@ -225,7 +257,7 @@ pub(super) fn with_unique_package_name(
         }
         match quoted_name(line).filter(|_| in_package && unique.is_none()) {
             Some(_) => {
-                let name = format!("fx_{suffix}");
+                let name = suffix.package_name();
                 lines.push(format!("name = \"{name}\""));
                 unique = Some(name);
             }
