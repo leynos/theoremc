@@ -5,7 +5,7 @@ This ExecPlan (execution plan) is a living document. The sections `Constraints`,
 `Outcomes & retrospective`, `Conformance basis`, and `Verification plan` must
 be kept up to date as work proceeds.
 
-Status: IN PROGRESS
+Status: COMPLETE
 
 Branch:
 `issue-143-nested-fixture-bdd-tests-intermittently-fail-with-enoent-not-hermetic`
@@ -158,7 +158,10 @@ Observable success:
       `make typecheck` all pass; `test-helpers` unit tests pass 43/43;
       `build_suite_bdd` passes 5/5 and `build_discovery_bdd` 3/3 with real
       Cargo.
-- [ ] Push the branch and open the draft pull request.
+- [x] (2026-11-25) Pushed the branch and opened draft PR
+      [#289](https://github.com/leynos/theoremc/pull/289).
+- [x] (2026-11-25) CI is green on `cac0fd7`: `build-test`, `Kani`,
+      CodeScene Code Health and Gecko Security all pass.
 
 ## Surprises & discoveries
 
@@ -334,20 +337,29 @@ Observable success:
 
 ## Outcomes & retrospective
 
-Implementation is complete and every gate passes when its suites are run
-without nextest's fixed 600 s per-test allowance, which the saturated host
-cannot meet for nested Cargo builds. The two Kani scenarios were proved not to
-be caused by this change: `kani_lists_the_generated_proof_harness` passed both
-with and without the `CARGO_BUILD_BUILD_DIR` pin when run alone, and its
-earlier failure captured `Blocking waiting for file lock on package cache`
-alongside a concurrent build of another worktree's `<shared-target>/kani`, so
-the failure tracked cross-process contention on a shared directory rather than
-the pin.
+Delivered as draft PR [#289](https://github.com/leynos/theoremc/pull/289), with
+`build-test`, `Kani`, CodeScene Code Health and Gecko Security all green on the
+final head.
 
-Lessons: the host's compile queue is the dominant cost for nested-build suites
-and must be allowed for in every timeout; and a shared target that includes
-Kani's own `kani` build directory inherits a cross-worktree lock, which is
-worth recording even though it is out of scope here.
+The work achieved what the issue asked for and one thing it could not: two real
+defects in this change's own first attempt were caught by running the same
+commands CI runs. The `CARGO_BUILD_BUILD_DIR` pin broke `cargo kani`, which
+keeps its own build directory, and quoting a rejected spelling inside the plan
+reproduced the spelling finding. Neither would have surfaced from the local
+subset that had been run, which is the lesson: the local gate set must mirror
+every stage CI executes, including `make spelling` and `make kani`.
+
+An earlier hypothesis in this plan -- that the Kani failures were only shared
+target contention -- was disproved by a controlled A/B on the same command:
+Kani failed with the pin and passed without it. The record now reflects the
+measured cause rather than the first plausible one.
+
+The ENOENT failure that opened the issue was never observed locally, so the
+diagnostics are the deliverable there: the next occurrence names its operation,
+path, fixture and stream content. Of the suspected causes the issue listed,
+non-atomic suffix allocation is closed outright, and a configured
+`build.target` is reduced to a recorded limitation, because Cargo offers no way
+to unset one.
 
 ## Context and orientation
 
