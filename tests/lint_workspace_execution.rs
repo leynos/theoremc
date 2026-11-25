@@ -70,6 +70,10 @@ struct Stage {
     /// The environment variable that denies warnings, when the stage uses one
     /// instead of a trailing `-D warnings`.
     warning_variable: Option<(&'static str, &'static str)>,
+    /// The lint the stage must name when it reports a finding.
+    lint: &'static str,
+    /// The member-relative source path the finding must name.
+    source_path: &'static str,
 }
 
 /// The rustdoc stage: `cargo doc --workspace --all-features --no-deps`.
@@ -77,6 +81,8 @@ static RUSTDOC_STAGE: Stage = Stage {
     name: "rustdoc",
     arguments: &["doc", "--workspace", "--all-features", "--no-deps"],
     warning_variable: Some(("RUSTDOCFLAGS", "-D warnings")),
+    lint: "broken_intra_doc_links",
+    source_path: "member/src/lib.rs",
 };
 
 /// The Clippy stage: `cargo clippy --workspace --all-targets --all-features -- -D
@@ -93,6 +99,8 @@ static CLIPPY_STAGE: Stage = Stage {
         "warnings",
     ],
     warning_variable: None,
+    lint: "dead_code",
+    source_path: "member/src/lib.rs",
 };
 
 /// Writes a two-package workspace whose member holds `member_source`.
@@ -170,10 +178,13 @@ fn a_clean_workspace_passes(#[case] stage: &Stage) -> Result<(), String> {
     Ok(())
 }
 
-/// Verifies that a finding in the non-root member fails the stage.
+/// Verifies that a finding in the non-root member fails the stage, naming the
+/// lint and the member path.
 ///
 /// This is the behaviour issue #99 was about: before `--workspace` reached the
-/// stages, a finding in a member crate could not fail any gate.
+/// stages, a finding in a member crate could not fail any gate. A non-zero exit
+/// alone would also be produced by a workspace that fails to build, so the
+/// diagnostic must name the lint and the member source the fixture broke.
 #[rstest]
 #[case::rustdoc(&RUSTDOC_STAGE, MEMBER_WITH_BROKEN_LINK)]
 #[case::clippy(&CLIPPY_STAGE, MEMBER_WITH_DEAD_CODE)]
@@ -188,6 +199,15 @@ fn a_finding_in_a_member_crate_fails_the_stage(
             "the {} stage must fail on a finding in the member crate, but it passed",
             stage.name
         ));
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    for fragment in [stage.lint, stage.source_path] {
+        if !stderr.contains(fragment) {
+            return Err(format!(
+                "the {} stage must report {fragment:?} for a member finding; stderr was:\n{stderr}",
+                stage.name
+            ));
+        }
     }
     Ok(())
 }

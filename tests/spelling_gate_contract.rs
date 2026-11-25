@@ -171,6 +171,79 @@ fn bypass_keys_are_detected_in_a_step() {
     );
 }
 
+/// Step-shaped text in a later block scalar is not a step.
+///
+/// A job-level `name: |` or `env:` scalar contains text, not workflow keys, so
+/// a scenario written there must not satisfy the gate. Neither the ordering
+/// predicate nor the exact-command check may be fooled by it.
+#[test]
+fn a_scalar_after_the_steps_does_not_supply_steps() {
+    let workflow = concat!(
+        "jobs:\n  build-test:\n    steps:\n",
+        "      - name: Markdown lint\n        run: make markdownlint\n",
+        "    name: |\n",
+        "      - name: Spelling\n        run: make spelling\n",
+        "      - name: Install Whitaker\n        run: echo install\n",
+    );
+    let job =
+        build_test_job(Workflow(workflow)).expect("the synthetic workflow must define the job");
+    assert!(
+        !spelling_runs_between_markdown_lint_and_whitaker(&job),
+        "a spelling scenario inside a scalar must not satisfy the ordering"
+    );
+    assert!(
+        build_test_step(Workflow(workflow), StepName("Spelling")).is_none(),
+        "a scalar entry must not be read as a step"
+    );
+}
+
+/// A step slice stops at the end of the step list.
+///
+/// In the indentless form a later job-level key sits at the step marker's own
+/// indentation, so a slice that ignores the list boundary would absorb it. The
+/// absorbed key must not be read as the step's command.
+#[test]
+fn a_step_slice_stops_at_the_end_of_the_step_list() {
+    let workflow = concat!(
+        "jobs:\n  build-test:\n    steps:\n",
+        "    - name: Spelling\n      uses: actions/checkout@v4\n",
+        "    env:\n      run: make spelling\n",
+    );
+    let (step, indent) =
+        build_test_step(Workflow(workflow), StepName("Spelling")).expect("the step must be found");
+    assert!(
+        !runs_exact_command(&step, indent),
+        "a key after the step list must not satisfy the command contract"
+    );
+}
+
+/// A two-space comment never opens or ends a job.
+#[test]
+fn a_two_space_comment_is_not_a_job_header() {
+    let workflow = format!("{BUILD_TEST_HEADER}  # Validation:\n{SPELLING_NAME}{SPELLING_RUN}");
+    assert_eq!(
+        step_run_command(&workflow).expect("the job must still define the Spelling step"),
+        "run: make spelling",
+        "a comment between keys must not truncate the job"
+    );
+}
+
+/// Job-shaped text in a top-level scalar is not a job.
+#[test]
+fn a_scalar_before_jobs_does_not_supply_a_job() {
+    let workflow = format!(
+        "name: |\n  build-test:\n    steps:\n{SPELLING_NAME}{SPELLING_RUN}jobs:\n  build-test:\n    steps:\n{SPELLING_NAME}        run: make other\n"
+    );
+    let job = build_test_job(Workflow(&workflow)).expect("the real build-test job must be found");
+    let (step, indent) = build_test_step(Workflow(&workflow), StepName("Spelling"))
+        .expect("the real step must be found");
+    assert!(
+        !runs_exact_command(&step, indent),
+        "the scalar copy must not satisfy the command contract; job had {} lines",
+        job.len()
+    );
+}
+
 /// A job-level bypass key is found even when it follows the `steps:` mapping.
 #[test]
 fn job_bypass_keys_are_found_at_any_position() {

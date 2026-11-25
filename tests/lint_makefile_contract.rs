@@ -275,6 +275,10 @@ fn whitaker_stage_denies_warnings_over_the_workspace() {
 }
 
 /// Verifies that no lint recipe can swallow a failing command.
+///
+/// Each stage is one command, so any of these shapes would turn a red gate
+/// green: make's `-` prefix, a `||` fallback (which also covers `|| :`), a
+/// trailing `; true`, or an explicit `exit 0`.
 #[test]
 fn no_lint_stage_can_mask_a_failure() {
     let makefile = Makefile(MAKEFILE);
@@ -285,16 +289,13 @@ fn no_lint_stage_can_mask_a_failure() {
                 "{} must not ignore a recipe failure: `{line}`",
                 target.name()
             );
-            assert!(
-                !line.contains("||"),
-                "{} must not swallow a failure behind a shell operator: `{line}`",
-                target.name()
-            );
-            assert!(
-                !line.contains("; true"),
-                "{} must not exit successfully after a failure: `{line}`",
-                target.name()
-            );
+            for fragment in ["||", "; true", "exit 0"] {
+                assert!(
+                    !line.contains(fragment),
+                    "{} must not swallow a failure behind `{fragment}`: `{line}`",
+                    target.name()
+                );
+            }
         }
     }
 }
