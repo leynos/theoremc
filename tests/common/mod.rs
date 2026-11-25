@@ -4,18 +4,28 @@ use derive_more::{From, Into};
 use the_newtype::Newtype;
 mod build_log;
 mod build_support_fixture;
+mod build_support_manifest;
+mod command_run;
+mod fixture_barrier;
+mod fixture_build;
 mod fixture_crate;
 mod fixture_isolation;
 mod hermetic_cargo;
+mod io_context;
 mod schema_fixtures;
 mod suite_layout;
 
 pub use build_log::{BuildLog, toml_section};
 pub use build_support_fixture::build_support_fixture_manifest;
+pub use fixture_barrier::{
+    BARRIER_BUILD_SCRIPT, BARRIER_READY_FILE, BARRIER_RELEASE_FILE, await_path, install_barrier,
+    precompile_barrier,
+};
+pub use fixture_build::RunningBuild;
 pub use fixture_crate::{
     BUILD_DISCOVERY_SOURCE, BUILD_SCRIPT_SOURCE, BUILD_SUITE_SOURCE, FixtureCrate, TRIVIAL_THEOREM,
 };
-pub use hermetic_cargo::hermetic_cargo;
+pub use hermetic_cargo::{hermetic_cargo, hermetic_cargo_build};
 pub use schema_fixtures::{
     FIXTURES_DIR, assert_diagnostic_failure, assert_fixture_error_contains, assert_fixture_fails,
     assert_fixture_loads, fixture_error_message, fixture_source_id, load_fixture,

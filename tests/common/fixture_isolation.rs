@@ -11,6 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use camino::{Utf8Path, Utf8PathBuf};
 use cap_std::{ambient_authority, fs_utf8::Dir};
 
+use super::io_context::path_error;
+
 /// The workspace's resolved dependency graph, copied into every fixture crate.
 ///
 /// Without it each fixture resolves the registry afresh, so two fixtures can
@@ -23,41 +25,144 @@ pub(super) const WORKSPACE_LOCK: &str = include_str!("../../Cargo.lock");
 /// Counts fixtures in this process, so package names stay unique within it.
 static FIXTURE_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
+/// The distinguishing part of a fixture's package name.
+///
+/// A suffix travels with every allocation step -- generated, scanned for,
+/// formatted into a package name and reserved -- so it is one value here rather
+/// than a bare string each helper reinterprets. It is deliberately opaque: the
+/// only way to build one is [`Suffix::new`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) struct Suffix(String);
+
+impl Suffix {
+    /// Wraps an already-generated suffix.
+    pub(super) fn new(value: impl Into<String>) -> Self {
+        Self(value.into())
+    }
+
+    /// Returns the package name this suffix gives its fixture.
+    pub(super) fn package_name(&self) -> String {
+        format!("fx_{}", self.as_str())
+    }
+
+    /// Returns the suffix as a string slice.
+    pub(super) fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for Suffix {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.0)
+    }
+}
+
 /// Returns a short suffix that is unlikely to clash with any other fixture's.
 ///
 /// Three parts make a clash unlikely: the process id separates processes that
 /// run at once, the sequence number separates fixtures within a process, and
 /// the clock's low 16 bits separate runs that reuse a process id. They do not
 /// make it impossible, because the clock bits wrap; `first_unused_suffix`
-/// closes that gap by refusing a suffix the shared target already holds build
-/// directories for.
-pub(super) fn unique_suffix() -> String {
+/// closes that gap by claiming a suffix the shared target has not already
+/// allocated.
+pub(super) fn unique_suffix() -> Suffix {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_nanos());
     let clock = u32::try_from(nanos & 0xffff).unwrap_or(0);
     let sequence = FIXTURE_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    format!("{:x}_{sequence:x}_{clock:04x}", std::process::id())
+    Suffix::new(format!("{:x}_{sequence:x}_{clock:04x}", std::process::id()))
 }
 
-/// Returns the first suffix `in_use` does not report as taken.
+/// Whether a candidate suffix could be claimed for a fixture.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Claim {
+    /// No other allocator or stale build holds the suffix.
+    Reserved,
+    /// Another allocator or an earlier run already holds the suffix.
+    Taken,
+}
+
+/// Returns the first suffix `claim` reports as reserved.
 ///
-/// A name is taken when the shared target already holds build directories for
-/// it, left by an earlier process whose id was reused. Checking the directory
-/// makes a name safe by construction instead of by probability.
+/// A name is claimed, not merely checked: the claim is an atomic `create_dir`
+/// that loses to any other allocator racing for the same name. A scan that
+/// failed, by contrast, cannot say a name is free, so its error stops the
+/// allocation.
 ///
 /// # Errors
 ///
-/// Returns the first error `in_use` reports: a scan that failed cannot say a
-/// name is free.
+/// Returns the first error `claim` reports.
 pub(super) fn first_unused_suffix(
-    mut next: impl FnMut() -> String,
-    mut in_use: impl FnMut(&str) -> Result<bool, String>,
-) -> Result<String, String> {
+    mut next: impl FnMut() -> Suffix,
+    mut claim: impl FnMut(&Suffix) -> Result<Claim, String>,
+) -> Result<Suffix, String> {
     loop {
         let suffix = next();
-        if !in_use(&suffix)? {
+        if claim(&suffix)? == Claim::Reserved {
             return Ok(suffix);
+        }
+    }
+}
+
+/// Names the reservation root inside a shared target directory.
+const RESERVATIONS: &str = "fixture-reservations";
+
+/// The marker directory names every allocated fixture suffix.
+///
+/// Markers are directories rather than files because `create_dir` fails with
+/// `AlreadyExists` instead of silently succeeding, which is what makes a claim
+/// atomic across processes. A file created with `create_new` would give the
+/// same signal; a directory simply matches the build directories it stands for.
+/// `cargo clean` removes markers with the rest of the target.
+pub(super) struct Reservations {
+    /// The shared target the markers live in, used in error context.
+    target_dir: Utf8PathBuf,
+    /// Capability-scoped handle to the marker root.
+    root: Dir,
+}
+
+impl Reservations {
+    /// Opens (creating if needed) the marker root inside `target_dir`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the root cannot be created or opened.
+    pub(super) fn open(target_dir: &Utf8Path) -> Result<Self, String> {
+        let root_path = target_dir.join(RESERVATIONS);
+        Dir::create_ambient_dir_all(&root_path, ambient_authority())
+            .map_err(|error| path_error("creating", &root_path, &error))?;
+        let root = Dir::open_ambient_dir(&root_path, ambient_authority())
+            .map_err(|error| path_error("opening", &root_path, &error))?;
+        Ok(Self {
+            target_dir: target_dir.to_path_buf(),
+            root,
+        })
+    }
+
+    /// Claims `suffix` for the fixture, or reports that another holder has it.
+    ///
+    /// The stale-output scan runs first so a name left by an earlier process is
+    /// skipped without leaving a marker, and the marker then settles any race
+    /// between allocators that both scanned before either had written anything.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the scan fails, or when a marker cannot be created
+    /// for any reason other than already existing.
+    pub(super) fn claim(&self, suffix: &Suffix) -> Result<Claim, String> {
+        if suffix_is_taken(&self.target_dir, suffix)? {
+            return Ok(Claim::Taken);
+        }
+        let marker = suffix.package_name();
+        match self.root.create_dir(&marker) {
+            Ok(()) => Ok(Claim::Reserved),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => Ok(Claim::Taken),
+            Err(error) => Err(path_error(
+                "reserving",
+                &self.target_dir.join(RESERVATIONS).join(&marker),
+                &error,
+            )),
         }
     }
 }
@@ -70,23 +175,53 @@ pub(super) fn first_unused_suffix(
 ///
 /// Returns an error when the build directory exists but cannot be read; a build
 /// directory that does not exist yet holds nothing.
-pub(super) fn suffix_is_taken(target_dir: &Utf8Path, suffix: &str) -> Result<bool, String> {
-    let package = format!("fx_{suffix}");
+pub(super) fn suffix_is_taken(target_dir: &Utf8Path, suffix: &Suffix) -> Result<bool, String> {
+    let package = suffix.package_name();
     let prefix = format!("{package}-");
-    let build = match Dir::open_ambient_dir(target_dir.join("debug/build"), ambient_authority()) {
+    let build_path = target_dir.join("debug/build");
+    let build = match Dir::open_ambient_dir(&build_path, ambient_authority()) {
         Ok(build) => build,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-        Err(error) => return Err(error.to_string()),
+        Err(error) => return Err(path_error("opening", &build_path, &error)),
     };
-    for listing in build.entries().map_err(|error| error.to_string())? {
-        let name = listing
-            .and_then(|found| found.file_name())
-            .map_err(|error| error.to_string())?;
-        if name.starts_with(&prefix) || name == package {
+    let entries = build
+        .entries()
+        .map_err(|error| path_error("listing", &build_path, &error))?;
+    for listing in entries {
+        if entry_matches(listing, &package, &prefix, &build_path)? == Some(true) {
             return Ok(true);
         }
     }
     Ok(false)
+}
+
+/// Classifies one entry yielded by a scan of a shared build directory.
+///
+/// Returns `Some(true)` when the entry names the package, `Some(false)` when it
+/// does not, and `None` when the entry vanished between the listing and the
+/// read. A directory can be removed by Cargo or a sibling fixture during the
+/// scan, and that is absence rather than failure; every other I/O error is
+/// fail-closed, because a scan that could not run must not report a name free.
+///
+/// # Errors
+///
+/// Returns the operation, the build path and the underlying error when the
+/// entry cannot be read for a reason other than having vanished.
+fn entry_matches(
+    entry: std::io::Result<cap_std::fs_utf8::DirEntry>,
+    package: &str,
+    prefix: &str,
+    build_path: &Utf8Path,
+) -> Result<Option<bool>, String> {
+    let found = match entry {
+        Ok(found) => found,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(path_error("reading an entry of", build_path, &error)),
+    };
+    let name = found
+        .file_name()
+        .map_err(|error| path_error("reading an entry of", build_path, &error))?;
+    Ok(Some(name.starts_with(prefix) || name == package))
 }
 
 /// Reads the value of a `name = "..."` line.
@@ -110,7 +245,7 @@ fn quoted_name(line: &str) -> Option<&str> {
 /// `[package]` changes.
 pub(super) fn with_unique_package_name(
     manifest: &str,
-    suffix: &str,
+    suffix: &Suffix,
 ) -> Result<(String, String), String> {
     let mut in_package = false;
     let mut unique = None;
@@ -122,7 +257,7 @@ pub(super) fn with_unique_package_name(
         }
         match quoted_name(line).filter(|_| in_package && unique.is_none()) {
             Some(_) => {
-                let name = format!("fx_{suffix}");
+                let name = suffix.package_name();
                 lines.push(format!("name = \"{name}\""));
                 unique = Some(name);
             }
@@ -157,10 +292,10 @@ pub(super) fn shared_target_dir() -> Result<Utf8PathBuf, String> {
         .map_or_else(|_| repository_root().join("target"), Utf8PathBuf::from);
     let directory = base.join("theoremc-fixture-builds");
     Dir::create_ambient_dir_all(&directory, ambient_authority())
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| path_error("creating", &directory, &error))?;
     directory
         .canonicalize_utf8()
-        .map_err(|error| error.to_string())
+        .map_err(|error| path_error("canonicalizing", &directory, &error))
 }
 
 #[cfg(test)]

@@ -1,5 +1,6 @@
 //! Capability-scoped build-fixture helpers for integration tests.
 
+use std::io;
 use std::time::{Duration, SystemTime};
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -7,12 +8,13 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 use filetime::FileTime;
 
 use super::BuildLog;
+use super::build_support_manifest::fixture_build_support_cargo_toml;
+use super::fixture_build::{self, FixtureIdentity, RunningBuild};
 use super::fixture_isolation::{
-    WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, suffix_is_taken, unique_suffix,
+    Reservations, WORKSPACE_LOCK, first_unused_suffix, shared_target_dir, unique_suffix,
     with_unique_package_name,
 };
-use super::hermetic_cargo::hermetic_cargo;
-use super::suite_layout::{package_directories, read_suite};
+use super::io_context::path_error;
 
 /// Source for the repository build script copied into fixture crates.
 pub const BUILD_SCRIPT_SOURCE: &str = include_str!("../../build.rs");
@@ -82,15 +84,30 @@ impl FixtureCrate {
     /// the manifest names no package, or when fixture files cannot be written.
     pub fn new(cargo_toml: &str, lib_rs: &str) -> Result<Self, String> {
         let target_dir = shared_target_dir()?;
-        let suffix =
-            first_unused_suffix(unique_suffix, |taken| suffix_is_taken(&target_dir, taken))?;
+        let reservations = Reservations::open(&target_dir)?;
+        let suffix = first_unused_suffix(unique_suffix, |candidate| reservations.claim(candidate))?;
         let (manifest, package_name) = with_unique_package_name(cargo_toml, &suffix)?;
-        let temp_dir = tempfile::tempdir().map_err(|error| error.to_string())?;
+        let temp_parent = std::env::temp_dir();
+        let temp_dir = tempfile::tempdir().map_err(|error| {
+            format!(
+                "creating a temporary fixture root under {}: {error} (package {package_name}, shared target {target_dir})",
+                temp_parent.display(),
+            )
+        })?;
         let manifest_dir = Utf8Path::from_path(temp_dir.path())
-            .ok_or_else(|| "temp dir path is not valid UTF-8".to_owned())?
+            .ok_or_else(|| {
+                format!(
+                    "temporary fixture root {} is not valid UTF-8 (package {package_name})",
+                    temp_dir.path().display(),
+                )
+            })?
             .to_path_buf();
-        let dir = Dir::open_ambient_dir(&manifest_dir, ambient_authority())
-            .map_err(|error| error.to_string())?;
+        let dir = Dir::open_ambient_dir(&manifest_dir, ambient_authority()).map_err(|error| {
+            format!(
+                "{} (package {package_name}, shared target {target_dir})",
+                path_error("opening the fixture root", &manifest_dir, &error),
+            )
+        })?;
         let fixture = Self {
             _temp_dir: temp_dir,
             manifest_dir,
@@ -99,19 +116,27 @@ impl FixtureCrate {
             dir,
         };
 
-        fixture.write_scaffold(&manifest, lib_rs)?;
+        fixture.write_scaffold(&manifest, lib_rs, BUILD_SCRIPT_SOURCE)?;
 
         Ok(fixture)
     }
 
     /// Writes the manifest, lock, build script, library source and the
     /// build-support crate into the fixture directory.
-    fn write_scaffold(&self, manifest: &str, lib_rs: &str) -> Result<(), String> {
+    ///
+    /// `build_script` lets a test substitute a script that synchronizes with
+    /// the test, such as the barrier build in `fixture_build`.
+    fn write_scaffold(
+        &self,
+        manifest: &str,
+        lib_rs: &str,
+        build_script: &str,
+    ) -> Result<(), String> {
         let build_support_manifest = fixture_build_support_cargo_toml(BUILD_SUPPORT_CARGO_TOML)?;
         let files = [
             ("Cargo.toml", manifest),
             ("Cargo.lock", WORKSPACE_LOCK),
-            ("build.rs", BUILD_SCRIPT_SOURCE),
+            ("build.rs", build_script),
             ("src/lib.rs", lib_rs),
             ("build-support/Cargo.toml", build_support_manifest.as_str()),
             ("build-support/src/lib.rs", BUILD_SUPPORT_LIB_SOURCE),
@@ -136,7 +161,7 @@ impl FixtureCrate {
     pub fn read_to_string(&self, path: &Utf8Path) -> Result<String, String> {
         self.dir
             .read_to_string(path.as_str())
-            .map_err(|error| error.to_string())
+            .map_err(|error| self.io_error("reading", &self.absolute(path), &error))
     }
 
     /// Writes `contents` to a path relative to the fixture crate root.
@@ -151,11 +176,11 @@ impl FixtureCrate {
         {
             self.dir
                 .create_dir_all(parent)
-                .map_err(|error| error.to_string())?;
+                .map_err(|error| self.io_error("creating", &self.absolute(parent), &error))?;
         }
         self.dir
             .write(path.as_str(), contents)
-            .map_err(|error| error.to_string())
+            .map_err(|error| self.io_error("writing", &self.absolute(path), &error))
     }
 
     /// Creates a directory relative to the fixture crate root.
@@ -166,7 +191,7 @@ impl FixtureCrate {
     pub fn create_dir(&self, path: &Utf8Path) -> Result<(), String> {
         self.dir
             .create_dir_all(path)
-            .map_err(|error| error.to_string())
+            .map_err(|error| self.io_error("creating", &self.absolute(path), &error))
     }
 
     /// Returns a fixture path's modification time.
@@ -180,7 +205,13 @@ impl FixtureCrate {
             .metadata(path)
             .and_then(|metadata| metadata.modified())
             .map(cap_std::time::SystemTime::into_std)
-            .map_err(|error| error.to_string())
+            .map_err(|error| {
+                self.io_error(
+                    "reading the modification time of",
+                    &self.absolute(path),
+                    &error,
+                )
+            })
     }
 
     /// Writes `contents` and advances the target and parent mtimes.
@@ -207,12 +238,12 @@ impl FixtureCrate {
     /// Returns an error when the target file does not exist or cannot be
     /// written.
     pub fn overwrite_in_place(&self, path: &Utf8Path, contents: &str) -> Result<(), String> {
-        self.dir
-            .metadata(path.as_str())
-            .map_err(|error| error.to_string())?;
+        self.dir.metadata(path.as_str()).map_err(|error| {
+            self.io_error("reading the metadata of", &self.absolute(path), &error)
+        })?;
         self.dir
             .write(path.as_str(), contents)
-            .map_err(|error| error.to_string())
+            .map_err(|error| self.io_error("overwriting", &self.absolute(path), &error))
     }
 
     /// Overwrites an existing fixture file and advances its mtime.
@@ -234,6 +265,26 @@ impl FixtureCrate {
         self.advance_parent_mtime(path)
     }
 
+    /// Returns whether `path` exists relative to the fixture crate root.
+    ///
+    /// This is a capability-scoped existence probe for tests that must wait for
+    /// a build to create a file, without reaching for the ambient filesystem.
+    #[must_use]
+    pub fn has_file(&self, path: &Utf8Path) -> bool {
+        self.dir.metadata(path).is_ok()
+    }
+
+    /// Removes a file relative to the fixture crate root.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the file cannot be removed.
+    pub fn remove_file(&self, path: &Utf8Path) -> Result<(), String> {
+        self.dir
+            .remove_file(path.as_str())
+            .map_err(|error| self.io_error("removing", &self.absolute(path), &error))
+    }
+
     /// Returns the fixture crate manifest directory.
     #[must_use]
     pub fn manifest_dir(&self) -> &Utf8Path {
@@ -250,8 +301,7 @@ impl FixtureCrate {
     ///
     /// # Errors
     ///
-    /// Returns the combined Cargo output when the command fails or cannot be
-    /// executed.
+    /// Returns the same diagnostic as [`Self::cargo_build_log`].
     pub fn cargo_build(&self) -> Result<(), String> {
         self.cargo_build_log().map(|_| ())
     }
@@ -260,24 +310,26 @@ impl FixtureCrate {
     ///
     /// # Errors
     ///
-    /// Returns the combined Cargo output when the command fails or cannot be
-    /// executed.
+    /// Returns the command and working directory with the underlying error when
+    /// Cargo cannot start, or the exit status with separately labelled stdout
+    /// and stderr when Cargo runs and fails.
     pub fn cargo_build_log(&self) -> Result<BuildLog, String> {
-        let output = hermetic_cargo(&self.manifest_dir, &self.target_dir)
-            .args(["build", "-vv", "--color", "never"])
-            .output()
-            .map_err(|error| error.to_string())?;
-        let log = format!(
-            "{}{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr),
-        );
+        fixture_build::build_log(&self.identity())
+    }
 
-        if output.status.success() {
-            Ok(BuildLog(log))
-        } else {
-            Err(log)
-        }
+    /// Starts `cargo build -vv --color never` without waiting for it.
+    ///
+    /// This exists for concurrency tests that must observe the build while it is
+    /// running, for example to remove a sibling fixture during it. Every other
+    /// caller should prefer [`Self::cargo_build`], which cannot leave a child
+    /// behind.
+    ///
+    /// # Errors
+    ///
+    /// Returns the command and working directory with the underlying error when
+    /// Cargo cannot start.
+    pub fn spawn_cargo_build(&self) -> Result<RunningBuild, String> {
+        fixture_build::spawn_build(&self.identity())
     }
 
     /// Reads the theorem suite generated by a fixture build.
@@ -287,15 +339,28 @@ impl FixtureCrate {
     /// Returns an error when the build output cannot be inspected or no
     /// generated theorem suite is present.
     pub fn generated_suite_contents(&self) -> Result<String, String> {
-        let build_dir =
-            Dir::open_ambient_dir(self.target_dir.join("debug/build"), ambient_authority())
-                .map_err(|error| error.to_string())?;
-        for name in package_directories(&build_dir, &self.package_name)? {
-            if let Some(contents) = read_suite(&build_dir, &name)? {
-                return Ok(contents);
-            }
-        }
-        Err("generated theorem_suite.rs was not found".to_owned())
+        fixture_build::generated_suite_contents(&self.identity())
+    }
+
+    /// Returns the fixture's resolved absolute path for a relative path.
+    fn absolute(&self, path: &Utf8Path) -> Utf8PathBuf {
+        self.manifest_dir.join(path)
+    }
+
+    /// Describes the fixture identity for build and lookup errors.
+    fn identity(&self) -> FixtureIdentity {
+        FixtureIdentity::new(&self.package_name, &self.manifest_dir, &self.target_dir)
+    }
+
+    /// Formats an I/O error with the operation, path and fixture identity.
+    fn io_error(&self, operation: &str, path: &Utf8Path, error: &io::Error) -> String {
+        format!(
+            "{} (fixture package {} at {}, shared target {})",
+            path_error(operation, path, error),
+            self.package_name,
+            self.manifest_dir,
+            self.target_dir,
+        )
     }
 
     /// Advances the modification time of `path`'s parent directory.
@@ -310,41 +375,14 @@ impl FixtureCrate {
 
     /// Advances `path`'s modification time to defeat Cargo caching.
     fn advance_mtime(&self, path: &Utf8Path) -> Result<(), String> {
-        let absolute_path = self.manifest_dir.join(path);
+        let absolute_path = self.absolute(path);
         let advanced_mtime = SystemTime::now()
             .checked_add(Duration::from_secs(2))
             .ok_or_else(|| "advanced modification time overflowed".to_owned())?;
         filetime::set_file_mtime(&absolute_path, FileTime::from_system_time(advanced_mtime))
-            .map_err(|error| error.to_string())
-    }
-}
-
-/// Builds a fixture manifest with lints disabled for build-script tests.
-fn fixture_build_support_cargo_toml(manifest: &str) -> Result<String, String> {
-    let mut removed_lints = false;
-    let mut inside_lints = false;
-    let mut retained_lines = Vec::new();
-
-    for line in manifest.lines() {
-        let trimmed_line = line.trim();
-        let is_section_header = trimmed_line.starts_with('[') && trimmed_line.ends_with(']');
-        if is_section_header {
-            inside_lints = false;
-            if trimmed_line == "[lints]" {
-                removed_lints = true;
-                inside_lints = true;
-                continue;
-            }
-        }
-        if !inside_lints {
-            retained_lines.push(line);
-        }
-    }
-
-    if removed_lints {
-        Ok(format!("{}\n", retained_lines.join("\n")))
-    } else {
-        Err("build-support manifest must contain a [lints] table".to_owned())
+            .map_err(|error| {
+                self.io_error("advancing the modification time of", &absolute_path, &error)
+            })
     }
 }
 

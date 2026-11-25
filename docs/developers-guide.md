@@ -616,12 +616,51 @@ suite.
   run-and-sequence suffix; short because Kani derives a file name from the
   crate name), which keeps its build artefacts apart in that directory;
   `generated_suite_contents` reads only the directories named after the
-  fixture. The workspace `Cargo.lock` is copied into each fixture so every
-  fixture resolves the versions the workspace already built, and the fixture's
-  `cargo` runs with `CARGO_NET_OFFLINE=true`, with `CARGO_BUILD_TARGET_DIR` and
-  `CARGO_BUILD_BUILD_DIR` removed so a caller's environment cannot move the
-  artefacts or share a lock. A fixture that needs a private target must say so
-  here and in its helper.
+  fixture. A suffix is claimed by creating
+  `<shared-target>/fixture-reservations/fx_<suffix>` with `create_dir`, so two
+  processes racing for the same name cannot both win; the markers persist after
+  a fixture is dropped and are removed by `cargo clean`. The workspace
+  `Cargo.lock` is copied into each fixture so every fixture resolves the
+  versions the workspace already built, and the fixture's `cargo` runs with
+  `CARGO_NET_OFFLINE=true`, with `CARGO_BUILD_TARGET_DIR` and
+  `CARGO_BUILD_TARGET` removed and `CARGO_TARGET_DIR` pinned to the shared
+  target, so an exported value cannot move the artefacts and an exported build
+  target cannot retarget the build. A plain fixture build also pins
+  `CARGO_BUILD_BUILD_DIR` to the shared target, so a configured
+  `build.build-dir` cannot move build-script output; that pin is not applied to
+  `cargo kani`, which keeps its own build directory and fails if one is
+  imposed. A `build.target` set in a Cargo configuration file is *not* cleared
+  by removing the environment variable, and it moves build-script output to
+  `<shared-target>/<triple>/debug/build`, which the lookup does not read. That
+  is a known limitation recorded in ADR 0012: a host with such a configuration
+  cannot run the fixture suites. Inherited `RUSTFLAGS` are left in place so a
+  fixture compiles with the gate's flags. A fixture that needs a private target
+  must say so here and in its helper.
+- Fixture failures have three shapes and must say which one happened.
+  `tests/common/io_context.rs` formats filesystem failures as
+  `<operation> <path>: <io error>` and appends the fixture package, root and
+  shared target; `tests/common/command_run.rs` reports a child that never
+  started with the command and working directory, and a child that ran and
+  failed with the exit status and separately labelled stdout and stderr;
+  `tests/common/fixture_build.rs` reports a lookup that cannot open
+  `debug/build` with the full path, and one that finds no suite with the
+  package, target and every attempted candidate. Read that ordering when
+  triaging an intermittent failure: a spawn failure means the directory or
+  program was absent, a completed failure means Cargo itself refused, and a
+  lookup failure means the build succeeded but wrote its output elsewhere.
+- To reproduce an intermittent fixture failure under a different temporary
+  root, export it for the run, for example
+  `TMPDIR=/data/tmp cargo nextest run -p theoremc --test build_suite_bdd`.
+  Issue #143 was first seen under `/data/tmp`; the fixture root is created by
+  `tempfile`, which honours `TMPDIR`.
+- A local gate that exempts a test by name is a local expedient, never a
+  repository policy. Do not mirror such an exemption into
+  `.config/nextest.toml`, the `Makefile` or `.github/workflows/`: CI must keep
+  running every test, including the four fixture tests named in issue #143
+  (`multiple_theorem_files_compile_in_deterministic_suite_order`,
+  `existing_theorem_files_are_discovered_recursively`,
+  `non_theorem_files_do_not_participate_in_discovery` and
+  `a_valid_theorem_file_exposes_a_kani_proof_harness`).
 - Tests that start a child `cargo` or `rustc` (the fixture suites, the macros
   crate's trybuild suite and the `rustc` compile-fail unit test) run in the
   `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,
