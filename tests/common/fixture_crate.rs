@@ -124,7 +124,7 @@ impl FixtureCrate {
     /// Writes the manifest, lock, build script, library source and the
     /// build-support crate into the fixture directory.
     ///
-    /// `build_script` lets a test substitute a script that synchronises with
+    /// `build_script` lets a test substitute a script that synchronizes with
     /// the test, such as the barrier build in `fixture_build`.
     fn write_scaffold(
         &self,

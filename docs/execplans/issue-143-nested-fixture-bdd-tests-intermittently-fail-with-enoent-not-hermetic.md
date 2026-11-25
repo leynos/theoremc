@@ -149,7 +149,7 @@ Observable success:
       individually), `lint_workspace_execution` 4/4, macros trybuild 1/1 and
       `arg_lowering` compile-fail 6/6.
 - [x] (2026-11-25) `EP-M5` CodeRabbit review cleared over six rounds, each
-      finding fixed and re-verified (barrier synchronisation, `Drop` reaping,
+      finding fixed and re-verified (barrier synchronization, `Drop` reaping,
       pre-compiled barrier, file-redirected logs with a regression test, named
       unreadable logs, platform-correct path assertions). Final gate evidence:
       `make check-fmt`, `make markdownlint`, `make nixie`, `cargo clippy
@@ -247,7 +247,7 @@ Observable success:
   relying on two threads intersecting by chance. Rationale: a child that has
   already exited cannot overlap the clean-up, and a signal sent before
   `cargo_build` proves nothing. `spawn_cargo_build` plus a live-child check
-  ties the synchronisation point to the active build; `wait` drains both pipes
+  ties the synchronization point to the active build; `wait` drains both pipes
   so a verbose build cannot block. Date/Author: 2026-11-24, implementing agent,
   from CodeRabbit review.
 - D9. Decision (review-driven): make the fixture-path tests Unix-only and derive
@@ -307,6 +307,13 @@ Observable success:
   child's both streams reach the returned log; `build_discovery_bdd` then
   passed 3/3 with real Cargo in 1363 s. Date/Author: 2026-11-24, implementing
   agent, from CodeRabbit review.
+- D15. Decision: run `make spelling` as part of the gate set, and keep the
+  en-GB-oxendict `-ize`/`-ization` forms throughout. Rationale: the first CI
+  run failed the Spelling stage on `synchronisation`, `synchronises` and
+  `recognise`, which the project's Oxford spelling rejects in favour of
+  `synchronization`, `synchronizes` and `recognize`. The gate had not been part
+  of the local run, so this plan now records it explicitly. Date/Author:
+  2026-11-25, implementing agent.
 
 ## Outcomes & retrospective
 

@@ -37,7 +37,7 @@ fn keeps_a_real_filesystem_errors_own_text() {
 
     assert!(
         message.contains(&error.to_string()),
-        "the original error text must survive so operators can recognise it: {message}",
+        "the original error text must survive so operators can recognize it: {message}",
     );
     assert!(
         message.starts_with(&format!("reading {absent}: ")),
