@@ -13,7 +13,7 @@ mod fixture_crate;
 #[path = "theorem_file_macro_bdd/referenced_type_fixtures.rs"]
 mod referenced_type_fixtures;
 
-use cargo_runner::CargoGuard;
+use cargo_runner::{CargoGuard, KaniOutcome};
 use fixture_crate::{
     FIXTURE_LIB_RS, TheoremFixtureSpec, build_fixture_and_list_kani_harnesses,
     build_fixture_and_verify_kani_harnesses, run_fixture_build, run_valid_fixture_build,
@@ -164,22 +164,19 @@ fn then_the_fixture_crate_builds_without_a_kani_dependency() -> Result<(), Strin
 
 #[then("cargo-kani lists the generated proof harness when installed")]
 fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
-    if !cargo_runner::kani_is_installed() {
-        return skip_without_kani("cargo-kani not installed", "listing");
-    }
-
-    let output = match build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
-        path: "theorems/single.theorem",
-        content: VALID_SINGLE_THEOREM,
-    }) {
-        Ok(output) => output,
-        Err(error) if is_unusable_kani_environment(&error) => {
-            return skip_without_kani(
-                &format!("cargo-kani is installed but unusable: {error}"),
-                "listing",
-            );
+    // A failed availability probe skips the check; a probe that succeeded and
+    // then could not list harnesses is a failure the caller must report.
+    let output = match kani_outcome("listing", || {
+        build_fixture_and_list_kani_harnesses(&TheoremFixtureSpec {
+            path: "theorems/single.theorem",
+            content: VALID_SINGLE_THEOREM,
+        })
+    })? {
+        KaniOutcome::Ran(output) => output,
+        KaniOutcome::Skipped(reason) => {
+            announce_kani_skip(&reason, "listing");
+            return Ok(());
         }
-        Err(error) => return Err(error),
     };
     let expected_mangled_harness = mangle_theorem_harness("theorems/single.theorem", "SmokeMacro");
     let expected_harness_identifier = expected_mangled_harness.identifier();
@@ -193,42 +190,52 @@ fn then_kani_lists_the_generated_proof_harness() -> Result<(), String> {
     Ok(())
 }
 
-/// Skips a Kani check, or fails it when `THEOREMC_REQUIRE_KANI=1`.
+/// Runs one Kani check under the availability-probe policy.
 ///
-/// A skip hides a missing verifier, so the proofs job sets the variable and
-/// turns every would-be skip into a failure.
+/// `check` names the operation in the required-Kani diagnostic. The run closure
+/// only executes once the probe has succeeded, so its failures reach the caller
+/// unchanged. The host's `THEOREMC_REQUIRE_KANI` value is read here, at the
+/// process boundary; `cargo_runner::run_kani_check` owns everything after it.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the CI proofs workflow and `make kani` export THEOREMC_REQUIRE_KANI to the test process, so the scenario reads the host's value at this boundary"
+)]
+fn kani_outcome<F>(check: &str, run: F) -> Result<KaniOutcome, String>
+where
+    F: FnOnce() -> Result<String, String>,
+{
+    let require_kani = std::env::var_os(cargo_runner::REQUIRE_KANI_VARIABLE);
+    cargo_runner::run_kani_check(
+        check,
+        cargo_runner::kani_is_installed(),
+        require_kani.as_deref(),
+        run,
+    )
+}
+
+/// Announces a skip for an unavailable Kani, which the classifier only permits
+/// when the probe failed and Kani is optional.
 #[expect(
     clippy::print_stderr,
     reason = "BDD skip diagnostics should remain non-fallible"
 )]
-fn skip_without_kani(reason: &str, check: &str) -> Result<(), String> {
-    if cargo_runner::kani_is_required() {
-        return Err(format!(
-            "THEOREMC_REQUIRE_KANI=1 forbids skipping the Kani {check} check: {reason}"
-        ));
-    }
+fn announce_kani_skip(reason: &str, check: &str) {
     eprintln!("{reason}; skipping Kani harness {check} check");
-    Ok(())
 }
 
 #[then("cargo-kani verifies every generated proof harness")]
 fn then_kani_verifies_every_generated_proof_harness() -> Result<(), String> {
-    if !cargo_runner::kani_is_installed() {
-        return skip_without_kani("cargo-kani not installed", "verification");
-    }
-
-    let output = match build_fixture_and_verify_kani_harnesses(&TheoremFixtureSpec {
-        path: "theorems/verify.theorem",
-        content: KANI_VERIFY_THEOREM,
-    }) {
-        Ok(output) => output,
-        Err(error) if is_unusable_kani_environment(&error) => {
-            return skip_without_kani(
-                &format!("cargo-kani is installed but unusable: {error}"),
-                "verification",
-            );
+    let output = match kani_outcome("verification", || {
+        build_fixture_and_verify_kani_harnesses(&TheoremFixtureSpec {
+            path: "theorems/verify.theorem",
+            content: KANI_VERIFY_THEOREM,
+        })
+    })? {
+        KaniOutcome::Ran(output) => output,
+        KaniOutcome::Skipped(reason) => {
+            announce_kani_skip(&reason, "verification");
+            return Ok(());
         }
-        Err(error) => return Err(error),
     };
 
     // Two theorem documents, so two harnesses, each of which must verify. The
@@ -252,13 +259,6 @@ fn then_kani_verifies_every_generated_proof_harness() -> Result<(), String> {
     }
 
     Ok(())
-}
-
-fn is_unusable_kani_environment(error: &str) -> bool {
-    error.contains("error while loading shared libraries")
-        || error.contains("cannot open shared object file")
-        || error.contains("Broken pipe")
-        || error.contains("unexpected output from `rustc --version`: \"\"")
 }
 
 fn is_expected_single_harness_listing(output: &str, expected_harness_identifier: &str) -> bool {
