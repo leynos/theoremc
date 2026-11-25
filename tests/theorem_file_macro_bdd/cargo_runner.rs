@@ -234,6 +234,7 @@ fn command_result(
 mod tests {
     //! Unit tests for the Kani probe-and-run policy.
 
+    use std::cell::Cell;
     use std::ffi::OsStr;
 
     use rstest::rstest;
@@ -242,6 +243,20 @@ mod tests {
 
     /// The loader failure observed when Kani's toolchain cannot start.
     const LOADER_ERROR: &str = "error while loading shared libraries: libLLVM.so";
+
+    /// Builds a run closure that records whether it was invoked.
+    ///
+    /// Every failed-probe path must decide without starting a run, so the
+    /// tests assert the flag is still `false` afterwards. Recording the
+    /// invocation is stronger than relying on the outcome alone: a mutant that
+    /// called the closure and discarded its result would leave the outcome
+    /// correct but the flag set, and the assertion would fail.
+    fn recording_run(invoked: &Cell<bool>) -> impl FnOnce() -> Result<String, String> + '_ {
+        move || {
+            invoked.set(true);
+            Err("the Kani run must not start when the availability probe fails".to_owned())
+        }
+    }
 
     /// Only the exact value `1` requires Kani.
     ///
@@ -261,9 +276,14 @@ mod tests {
         #[case] expected_failure: bool,
     ) {
         let os_value = value.map(OsStr::new);
+        let invoked = Cell::new(false);
 
-        let outcome = run_kani_check("listing", false, os_value, run_must_not_happen);
+        let outcome = run_kani_check("listing", false, os_value, recording_run(&invoked));
 
+        assert!(
+            !invoked.get(),
+            "a failed probe must not start the Kani run (THEOREMC_REQUIRE_KANI={value:?})"
+        );
         if expected_failure {
             let error = outcome.expect_err("THEOREMC_REQUIRE_KANI=1 must fail a failed probe");
             assert!(
@@ -281,16 +301,14 @@ mod tests {
         }
     }
 
-    /// Proves the probe gate by failing the test when the run closure executes.
-    fn run_must_not_happen() -> Result<String, String> {
-        Err("the Kani run must not start when the availability probe fails".to_owned())
-    }
-
     #[test]
     fn a_missing_kani_toolchain_skips_the_check_when_kani_is_optional() {
-        let outcome = classify_kani_run("listing", false, false, run_must_not_happen)
+        let invoked = Cell::new(false);
+
+        let outcome = classify_kani_run("listing", false, false, recording_run(&invoked))
             .expect("an unavailable optional tool should skip rather than fail");
 
+        assert!(!invoked.get(), "a failed probe must not start the Kani run");
         assert_eq!(
             outcome,
             KaniOutcome::Skipped("the cargo kani --version probe failed".to_owned()),
@@ -300,9 +318,12 @@ mod tests {
 
     #[test]
     fn a_missing_kani_toolchain_fails_the_check_when_kani_is_required() {
-        let error = classify_kani_run("listing", false, true, run_must_not_happen)
+        let invoked = Cell::new(false);
+
+        let error = classify_kani_run("listing", false, true, recording_run(&invoked))
             .expect_err("a required Kani must not skip when the probe fails");
 
+        assert!(!invoked.get(), "a failed probe must not start the Kani run");
         assert!(
             error.contains("THEOREMC_REQUIRE_KANI=1") && error.contains("listing"),
             "the failure should name the requirement and the check, got: {error}"
