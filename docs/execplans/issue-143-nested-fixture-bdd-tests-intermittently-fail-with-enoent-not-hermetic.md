@@ -45,12 +45,13 @@ Observable success:
 4. Two processes racing to allocate a fixture suffix cannot receive the same
    suffix; the reservation is a `create_dir` marker under
    `<shared-target>/fixture-reservations`.
-5. The child `cargo` receives `CARGO_BUILD_BUILD_DIR` equal to its
-   `CARGO_TARGET_DIR`, and the `CARGO_BUILD_TARGET` environment variable is
-   removed, so an exported `build.target` cannot retarget the build. A
-   `build.target` set in a Cargo configuration file is not cleared by this and
-   remains a documented limitation: Cargo offers no supported way to unset a
-   configured target, and output then moves to `<target>/<triple>/debug/build`.
+5. A plain child `cargo build` receives `CARGO_BUILD_BUILD_DIR` equal to its
+   `CARGO_TARGET_DIR` (and no other subcommand does), and the
+   `CARGO_BUILD_TARGET` environment variable is removed, so an exported
+   `build.target` cannot retarget the build. A `build.target` set in a Cargo
+   configuration file is not cleared by this and remains a documented
+   limitation: Cargo offers no supported way to unset a configured target, and
+   output then moves to `<target>/<triple>/debug/build`.
 6. The existing four named tests remain selected in CI; no name-based local
    exemption is mirrored into repository configuration.
 
@@ -307,13 +308,29 @@ Observable success:
   child's both streams reach the returned log; `build_discovery_bdd` then
   passed 3/3 with real Cargo in 1363 s. Date/Author: 2026-11-24, implementing
   agent, from CodeRabbit review.
-- D15. Decision: run `make spelling` as part of the gate set, and keep the
+- D15. Decision: run `make spelling` as part of the gate set, and use the
   en-GB-oxendict `-ize`/`-ization` forms throughout. Rationale: the first CI
-  run failed the Spelling stage on `synchronisation`, `synchronises` and
-  `recognise`, which the project's Oxford spelling rejects in favour of
-  `synchronization`, `synchronizes` and `recognize`. The gate had not been part
-  of the local run, so this plan now records it explicitly. Date/Author:
-  2026-11-25, implementing agent.
+  run failed the Spelling stage on three words spelled with the
+  `-ise`/`-isation` form instead of the Oxford `-ize`/`-ization` form. The gate
+  had not been part of the local run, so this plan now records it explicitly.
+  The rejected words are not quoted here, because quoting a rejected spelling
+  reproduces the finding. Date/Author: 2026-11-25, implementing agent.
+- D16. Decision: scope `CARGO_BUILD_BUILD_DIR` to plain builds only.
+  Rationale: CI's Kani job and a local `make kani` both failed with the same
+  `error: No such file or directory (os error 2)` while the deferral branch
+  passed, and a controlled A/B settled it: the same command failed with the pin
+  and passed without it. `cargo kani` builds into its own `<target>/kani`
+  directory and fails when an outer build directory is imposed. The pin now
+  lives in `hermetic_cargo_build`, used by `FixtureCrate`'s plain builds, while
+  the Kani-capable macro runner uses unmodified `hermetic_cargo`. `make kani`
+  then passed 2/2, and the plain-build suites were re-run to confirm the lookup
+  still finds its suite. Date/Author: 2026-11-25, implementing agent, from a CI
+  failure.
+- D17. Decision: treat `make kani` as a local gate alongside the others.
+  Rationale: the Kani scenarios are not part of `make test` on a host without
+  Kani, so a regression in a fixture's Cargo environment can reach CI
+  undetected. `make kani` is the only local command that exercises the same
+  path CI does. Date/Author: 2026-11-25, implementing agent.
 
 ## Outcomes & retrospective
 
@@ -401,12 +418,14 @@ Invariants:
 4. Dropping one fixture removes only its own root.
    Verified by creating two fixtures, dropping one, and probing both roots, the
    sibling file and the shared target.
-5. A child Cargo command always sees `CARGO_TARGET_DIR == CARGO_BUILD_BUILD_DIR`
-   and no `CARGO_BUILD_TARGET`, `CARGO_BUILD_TARGET_DIR`. Verified by
-   inspecting the prepared `Command` in `hermetic_cargo_tests.rs`, and by a
-   real concurrent build that still finds its own suite. The guarantee covers
-   environment variables only; a configured `build.target` is a stated
-   limitation, not a verified prevention.
+5. A plain child `cargo build` always sees
+   `CARGO_TARGET_DIR == CARGO_BUILD_BUILD_DIR`, and every child sees no
+   `CARGO_BUILD_TARGET` or `CARGO_BUILD_TARGET_DIR`; a `cargo kani` child sees
+   no `CARGO_BUILD_BUILD_DIR`, which it must own. Verified by inspecting the
+   prepared `Command` in `hermetic_cargo_tests.rs`, and by a real concurrent
+   build that still finds its own suite. The guarantee covers environment
+   variables only; a configured `build.target` is a stated limitation, not a
+   verified prevention.
 6. The four named tests remain in the shipped selection.
    Verified by reading `.config/nextest.toml` in the final diff; it is
    unchanged.

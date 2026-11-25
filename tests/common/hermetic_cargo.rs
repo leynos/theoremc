@@ -20,14 +20,11 @@ const INHERITED_BUILD_LAYOUT: [&str; 1] = ["CARGO_BUILD_TARGET"];
 /// Returns a `cargo` command that runs in `manifest_dir` and builds into
 /// `target_dir`, whatever the caller exports.
 ///
-/// `CARGO_TARGET_DIR` and `CARGO_BUILD_BUILD_DIR` are both set explicitly, so
-/// an exported or configured value cannot win. Pinning the build directory as
-/// well as the target keeps build-script output at `<target_dir>/debug/build`,
-/// which is exactly where `fixture_build` looks for the generated suite; an
-/// inherited or configured `build.build-dir` would otherwise move it.
-/// `CARGO_BUILD_TARGET_DIR` and `CARGO_BUILD_TARGET` are removed so neither an
-/// exported target directory nor an exported `build.target` can split, share or
-/// retarget the build.
+/// `CARGO_TARGET_DIR` is set explicitly, so an exported or configured value
+/// cannot win, and `CARGO_BUILD_BUILD_DIR` is pinned alongside it by
+/// [`hermetic_cargo_build`]. `CARGO_BUILD_TARGET_DIR` and `CARGO_BUILD_TARGET`
+/// are removed so neither an exported target directory nor an exported
+/// `build.target` can split, share or retarget the build.
 ///
 /// That removal covers the environment, not Cargo's configuration files: a
 /// `build.target` set in an ancestor or `CARGO_HOME` `config.toml` still applies,
@@ -76,8 +73,28 @@ pub fn hermetic_cargo(manifest_dir: &Utf8Path, target_dir: &Utf8Path) -> Result<
     command
         .current_dir(manifest_dir)
         .env("CARGO_TARGET_DIR", target_dir.as_str())
-        .env("CARGO_BUILD_BUILD_DIR", target_dir.as_str())
         .env("CARGO_NET_OFFLINE", "true");
+    Ok(command)
+}
+
+/// Returns a `cargo build` command with its build directory pinned as well.
+///
+/// This adds `CARGO_BUILD_BUILD_DIR`, so build-script output stays at
+/// `<target_dir>/debug/build` where `fixture_build` looks for the generated
+/// suite. It must not be used for every fixture `cargo` invocation: `cargo kani`
+/// keeps its own build directory under `<target_dir>/kani` and fails with a bare
+/// "No such file or directory" when an outer build directory is imposed on it.
+/// Only a plain build needs, and only a plain build may have, this pin.
+///
+/// # Errors
+///
+/// Returns the same error as [`hermetic_cargo`].
+pub fn hermetic_cargo_build(
+    manifest_dir: &Utf8Path,
+    target_dir: &Utf8Path,
+) -> Result<Command, String> {
+    let mut command = hermetic_cargo(manifest_dir, target_dir)?;
+    command.env("CARGO_BUILD_BUILD_DIR", target_dir.as_str());
     Ok(command)
 }
 

@@ -12,7 +12,7 @@ use std::ffi::OsStr;
 
 use camino::Utf8Path;
 
-use super::hermetic_cargo;
+use super::{hermetic_cargo, hermetic_cargo_build};
 
 /// A prepared command for a fixture rooted at `/fixture`.
 fn fixture_command() -> std::process::Command {
@@ -56,13 +56,25 @@ fn builds_into_the_target_directory_it_was_given() {
 }
 
 #[test]
-fn pins_the_build_directory_to_the_target_so_build_scripts_write_where_we_look() {
+fn pins_the_build_directory_only_for_a_plain_build() {
+    let build = hermetic_cargo_build(Utf8Path::new("/fixture"), Utf8Path::new("/fixture/target"))
+        .expect("an absolute target directory is accepted");
+
+    assert_eq!(
+        environment(&build, "CARGO_BUILD_BUILD_DIR"),
+        EnvState::Exported("/fixture/target".to_owned()),
+        "a plain build must pin build-script output where the lookup expects it",
+    );
+}
+
+#[test]
+fn leaves_the_build_directory_alone_for_other_subcommands() {
     let command = fixture_command();
 
     assert_eq!(
         environment(&command, "CARGO_BUILD_BUILD_DIR"),
-        EnvState::Exported("/fixture/target".to_owned()),
-        "an ancestor or Cargo-home build.build-dir must not move build-script output",
+        EnvState::Untouched,
+        "cargo kani keeps its own build directory, so imposing one breaks it",
     );
 }
 

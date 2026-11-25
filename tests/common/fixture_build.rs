@@ -12,7 +12,7 @@ use cap_std::{ambient_authority, fs_utf8::Dir};
 
 use super::BuildLog;
 use super::command_run;
-use super::hermetic_cargo::hermetic_cargo;
+use super::hermetic_cargo::hermetic_cargo_build;
 use super::io_context::path_error;
 use super::suite_layout::{package_directories, read_suite};
 
@@ -281,7 +281,7 @@ fn create_log(path: &Utf8Path) -> Result<cap_std::fs_utf8::File, String> {
 /// Returns a message naming the command and directory when Cargo cannot start,
 /// or the log paths when they cannot be created.
 pub(super) fn spawn_build(identity: &FixtureIdentity) -> Result<RunningBuild, String> {
-    let mut command = hermetic_cargo(&identity.root, &identity.target_dir)?;
+    let mut command = hermetic_cargo_build(&identity.root, &identity.target_dir)?;
     command.args(["build", "-vv", "--color", "never"]);
     spawn_redirected(identity, command)
 }

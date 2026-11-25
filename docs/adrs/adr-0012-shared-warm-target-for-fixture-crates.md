@@ -90,10 +90,13 @@ now an atomic one.
   treated as absent rather than as an error. That race is expected in a shared
   target; every other I/O error stays fail-closed, because a scan that cannot
   run must not report a name free.
-- The child `cargo` is pinned to the layout the lookup expects. It receives
-  `CARGO_BUILD_BUILD_DIR` equal to its `CARGO_TARGET_DIR`, so an inherited or
-  configured `build.build-dir` cannot move build-script output away from
-  `<target>/debug/build`, and `CARGO_BUILD_TARGET` is removed alongside
+- The child `cargo` is pinned to the layout the lookup expects. A plain
+  `cargo build` receives `CARGO_BUILD_BUILD_DIR` equal to its
+  `CARGO_TARGET_DIR`, so an inherited or configured `build.build-dir` cannot
+  move build-script output away from `<target>/debug/build`. The pin is
+  deliberately limited to builds: `cargo kani` keeps its own build directory
+  under `<target>/kani`, and imposing an outer one makes it fail with a bare
+  "No such file or directory". `CARGO_BUILD_TARGET` is removed alongside
   `CARGO_BUILD_TARGET_DIR`, so an exported build target cannot retarget the
   build. `hermetic_cargo` rejects a relative target directory rather than
   letting it mean something different in the child's working directory.

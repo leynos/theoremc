@@ -25,7 +25,7 @@ pub use fixture_build::RunningBuild;
 pub use fixture_crate::{
     BUILD_DISCOVERY_SOURCE, BUILD_SCRIPT_SOURCE, BUILD_SUITE_SOURCE, FixtureCrate, TRIVIAL_THEOREM,
 };
-pub use hermetic_cargo::hermetic_cargo;
+pub use hermetic_cargo::{hermetic_cargo, hermetic_cargo_build};
 pub use schema_fixtures::{
     FIXTURES_DIR, assert_diagnostic_failure, assert_fixture_error_contains, assert_fixture_fails,
     assert_fixture_loads, fixture_error_message, fixture_source_id, load_fixture,

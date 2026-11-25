@@ -619,12 +619,14 @@ suite.
   `Cargo.lock` is copied into each fixture so every fixture resolves the
   versions the workspace already built, and the fixture's `cargo` runs with
   `CARGO_NET_OFFLINE=true`, with `CARGO_BUILD_TARGET_DIR` and
-  `CARGO_BUILD_TARGET` removed and `CARGO_TARGET_DIR` and
-  `CARGO_BUILD_BUILD_DIR` both pinned to the shared target, so an exported
-  value or a configured `build.build-dir` cannot move the artefacts, and an
-  exported build target cannot retarget the build. A `build.target` set in a
-  Cargo configuration file is *not* cleared by removing the environment
-  variable, and it moves build-script output to
+  `CARGO_BUILD_TARGET` removed and `CARGO_TARGET_DIR` pinned to the shared
+  target, so an exported value cannot move the artefacts and an exported build
+  target cannot retarget the build. A plain fixture build also pins
+  `CARGO_BUILD_BUILD_DIR` to the shared target, so a configured
+  `build.build-dir` cannot move build-script output; that pin is not applied to
+  `cargo kani`, which keeps its own build directory and fails if one is
+  imposed. A `build.target` set in a Cargo configuration file is *not* cleared
+  by removing the environment variable, and it moves build-script output to
   `<shared-target>/<triple>/debug/build`, which the lookup does not read. That
   is a known limitation recorded in ADR 0012: a host with such a configuration
   cannot run the fixture suites. Inherited `RUSTFLAGS` are left in place so a
