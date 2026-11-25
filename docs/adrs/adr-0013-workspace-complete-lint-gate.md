@@ -123,6 +123,26 @@ the stub-executable contract test possible.
   This decision makes the existing `[workspace.lints.*]` tables reach every
   member; it does not add rules to them.
 
+## Addendum (2026-11-23): private-item documentation reaches every package
+
+Issue #100 completed the last baseline rule this record anticipated.
+`clippy::missing_docs_in_private_items` is now denied in
+`[workspace.lints.clippy]`, and the workspace-complete pipeline this decision
+established is what carries it to each package, target, and feature set. Two
+points follow from that dependency.
+
+- The rule reaches a package only when its manifest opts in with
+  `[lints] workspace = true`. `tests/lint_manifest_contract.rs` asserts the
+  root table entry and the opt-in in every manifest `cargo metadata` reports,
+  including the hybrid root, so narrowing the gate requires a deliberate edit
+  that fails a test.
+- The scope is the one `LINT_PACKAGES` and `LINT_TARGET_FLAGS` already name, so
+  build scripts, proc-macro internals, integration-test targets, and
+  feature-gated code are covered without a further recipe change. Clippy skips
+  the lint when a crate is built as a test harness, so items compiled only into
+  test binaries are outside its reach; authored items carry `///`, and the
+  delivered documentation describes invariants rather than restating names.
+
 ## Addendum (2026-11-12): renumbering
 
 This record was formerly filed as ADR 012 in
