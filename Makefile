@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint lint-rustdoc lint-clippy lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv check-adr-rfc-names install-kani kani
+.PHONY: help all clean test build release lint lint-rustdoc lint-clippy lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv check-adr-rfc-names interrogate install-kani kani
 
 TARGET ?= cargo-theorem
 
@@ -111,7 +111,19 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 # slots. Recursing through `$(MAKE)` gives each stage its own recipe line, so
 # they run in the listed order even under `-j`, and a failing stage stops the
 # aggregate with that stage's exit status.
-lint: ## Run rustdoc, Clippy and the Whitaker suite over the workspace, in order
+# Interrogate measures docstring presence in the Python files under
+# INTERROGATE_TARGETS; add a new Python directory there. No `--python` pin: a
+# managed interpreter would be downloaded.
+INTERROGATE_VERSION ?= 1.7.0
+INTERROGATE_TARGETS ?= tools
+INTERROGATE = $(UV_ENV) $(UV) tool run --from 'interrogate==$(INTERROGATE_VERSION)' interrogate --fail-under 100
+
+# To list each undocumented definition, run
+# `make interrogate INTERROGATE_TARGETS="-vv tools"`.
+interrogate: ## Enforce complete Python docstring coverage
+	$(INTERROGATE) $(INTERROGATE_TARGETS)
+
+lint: interrogate ## Run interrogate, rustdoc, Clippy and the Whitaker suite over the workspace, in order
 	$(MAKE) lint-rustdoc
 	$(MAKE) lint-clippy
 	$(MAKE) lint-whitaker

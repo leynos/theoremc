@@ -53,6 +53,7 @@ def _run_checker(checker: Path) -> subprocess.CompletedProcess[str]:
 
 
 def test_command_succeeds_for_valid_records_and_links(tmp_path: Path) -> None:
+    """The CLI accepts a valid record set and reports its counts."""
     checker = _create_repository(tmp_path)
 
     result = _run_checker(checker)
@@ -64,6 +65,7 @@ def test_command_succeeds_for_valid_records_and_links(tmp_path: Path) -> None:
 
 
 def test_command_reports_contract_errors(tmp_path: Path) -> None:
+    """The CLI exits with status 1 and names each contract violation."""
     checker = _create_repository(tmp_path)
     docs_root = tmp_path / "docs"
     (docs_root / "adrs" / "adr-1-noncanonical.md").write_text("", encoding="utf-8")
@@ -79,6 +81,7 @@ def test_command_reports_contract_errors(tmp_path: Path) -> None:
 
 
 def test_command_reports_invalid_utf8_without_traceback(tmp_path: Path) -> None:
+    """Unreadable UTF-8 records fail cleanly without a traceback."""
     checker = _create_repository(tmp_path)
     invalid_record = tmp_path / "docs" / "adrs" / "adr-0002-invalid.md"
     invalid_record.write_bytes(b"\xff")
@@ -93,6 +96,7 @@ def test_command_reports_invalid_utf8_without_traceback(tmp_path: Path) -> None:
 def test_command_reports_malformed_destination_without_traceback(
     tmp_path: Path,
 ) -> None:
+    """Malformed link destinations are diagnosed without a traceback."""
     checker = _create_repository(tmp_path)
     (tmp_path / "docs" / "contents.md").write_text(
         "[broken](adrs/adr-0001%00.md)\n[url](http://[abc)\n",
@@ -109,6 +113,7 @@ def test_command_reports_malformed_destination_without_traceback(
 def test_command_reports_filesystem_failure_without_traceback(
     tmp_path: Path,
 ) -> None:
+    """A dangling Markdown symlink is a read failure, not a traceback."""
     checker = _create_repository(tmp_path)
     (tmp_path / "docs" / "broken.md").symlink_to(tmp_path / "missing.md")
 
@@ -124,6 +129,7 @@ def test_main_reports_symlink_loop_root_without_traceback(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
+    """A self-referencing repository root makes main fail with a read error."""
     loop_root = tmp_path / "loop"
     loop_root.symlink_to(loop_root)
     monkeypatch.setattr(check_adr_rfc_names, "REPOSITORY_ROOT", loop_root)
@@ -138,6 +144,7 @@ def test_main_reports_symlink_loop_root_without_traceback(
 def test_make_target_executes_both_checks_with_pinned_interpreter(
     tmp_path: Path,
 ) -> None:
+    """The make target runs both checks through uv on Python 3.13."""
     repository_root = Path(__file__).resolve().parents[1]
     log = tmp_path / "uv-calls.log"
     stub = tmp_path / "uv"

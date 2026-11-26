@@ -17,6 +17,7 @@ FENCE = st.sampled_from(("```", "````", "~~~", "~~~~"))
 
 @given(title=st.text())
 def test_slug_for_title_returns_canonical_kebab_case(title: str) -> None:
+    """Generated slugs are empty or canonical kebab-case for any title."""
     slug = slug_for_title(title)
 
     assert slug == "" or CANONICAL_SLUG.fullmatch(slug), (
@@ -26,6 +27,7 @@ def test_slug_for_title_returns_canonical_kebab_case(title: str) -> None:
 
 @given(title=st.text())
 def test_slug_for_title_is_idempotent(title: str) -> None:
+    """Slugifying a slug returns the same slug for any title."""
     slug = slug_for_title(title)
 
     assert slug_for_title(slug) == slug, "slug generation must be idempotent"
@@ -35,6 +37,7 @@ def test_slug_for_title_is_idempotent(title: str) -> None:
 def test_fenced_links_are_hidden_while_visible_links_remain(
     fence: str, destination: str
 ) -> None:
+    """Links inside fenced code are hidden while visible links are kept."""
     fenced = f"{fence}\n[link]({destination})\n{fence}\n"
     visible = f"[link]({destination})\n"
 
@@ -48,6 +51,7 @@ def test_fenced_links_are_hidden_while_visible_links_remain(
 
 @given(destination=DESTINATION)
 def test_html_record_destinations_are_extracted(destination: str) -> None:
+    """HTML href destinations are extracted as Markdown destinations."""
     markdown = f'<a href="{destination}">record</a>\n'
 
     assert extract_markdown_destinations(markdown) == [destination], (

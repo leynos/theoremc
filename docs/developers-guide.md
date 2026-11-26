@@ -387,7 +387,7 @@ where available, and run the direct Cargo invocations for specialized checks:
 | Gate                 | Command                                                                                            | What it checks                                                               |
 | -------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Formatting           | `make check-fmt`                                                                                   | Checks Rust and Markdown table formatting                                    |
-| Linting              | `make lint`                                                                                        | rustdoc, Clippy, then Whitaker, each over the whole workspace                |
+| Linting              | `make lint`                                                                                        | interrogate (Python), then rustdoc, Clippy and Whitaker over the workspace   |
 | Type checking        | `make typecheck`                                                                                   | `cargo check --workspace --all-targets --all-features`                       |
 | Acyclicity           | `cargo modules graph --acyclic --lib`                                                              | Checks for cycles in module dependencies                                     |
 | Wildcard imports     | `cargo clippy --workspace --all-targets --all-features -- -D warnings -D clippy::wildcard_imports` | Flags wildcard imports to keep dependency edges explicit                     |
@@ -449,18 +449,21 @@ malformed local destination becomes an error diagnostic rather than a
 traceback. Because the adapter answers containment, a test double can supply
 `LinkFacts` without a filesystem.
 
-`make lint` is the aggregate entry point, locally and in CI. It runs three
-stages in order — rustdoc, Clippy, then Whitaker — and recurses through
-`$(MAKE)` for each, so the stages stay sequential even under `make -j`, and a
-failing stage stops the aggregate with its own exit status. All three cover the
-whole workspace: `LINT_PACKAGES` defaults to `--workspace`, `CARGO_FLAGS` adds
-`--all-targets --all-features`, and the rustdoc stage adds
-`--all-features --no-deps`. The scope is named once because Cargo selects only
-the root package when no package flag is given, which is how the gates used to
-under-check. Four tests hold this shape. `tests/lint_makefile_contract.rs`
-reads the recipes as text, and `tests/lint_ci_contract.rs` reads the workflow
-and `dylint.toml`. `tests/lint_gate_execution.rs` runs the recipes against stub
-executables to prove each stage runs in order and propagates its failure.
+`make lint` is the aggregate entry point, locally and in CI. It first runs
+`make interrogate`, which needs `uv` and fails when any Python definition under
+`tools` lacks a docstring (add new Python directories to
+`INTERROGATE_TARGETS`). It then runs three stages in order — rustdoc, Clippy,
+then Whitaker — and recurses through `$(MAKE)` for each, so the stages stay
+sequential even under `make -j`, and a failing stage stops the aggregate with
+its own exit status. All three cover the whole workspace: `LINT_PACKAGES`
+defaults to `--workspace`, `CARGO_FLAGS` adds `--all-targets --all-features`,
+and the rustdoc stage adds `--all-features --no-deps`. The scope is named once
+because Cargo selects only the root package when no package flag is given,
+which is how the gates used to under-check. Four tests hold this shape.
+`tests/lint_makefile_contract.rs` reads the recipes as text, and
+`tests/lint_ci_contract.rs` reads the workflow and `dylint.toml`.
+`tests/lint_gate_execution.rs` runs the recipes against stub executables to
+prove each stage runs in order and propagates its failure.
 `tests/lint_workspace_execution.rs` writes a two-package workspace and runs the
 real `cargo doc` and `cargo clippy` invocations, so a finding in the non-root
 member is shown to fail the stage rather than merely being passed the right

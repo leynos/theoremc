@@ -21,12 +21,14 @@ from adr_rfc_repository import PathRecordReader, markdown_files
 
 
 def test_slug_transliterates_accents_and_keeps_kebab_case() -> None:
+    """Accents and ligatures transliterate into kebab-case slugs."""
     assert slug_for_title("Café and Æther") == "cafe-and-aether", (
         "accents and ligatures must transliterate"
     )
 
 
 def test_extracts_local_links_but_ignores_code() -> None:
+    """Inline and reference links are extracted, but code is ignored."""
     markdown = """
 [record](adrs/adr-0001-example.md#decision)
 [reference]: <rfcs/rfc-0001-example.md>
@@ -44,6 +46,7 @@ def test_extracts_local_links_but_ignores_code() -> None:
 
 
 def test_extracts_wrapped_link_text_and_destination() -> None:
+    """A link whose text and destination wrap across lines is extracted."""
     markdown = (
         "- [ADR-0002: Library-first internationalization and localization with\n"
         "  Fluent](\n"
@@ -57,6 +60,7 @@ def test_extracts_wrapped_link_text_and_destination() -> None:
 
 
 def test_fence_with_info_string_does_not_close_code_block() -> None:
+    """A fence carrying an info string does not close its code block."""
     markdown = """
 ```markdown
 ```python
@@ -72,6 +76,7 @@ def test_fence_with_info_string_does_not_close_code_block() -> None:
 
 
 def test_footnote_continuations_are_not_reference_links() -> None:
+    """Footnote continuation lines are not read as reference links."""
     markdown = """
 [^2]: `ADR-0001-3`
       (docs/adrs/adr-0001-example.md decision 3)
@@ -83,6 +88,7 @@ def test_footnote_continuations_are_not_reference_links() -> None:
 
 
 def test_reports_duplicate_record_serials(tmp_path: Path) -> None:
+    """Two ADRs sharing a serial number produce one duplicate-serial error."""
     adrs_root = tmp_path / "docs" / "adrs"
     adrs_root.mkdir(parents=True)
     (adrs_root / "adr-0001-first-decision.md").write_text(
@@ -101,6 +107,7 @@ def test_reports_duplicate_record_serials(tmp_path: Path) -> None:
 
 
 def test_checks_noncanonical_names_and_rfc_contract(tmp_path: Path) -> None:
+    """Non-canonical names and the RFC serial and title contract are reported."""
     adrs_root = tmp_path / "docs" / "adrs"
     rfcs_root = tmp_path / "docs" / "rfcs"
     adrs_root.mkdir(parents=True)
@@ -139,6 +146,7 @@ def test_checks_noncanonical_names_and_rfc_contract(tmp_path: Path) -> None:
 def test_reports_missing_or_malformed_headings(
     tmp_path: Path, family: str, filename: str, heading: str
 ) -> None:
+    """A record without a numbered first heading is reported."""
     records_root = tmp_path / "docs" / family
     records_root.mkdir(parents=True)
     (records_root / filename).write_text(heading, encoding="utf-8")
@@ -150,6 +158,7 @@ def test_reports_missing_or_malformed_headings(
 
 
 def test_reports_adr_serial_and_slug_mismatch(tmp_path: Path) -> None:
+    """Filename serial and slug mismatches against the heading are reported."""
     adrs_root = tmp_path / "docs" / "adrs"
     adrs_root.mkdir(parents=True)
     (adrs_root / "adr-0001-wrong-slug.md").write_text(
@@ -169,6 +178,7 @@ def test_reports_adr_serial_and_slug_mismatch(tmp_path: Path) -> None:
 def test_markdown_file_scan_prunes_excluded_directories(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """The Markdown scan skips generated and symlinked directories."""
     docs_root = tmp_path / "docs"
     docs_root.mkdir()
     contents = docs_root / "contents.md"
@@ -195,6 +205,7 @@ def test_markdown_file_scan_prunes_excluded_directories(
     original_iterdir = Path.iterdir
 
     def track_directory_visits(directory: Path):
+        """Record each scanned directory, then list it as usual."""
         visited.append(directory)
         return original_iterdir(directory)
 
@@ -214,6 +225,7 @@ def test_markdown_file_scan_prunes_excluded_directories(
 def test_local_record_links_handle_encoded_root_external_and_escape_paths(
     tmp_path: Path,
 ) -> None:
+    """Root, encoded, and escaping local links are checked; externals are not."""
     docs_root = tmp_path / "docs"
     adrs_root = docs_root / "adrs"
     adrs_root.mkdir(parents=True)
@@ -237,6 +249,7 @@ def test_local_record_links_handle_encoded_root_external_and_escape_paths(
 
 
 def test_checks_filename_heading_slug_and_record_links(tmp_path: Path) -> None:
+    """A canonical record set and its visible local links pass validation."""
     docs_root = tmp_path / "docs"
     adrs_root = docs_root / "adrs"
     rfcs_root = docs_root / "rfcs"
@@ -277,6 +290,7 @@ def test_checks_filename_heading_slug_and_record_links(tmp_path: Path) -> None:
     ("adrs/adr-0001-retired-name.md", "rfcs/missing-record.md"),
 )
 def test_reports_missing_record_link(tmp_path: Path, destination: str) -> None:
+    """A link to a missing record is reported as one error."""
     docs_root = tmp_path / "docs"
     (docs_root / "adrs").mkdir(parents=True)
     (docs_root / "rfcs").mkdir()
@@ -290,6 +304,7 @@ def test_reports_missing_record_link(tmp_path: Path, destination: str) -> None:
 
 
 def test_validates_html_record_links(tmp_path: Path) -> None:
+    """HTML href record links are checked and missing targets are reported."""
     docs_root = tmp_path / "docs"
     adrs_root = docs_root / "adrs"
     adrs_root.mkdir(parents=True)
@@ -311,6 +326,7 @@ def test_validates_html_record_links(tmp_path: Path) -> None:
 
 
 def test_ignores_malformed_external_url(tmp_path: Path) -> None:
+    """A malformed external URL is skipped and not counted as a link."""
     docs_root = tmp_path / "docs"
     docs_root.mkdir()
     source = docs_root / "contents.md"
@@ -324,6 +340,7 @@ def test_ignores_malformed_external_url(tmp_path: Path) -> None:
 
 
 def test_reports_local_path_with_null_byte_as_diagnostic(tmp_path: Path) -> None:
+    """A local link with an encoded null byte yields a diagnostic, not a crash."""
     docs_root = tmp_path / "docs"
     (docs_root / "adrs").mkdir(parents=True)
     source = docs_root / "contents.md"
@@ -448,9 +465,11 @@ def test_reports_root_resolution_failure_before_any_discovery(
     """A root that cannot resolve must become a read error, not a check run."""
 
     def fail_to_resolve(*_args: object, **_kwargs: object) -> Path:
+        """Raise the parameterized error in place of resolving a path."""
         raise error_type("unresolvable root")
 
     def forbidden_discovery(*_args: object, **_kwargs: object) -> list[str]:
+        """Fail the test if record discovery runs."""
         raise AssertionError("discovery must not run for an unresolvable root")
 
     monkeypatch.setattr(Path, "resolve", fail_to_resolve)
@@ -473,11 +492,13 @@ class _StubReader:
         documents: list[MarkdownDocument] | None = None,
         facts: dict[str, LinkFacts | None] | None = None,
     ) -> None:
+        """Hold the supplied records, documents, and link facts."""
         self._records = records or []
         self._documents = documents or []
         self._facts = facts or {}
 
     def record_files(self, family: str) -> list[RecordFile]:
+        """Return the stub records that sit under the family directory."""
         prefix = f"docs/{family}/"
         return [
             record
@@ -486,13 +507,16 @@ class _StubReader:
         ]
 
     def markdown_documents(self) -> list[MarkdownDocument]:
+        """Return a copy of the stub Markdown documents."""
         return list(self._documents)
 
     def link_facts(self, source: str, destination_path: str) -> LinkFacts | None:
+        """Return the stub facts for a destination, or None if absent."""
         return self._facts.get(destination_path)
 
 
 def test_validation_uses_injected_reader_without_filesystem() -> None:
+    """Validation reads records and documents only through the injected reader."""
     reader = _StubReader(
         records=[
             RecordFile(
@@ -512,6 +536,7 @@ def test_validation_uses_injected_reader_without_filesystem() -> None:
 
 
 def test_stub_reader_supplies_local_record_link_facts() -> None:
+    """Link facts from a stub reader let a valid local link pass."""
     reader = _StubReader(
         documents=[
             MarkdownDocument(
@@ -527,6 +552,7 @@ def test_stub_reader_supplies_local_record_link_facts() -> None:
 
 
 def test_rules_reject_a_link_the_adapter_reports_outside_the_root() -> None:
+    """A link the adapter reports as outside the root is rejected."""
     reader = _StubReader(
         documents=[
             MarkdownDocument(
@@ -549,6 +575,7 @@ def test_rules_reject_a_link_the_adapter_reports_outside_the_root() -> None:
 
 
 def test_rules_reject_a_link_the_adapter_reports_missing() -> None:
+    """A link the adapter reports as missing is rejected."""
     reader = _StubReader(
         documents=[
             MarkdownDocument(
@@ -594,6 +621,7 @@ def _direct_filesystem_calls(tree: ast.AST) -> list[str]:
 
 
 def test_rules_module_has_no_direct_filesystem_calls() -> None:
+    """The rules module makes no direct filesystem calls."""
     source = Path(adr_rfc_names.__file__).read_text(encoding="utf-8")
     tree = ast.parse(source)
 
@@ -619,6 +647,7 @@ def _imported_modules(tree: ast.AST) -> set[str]:
 
 
 def test_rules_module_imports_no_filesystem_path_type() -> None:
+    """The rules module does not import pathlib."""
     source = Path(adr_rfc_names.__file__).read_text(encoding="utf-8")
     imported_modules = _imported_modules(ast.parse(source))
 
@@ -628,6 +657,7 @@ def test_rules_module_imports_no_filesystem_path_type() -> None:
 
 
 def test_ports_module_imports_no_filesystem_path_type() -> None:
+    """The ports module does not import pathlib."""
     source = Path(adr_rfc_ports.__file__).read_text(encoding="utf-8")
     imported_modules = _imported_modules(ast.parse(source))
 

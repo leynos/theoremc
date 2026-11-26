@@ -124,6 +124,7 @@ class PathRecordReader(RecordReader):
     """
 
     def __init__(self, repository_root: Path) -> None:
+        """Resolve the repository root strictly and store it."""
         self._root = repository_root.resolve(strict=True)
 
     @property
