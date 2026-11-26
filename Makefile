@@ -123,8 +123,7 @@ INTERROGATE = $(UV_ENV) $(UV) tool run --from 'interrogate==$(INTERROGATE_VERSIO
 interrogate: ## Enforce complete Python docstring coverage
 	$(INTERROGATE) $(INTERROGATE_TARGETS)
 
-lint: ## Run interrogate, rustdoc, Clippy and the Whitaker suite over the workspace, in order
-	$(MAKE) interrogate
+lint: interrogate ## Run interrogate, rustdoc, Clippy and the Whitaker suite over the workspace, in order
 	$(MAKE) lint-rustdoc
 	$(MAKE) lint-clippy
 	$(MAKE) lint-whitaker

@@ -219,9 +219,11 @@ project:
 
     validating Rust formatting across the entire workspace and the layout of
     tracked and untracked Markdown files without modifying anything.
-  - `make lint` runs `make interrogate` (every Python definition under
-    `tools` must carry a docstring; add new Python directories to
-    `INTERROGATE_TARGETS`), then three stages, in order, over the whole
+  - `make lint` runs `make interrogate` first (`interrogate --fail-under 100`
+    over `tools`, through `uv`; add new Python directories to
+    `INTERROGATE_TARGETS`). Interrogate rounds its percentage to one decimal,
+    so check the missing count directly if the Python estate ever passes about
+    2,000 definitions. It then runs three stages, in order, over the whole
     workspace:
 
     ```sh
