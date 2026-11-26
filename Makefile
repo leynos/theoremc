@@ -1,4 +1,4 @@
-.PHONY: help all clean test build release lint lint-rustdoc lint-clippy lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv check-adr-rfc-names install-kani kani
+.PHONY: help all clean test build release lint lint-rustdoc lint-clippy lint-whitaker typecheck fmt check-fmt markdownlint nixie spelling test-workflow-contracts check-agent-native msrv check-adr-rfc-names interrogate install-kani kani
 
 TARGET ?= cargo-theorem
 
@@ -111,7 +111,27 @@ target/%/$(TARGET): ## Build binary in debug or release mode
 # slots. Recursing through `$(MAKE)` gives each stage its own recipe line, so
 # they run in the listed order even under `-j`, and a failing stage stops the
 # aggregate with that stage's exit status.
-lint: ## Run rustdoc, Clippy and the Whitaker suite over the workspace, in order
+# Interrogate measures docstring presence in the Python files under
+# INTERROGATE_TARGETS; add a new Python directory there. No `--python` pin: a
+# managed interpreter would be downloaded.
+INTERROGATE_VERSION ?= 1.7.0
+INTERROGATE_TARGETS ?= tools
+INTERROGATE = $(UV_ENV) $(UV) tool run --from 'interrogate==$(INTERROGATE_VERSION)' interrogate -vv --fail-under 100
+
+# Interrogate rounds its percentage to one decimal, so `--fail-under 100` alone
+# can pass a lone gap in a large repository; fail on any MISSED row as well.
+interrogate: ## Enforce complete Python docstring coverage
+	@report="$$($(INTERROGATE) $(INTERROGATE_TARGETS))"; \
+	  status=$$?; \
+	  printf '%s\n' "$$report"; \
+	  test "$$status" -eq 0 || exit "$$status"; \
+	  if printf '%s\n' "$$report" | grep '| *MISSED *|' >/dev/null; then \
+	    printf '%s\n' 'interrogate: undocumented definitions remain; see the MISSED rows above' >&2; \
+	    exit 1; \
+	  fi
+
+lint: ## Run interrogate, rustdoc, Clippy and the Whitaker suite over the workspace, in order
+	$(MAKE) interrogate
 	$(MAKE) lint-rustdoc
 	$(MAKE) lint-clippy
 	$(MAKE) lint-whitaker

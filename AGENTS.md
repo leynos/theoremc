@@ -219,7 +219,10 @@ project:
 
     validating Rust formatting across the entire workspace and the layout of
     tracked and untracked Markdown files without modifying anything.
-  - `make lint` runs three stages, in order, over the whole workspace:
+  - `make lint` runs `make interrogate` (every Python definition under
+    `tools` must carry a docstring; add new Python directories to
+    `INTERROGATE_TARGETS`), then three stages, in order, over the whole
+    workspace:
 
     ```sh
     make lint-rustdoc
