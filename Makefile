@@ -20,6 +20,10 @@ CLIPPY_FLAGS ?= $(CARGO_FLAGS) -- $(RUST_FLAGS)
 # `cargo doc` rejects `--all-targets`, so documentation carries its own flags.
 RUSTDOC_TARGET_FLAGS ?= $(LINT_PACKAGES) --all-features --no-deps
 NEXTEST_FLAGS ?= $(CARGO_FLAGS)
+# The build scope of the warm-up before nextest. It is separate from
+# NEXTEST_FLAGS because `cargo test` rejects runner options such as
+# `--test-threads`; an override of the scope in NEXTEST_FLAGS belongs here too.
+WARM_FLAGS ?= $(CARGO_FLAGS)
 DOCTEST_FLAGS ?= $(LINT_PACKAGES) --all-features --doc
 MDLINT ?= markdownlint-cli2
 NIXIE ?= nixie
@@ -104,7 +108,7 @@ test: ## Run tests with warnings treated as errors
 	# that a compile never fills, so the `expand` test would pay for them inside
 	# nextest's timer. Compile first, then run it once outside the timer, under the
 	# run's own flags.
-	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --no-run $(NEXTEST_FLAGS) $(BUILD_JOBS)
+	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test --no-run $(WARM_FLAGS) $(BUILD_JOBS)
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test $(LINT_PACKAGES) --all-features --test expand $(BUILD_JOBS)
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) nextest run $(NEXTEST_FLAGS) $(BUILD_JOBS)
 	RUSTFLAGS="$${RUSTFLAGS:+$$RUSTFLAGS }$(RUST_FLAGS) $(STANDARD_RUSTFLAGS)" $(CARGO) test $(DOCTEST_FLAGS) $(BUILD_JOBS)
