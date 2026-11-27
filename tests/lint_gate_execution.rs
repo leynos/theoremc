@@ -208,6 +208,10 @@ fn run_lint_target(root: &Path, fail_on: Option<Stage>) -> Result<Output, String
         // the Rust stages, so stand in for the tool that gate fetches through
         // `uv`, which would need the network.
         .arg("INTERROGATE=true")
+        // The YAML lint prerequisites are not under test either, and need the
+        // estate tools on `PATH`; stand in for both.
+        .arg("YAMLLINT=true")
+        .arg("ACTIONLINT=true")
         .current_dir(manifest_dir)
         .env("STUB_LOG", root.join("stub.log"))
         .env("STUB_FAIL_ON", fail_on.map(Stage::name).unwrap_or_default());
