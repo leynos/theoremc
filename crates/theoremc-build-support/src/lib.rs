@@ -10,6 +10,8 @@ mod build_script;
 mod discovery;
 mod suite;
 
-pub use build_script::{BuildScriptError, BuildScriptOutput, prepare_build_script};
+pub use build_script::{
+    BuildScriptContext, BuildScriptError, BuildScriptOutput, prepare_build_script,
+};
 pub use discovery::{BuildDiscovery, BuildDiscoveryError, discover_theorem_inputs};
 pub use suite::{BuildSuiteError, write_theorem_suite};

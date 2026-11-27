@@ -27,7 +27,10 @@ impl BuildScriptOutput {
     ///
     /// ```no_run
     /// # fn main() -> Result<(), theoremc_build_support::BuildScriptError> {
-    /// let output = theoremc_build_support::prepare_build_script()?;
+    /// use theoremc_build_support::{BuildScriptContext, prepare_build_script};
+    ///
+    /// let context = BuildScriptContext::from_cargo_env()?;
+    /// let output = prepare_build_script(&context)?;
     /// if output.has_theorems() {
     ///     println!("cargo::rustc-cfg=theoremc_has_theorems");
     /// }
@@ -47,7 +50,10 @@ impl BuildScriptOutput {
     ///
     /// ```no_run
     /// # fn main() -> Result<(), theoremc_build_support::BuildScriptError> {
-    /// let output = theoremc_build_support::prepare_build_script()?;
+    /// use theoremc_build_support::{BuildScriptContext, prepare_build_script};
+    ///
+    /// let context = BuildScriptContext::from_cargo_env()?;
+    /// let output = prepare_build_script(&context)?;
     /// for path in output.rerun_paths() {
     ///     println!("cargo::rerun-if-changed={path}");
     /// }
@@ -88,16 +94,200 @@ pub enum BuildScriptError {
     Suite(#[from] BuildSuiteError),
 }
 
-/// Prepares theorem discovery, generated-suite output, and Cargo rerun metadata.
+/// The two Cargo-provided paths that configure build-script preparation.
+///
+/// Cargo supplies exactly two values a build script cannot otherwise learn:
+/// the manifest directory of the crate being built, and the output directory
+/// the script must write into. Capturing them once as a context lets discovery
+/// and suite generation stay pure functions of explicit input, so every test
+/// supplies its own temporary directories and never touches the process
+/// environment.
 ///
 /// # Examples
 ///
-/// A root `build.rs` can delegate preparation and emit the Cargo metadata it
-/// owns:
+/// A test can build a context from temporary directories:
+///
+/// ```
+/// use camino::Utf8PathBuf;
+/// use theoremc_build_support::BuildScriptContext;
+///
+/// let context = BuildScriptContext::new(
+///     Utf8PathBuf::from("/workspace/crate"),
+///     Utf8PathBuf::from("/workspace/target/out"),
+/// );
+/// assert_eq!(context.manifest_dir().as_str(), "/workspace/crate");
+/// assert_eq!(context.out_dir().as_str(), "/workspace/target/out");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BuildScriptContext {
+    /// Manifest directory of the crate whose theorem tree is discovered.
+    manifest_dir: Utf8PathBuf,
+    /// Output directory Cargo expects the generated suite to be written into.
+    out_dir: Utf8PathBuf,
+}
+
+impl BuildScriptContext {
+    /// Creates a context from explicit manifest and output directories.
+    ///
+    /// # Parameters
+    ///
+    /// - `manifest_dir`: The manifest directory of the crate whose theorem
+    ///   tree is discovered.
+    /// - `out_dir`: The output directory Cargo expects the generated suite to
+    ///   be written into.
+    ///
+    /// # Returns
+    ///
+    /// A context carrying the two paths unchanged.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use camino::Utf8PathBuf;
+    /// use theoremc_build_support::BuildScriptContext;
+    ///
+    /// let context = BuildScriptContext::new(
+    ///     Utf8PathBuf::from("crate"),
+    ///     Utf8PathBuf::from("target/out"),
+    /// );
+    /// assert_eq!(context.manifest_dir().as_str(), "crate");
+    /// ```
+    #[must_use]
+    pub const fn new(manifest_dir: Utf8PathBuf, out_dir: Utf8PathBuf) -> Self {
+        Self {
+            manifest_dir,
+            out_dir,
+        }
+    }
+
+    /// Returns the manifest directory used for theorem discovery.
+    ///
+    /// # Returns
+    ///
+    /// The manifest directory supplied when the context was created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use camino::Utf8PathBuf;
+    /// use theoremc_build_support::BuildScriptContext;
+    ///
+    /// let context = BuildScriptContext::new(
+    ///     Utf8PathBuf::from("crate"),
+    ///     Utf8PathBuf::from("target/out"),
+    /// );
+    /// assert_eq!(context.manifest_dir().as_str(), "crate");
+    /// ```
+    #[must_use]
+    pub fn manifest_dir(&self) -> &Utf8Path {
+        &self.manifest_dir
+    }
+
+    /// Returns the output directory the generated suite is written into.
+    ///
+    /// # Returns
+    ///
+    /// The output directory supplied when the context was created.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use camino::Utf8PathBuf;
+    /// use theoremc_build_support::BuildScriptContext;
+    ///
+    /// let context = BuildScriptContext::new(
+    ///     Utf8PathBuf::from("crate"),
+    ///     Utf8PathBuf::from("target/out"),
+    /// );
+    /// assert_eq!(context.out_dir().as_str(), "target/out");
+    /// ```
+    #[must_use]
+    pub fn out_dir(&self) -> &Utf8Path {
+        &self.out_dir
+    }
+
+    /// Captures Cargo's manifest and output directories from the environment.
+    ///
+    /// This is the only place in the crate that reads the process environment,
+    /// so it is the crate's composition root. Everything downstream receives
+    /// the captured paths explicitly.
+    ///
+    /// # Returns
+    ///
+    /// A context built from Cargo's manifest and output directories.
+    ///
+    /// # Examples
+    ///
+    /// A build script captures the context and hands it to preparation:
+    ///
+    /// ```no_run
+    /// # fn main() -> Result<(), theoremc_build_support::BuildScriptError> {
+    /// use theoremc_build_support::{BuildScriptContext, prepare_build_script};
+    ///
+    /// let context = BuildScriptContext::from_cargo_env()?;
+    /// let output = prepare_build_script(&context)?;
+    /// # let _ = output;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`BuildScriptError::Environment`] when Cargo does not export
+    /// `CARGO_MANIFEST_DIR` or `OUT_DIR`, including when either is not valid
+    /// Unicode.
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "a Cargo build script can only learn its crate root and output directory from Cargo's environment, so this single reader is the boundary seam injected into the pure preparation step"
+    )]
+    pub fn from_cargo_env() -> Result<Self, BuildScriptError> {
+        Self::from_lookup(env::var)
+    }
+
+    /// Builds a context through an injected variable reader.
+    ///
+    /// `CARGO_MANIFEST_DIR` is read before `OUT_DIR`, and the first failure
+    /// stops the lookup so an error always names the variable that actually
+    /// failed. A stub reader lets tests exercise this mapping without changing
+    /// process state.
+    fn from_lookup(
+        mut read_cargo_variable: impl FnMut(&'static str) -> Result<String, env::VarError>,
+    ) -> Result<Self, BuildScriptError> {
+        let manifest_dir = required_cargo_path(MANIFEST_DIR_VARIABLE, &mut read_cargo_variable)?;
+        let out_dir = required_cargo_path(OUT_DIR_VARIABLE, &mut read_cargo_variable)?;
+        Ok(Self {
+            manifest_dir,
+            out_dir,
+        })
+    }
+}
+
+/// Cargo's variable holding the manifest directory of the crate being built.
+const MANIFEST_DIR_VARIABLE: &str = "CARGO_MANIFEST_DIR";
+
+/// Cargo's variable holding the build-script output directory.
+const OUT_DIR_VARIABLE: &str = "OUT_DIR";
+
+/// Prepares theorem discovery, generated-suite output, and Cargo rerun metadata.
+///
+/// # Parameters
+///
+/// - `context`: The manifest and output directories to prepare with. The
+///   function reads no environment of its own.
+///
+/// # Returns
+///
+/// The theorem presence and the ordered rerun paths Cargo should watch.
+///
+/// # Examples
+///
+/// A root `build.rs` can capture Cargo's context and delegate preparation,
+/// then emit the Cargo metadata it owns:
 ///
 /// ```no_run
 /// fn main() -> Result<(), theoremc_build_support::BuildScriptError> {
-///     let output = theoremc_build_support::prepare_build_script()?;
+///     let context = theoremc_build_support::BuildScriptContext::from_cargo_env()?;
+///     let output = theoremc_build_support::prepare_build_script(&context)?;
 ///     if output.has_theorems() {
 ///         println!("cargo::rustc-cfg=theoremc_has_theorems");
 ///     }
@@ -110,59 +300,17 @@ pub enum BuildScriptError {
 ///
 /// # Errors
 ///
-/// Returns [`BuildScriptError`] when Cargo's environment is incomplete, the
-/// theorem tree cannot be inspected, or the generated suite cannot be written.
-#[expect(
-    clippy::disallowed_methods,
-    reason = "a Cargo build script can only learn its crate root and output directory from Cargo's environment, so this single reader is the boundary seam injected into the pure preparation step"
-)]
-pub fn prepare_build_script() -> Result<BuildScriptOutput, BuildScriptError> {
-    prepare_build_script_with_env(env::var)
-}
-
-/// Reads Cargo's manifest and output paths before preparing build output.
-///
-/// # Examples
-///
-/// An internal caller can supply the two Cargo variables without changing the
-/// process environment:
-///
-/// ```text
-/// prepare_build_script_with_env(|name| match name {
-///     "CARGO_MANIFEST_DIR" => Ok("/workspace/crate".to_owned()),
-///     "OUT_DIR" => Ok("/workspace/target/out".to_owned()),
-///     _ => Err(env::VarError::NotPresent),
-/// })
-/// ```
-fn prepare_build_script_with_env(
-    read_cargo_variable: impl Fn(&'static str) -> Result<String, env::VarError>,
+/// Returns [`BuildScriptError`] when the theorem tree cannot be inspected or
+/// the generated suite cannot be written.
+pub fn prepare_build_script(
+    context: &BuildScriptContext,
 ) -> Result<BuildScriptOutput, BuildScriptError> {
-    let manifest_dir = required_cargo_path("CARGO_MANIFEST_DIR", &read_cargo_variable)?;
-    let out_dir_path = required_cargo_path("OUT_DIR", &read_cargo_variable)?;
-    prepare_build_script_at(&manifest_dir, &out_dir_path)
-}
-
-/// Discovers theorem inputs and writes the suite under Cargo's output path.
-///
-/// # Examples
-///
-/// The internal preparation step accepts paths explicitly, which lets tests
-/// use temporary crate and output directories:
-///
-/// ```text
-/// prepare_build_script_at(crate_root, output_directory)
-/// ```
-fn prepare_build_script_at(
-    manifest_dir: &Utf8Path,
-    out_dir_path: &Utf8Path,
-) -> Result<BuildScriptOutput, BuildScriptError> {
-    let discovery = discover_theorem_inputs(manifest_dir)?;
-    let out_dir = Utf8Dir::open_ambient_dir(out_dir_path, cap_std::ambient_authority()).map_err(
-        |source| BuildScriptError::OpenOutputDirectory {
-            path: out_dir_path.to_path_buf(),
+    let discovery = discover_theorem_inputs(context.manifest_dir())?;
+    let out_dir = Utf8Dir::open_ambient_dir(context.out_dir(), cap_std::ambient_authority())
+        .map_err(|source| BuildScriptError::OpenOutputDirectory {
+            path: context.out_dir().to_path_buf(),
             source,
-        },
-    )?;
+        })?;
 
     write_theorem_suite(&out_dir, &discovery)?;
 
@@ -173,17 +321,9 @@ fn prepare_build_script_at(
 }
 
 /// Converts one required Cargo environment variable into a UTF-8 path.
-///
-/// # Examples
-///
-/// A required manifest path is read by its Cargo variable name:
-///
-/// ```text
-/// required_cargo_path("CARGO_MANIFEST_DIR", &read_variable)
-/// ```
 fn required_cargo_path(
     variable: &'static str,
-    read_cargo_variable: &impl Fn(&'static str) -> Result<String, env::VarError>,
+    read_cargo_variable: &mut impl FnMut(&'static str) -> Result<String, env::VarError>,
 ) -> Result<Utf8PathBuf, BuildScriptError> {
     read_cargo_variable(variable)
         .map(Utf8PathBuf::from)

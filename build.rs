@@ -1,7 +1,8 @@
 //! Cargo build-script entrypoint for theoremc build support.
 
 fn main() -> Result<(), theoremc_build_support::BuildScriptError> {
-    let build_output = theoremc_build_support::prepare_build_script()?;
+    let context = theoremc_build_support::BuildScriptContext::from_cargo_env()?;
+    let build_output = theoremc_build_support::prepare_build_script(&context)?;
 
     println!("cargo::rustc-check-cfg=cfg(theoremc_has_theorems)");
     if build_output.has_theorems() {

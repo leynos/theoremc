@@ -16,7 +16,7 @@ mod process;
 #[path = "entry_points/support.rs"]
 mod support;
 use agent_context::assert_success_json;
-use process::{cargo_binary, isolated_command, isolated_path};
+use process::{HostEnv, cargo_binary, isolated_command, isolated_path};
 use support::{CargoSubcommandEnvironment, cargo_subcommand_environment};
 
 #[rstest]
@@ -25,14 +25,16 @@ fn cargo_and_direct_invocations_emit_the_same_json_document(
 ) -> Result<()> {
     let environment = cargo_subcommand_environment?;
     let direct = isolated_command(
+        &environment.host,
         OsStr::new(BINARY),
         environment.directory.path(),
         &environment.path,
     )
     .args(["theorem", "context", "--json"])
     .output()?;
-    let cargo = cargo_binary()?;
+    let cargo = cargo_binary(&environment.host)?;
     let via_cargo = isolated_command(
+        &environment.host,
         cargo.as_os_str(),
         environment.directory.path(),
         &environment.path,
@@ -57,10 +59,11 @@ fn cargo_and_direct_invocations_emit_the_same_json_document(
 #[test]
 fn context_ignores_malformed_automatic_project_configuration() -> Result<()> {
     let directory = tempfile::tempdir()?;
+    let host = HostEnv::capture();
     let capability = Dir::open_ambient_dir(directory.path(), ambient_authority())?;
     capability.write("theoremc.toml", b"color = [\n")?;
-    let path = isolated_path(directory.path())?;
-    let output = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+    let path = isolated_path(&host, directory.path())?;
+    let output = isolated_command(&host, OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "context", "--json"])
         .output()?;
 
@@ -78,6 +81,7 @@ fn cargo_and_direct_help_expose_the_same_command_tree(
 ) -> Result<()> {
     let environment = cargo_subcommand_environment?;
     let help = isolated_command(
+        &environment.host,
         OsStr::new(BINARY),
         environment.directory.path(),
         &environment.path,
@@ -91,8 +95,9 @@ fn cargo_and_direct_help_expose_the_same_command_tree(
         "help must use stdout"
     );
     ensure!(help.stderr.is_empty(), "help must not use stderr");
-    let cargo_executable = cargo_binary()?;
+    let cargo_executable = cargo_binary(&environment.host)?;
     let cargo_help = isolated_command(
+        &environment.host,
         cargo_executable.as_os_str(),
         environment.directory.path(),
         &environment.path,
@@ -117,8 +122,9 @@ fn cargo_and_direct_help_expose_the_same_command_tree(
 #[test]
 fn help_and_json_configuration_failures_use_the_documented_streams() -> Result<()> {
     let directory = tempfile::tempdir()?;
-    let path = isolated_path(directory.path())?;
-    let json_help = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+    let host = HostEnv::capture();
+    let path = isolated_path(&host, directory.path())?;
+    let json_help = isolated_command(&host, OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "context", "--json", "--help"])
         .output()?;
     ensure!(
@@ -133,7 +139,7 @@ fn help_and_json_configuration_failures_use_the_documented_streams() -> Result<(
         json_help.stderr.is_empty(),
         "JSON-mode help must use stdout"
     );
-    let version = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+    let version = isolated_command(&host, OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "--version"])
         .output()?;
     ensure!(version.status.success(), "version must exit successfully");
@@ -144,7 +150,7 @@ fn help_and_json_configuration_failures_use_the_documented_streams() -> Result<(
     ensure!(version.stderr.is_empty(), "version must not use stderr");
 
     let missing = directory.path().join("missing.toml");
-    let invalid = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+    let invalid = isolated_command(&host, OsStr::new(BINARY), directory.path(), &path)
         .args([
             OsString::from("theorem"),
             OsString::from("--config"),
@@ -180,8 +186,9 @@ fn help_and_json_configuration_failures_use_the_documented_streams() -> Result<(
 #[test]
 fn command_parse_failure_keeps_usage_status_and_stderr() -> Result<()> {
     let directory = tempfile::tempdir()?;
-    let path = isolated_path(directory.path())?;
-    let output = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+    let host = HostEnv::capture();
+    let path = isolated_path(&host, directory.path())?;
+    let output = isolated_command(&host, OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "unknown"])
         .output()?;
     ensure!(
@@ -197,7 +204,7 @@ fn command_parse_failure_keeps_usage_status_and_stderr() -> Result<()> {
         "parse failure must use stderr"
     );
 
-    let json = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+    let json = isolated_command(&host, OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "context", "--json", "--unknown"])
         .output()?;
     ensure!(
@@ -237,8 +244,9 @@ fn command_parse_failure_keeps_usage_status_and_stderr() -> Result<()> {
 #[test]
 fn direct_invocation_without_the_theorem_token_is_a_usage_failure() -> Result<()> {
     let directory = tempfile::tempdir()?;
-    let path = isolated_path(directory.path())?;
-    let output = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+    let host = HostEnv::capture();
+    let path = isolated_path(&host, directory.path())?;
+    let output = isolated_command(&host, OsStr::new(BINARY), directory.path(), &path)
         .args(["context", "--json"])
         .output()?;
     ensure!(
@@ -270,8 +278,9 @@ fn direct_invocation_without_the_theorem_token_is_a_usage_failure() -> Result<()
 #[test]
 fn missing_global_value_preserves_a_following_json_flag() -> Result<()> {
     let directory = tempfile::tempdir()?;
-    let path = isolated_path(directory.path())?;
-    let missing_colour_value = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+    let host = HostEnv::capture();
+    let path = isolated_path(&host, directory.path())?;
+    let missing_colour_value = isolated_command(&host, OsStr::new(BINARY), directory.path(), &path)
         .args(["theorem", "context", "--color", "--json"])
         .output()?;
     ensure!(
@@ -297,10 +306,11 @@ fn missing_global_value_preserves_a_following_json_flag() -> Result<()> {
 #[test]
 fn malformed_configuration_has_a_distinct_configuration_exit_class() -> Result<()> {
     let directory = tempfile::tempdir()?;
+    let host = HostEnv::capture();
     let capability = Dir::open_ambient_dir(directory.path(), ambient_authority())?;
     capability.write("broken.toml", b"color = [\n")?;
-    let path = isolated_path(directory.path())?;
-    let output = isolated_command(OsStr::new(BINARY), directory.path(), &path)
+    let path = isolated_path(&host, directory.path())?;
+    let output = isolated_command(&host, OsStr::new(BINARY), directory.path(), &path)
         .args([
             OsString::from("theorem"),
             OsString::from("--config"),

@@ -61,15 +61,26 @@ normal dependencies for the host toolchain, not the target.
 ### 1.2 Build script entrypoint (`build.rs`)
 
 The minimal build-script entrypoint calls
-`theoremc_build_support::prepare_build_script()`. The support crate:
+`theoremc_build_support::BuildScriptContext::from_cargo_env()` and then
+`theoremc_build_support::prepare_build_script(&context)`. The context holds the
+two paths Cargo supplies; capturing them first is what keeps the rest of the
+crate free of environment reads, as
+[ADR-0014](adrs/adr-0014-environment-seam-boundaries.md) requires. Preparation
+then:
 
-1. reads `CARGO_MANIFEST_DIR` and `OUT_DIR` from Cargo's environment,
-2. delegates to `theoremc_build_support::discover_theorem_inputs()`,
-3. writes `OUT_DIR/theorem_suite.rs` via
+1. delegates to `theoremc_build_support::discover_theorem_inputs()` with the
+   context's manifest directory,
+2. writes `<out_dir>/theorem_suite.rs` via
    `theoremc_build_support::write_theorem_suite()`, containing
    `theorem_file!("path/to/file.theorem");` invocations for each discovered
    theorem,
-4. returns `BuildScriptOutput` with theorem presence and ordered rerun paths.
+3. returns `BuildScriptOutput` with theorem presence and ordered rerun paths.
+
+`from_cargo_env` is the crate's single process-environment read. It reads
+`CARGO_MANIFEST_DIR` before `OUT_DIR` and stops at the first failure, so an
+error names the variable that actually failed. Tests build a context from
+temporary directories with `BuildScriptContext::new`, or through the private
+`from_lookup` with a stub reader; none of them changes the process environment.
 
 The root `build.rs` adapter registers the theorem cfg with
 `cargo::rustc-check-cfg`, emits `cargo::rustc-cfg=theoremc_has_theorems` when
@@ -510,6 +521,30 @@ inject sources through `GlobalOptions::load_with_sources`. Each carries
 used. `unsafe_code = "forbid"` is set workspace-wide, so no expectation can
 re-open it.
 
+[ADR-0014](adrs/adr-0014-environment-seam-boundaries.md) records the seam
+shapes, and it is the place to change them. The rule is that the smallest seam
+carrying the input wins: an explicit value for one variable and one caller; a
+narrow closure for one variable and one caller where the value must be resolved
+lazily; `mockable::Env` and the CLI's existing `MapEnv` sources for a growing
+shared group; and `Command::env_clear` plus explicit `Command::env` values for
+a child process. The approved roots are `BuildScriptContext::from_cargo_env`,
+`manifest_dir_from_env`, `HostEnv::capture`, `ambient_target_base`,
+`kani_is_required`, and the `GlobalOptions` derive. Adding a boundary is an
+ADR-level change.
+
+The build-script seam is the worked example. `BuildScriptContext` in
+`crates/theoremc-build-support/src/build_script.rs` holds the manifest and
+output directories, `from_cargo_env` is the one annotated read, and
+`prepare_build_script` takes the context and never reads the process. A test
+builds a context from temporary directories, or through `from_lookup` with a
+stub reader, and asserts the lookup order and the error mapping directly.
+
+Two test-side notes follow from the same rule. A test that starts a child
+process configures that child: it never writes the parent's variables or its
+current directory. And a test that must arrange an environment-derived input
+passes a stub reader or an explicit value, so the suite needs no environment
+mutex and no serialized group.
+
 `make lint-whitaker` runs the Whitaker Dylint suite through the `whitaker`
 wrapper. Install it with `whitaker-installer` so that `whitaker` is on `PATH`,
 and never call `cargo dylint` directly. The recipe sets
@@ -627,7 +662,13 @@ suite.
 - Fixture crates that tests build with `cargo` share one warm target directory,
   `theoremc-fixture-builds` inside `$CARGO_TARGET_DIR` (or the repository's
   `target`), so third-party dependencies compile once per run instead of once
-  per fixture. Each fixture's package gets a short unique name (`fx_` and a
+  per fixture. The choice is
+  `fixture_target_dir(ambient_target_base().as_deref())` in
+  `tests/common/fixture_isolation.rs`: `ambient_target_base` is the one
+  annotated read of `CARGO_TARGET_DIR`, and `fixture_target_dir` is a pure
+  selector that appends the directory name, creates it, and canonicalizes it. A
+  test exercises the selector from an explicit base rather than by exporting
+  the variable. Each fixture's package gets a short unique name (`fx_` and a
   run-and-sequence suffix; short because Kani derives a file name from the
   crate name), which keeps its build artefacts apart in that directory;
   `generated_suite_contents` reads only the directories named after the
@@ -665,6 +706,14 @@ suite.
   `nested-cargo-builds` nextest group (`.config/nextest.toml`), one at a time,
   with an explicit `slow-timeout` and a `global-timeout` for the run. Add a new
   test of that kind to the group's filter.
+- The macros crate's trybuild suite stages its `.theorem` fixtures into the
+  project trybuild generates. Both trybuild and the staging step resolve the
+  target directory from `cargo metadata`'s `target_directory`, so the two agree
+  without either reading `CARGO_TARGET_DIR`; staging then copies each fixture to
+  `<target>/tests/trybuild/theoremc-macros/tests/expand/`. A new fixture
+  document is added to `STAGED_FIXTURES` in
+  `crates/theoremc-macros/tests/expand.rs` as well as to the fixture directory,
+  or the expanded macro will not find it.
 - Integration tests under `tests/` are separate crates and inherit
   package lint policy. Note that `expect_used = "deny"` fires in integration
   tests but not in `#[cfg(test)]` modules.

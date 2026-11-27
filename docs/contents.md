@@ -104,6 +104,11 @@
   gate](adrs/adr-0013-workspace-complete-lint-gate.md)
   - Decision record for workspace-scoped rustdoc, Clippy, and Whitaker stages,
     the sequential `make lint` aggregate, and the exclusion-free `dylint.toml`.
+- [Architectural decision record (ADR) 0014: environment seam
+  boundaries](adrs/adr-0014-environment-seam-boundaries.md)
+  - Decision record for capturing process-environment values once at named
+    composition roots, injecting them into pure logic, and forbidding
+    in-process mutation and ambient reads through Clippy.
 
 ## Requests for comments
 
@@ -205,3 +210,7 @@
       tests, documentation, and dependency policy.
   - [Include provenance in action-signature conflict diagnostics](execplans/issue-51-include-provenance-in-macro-action-signature-conflict-diagnostics.md)
     - ExecPlan for adding theorem provenance to signature-conflict errors.
+  - [Replace ambient process-environment access and mutation with injected
+    seams](execplans/issue-101-replace-ambient-process-environment-access-and-mutation-with-injected-seams.md)
+    - ExecPlan for the environment composition roots, the injected seams, and
+      the Clippy prohibition.
